@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isFirebaseConfigured } from "@/lib/firebase";
-import { getRoomGame, roomPath } from "@/lib/games";
+import { roomPath } from "@/lib/games";
+import { getRoomGame } from "@/lib/roomLookup";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 
