@@ -3,7 +3,7 @@
 import { memo, useEffect, useRef } from "react";
 import { Image as KonvaImage } from "react-konva";
 import Konva from "konva";
-import type { PieceState } from "@/lib/room";
+import type { PieceState } from "@/lib/puzzleRoom";
 
 export interface PuzzlePieceProps {
   pieceId: string;

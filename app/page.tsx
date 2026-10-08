@@ -1,9 +1,15 @@
 "use client";
 
 import { isFirebaseConfigured } from "@/lib/firebase";
+import { GAMES } from "@/lib/games";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import GameCard from "@/components/GameCard";
-import { PuzzleThumbnail, ComingSoonThumbnail } from "@/components/GameThumbnails";
+import JoinRoomForm from "@/components/JoinRoomForm";
+import {
+  PuzzleThumbnail,
+  MemotestThumbnail,
+  ComingSoonThumbnail,
+} from "@/components/GameThumbnails";
 import PlayerIdentity from "@/components/PlayerIdentity";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 
@@ -23,7 +29,7 @@ export default function GamesHub() {
           </span>
         </h1>
         <p className="mt-3 text-center text-slate-400">
-          Elegí un juego para armar en tiempo real con otras personas, en una sala
+          Elegí un juego para jugar en tiempo real con otras personas, en una sala
           compartida.
         </p>
 
@@ -33,10 +39,16 @@ export default function GamesHub() {
 
         <div className="mt-8 grid gap-6 sm:grid-cols-2">
           <GameCard
-            href="/rompecabezas"
-            title="🧩 Rompecabezas Colaborativo"
+            href={`/${GAMES.rompecabezas.path}`}
+            title={`${GAMES.rompecabezas.emoji} ${GAMES.rompecabezas.title}`}
             description="Subí una imagen, convertila en un rompecabezas y armala con quien quieras — de a uno, o por equipos a las apuradas."
             thumbnail={<PuzzleThumbnail />}
+          />
+          <GameCard
+            href={`/${GAMES.memotest.path}`}
+            title={`${GAMES.memotest.emoji} ${GAMES.memotest.title}`}
+            description="Dá vuelta las cartas y encontrá los pares, por turnos. Si acertás, seguís. Gana quien junte más."
+            thumbnail={<MemotestThumbnail />}
           />
           <GameCard
             href="#"
@@ -46,6 +58,7 @@ export default function GamesHub() {
             badge="Próximamente"
             disabled
           />
+          {identity.name && <JoinRoomForm />}
         </div>
       </div>
     </div>

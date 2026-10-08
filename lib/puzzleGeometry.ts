@@ -6,6 +6,8 @@
  * positions do.
  */
 
+import { mulberry32 } from "./random";
+
 export type EdgeSign = -1 | 0 | 1; // -1 = socket (blank), 0 = flat (border), 1 = tab (bump)
 
 export interface PieceEdges {
@@ -37,21 +39,6 @@ export interface PuzzleLayout {
   pieces: PieceDef[];
 }
 
-/** Small deterministic PRNG (mulberry32) so a numeric seed reproduces identical output everywhere. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return function () {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-export function makeSeed(): number {
-  return Math.floor(Math.random() * 0xffffffff);
-}
 
 /**
  * Builds the shared edge grids: `horiz[r][c]` is the edge between piece

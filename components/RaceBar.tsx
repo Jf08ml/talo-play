@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TEAMS, type RaceState, type TeamId } from "@/lib/room";
+import type { RaceState } from "@/lib/puzzleRoom";
+import { TEAMS, type TeamId } from "@/lib/teams";
 
 function formatElapsed(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));

@@ -1,6 +1,6 @@
 "use client";
 
-import { TEAMS, type TeamId } from "@/lib/room";
+import { TEAMS, type TeamId } from "@/lib/teams";
 import type { PresenceMap } from "@/lib/presence";
 
 export default function TeamPicker({

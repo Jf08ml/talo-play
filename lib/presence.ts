@@ -8,7 +8,7 @@ import {
   type Unsubscribe,
 } from "firebase/database";
 import { getDb } from "./firebase";
-import type { TeamId } from "./room";
+import type { TeamId } from "./teams";
 
 export interface PresenceInfo {
   name: string;

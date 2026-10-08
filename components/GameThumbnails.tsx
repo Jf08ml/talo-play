@@ -39,6 +39,61 @@ export function PuzzleThumbnail() {
   );
 }
 
+export function MemotestThumbnail() {
+  const cards = [
+    { x: 92, y: 52, r: -10, face: "🦊" },
+    { x: 162, y: 40, r: -3, face: null },
+    { x: 232, y: 46, r: 5, face: "🦊" },
+    { x: 126, y: 132, r: 4, face: null },
+    { x: 200, y: 128, r: -6, face: "🚀" },
+  ];
+  return (
+    <svg viewBox="0 0 400 240" className="h-full w-full">
+      <defs>
+        <radialGradient id="memo-bg" cx="70%" cy="20%" r="90%">
+          <stop offset="0%" stopColor="#164e63" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+        <linearGradient id="memo-back" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#7c3aed" />
+          <stop offset="100%" stopColor="#a21caf" />
+        </linearGradient>
+        <filter id="memo-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="5" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      <rect width="400" height="240" fill="url(#memo-bg)" />
+      <g filter="url(#memo-glow)">
+        {cards.map((c, i) => (
+          <g key={i} transform={`translate(${c.x} ${c.y}) rotate(${c.r} 32 38)`}>
+            <rect
+              width="64"
+              height="76"
+              rx="10"
+              fill={c.face ? "#1e293b" : "url(#memo-back)"}
+              stroke={c.face ? "#22d3ee" : "#c084fc"}
+              strokeWidth="2.5"
+            />
+            {c.face ? (
+              <text x="32" y="50" textAnchor="middle" fontSize="32">
+                {c.face}
+              </text>
+            ) : (
+              <text x="32" y="47" textAnchor="middle" fontSize="20" fill="#e9d5ff" opacity="0.6">
+                ✦
+              </text>
+            )}
+          </g>
+        ))}
+      </g>
+    </svg>
+  );
+}
+
 export function ComingSoonThumbnail() {
   return (
     <svg viewBox="0 0 400 240" className="h-full w-full">

@@ -12,18 +12,17 @@ import {
 } from "firebase/database";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getDb, getStorageInstance } from "./firebase";
-import { generatePuzzleLayout, makeSeed, type PuzzleLayout } from "./puzzleGeometry";
+import { generatePuzzleLayout, type PuzzleLayout } from "./puzzleGeometry";
+import { makeSeed } from "./random";
 import { generateRoomCode } from "./ids";
+import type { TeamId } from "./teams";
+import type { GameId } from "./games";
 
 export type RoomMode = "colab" | "versus";
-export type TeamId = "red" | "blue";
-
-export const TEAMS: { id: TeamId; label: string; color: string }[] = [
-  { id: "red", label: "Equipo Rojo", color: "#fb3a5d" },
-  { id: "blue", label: "Equipo Azul", color: "#22d3ee" },
-];
 
 export interface RoomMeta {
+  /** Absent on rooms created before the salón had more than one game. */
+  game?: GameId;
   imageUrl: string;
   imageWidth: number;
   imageHeight: number;
@@ -156,6 +155,7 @@ export async function createRoom(params: {
 
   const db = getDb();
   const meta: RoomMeta = {
+    game: "rompecabezas",
     imageUrl,
     imageWidth: width,
     imageHeight: height,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import {
@@ -10,12 +10,11 @@ import {
   subscribeRace,
   startRace,
   reportTeamFinished,
-  TEAMS,
   type PieceState,
   type RoomMeta,
   type RaceState,
-  type TeamId,
-} from "@/lib/room";
+} from "@/lib/puzzleRoom";
+import { TEAMS, type TeamId } from "@/lib/teams";
 import { joinPresence, subscribePresence, type PresenceMap } from "@/lib/presence";
 import { generatePuzzleLayout, type PuzzleLayout } from "@/lib/puzzleGeometry";
 import { renderPieceBitmaps, type PieceBitmap } from "@/lib/piecesRender";
@@ -27,6 +26,8 @@ import ProgressBar from "@/components/ProgressBar";
 import RaceBar from "@/components/RaceBar";
 import TeamPicker from "@/components/TeamPicker";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
+import RoomHeader from "@/components/RoomHeader";
+import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 
 const PuzzleStage = dynamic(() => import("@/components/PuzzleStage"), {
   ssr: false,
@@ -60,6 +61,7 @@ function getServerTeamSnapshot() {
 
 export default function RoomClient({ roomId }: { roomId: string }) {
   const identity = useClientIdentity();
+  const router = useRouter();
   const [status, setStatus] = useState<Status>("loading");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [meta, setMeta] = useState<RoomMeta | null>(null);
@@ -70,7 +72,6 @@ export default function RoomClient({ roomId }: { roomId: string }) {
   const [opponentPieces, setOpponentPieces] = useState<Record<string, PieceState>>({});
   const [presence, setPresence] = useState<PresenceMap>({});
   const [race, setRace] = useState<RaceState>(EMPTY_RACE);
-  const [copied, setCopied] = useState(false);
 
   // A team explicitly picked this render session (takes precedence), falling
   // back to whatever was already stored in localStorage for this room —
@@ -106,6 +107,11 @@ export default function RoomClient({ roomId }: { roomId: string }) {
         if (cancelled) return;
         if (!roomMeta) {
           setStatus("not-found");
+          return;
+        }
+        if (roomMeta.game && roomMeta.game !== "rompecabezas") {
+          // A code from another game typed into this URL: let /sala route it.
+          router.replace(`/sala/${roomId}`);
           return;
         }
         if (!roomMeta.imageWidth || !roomMeta.imageHeight) {
@@ -153,7 +159,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [roomId, identity.clientId, identity.name, configured]);
+  }, [roomId, identity.clientId, identity.name, configured, router]);
 
   // Read-only presence peek so the team picker can show live headcounts
   // before this client has joined (and thus picked a color/team).
@@ -224,16 +230,6 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     }
   }, [isVersus, myTeam, race.status, progress, roomId]);
 
-  const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard API may be unavailable; ignore silently.
-    }
-  };
-
   if (!configured) {
     return <FirebaseSetupNotice />;
   }
@@ -244,39 +240,25 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
   return (
     <div className="flex h-dvh flex-col">
-      <header className="flex flex-col gap-2.5 border-b border-violet-500/15 bg-slate-900/80 px-4 py-3 shadow-[0_1px_20px_rgba(139,92,246,0.08)] backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/"
-            className="font-display flex items-center gap-1 text-sm font-semibold text-violet-400 hover:text-violet-300"
-          >
-            🧩 <span className="hidden sm:inline">Inicio</span>
-          </Link>
-          <span className="text-slate-700">·</span>
-          <span className="text-xs uppercase tracking-wide text-slate-500">Sala</span>
-          <span className="rounded-md border border-violet-500/20 bg-slate-800 px-2 py-1 font-mono text-sm font-semibold text-violet-200">
-            {roomId}
-          </span>
-          {isVersus && (
+      <RoomHeader
+        game="rompecabezas"
+        roomId={roomId}
+        badges={
+          isVersus && (
             <span className="rounded-md border border-fuchsia-500/20 bg-fuchsia-500/10 px-2 py-1 text-xs font-medium text-fuchsia-300">
               ⚔️ Competencia
             </span>
-          )}
-          <button
-            onClick={copyLink}
-            className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-          >
-            {copied ? "¡Copiado!" : "Copiar enlace"}
-          </button>
-        </div>
-
-        {status === "ready" && (
-          <div className="flex items-center justify-between gap-4 sm:justify-end">
-            {!isVersus && <ProgressBar placed={progress.placed} total={progress.total} />}
-            <PlayerBadges presence={presence} myClientId={identity.clientId} />
-          </div>
-        )}
-      </header>
+          )
+        }
+        right={
+          status === "ready" && (
+            <>
+              {!isVersus && <ProgressBar placed={progress.placed} total={progress.total} />}
+              <PlayerBadges presence={presence} myClientId={identity.clientId} />
+            </>
+          )
+        }
+      />
 
       {status === "ready" && isVersus && myTeam && raceProgress && (
         <RaceBar
@@ -292,28 +274,9 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
         {showTeamPicker && <TeamPicker presence={presence} onPick={chooseTeam} />}
 
-        {status === "loading" && (
-          <div className="flex h-full items-center justify-center text-slate-400">
-            Preparando el rompecabezas…
-          </div>
-        )}
-
-        {status === "not-found" && (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-400">
-            <p className="text-lg font-medium text-slate-200">No encontramos esa sala.</p>
-            <p>Revisá el código o pedile a quien la creó que te comparta el enlace de nuevo.</p>
-            <Link href="/" className="mt-3 text-violet-400 hover:underline">
-              Volver al inicio
-            </Link>
-          </div>
-        )}
-
-        {status === "error" && (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-400">
-            <p className="text-lg font-medium text-red-400">Ocurrió un error.</p>
-            <p>{errorMsg}</p>
-          </div>
-        )}
+        {status === "loading" && <RoomLoading text="Preparando el rompecabezas…" />}
+        {status === "not-found" && <RoomNotFound />}
+        {status === "error" && <RoomError message={errorMsg} />}
 
         {!isVersus && (
           <CompletionBanner show={progress.total > 0 && progress.placed === progress.total} />
