@@ -46,6 +46,8 @@ export const DEFAULT_RULES: MemoRules = { mode: "turnos", extraTurn: true, turnS
 /** The room's fixed setup, as stored in `rooms/{id}/meta`. */
 export interface MemoMeta {
   game: "memotest";
+  /** Who created the room: starts the game (anyone can if they're away). Absent on older rooms. */
+  hostId?: string;
   /** Absent on rooms created before decks were configurable (= emoji). */
   kind?: DeckKind;
   theme?: string;
@@ -188,10 +190,11 @@ export type CreateMemoParams =
   | { kind: "fotos"; files: File[]; rules: MemoRules }
   | { kind: "texto"; textPairs: TextPair[]; rules: MemoRules };
 
-export async function createMemotestRoom(params: CreateMemoParams): Promise<string> {
+export async function createMemotestRoom(params: CreateMemoParams, hostId: string): Promise<string> {
   const roomId = generateRoomCode();
   const meta: MemoMeta = {
     game: "memotest",
+    hostId,
     kind: params.kind,
     pairs: 0,
     rules: params.rules,

@@ -13,10 +13,12 @@ import {
 import { DEFAULT_CATEGORIES, EASY_LETTERS, HARD_LETTERS, SUGGESTED_CATEGORIES } from "@/lib/tuttiCategories";
 import { roomPath } from "@/lib/games";
 import GameLobby from "@/components/GameLobby";
+import { useClientIdentity } from "@/hooks/useClientIdentity";
 import { CARD, PRIMARY_BUTTON, SECTION_LABEL, chipClass } from "@/components/ui";
 
 export default function TuttiHome() {
   const router = useRouter();
+  const identity = useClientIdentity();
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [custom, setCustom] = useState("");
   const [rounds, setRounds] = useState<number>(5);
@@ -49,7 +51,9 @@ export default function TuttiHome() {
         rounds,
         roundSeconds,
         letters: hardLetters ? EASY_LETTERS + HARD_LETTERS : EASY_LETTERS,
-      });
+        },
+        identity.clientId
+      );
       router.push(roomPath("tutti", roomId));
     } catch (err) {
       console.error(err);
@@ -59,10 +63,7 @@ export default function TuttiHome() {
   };
 
   return (
-    <GameLobby
-      game="tutti"
-      description="Sale una letra y hay que completar cada categoría con una palabra que empiece con ella. El primero que termina grita ¡Basta! y se cierra la ronda para todos."
-    >
+    <GameLobby game="tutti">
       <form onSubmit={handleCreate} className={`${CARD} flex flex-col gap-4`}>
         <h2 className="font-display text-lg font-semibold text-slate-100">Crear una sala nueva</h2>
 

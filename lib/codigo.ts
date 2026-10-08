@@ -24,6 +24,8 @@ export type CodigoPhase = "clue" | "guess";
 
 export interface CodigoMeta {
   game: "codigo";
+  /** Who created the room: starts the game (anyone can if they're away). Absent on older rooms. */
+  hostId?: string;
   createdAt: number | object;
 }
 
@@ -142,9 +144,9 @@ function mutate(roomId: string, fn: (state: CodigoState) => CodigoState | null) 
   return transactState(statePath(roomId), normalizeState, fn);
 }
 
-export async function createCodigoRoom(): Promise<string> {
+export async function createCodigoRoom(hostId: string): Promise<string> {
   const roomId = generateRoomCode();
-  const meta: CodigoMeta = { game: "codigo", createdAt: serverTimestamp() };
+  const meta: CodigoMeta = { game: "codigo", hostId, createdAt: serverTimestamp() };
   const seed = makeSeed();
   const state: Partial<CodigoState> = { status: "waiting", seed, gameNo: 0, turn: startingTeam(seed), phase: "clue" };
   await update(ref(getDb()), {

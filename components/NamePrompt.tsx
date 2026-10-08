@@ -1,18 +1,23 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { GAMES, type GameId } from "@/lib/games";
+import { TaloMark } from "./TaloLogo";
 
 export default function NamePrompt({
   onSubmit,
   onCancel,
   initialValue = "",
   submitLabel = "Entrar",
+  invitedTo,
 }: {
   onSubmit: (name: string) => void;
   /** When provided the prompt can be dismissed (e.g. when changing an existing name). */
   onCancel?: () => void;
   initialValue?: string;
   submitLabel?: string;
+  /** Shown to people arriving by an invite link, so they know what they're joining. */
+  invitedTo?: GameId;
 }) {
   const [value, setValue] = useState(initialValue);
 
@@ -34,11 +39,23 @@ export default function NamePrompt({
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-sm rounded-2xl border border-violet-500/20 bg-slate-900 p-6 shadow-[0_0_40px_rgba(139,92,246,0.2)]"
       >
+        {invitedTo && (
+          <div className="mb-4 flex items-center gap-3 rounded-xl bg-violet-500/10 p-3 ring-1 ring-violet-400/20">
+            <TaloMark className="h-8 w-8 shrink-0" />
+            <p className="text-sm text-slate-300">
+              Te invitaron a jugar{" "}
+              <span className="font-semibold text-slate-100">
+                {GAMES[invitedTo].emoji} {GAMES[invitedTo].title}
+              </span>{" "}
+              en Talo
+            </p>
+          </div>
+        )}
         <h2 className="font-display text-lg font-semibold text-slate-100">
           ¿Cómo te llamás?
         </h2>
         <p className="mt-1 text-sm text-slate-400">
-          Tu nombre se mostrará a los demás jugadores en todos los juegos del salón.
+          Así te van a ver los demás jugadores. No hace falta registrarse.
         </p>
         <input
           autoFocus

@@ -28,6 +28,8 @@ const IMAGE_PX = 720;
 
 export interface DeslizMeta {
   game: "deslizante";
+  /** Who created the room: starts the game (anyone can if they're away). Absent on older rooms. */
+  hostId?: string;
   size: number;
   imageUrl: string;
   showNumbers: boolean;
@@ -166,7 +168,10 @@ function mutate(roomId: string, fn: (state: DeslizState) => DeslizState | null) 
   return transactState(`${base(roomId)}/state`, normalizeState, fn);
 }
 
-export async function createDeslizRoom(params: { file: File; size: number; showNumbers: boolean }): Promise<string> {
+export async function createDeslizRoom(
+  params: { file: File; size: number; showNumbers: boolean },
+  hostId: string
+): Promise<string> {
   const roomId = generateRoomCode();
   const blob = await cropSquare(params.file, IMAGE_PX, 0.9);
   const imgRef = storageRef(getStorageInstance(), `rooms/${roomId}/image.jpg`);
@@ -175,6 +180,7 @@ export async function createDeslizRoom(params: { file: File; size: number; showN
 
   const meta: DeslizMeta = {
     game: "deslizante",
+    hostId,
     size: params.size,
     imageUrl,
     showNumbers: params.showNumbers,

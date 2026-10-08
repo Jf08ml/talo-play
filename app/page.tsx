@@ -1,10 +1,13 @@
 "use client";
 
+import { useState, type ReactNode } from "react";
 import { isFirebaseConfigured } from "@/lib/firebase";
-import { GAMES } from "@/lib/games";
+import { CONTEXTS, GAME_ORDER, GAMES, type GameId, type PlayContext } from "@/lib/games";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import GameCard from "@/components/GameCard";
 import JoinRoomForm from "@/components/JoinRoomForm";
+import TaloLogo from "@/components/TaloLogo";
+import PlayerIdentity from "@/components/PlayerIdentity";
 import {
   PuzzleThumbnail,
   MemotestThumbnail,
@@ -13,72 +16,86 @@ import {
   CodigoThumbnail,
   DeslizanteThumbnail,
 } from "@/components/GameThumbnails";
-import PlayerIdentity from "@/components/PlayerIdentity";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 
-export default function GamesHub() {
-  const identity = useClientIdentity();
-  const configured = isFirebaseConfigured();
+const THUMBNAILS: Record<GameId, ReactNode> = {
+  rompecabezas: <PuzzleThumbnail />,
+  deslizante: <DeslizanteThumbnail />,
+  memotest: <MemotestThumbnail />,
+  tutti: <TuttiThumbnail />,
+  dibujo: <DibujoThumbnail />,
+  codigo: <CodigoThumbnail />,
+};
 
-  if (!configured) return <FirebaseSetupNotice />;
+export default function Home() {
+  const identity = useClientIdentity();
+  const [context, setContext] = useState<PlayContext | null>(null);
+
+  if (!isFirebaseConfigured()) return <FirebaseSetupNotice />;
+
+  const games = GAME_ORDER.map((id) => GAMES[id]).filter((g) => !context || g.contexts.includes(context));
+  const selected = CONTEXTS.find((c) => c.id === context);
 
   return (
-    <div className="flex flex-1 flex-col items-center px-4 py-10">
-      <div className="w-full max-w-3xl">
-        <h1 className="animate-glow-pulse mx-auto flex w-fit items-center gap-2 rounded-2xl px-2 text-center font-display text-3xl font-bold tracking-tight sm:text-5xl">
-          <span>🎮</span>
-          <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-400 bg-clip-text text-transparent">
-            Salón de Juegos
-          </span>
-        </h1>
-        <p className="mt-3 text-center text-slate-400">
-          Elegí un juego para jugar en tiempo real con otras personas, en una sala
-          compartida.
-        </p>
+    <div className="flex flex-1 flex-col items-center px-4 pb-12 pt-8 sm:pt-12">
+      <div className="w-full max-w-4xl">
+        <header className="flex flex-col items-center text-center">
+          <TaloLogo size="lg" />
+          <h1 className="mt-5 font-display text-2xl font-semibold text-slate-100 sm:text-3xl">
+            Juegos para jugar juntos
+          </h1>
+          <p className="mt-2 max-w-md text-slate-400">
+            Elegí un juego, mandá el link y en un minuto están jugando. Sin registrarse ni descargar nada.
+          </p>
+          <div className="mt-4">
+            <PlayerIdentity identity={identity} requireName={false} />
+          </div>
+        </header>
 
-        <div className="mt-6">
-          <PlayerIdentity identity={identity} />
+        <div className="mx-auto mt-6 max-w-xl">
+          <JoinRoomForm />
         </div>
 
-        <div className="mt-8 grid gap-6 sm:grid-cols-2">
-          <GameCard
-            href={`/${GAMES.rompecabezas.path}`}
-            title={`${GAMES.rompecabezas.emoji} ${GAMES.rompecabezas.title}`}
-            description="Subí una imagen, convertila en un rompecabezas y armala con quien quieras — de a uno, o por equipos a las apuradas."
-            thumbnail={<PuzzleThumbnail />}
-          />
-          <GameCard
-            href={`/${GAMES.deslizante.path}`}
-            title={`${GAMES.deslizante.emoji} ${GAMES.deslizante.title}`}
-            description="Las fichas están mezcladas y falta una: deslizalas por el hueco hasta rearmar la imagen. Todos con la misma mezcla, gana el más rápido."
-            thumbnail={<DeslizanteThumbnail />}
-          />
-          <GameCard
-            href={`/${GAMES.memotest.path}`}
-            title={`${GAMES.memotest.emoji} ${GAMES.memotest.title}`}
-            description="Dá vuelta las cartas y encontrá los pares, por turnos. Si acertás, seguís. Gana quien junte más."
-            thumbnail={<MemotestThumbnail />}
-          />
-          <GameCard
-            href={`/${GAMES.tutti.path}`}
-            title={`${GAMES.tutti.emoji} ${GAMES.tutti.title}`}
-            description="Sale una letra y hay que llenar cada categoría. El primero que termina grita ¡Basta! Después se votan las respuestas."
-            thumbnail={<TuttiThumbnail />}
-          />
-          <GameCard
-            href={`/${GAMES.dibujo.path}`}
-            title={`${GAMES.dibujo.emoji} ${GAMES.dibujo.title}`}
-            description="Uno dibuja una palabra secreta y los demás la adivinan en el chat. Cuanto más rápido, más puntos."
-            thumbnail={<DibujoThumbnail />}
-          />
-          <GameCard
-            href={`/${GAMES.codigo.path}`}
-            title={`${GAMES.codigo.emoji} ${GAMES.codigo.title}`}
-            description="Rojos contra azules. Los jefes de espías dan pistas de una palabra para encontrar a sus agentes… sin tocar la bomba."
-            thumbnail={<CodigoThumbnail />}
-          />
-          {identity.name && <JoinRoomForm />}
-        </div>
+        <section className="mt-10">
+          <h2 className="text-center font-display text-xl font-semibold text-slate-100">¿Con quién vas a jugar?</h2>
+          <div className="mx-auto mt-4 grid max-w-2xl grid-cols-2 gap-2 sm:grid-cols-4">
+            {CONTEXTS.map((c) => {
+              const active = context === c.id;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setContext(active ? null : c.id)}
+                  aria-pressed={active}
+                  className={`flex flex-col items-center gap-0.5 rounded-2xl border px-3 py-3 transition ${
+                    active
+                      ? "border-fuchsia-400/60 bg-fuchsia-500/15 shadow-[0_0_20px_rgba(217,70,239,0.25)]"
+                      : "border-slate-700/80 bg-slate-900/50 hover:border-slate-500"
+                  }`}
+                >
+                  <span className="text-2xl">{c.emoji}</span>
+                  <span className="font-semibold text-slate-100">{c.label}</span>
+                  <span className="text-xs text-slate-500">{c.hint}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-8 flex items-baseline justify-between gap-3">
+            <h3 className="text-sm font-medium uppercase tracking-wide text-slate-500">
+              {selected ? `Para jugar ${selected.label.toLowerCase()}` : "Todos los juegos"}
+            </h3>
+            {selected && (
+              <button onClick={() => setContext(null)} className="text-sm text-violet-400 hover:text-violet-300">
+                Ver todos
+              </button>
+            )}
+          </div>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {games.map((g) => (
+              <GameCard key={g.id} game={g} thumbnail={THUMBNAILS[g.id]} />
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );

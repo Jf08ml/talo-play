@@ -20,9 +20,22 @@ const balooTwo = Baloo_2({
   subsets: ["latin"],
 });
 
+const DESCRIPTION =
+  "Juegos para jugar juntos, al toque: elegí un juego, mandá el link y ya están jugando. En pareja, con amigos o en grupo, sin registrarse.";
+
 export const metadata: Metadata = {
-  title: "Salón de Juegos",
-  description: "Jugá en tiempo real con otras personas, en salas compartidas.",
+  // Absolute base for link previews (og:image etc.); override per deploy with NEXT_PUBLIC_SITE_URL.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://talo-play.vercel.app"),
+  title: { default: "Talo · Juegos para jugar juntos", template: "%s · Talo" },
+  description: DESCRIPTION,
+  applicationName: "Talo",
+  openGraph: {
+    siteName: "Talo",
+    title: "Talo · Juegos para jugar juntos",
+    description: DESCRIPTION,
+    locale: "es_AR",
+    type: "website",
+  },
 };
 
 // The puzzle board has its own pinch-to-zoom; locking the page viewport keeps

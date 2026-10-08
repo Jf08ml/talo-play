@@ -3,7 +3,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { generateClientId, colorForClient } from "@/lib/ids";
 
-// Identity is shared by every game in the salón, so keys aren't game-scoped.
+// Identity is shared by every game in Talo, so keys aren't game-scoped.
 const CLIENT_ID_KEY = "salon.clientId";
 const NAME_KEY = "salon.playerName";
 const NAME_CHANGE_EVENT = "salon:name-changed";

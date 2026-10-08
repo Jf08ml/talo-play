@@ -5,17 +5,24 @@ import type { ClientIdentity } from "@/hooks/useClientIdentity";
 import NamePrompt from "./NamePrompt";
 
 /**
- * Salón-wide identity gate for lobby pages: asks for a name when there is none
- * and otherwise shows "Jugando como …" with a way to change it.
+ * Shows "Jugando como …" with a way to change it. With `requireName` (lobby
+ * pages, i.e. once you're about to play) it also asks for a name when there
+ * is none; the home page leaves it off so a first visit isn't a form.
  */
-export default function PlayerIdentity({ identity }: { identity: ClientIdentity }) {
+export default function PlayerIdentity({
+  identity,
+  requireName = true,
+}: {
+  identity: ClientIdentity;
+  requireName?: boolean;
+}) {
   const [editing, setEditing] = useState(false);
 
   // clientId is "" during SSR / before hydration; render nothing until then.
   if (!identity.clientId) return null;
 
   if (!identity.name) {
-    return <NamePrompt onSubmit={identity.setName} />;
+    return requireName ? <NamePrompt onSubmit={identity.setName} /> : null;
   }
 
   return (

@@ -270,7 +270,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
       )}
 
       <main className="relative flex-1">
-        {identity.clientId && !identity.name && <NamePrompt onSubmit={identity.setName} submitLabel="Entrar a la sala" />}
+        {identity.clientId && !identity.name && <NamePrompt onSubmit={identity.setName} submitLabel="Entrar a la sala" invitedTo="rompecabezas" />}
 
         {showTeamPicker && <TeamPicker presence={presence} onPick={chooseTeam} />}
 

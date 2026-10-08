@@ -35,6 +35,7 @@ import { useClientIdentity } from "@/hooks/useClientIdentity";
 import { useRoomPresence } from "@/hooks/useRoomPresence";
 import { useServerNow } from "@/hooks/useServerNow";
 import NamePrompt from "@/components/NamePrompt";
+import WaitingRoom from "@/components/WaitingRoom";
 import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
@@ -52,6 +53,7 @@ export default function TuttiClient({ roomId }: { roomId: string }) {
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
   const [config, setConfig] = useState<Config | null>(null);
+  const [hostId, setHostId] = useState("");
   const [state, setState] = useState<TuttiState | null>(null);
   const [answers, setAnswers] = useState<AllAnswers>({});
   const [votes, setVotes] = useState<AllVotes>({});
@@ -77,6 +79,7 @@ export default function TuttiClient({ roomId }: { roomId: string }) {
         if (cancelled) return;
         if (!meta) return setStatus("not-found");
         if (meta.game !== "tutti") return router.replace(`/sala/${roomId}`);
+        setHostId(meta.hostId ?? "");
         setConfig({
           categories: meta.categories ?? [],
           rounds: meta.rounds ?? 5,
@@ -181,30 +184,35 @@ export default function TuttiClient({ roomId }: { roomId: string }) {
 
       <main className="relative flex flex-1 flex-col">
         {identity.clientId && !identity.name && (
-          <NamePrompt onSubmit={identity.setName} submitLabel="Entrar a la sala" />
+          <NamePrompt onSubmit={identity.setName} submitLabel="Entrar a la sala" invitedTo="tutti" />
         )}
 
         {status === "loading" && <RoomLoading text="Repartiendo las hojas…" />}
         {status === "not-found" && <RoomNotFound />}
         {status === "error" && <RoomError message="No se pudo cargar la sala." />}
 
-        {status === "ready" && state && config && (
+        {status === "ready" && state && config && state.status === "waiting" && (
+          <div className="mx-auto w-full max-w-2xl p-4">
+            <WaitingRoom
+              game="tutti"
+              roomId={roomId}
+              hostId={hostId}
+              players={state.order.map((id) => ({ id, ...state.players[id] }))}
+              presence={presence}
+              myId={myId}
+              summary={`${config.rounds} rondas · ${config.categories.length} categorías${
+                config.roundSeconds ? ` · ${config.roundSeconds} s por ronda` : ""
+              }`}
+              onStart={() => startTutti(roomId)}
+            >
+              <p className="text-center text-xs text-slate-500">{config.categories.join(" · ")}</p>
+            </WaitingRoom>
+          </div>
+        )}
+
+        {status === "ready" && state && config && state.status !== "waiting" && (
           <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-4 lg:flex-row lg:items-start">
             <div className="min-w-0 flex-1">
-              {state.status === "waiting" && (
-                <div className={`${CARD} flex flex-col items-center gap-3 text-center`}>
-                  <p className="font-display text-lg font-semibold text-slate-100">Esperando jugadores…</p>
-                  <p className="text-sm text-slate-400">
-                    {config.rounds} rondas · {config.categories.length} categorías
-                    {config.roundSeconds ? ` · ${config.roundSeconds} s por ronda` : ""}. Compartí el enlace;
-                    cuando estén todos, cualquiera puede arrancar.
-                  </p>
-                  <p className="text-xs text-slate-500">{config.categories.join(" · ")}</p>
-                  <button onClick={() => startTutti(roomId)} className={`w-full max-w-xs ${PRIMARY_BUTTON}`}>
-                    Empezar partida
-                  </button>
-                </div>
-              )}
 
               {state.status === "writing" && (
                 <WritingView

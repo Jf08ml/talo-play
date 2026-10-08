@@ -3,56 +3,60 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { isFirebaseConfigured } from "@/lib/firebase";
-import { GAMES, type GameId } from "@/lib/games";
+import { GAMES, playersLabel, type GameId } from "@/lib/games";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import FirebaseSetupNotice from "./FirebaseSetupNotice";
 import PlayerIdentity from "./PlayerIdentity";
-import JoinRoomForm from "./JoinRoomForm";
+import { TaloMark } from "./TaloLogo";
+import { CARD } from "./ui";
 
 /**
- * Common lobby page for a game: title, player name, and "create" next to
- * "join". Each game only supplies its own create-room form as `children`.
+ * Common page to set up a game: what it is (from the catalog), the player's
+ * name, the game's own create-room form (`children`) and how to play.
+ * Joining by code lives on the home page and in shared links.
  */
-export default function GameLobby({
-  game,
-  description,
-  children,
-}: {
-  game: GameId;
-  description: string;
-  children: ReactNode;
-}) {
+export default function GameLobby({ game, children }: { game: GameId; children: ReactNode }) {
   const identity = useClientIdentity();
   const info = GAMES[game];
 
   if (!isFirebaseConfigured()) return <FirebaseSetupNotice />;
 
   return (
-    <div className="flex flex-1 flex-col items-center px-4 py-10">
+    <div className="flex flex-1 flex-col items-center px-4 py-8">
       <div className="w-full max-w-3xl">
-        <Link
-          href="/"
-          className="mb-4 inline-flex items-center gap-1 text-sm text-slate-400 hover:text-violet-300"
-        >
-          ← Salón de juegos
+        <Link href="/" className="mb-5 inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-violet-300">
+          ← <TaloMark className="h-5 w-5" /> Volver a Talo
         </Link>
 
-        <h1 className="animate-glow-pulse mx-auto flex w-fit items-center gap-2 rounded-2xl px-2 text-center font-display text-3xl font-bold tracking-tight sm:text-5xl">
-          <span>{info.emoji}</span>
-          <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-cyan-400 bg-clip-text text-transparent">
-            {info.title}
-          </span>
-        </h1>
-        <p className="mt-3 text-center text-slate-400">{description}</p>
+        <div className="text-center">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-slate-100 sm:text-4xl">
+            {info.emoji} {info.title}
+          </h1>
+          <p className="mx-auto mt-2 max-w-xl text-slate-400">{info.tagline}</p>
+          <div className="mt-3 flex justify-center gap-2 text-xs text-slate-400">
+            <span className="rounded-full bg-slate-800 px-2.5 py-1">👤 {playersLabel(info)} jugadores</span>
+            <span className="rounded-full bg-slate-800 px-2.5 py-1">⏱ {info.duration}</span>
+          </div>
+        </div>
 
-        <div className="mt-6">
+        <div className="mt-5">
           <PlayerIdentity identity={identity} />
         </div>
 
         {identity.name && (
-          <div className="mt-8 grid gap-6 sm:grid-cols-2">
+          <div className="mt-6 grid gap-6 md:grid-cols-[1.4fr_1fr]">
             {children}
-            <JoinRoomForm />
+            <div className={`${CARD} h-fit`}>
+              <h2 className="font-display text-lg font-semibold text-slate-100">Cómo se juega</h2>
+              <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-slate-400">
+                {info.howTo.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+              <p className="mt-4 text-sm text-slate-500">
+                Creás la sala, mandás el link por WhatsApp y los demás entran con un toque.
+              </p>
+            </div>
           </div>
         )}
       </div>

@@ -17,6 +17,7 @@ import {
 import { EMOJI_THEMES, type TextPair } from "@/lib/memotestDecks";
 import { roomPath } from "@/lib/games";
 import GameLobby from "@/components/GameLobby";
+import { useClientIdentity } from "@/hooks/useClientIdentity";
 import PhotoPicker from "@/components/memotest/PhotoPicker";
 import TextPairsEditor from "@/components/memotest/TextPairsEditor";
 import { CARD, PRIMARY_BUTTON, SECTION_LABEL, chipClass, segmentClass } from "@/components/ui";
@@ -29,6 +30,7 @@ const DECK_KINDS: { id: DeckKind; label: string }[] = [
 
 export default function MemotestHome() {
   const router = useRouter();
+  const identity = useClientIdentity();
 
   const [kind, setKind] = useState<DeckKind>("emoji");
   const [theme, setTheme] = useState(EMOJI_THEMES[0].id);
@@ -66,7 +68,7 @@ export default function MemotestHome() {
           ? { kind, textPairs: filledText, rules }
           : { kind, theme, pairs, rules };
     try {
-      const roomId = await createMemotestRoom(params);
+      const roomId = await createMemotestRoom(params, identity.clientId);
       router.push(roomPath("memotest", roomId));
     } catch (err) {
       console.error(err);
@@ -76,10 +78,7 @@ export default function MemotestHome() {
   };
 
   return (
-    <GameLobby
-      game="memotest"
-      description="Dá vuelta las cartas de a dos y encontrá los pares. Con emojis, tus propias fotos o pares de texto, por turnos o todos juntos contra reloj."
-    >
+    <GameLobby game="memotest">
       <form onSubmit={handleCreate} className={`${CARD} flex flex-col gap-4`}>
         <h2 className="font-display text-lg font-semibold text-slate-100">Crear una sala nueva</h2>
 

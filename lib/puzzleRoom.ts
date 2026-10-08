@@ -21,7 +21,7 @@ import type { GameId } from "./games";
 export type RoomMode = "colab" | "versus";
 
 export interface RoomMeta {
-  /** Absent on rooms created before the salón had more than one game. */
+  /** Absent on rooms created before Talo had more than one game. */
   game?: GameId;
   imageUrl: string;
   imageWidth: number;

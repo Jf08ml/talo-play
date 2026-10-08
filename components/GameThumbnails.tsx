@@ -5,7 +5,7 @@
 
 export function PuzzleThumbnail() {
   return (
-    <svg viewBox="0 0 400 240" className="h-full w-full">
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
       <defs>
         <radialGradient id="puzzle-bg" cx="30%" cy="20%" r="90%">
           <stop offset="0%" stopColor="#2e1065" />
@@ -48,7 +48,7 @@ export function MemotestThumbnail() {
     { x: 200, y: 128, r: -6, face: "🚀" },
   ];
   return (
-    <svg viewBox="0 0 400 240" className="h-full w-full">
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
       <defs>
         <radialGradient id="memo-bg" cx="70%" cy="20%" r="90%">
           <stop offset="0%" stopColor="#164e63" />
@@ -102,7 +102,7 @@ export function TuttiThumbnail() {
     { label: "Color", value: "Marrón" },
   ];
   return (
-    <svg viewBox="0 0 400 240" className="h-full w-full">
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
       <defs>
         <radialGradient id="tutti-bg" cx="20%" cy="80%" r="90%">
           <stop offset="0%" stopColor="#4a044e" />
@@ -156,7 +156,7 @@ export function TuttiThumbnail() {
 
 export function DibujoThumbnail() {
   return (
-    <svg viewBox="0 0 400 240" className="h-full w-full">
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
       <defs>
         <radialGradient id="dibujo-bg" cx="80%" cy="80%" r="90%">
           <stop offset="0%" stopColor="#3b0764" />
@@ -210,7 +210,7 @@ export function CodigoThumbnail() {
     { w: "ESPÍA", fill: "#fb3a5d", ink: "#fff" },
   ];
   return (
-    <svg viewBox="0 0 400 240" className="h-full w-full">
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
       <defs>
         <radialGradient id="codigo-bg" cx="50%" cy="10%" r="90%">
           <stop offset="0%" stopColor="#1e1b4b" />
@@ -245,7 +245,7 @@ export function DeslizanteThumbnail() {
   const order = [1, 2, 3, 4, 5, 6, 7, 0, 8];
   const colors = ["#7c3aed", "#8b5cf6", "#a855f7", "#c026d3", "#d946ef", "#e879f9", "#0891b2", "#22d3ee"];
   return (
-    <svg viewBox="0 0 400 240" className="h-full w-full">
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
       <defs>
         <radialGradient id="desliz-bg" cx="70%" cy="30%" r="90%">
           <stop offset="0%" stopColor="#312e81" />

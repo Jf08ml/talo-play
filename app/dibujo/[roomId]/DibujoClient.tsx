@@ -39,6 +39,7 @@ import { useRoomPresence } from "@/hooks/useRoomPresence";
 import { useServerNow } from "@/hooks/useServerNow";
 import DrawingCanvas, { BACKGROUND } from "@/components/dibujo/DrawingCanvas";
 import NamePrompt from "@/components/NamePrompt";
+import WaitingRoom from "@/components/WaitingRoom";
 import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
@@ -57,6 +58,7 @@ export default function DibujoClient({ roomId }: { roomId: string }) {
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
   const [config, setConfig] = useState<{ rounds: number; drawSeconds: number; pool: string[] } | null>(null);
+  const [hostId, setHostId] = useState("");
   const [state, setState] = useState<DibujoState | null>(null);
   const [strokes, setStrokes] = useState<Map<string, Stroke>>(new Map());
   const [chat, setChat] = useState<ChatMessage[]>([]);
@@ -78,6 +80,7 @@ export default function DibujoClient({ roomId }: { roomId: string }) {
         if (cancelled) return;
         if (!meta) return setStatus("not-found");
         if (meta.game !== "dibujo") return router.replace(`/sala/${roomId}`);
+        setHostId(meta.hostId ?? "");
         setConfig({
           rounds: meta.rounds ?? 2,
           drawSeconds: meta.drawSeconds ?? 80,
@@ -157,28 +160,32 @@ export default function DibujoClient({ roomId }: { roomId: string }) {
 
       <main className="relative flex flex-1 flex-col">
         {identity.clientId && !identity.name && (
-          <NamePrompt onSubmit={identity.setName} submitLabel="Entrar a la sala" />
+          <NamePrompt onSubmit={identity.setName} submitLabel="Entrar a la sala" invitedTo="dibujo" />
         )}
 
         {status === "loading" && <RoomLoading text="Sacando los lápices…" />}
         {status === "not-found" && <RoomNotFound />}
         {status === "error" && <RoomError message="No se pudo cargar la sala." />}
 
-        {status === "ready" && state && config && (
+        {status === "ready" && state && config && state.status === "waiting" && (
+          <div className="mx-auto w-full max-w-2xl p-4">
+            <WaitingRoom
+              game="dibujo"
+              roomId={roomId}
+              hostId={hostId}
+              players={state.order.map((id) => ({ id, ...state.players[id] }))}
+              presence={presence}
+              myId={myId}
+              summary={`Cada uno dibuja ${config.rounds} ${config.rounds === 1 ? "vez" : "veces"} · ${config.drawSeconds} s por dibujo`}
+              onStart={() => startDibujo(roomId)}
+            />
+          </div>
+        )}
+
+        {status === "ready" && state && config && state.status !== "waiting" && (
           <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 p-4 lg:flex-row lg:items-start">
             <div className="flex min-w-0 flex-1 flex-col gap-3">
-              {state.status === "waiting" ? (
-                <div className={`${CARD} flex flex-col items-center gap-3 text-center`}>
-                  <p className="font-display text-lg font-semibold text-slate-100">Esperando jugadores…</p>
-                  <p className="text-sm text-slate-400">
-                    Cada uno dibuja {config.rounds} {config.rounds === 1 ? "vez" : "veces"}, {config.drawSeconds} s por
-                    dibujo. Compartí el enlace; cuando estén todos, cualquiera puede arrancar.
-                  </p>
-                  <button onClick={() => startDibujo(roomId)} className={`w-full max-w-xs ${PRIMARY_BUTTON}`}>
-                    Empezar partida
-                  </button>
-                </div>
-              ) : state.status === "finished" ? (
+              {state.status === "finished" ? (
                 <FinishedView state={state} myId={myId} onRestart={() => restartDibujo(roomId)} />
               ) : (
                 <>
@@ -205,19 +212,17 @@ export default function DibujoClient({ roomId }: { roomId: string }) {
 
             <div className="flex w-full flex-col gap-4 lg:w-80">
               <Scoreboard state={state} presence={presence} myId={myId} />
-              {state.status !== "waiting" && (
-                <Chat
-                  roomId={roomId}
-                  tk={tk}
-                  state={state}
-                  chat={chat}
-                  myId={myId}
-                  isDrawer={isDrawer}
-                  onCorrect={() =>
-                    submitCorrectGuess(roomId, state.turnNo, myId, config.drawSeconds, Math.max(1, onlineGuessers.length))
-                  }
-                />
-              )}
+              <Chat
+                roomId={roomId}
+                tk={tk}
+                state={state}
+                chat={chat}
+                myId={myId}
+                isDrawer={isDrawer}
+                onCorrect={() =>
+                  submitCorrectGuess(roomId, state.turnNo, myId, config.drawSeconds, Math.max(1, onlineGuessers.length))
+                }
+              />
             </div>
           </div>
         )}

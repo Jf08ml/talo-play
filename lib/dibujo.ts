@@ -46,6 +46,8 @@ export const DRAWER_POINTS_PER_GUESS = 15;
 
 export interface DibujoMeta {
   game: "dibujo";
+  /** Who created the room: starts the game (anyone can if they're away). Absent on older rooms. */
+  hostId?: string;
   /** How many times each player draws. */
   rounds: number;
   drawSeconds: number;
@@ -184,7 +186,7 @@ export async function createDibujoRoom(params: {
   drawSeconds: number;
   customWords: string[];
   useDefaultWords: boolean;
-}): Promise<string> {
+}, hostId: string): Promise<string> {
   const roomId = generateRoomCode();
   const customWords = params.customWords
     .map((w) => w.trim().slice(0, MAX_WORD_LENGTH))
@@ -192,6 +194,7 @@ export async function createDibujoRoom(params: {
     .slice(0, MAX_CUSTOM_WORDS);
   const meta: DibujoMeta = {
     game: "dibujo",
+    hostId,
     rounds: params.rounds,
     drawSeconds: params.drawSeconds,
     useDefaultWords: params.useDefaultWords || customWords.length === 0,

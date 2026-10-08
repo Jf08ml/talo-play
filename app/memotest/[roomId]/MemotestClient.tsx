@@ -26,6 +26,7 @@ import { useClientIdentity } from "@/hooks/useClientIdentity";
 import { useRoomPresence } from "@/hooks/useRoomPresence";
 import { useServerNow } from "@/hooks/useServerNow";
 import NamePrompt from "@/components/NamePrompt";
+import WaitingRoom from "@/components/WaitingRoom";
 import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
@@ -40,6 +41,7 @@ export default function MemotestClient({ roomId }: { roomId: string }) {
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
   const [config, setConfig] = useState<MemoConfig | null>(null);
+  const [hostId, setHostId] = useState("");
   const [state, setState] = useState<MemoState | null>(null);
 
   const me = identity.clientId && identity.name
@@ -59,6 +61,7 @@ export default function MemotestClient({ roomId }: { roomId: string }) {
         if (!meta) return setStatus("not-found");
         if (meta.game !== "memotest") return router.replace(`/sala/${roomId}`);
         setConfig(normalizeMeta(meta));
+        setHostId(meta.hostId ?? "");
         unsub = subscribeMemo(roomId, setState);
         setStatus("ready");
       })
@@ -147,14 +150,29 @@ export default function MemotestClient({ roomId }: { roomId: string }) {
 
       <main className="relative flex flex-1 flex-col">
         {identity.clientId && !identity.name && (
-          <NamePrompt onSubmit={identity.setName} submitLabel="Entrar a la sala" />
+          <NamePrompt onSubmit={identity.setName} submitLabel="Entrar a la sala" invitedTo="memotest" />
         )}
 
         {status === "loading" && <RoomLoading text="Mezclando las cartas…" />}
         {status === "not-found" && <RoomNotFound />}
         {status === "error" && <RoomError message="No se pudo cargar la sala." />}
 
-        {status === "ready" && state && config && (
+        {status === "ready" && state && config && state.status === "waiting" && (
+          <div className="mx-auto w-full max-w-2xl p-4">
+            <WaitingRoom
+              game="memotest"
+              roomId={roomId}
+              hostId={hostId}
+              players={state.order.map((id) => ({ id, ...state.players[id] }))}
+              presence={presence}
+              myId={identity.clientId}
+              summary={memoSummary(config)}
+              onStart={() => startMemo(roomId)}
+            />
+          </div>
+        )}
+
+        {status === "ready" && state && config && state.status !== "waiting" && (
           <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-4 lg:flex-row lg:items-start">
             <div className="flex-1">
               <TurnBanner
@@ -267,6 +285,17 @@ function MemoCard({
   );
 }
 
+const KIND_LABEL: Record<MemoConfig["kind"], string> = { emoji: "emojis", fotos: "fotos", texto: "pares de texto" };
+
+function memoSummary(config: MemoConfig): string {
+  const { rules } = config;
+  const mode =
+    rules.mode === "colab"
+      ? "Cooperativo contra reloj"
+      : `Por turnos${rules.turnSeconds ? `, ${rules.turnSeconds} s cada uno` : ""}`;
+  return `${config.pairs} pares de ${KIND_LABEL[config.kind]} · ${mode}`;
+}
+
 function TurnBanner({
   state,
   config,
@@ -285,23 +314,6 @@ function TurnBanner({
   turnDeadline: number;
 }) {
   const isColab = config.rules.mode === "colab";
-
-  if (state.status === "waiting") {
-    return (
-      <div className={`${CARD} flex flex-col items-center gap-3 text-center`}>
-        <p className="font-display text-lg font-semibold text-slate-100">Esperando jugadores…</p>
-        <p className="text-sm text-slate-400">
-          {isColab
-            ? "Modo cooperativo: todos juegan a la vez contra el reloj. "
-            : "Por turnos. "}
-          Compartí el enlace de la sala; cuando estén todos, cualquiera puede arrancar.
-        </p>
-        <button onClick={() => startMemo(roomId)} className={`w-full max-w-xs ${PRIMARY_BUTTON}`}>
-          Empezar partida
-        </button>
-      </div>
-    );
-  }
 
   if (state.status === "finished") {
     let title: string;

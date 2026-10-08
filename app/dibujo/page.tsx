@@ -12,6 +12,7 @@ import {
 import { DEFAULT_WORDS } from "@/lib/dibujoWords";
 import { roomPath } from "@/lib/games";
 import GameLobby from "@/components/GameLobby";
+import { useClientIdentity } from "@/hooks/useClientIdentity";
 import { CARD, PRIMARY_BUTTON, SECTION_LABEL, chipClass } from "@/components/ui";
 
 /** One word per line or separated by commas. */
@@ -25,6 +26,7 @@ function parseWords(text: string): string[] {
 
 export default function DibujoHome() {
   const router = useRouter();
+  const identity = useClientIdentity();
   const [rounds, setRounds] = useState<number>(2);
   const [drawSeconds, setDrawSeconds] = useState<number>(80);
   const [wordsText, setWordsText] = useState("");
@@ -41,7 +43,7 @@ export default function DibujoHome() {
     setCreating(true);
     setCreateError(null);
     try {
-      const roomId = await createDibujoRoom({ rounds, drawSeconds, customWords, useDefaultWords });
+      const roomId = await createDibujoRoom({ rounds, drawSeconds, customWords, useDefaultWords }, identity.clientId);
       router.push(roomPath("dibujo", roomId));
     } catch (err) {
       console.error(err);
@@ -51,10 +53,7 @@ export default function DibujoHome() {
   };
 
   return (
-    <GameLobby
-      game="dibujo"
-      description="Por turnos, uno dibuja una palabra secreta y los demás tratan de adivinarla en el chat. Cuanto más rápido adivinás, más puntos."
-    >
+    <GameLobby game="dibujo">
       <form onSubmit={handleCreate} className={`${CARD} flex flex-col gap-4`}>
         <h2 className="font-display text-lg font-semibold text-slate-100">Crear una sala nueva</h2>
 

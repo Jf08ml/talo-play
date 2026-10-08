@@ -27,6 +27,7 @@ import { useRoomPresence } from "@/hooks/useRoomPresence";
 import { useServerNow } from "@/hooks/useServerNow";
 import SlidingBoard from "@/components/deslizante/SlidingBoard";
 import NamePrompt from "@/components/NamePrompt";
+import WaitingRoom from "@/components/WaitingRoom";
 import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
@@ -34,7 +35,7 @@ import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 
 type Status = "loading" | "not-found" | "ready" | "error";
-type Config = { size: number; imageUrl: string; showNumbers: boolean };
+type Config = { size: number; imageUrl: string; showNumbers: boolean; hostId: string };
 
 export default function DeslizanteClient({ roomId }: { roomId: string }) {
   const identity = useClientIdentity();
@@ -62,7 +63,12 @@ export default function DeslizanteClient({ roomId }: { roomId: string }) {
         if (cancelled) return;
         if (!meta) return setStatus("not-found");
         if (meta.game !== "deslizante") return router.replace(`/sala/${roomId}`);
-        setConfig({ size: meta.size ?? 4, imageUrl: meta.imageUrl ?? "", showNumbers: meta.showNumbers ?? true });
+        setConfig({
+          size: meta.size ?? 4,
+          imageUrl: meta.imageUrl ?? "",
+          showNumbers: meta.showNumbers ?? true,
+          hostId: meta.hostId ?? "",
+        });
         unsub = subscribeDesliz(roomId, (data) => {
           setState(data.state);
           setBoards(data.boards);
@@ -149,14 +155,33 @@ export default function DeslizanteClient({ roomId }: { roomId: string }) {
 
       <main className="relative flex flex-1 flex-col">
         {identity.clientId && !identity.name && (
-          <NamePrompt onSubmit={identity.setName} submitLabel="Entrar a la sala" />
+          <NamePrompt onSubmit={identity.setName} submitLabel="Entrar a la sala" invitedTo="deslizante" />
         )}
 
         {status === "loading" && <RoomLoading text="Mezclando las fichas…" />}
         {status === "not-found" && <RoomNotFound />}
         {status === "error" && <RoomError message="No se pudo cargar la sala." />}
 
-        {status === "ready" && state && config && (
+        {status === "ready" && state && config && state.status === "waiting" && (
+          <div className="mx-auto w-full max-w-2xl p-4">
+            <WaitingRoom
+              game="deslizante"
+              roomId={roomId}
+              hostId={config.hostId}
+              players={Object.entries(state.players).map(([id, p]) => ({ id, ...p }))}
+              presence={presence}
+              myId={myId}
+              summary={`${config.size}×${config.size} · todos con la misma mezcla`}
+              onStart={() => startRace(roomId)}
+            >
+              <div className="mx-auto w-full max-w-[220px]">
+                <SlidingBoard tiles={start} size={config.size} imageUrl={config.imageUrl} showNumbers={false} compact />
+              </div>
+            </WaitingRoom>
+          </div>
+        )}
+
+        {status === "ready" && state && config && state.status !== "waiting" && (
           <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 p-4 lg:flex-row lg:items-start">
             <div className="flex w-full flex-col gap-3 lg:max-w-[560px]">
               <TopBar
@@ -166,7 +191,6 @@ export default function DeslizanteClient({ roomId }: { roomId: string }) {
                 correct={correctCount(myBoard.tiles)}
                 total={total}
                 moves={myBoard.moves}
-                onStart={() => startRace(roomId)}
                 onNewRace={() => newRace(roomId, state.gameNo)}
               />
 
@@ -178,13 +202,6 @@ export default function DeslizanteClient({ roomId }: { roomId: string }) {
                   showNumbers={config.showNumbers}
                   onTileClick={canMove ? move : undefined}
                 />
-                {state.status === "waiting" && (
-                  <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-slate-950/70 p-6 text-center">
-                    <p className="font-display text-lg text-slate-200">
-                      Esta es la mezcla. Cuando estén todos, arranquen la carrera.
-                    </p>
-                  </div>
-                )}
                 {countingDown && (
                   <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-slate-950/60">
                     <span key={Math.ceil((state.startedAt - now) / 1000)} className="animate-celebration-in font-display text-8xl font-bold text-white drop-shadow-[0_0_25px_rgba(168,85,247,0.8)]">
@@ -251,7 +268,6 @@ function TopBar({
   correct,
   total,
   moves,
-  onStart,
   onNewRace,
 }: {
   state: DeslizState;
@@ -260,22 +276,8 @@ function TopBar({
   correct: number;
   total: number;
   moves: number;
-  onStart: () => void;
   onNewRace: () => void;
 }) {
-  if (state.status === "waiting") {
-    return (
-      <div className={`${CARD} flex flex-col items-center gap-3 text-center`}>
-        <p className="text-sm text-slate-400">
-          Todos reciben la misma mezcla. Tocá una ficha en la fila o columna del hueco para deslizarla (o usá las flechas).
-        </p>
-        <button onClick={onStart} className={`w-full max-w-xs ${PRIMARY_BUTTON}`}>
-          Empezar carrera
-        </button>
-      </div>
-    );
-  }
-
   if (state.winner) {
     const w = state.results[state.winner];
     const name = state.winner === myId ? "Vos" : state.players[state.winner]?.name ?? "?";

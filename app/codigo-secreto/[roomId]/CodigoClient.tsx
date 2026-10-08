@@ -29,6 +29,8 @@ import type { PresenceMap } from "@/lib/presence";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import { useRoomPresence } from "@/hooks/useRoomPresence";
 import NamePrompt from "@/components/NamePrompt";
+import InviteCard from "@/components/InviteCard";
+import { startPermission } from "@/components/WaitingRoom";
 import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
@@ -45,6 +47,7 @@ export default function CodigoClient({ roomId }: { roomId: string }) {
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
   const [state, setState] = useState<CodigoState | null>(null);
+  const [hostId, setHostId] = useState("");
 
   const myId = identity.clientId;
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;
@@ -60,6 +63,7 @@ export default function CodigoClient({ roomId }: { roomId: string }) {
         if (cancelled) return;
         if (!meta) return setStatus("not-found");
         if (meta.game !== "codigo") return router.replace(`/sala/${roomId}`);
+        setHostId(meta.hostId ?? "");
         unsub = subscribeCodigo(roomId, setState);
         setStatus("ready");
       })
@@ -97,7 +101,7 @@ export default function CodigoClient({ roomId }: { roomId: string }) {
 
       <main className="relative flex flex-1 flex-col">
         {identity.clientId && !identity.name && (
-          <NamePrompt onSubmit={identity.setName} submitLabel="Entrar a la sala" />
+          <NamePrompt onSubmit={identity.setName} submitLabel="Entrar a la sala" invitedTo="codigo" />
         )}
 
         {status === "loading" && <RoomLoading text="Repartiendo los expedientes…" />}
@@ -107,7 +111,7 @@ export default function CodigoClient({ roomId }: { roomId: string }) {
         {status === "ready" && state && board && (
           <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 p-4">
             {state.status === "waiting" ? (
-              <TeamSetup roomId={roomId} state={state} presence={presence} myId={myId} />
+              <TeamSetup roomId={roomId} hostId={hostId} state={state} presence={presence} myId={myId} />
             ) : (
               <>
                 <StatusBar roomId={roomId} state={state} board={board} myId={myId} />
@@ -141,16 +145,19 @@ export default function CodigoClient({ roomId }: { roomId: string }) {
 
 function TeamSetup({
   roomId,
+  hostId,
   state,
   presence,
   myId,
 }: {
   roomId: string;
+  hostId: string;
   state: CodigoState;
   presence: PresenceMap;
   myId: string;
 }) {
   const problem = setupProblem(state.players);
+  const { canStart, message } = startPermission(hostId, state.players[hostId]?.name, presence, myId);
   const myself = state.players[myId];
   const unassigned = Object.entries(state.players).filter(([id, p]) => !p.team && id in presence);
 
@@ -178,6 +185,7 @@ function TeamSetup({
                     <span className="text-slate-200">
                       {p.name}
                       {id === myId && <span className="text-slate-500"> (vos)</span>}
+                      {id === hostId && <span title="Anfitrión"> 👑</span>}
                     </span>
                     {p.spymaster && <span className="text-xs text-slate-500">jefe de espías</span>}
                   </li>
@@ -218,16 +226,20 @@ function TeamSetup({
         {problem ? (
           <p className="text-sm text-amber-300/90">{problem}</p>
         ) : (
-          <p className="text-sm text-slate-400">¡Equipos listos!</p>
+          <p className="text-sm text-slate-300">¡Equipos listos! {message}</p>
         )}
-        <button
-          onClick={() => startCodigo(roomId)}
-          disabled={problem !== null}
-          className={`w-full max-w-xs ${PRIMARY_BUTTON}`}
-        >
-          Empezar partida
-        </button>
+        {canStart && (
+          <button
+            onClick={() => startCodigo(roomId)}
+            disabled={problem !== null}
+            className={`w-full max-w-xs ${PRIMARY_BUTTON}`}
+          >
+            Empezar partida
+          </button>
+        )}
       </div>
+
+      <InviteCard game="codigo" roomId={roomId} />
     </div>
   );
 }

@@ -42,10 +42,7 @@ export default function RompecabezasHome() {
   };
 
   return (
-    <GameLobby
-      game="rompecabezas"
-      description="Subí una imagen, convertila en un rompecabezas y armala en tiempo real con quien quieras, en una sala compartida."
-    >
+    <GameLobby game="rompecabezas">
       <form onSubmit={handleCreate} className={`${CARD} flex flex-col gap-4`}>
         <h2 className="font-display text-lg font-semibold text-slate-100">Crear una sala nueva</h2>
 

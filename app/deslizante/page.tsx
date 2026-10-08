@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { createDeslizRoom, SIZES } from "@/lib/deslizante";
 import { roomPath } from "@/lib/games";
 import GameLobby from "@/components/GameLobby";
+import { useClientIdentity } from "@/hooks/useClientIdentity";
 import ImageDropzone from "@/components/ImageDropzone";
 import { CARD, PRIMARY_BUTTON, SECTION_LABEL, chipClass } from "@/components/ui";
 
 export default function DeslizanteHome() {
   const router = useRouter();
+  const identity = useClientIdentity();
   const [file, setFile] = useState<File | null>(null);
   const [size, setSize] = useState<number>(4);
   const [showNumbers, setShowNumbers] = useState(true);
@@ -22,7 +24,7 @@ export default function DeslizanteHome() {
     setCreating(true);
     setCreateError(null);
     try {
-      const roomId = await createDeslizRoom({ file, size, showNumbers });
+      const roomId = await createDeslizRoom({ file, size, showNumbers }, identity.clientId);
       router.push(roomPath("deslizante", roomId));
     } catch (err) {
       console.error(err);
@@ -32,10 +34,7 @@ export default function DeslizanteHome() {
   };
 
   return (
-    <GameLobby
-      game="deslizante"
-      description="Las fichas están mezcladas y falta una: deslizalas por el hueco hasta rearmar la imagen. Todos reciben la misma mezcla y gana el primero que lo ordena."
-    >
+    <GameLobby game="deslizante">
       <form onSubmit={handleCreate} className={`${CARD} flex flex-col gap-4`}>
         <h2 className="font-display text-lg font-semibold text-slate-100">Crear una sala nueva</h2>
 

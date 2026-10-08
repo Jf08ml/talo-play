@@ -1,5 +1,5 @@
 // Shared Tailwind class strings so every game's lobby and room look like part
-// of the same salón.
+// of the same product.
 
 export const CARD =
   "rounded-2xl border border-violet-500/15 bg-slate-900/60 p-5 shadow-[0_0_25px_rgba(139,92,246,0.08)] backdrop-blur";

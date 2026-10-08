@@ -24,6 +24,8 @@ export const ROUND_SECONDS_OPTIONS = [0, 60, 90, 120] as const;
 
 export interface TuttiMeta {
   game: "tutti";
+  /** Who created the room: starts the game (anyone can if they're away). Absent on older rooms. */
+  hostId?: string;
   categories: string[];
   rounds: number;
   /** 0 = no time limit; rounds then end only with "¡Basta!". */
@@ -162,10 +164,11 @@ export async function createTuttiRoom(params: {
   rounds: number;
   roundSeconds: number;
   letters: string;
-}): Promise<string> {
+}, hostId: string): Promise<string> {
   const roomId = generateRoomCode();
   const meta: TuttiMeta = {
     game: "tutti",
+    hostId,
     categories: params.categories.map((c) => c.trim().slice(0, MAX_CATEGORY_LENGTH)),
     rounds: Math.min(params.rounds, params.letters.length),
     roundSeconds: params.roundSeconds,
