@@ -1,9 +1,10 @@
-import { ref, get, onValue, runTransaction, serverTimestamp, update, type Unsubscribe } from "firebase/database";
+import { ref, get, onValue, serverTimestamp, update, type Unsubscribe } from "firebase/database";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getDb, getStorageInstance } from "./firebase";
 import { generateRoomCode } from "./ids";
 import { makeSeed, seededShuffle } from "./random";
 import { serverNow } from "./serverTime";
+import { transactState } from "./transact";
 import { EMOJI_THEMES, type TextPair } from "./memotestDecks";
 
 /**
@@ -265,12 +266,7 @@ export function subscribeMemo(roomId: string, cb: (state: MemoState | null) => v
  * next state, or null to leave it untouched.
  */
 function mutate(roomId: string, fn: (state: MemoState) => MemoState | null) {
-  return runTransaction(memoRef(roomId), (raw: Partial<MemoState> | null) => {
-    const state = normalizeState(raw);
-    // No local copy yet: return the raw value so the SDK fetches the real one and retries.
-    if (!state) return raw;
-    return fn(state) ?? undefined;
-  });
+  return transactState(`rooms/${roomId}/memo`, normalizeState, fn);
 }
 
 function nextTurn(s: MemoState): number {

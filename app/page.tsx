@@ -8,6 +8,7 @@ import JoinRoomForm from "@/components/JoinRoomForm";
 import {
   PuzzleThumbnail,
   MemotestThumbnail,
+  TuttiThumbnail,
   ComingSoonThumbnail,
 } from "@/components/GameThumbnails";
 import PlayerIdentity from "@/components/PlayerIdentity";
@@ -49,6 +50,12 @@ export default function GamesHub() {
             title={`${GAMES.memotest.emoji} ${GAMES.memotest.title}`}
             description="Dá vuelta las cartas y encontrá los pares, por turnos. Si acertás, seguís. Gana quien junte más."
             thumbnail={<MemotestThumbnail />}
+          />
+          <GameCard
+            href={`/${GAMES.tutti.path}`}
+            title={`${GAMES.tutti.emoji} ${GAMES.tutti.title}`}
+            description="Sale una letra y hay que llenar cada categoría. El primero que termina grita ¡Basta! Después se votan las respuestas."
+            thumbnail={<TuttiThumbnail />}
           />
           <GameCard
             href="#"

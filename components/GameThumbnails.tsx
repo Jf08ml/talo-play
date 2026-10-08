@@ -94,6 +94,66 @@ export function MemotestThumbnail() {
   );
 }
 
+export function TuttiThumbnail() {
+  const rows = [
+    { label: "Nombre", value: "Martina" },
+    { label: "País", value: "México" },
+    { label: "Animal", value: "Mono" },
+    { label: "Color", value: "Marrón" },
+  ];
+  return (
+    <svg viewBox="0 0 400 240" className="h-full w-full">
+      <defs>
+        <radialGradient id="tutti-bg" cx="20%" cy="80%" r="90%">
+          <stop offset="0%" stopColor="#4a044e" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+        <linearGradient id="tutti-letter" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#7c3aed" />
+          <stop offset="100%" stopColor="#c026d3" />
+        </linearGradient>
+        <filter id="tutti-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="6" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      <rect width="400" height="240" fill="url(#tutti-bg)" />
+      <g filter="url(#tutti-glow)">
+        <rect x="58" y="70" width="96" height="96" rx="20" fill="url(#tutti-letter)" transform="rotate(-6 106 118)" />
+      </g>
+      <text
+        x="106"
+        y="140"
+        textAnchor="middle"
+        fontSize="64"
+        fontWeight="700"
+        fill="#fff"
+        fontFamily="system-ui, sans-serif"
+        transform="rotate(-6 106 118)"
+      >
+        M
+      </text>
+      <g transform="translate(184 48)">
+        <rect width="170" height="148" rx="12" fill="#0f172a" stroke="#22d3ee" strokeOpacity="0.5" strokeWidth="2" />
+        {rows.map((r, i) => (
+          <g key={r.label} transform={`translate(14 ${30 + i * 32})`}>
+            <text fontSize="11" fill="#64748b" fontFamily="system-ui, sans-serif">
+              {r.label}
+            </text>
+            <text x="58" fontSize="14" fill="#e2e8f0" fontFamily="system-ui, sans-serif" fontWeight="600">
+              {r.value}
+            </text>
+            <line x1="58" y1="6" x2="146" y2="6" stroke="#334155" />
+          </g>
+        ))}
+      </g>
+    </svg>
+  );
+}
+
 export function ComingSoonThumbnail() {
   return (
     <svg viewBox="0 0 400 240" className="h-full w-full">

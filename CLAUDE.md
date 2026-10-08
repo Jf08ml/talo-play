@@ -16,7 +16,7 @@ There is no test suite. `next.config.ts` allows `*.trycloudflare.com` as a dev o
 
 ## What this is
 
-"Salón de Juegos": a hub (`app/page.tsx`) of real-time multiplayer browser games. Each game has a lobby at `/{game}` and rooms at `/{game}/[roomId]`; games so far: `rompecabezas` (collaborative/versus jigsaw) and `memotest` (turn-based pairs). UI text is in Spanish (rioplatense voseo: "Subí", "Elegí") — keep that tone.
+"Salón de Juegos": a hub (`app/page.tsx`) of real-time multiplayer browser games. Each game has a lobby at `/{game}` and rooms at `/{game}/[roomId]`; games so far: `rompecabezas` (collaborative/versus jigsaw), `memotest` (pairs) and `tutti` (Tutti Frutti, at `/tutti-frutti`). UI text is in Spanish (rioplatense voseo: "Subí", "Elegí") — keep that tone.
 
 Stack: Next.js 16 App Router + React 19, Tailwind v4, Konva/react-konva for the puzzle board, Firebase Realtime Database + Storage. **There is no backend of our own and no Firebase Auth** — everything runs client-side. Firebase config comes from `NEXT_PUBLIC_FIREBASE_*` env vars (in `.env`, gitignored); when missing, pages render `FirebaseSetupNotice` instead of crashing. The Firebase project is `talo-play` (`.firebaserc`); rules live in `database.rules.json` / `storage.rules`. The Storage bucket needs the CORS config in `cors.json` (applied with `gcloud storage buckets update gs://talo-play.firebasestorage.app --cors-file=cors.json`, not by `firebase deploy`) because the puzzle loads its image with `crossOrigin` to cut it on a canvas.
 
@@ -29,7 +29,7 @@ Stack: Next.js 16 App Router + React 19, Tailwind v4, Konva/react-konva for the 
 - **UI pieces**: `GameLobby` (title, name, create form passed as children + join form), `RoomHeader`, `RoomStatus` (loading / not found / error), `components/ui.ts` (shared Tailwind class strings).
 - **Presence** (`lib/presence.ts`, `hooks/useRoomPresence.ts`): connected players with name/color, removed via `onDisconnect`.
 - **Seeded randomness** (`lib/random.ts`): `mulberry32`, `seededShuffle`. Anything derived from a seed stored in the room must stay deterministic across clients; changing it alters existing rooms.
-- **No host**: shared game state (turns, rounds, races) is only mutated through `runTransaction`, so concurrent clients can't double-apply a move. Timers/delays are scheduled by every client and made idempotent by the transaction (see `resolveMismatch`), so one player leaving can't freeze a game.
+- **No host**: shared game state (turns, rounds, races) is only mutated through `runTransaction` (`lib/transact.ts` wraps it with a normalizer), so concurrent clients can't double-apply a move. Timers/delays are scheduled by every client and made idempotent by the transaction (see `resolveMismatch`), so one player leaving can't freeze a game.
 
 ### Rompecabezas (`app/rompecabezas`, `lib/puzzleRoom.ts`)
 
@@ -48,6 +48,13 @@ Stack: Next.js 16 App Router + React 19, Tailwind v4, Konva/react-konva for the 
 - `rooms/{id}/memo` — status, `seed` (per game, so "Jugar de nuevo" reshuffles), turn `order`, `players`, `turn`, `flipped`, `matched`, `moves`, server-time `startedAt`/`finishedAt`/`turnStartedAt` (`lib/serverTime.ts`).
 - The deck is `buildDeck(seed, config)`, computed locally; cards match by `pair`, not by face (text pairs have different faces). Its card order before shuffling must stay as is, or rooms created earlier get a different layout.
 - Everyone who enters joins the turn order. A miss stays face up for `MISMATCH_REVEAL_MS`, then any client's `resolveMismatch` turns it down (and passes the turn in turnos). When the turn timer runs out, or a player left, any client calls `passTurn`, guarded by the expected `turn` + `turnStartedAt`. In colab anyone can flip and nobody has a turn.
+
+### Tutti Frutti (`app/tutti-frutti`, `lib/tutti.ts`)
+
+- `rooms/{id}/meta` — `categories`, `rounds`, `roundSeconds` (0 = only "¡Basta!" ends a round), `letters`. The round's letter is `letterFor(seed, letters, round)` (seeded shuffle, no repeats).
+- `rooms/{id}/tutti/state` — round flow `waiting → writing → reviewing → … → finished`, mutated only by transactions (`endRound`, `advanceRound`, `setReady`…). `gameNo` bumps on "Jugar de nuevo"; round data is keyed `g{gameNo}r{round}` (`roundKey`).
+- `rooms/{id}/tutti/answers/{rk}/{clientId}` (`c{cat}` → text, saved debounced while typing) and `votes/{rk}/{authorId}__c{cat}/{voterId}` (true = rejected) are plain writes outside the state transaction.
+- Scores are never stored: `scoreRound` computes them on every client from answers + votes (invalid if wrong letter or rejected by more than half of the other players; 20 only valid / 10 unique / 5 repeated, compared with `normalizeAnswer`). The round advances when every connected player is `ready`.
 
 ## Gotchas
 
