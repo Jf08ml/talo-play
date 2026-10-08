@@ -44,8 +44,10 @@ Stack: Next.js 16 App Router + React 19, Tailwind v4, Konva/react-konva for the 
 
 ### Memotest (`app/memotest`, `lib/memotest.ts`)
 
-- `rooms/{id}/meta` — `{game, pairs}`; `rooms/{id}/memo` — status, `seed` (per game, so "Jugar de nuevo" reshuffles), turn `order`, `players`, `turn`, `flipped`, `matched`. The deck is `buildDeck(seed, pairs)`, computed locally.
-- Everyone who enters joins the turn order. A pair keeps your turn; a miss stays face up for `MISMATCH_REVEAL_MS`, then any client's `resolveMismatch` passes the turn. A player who left can be skipped with `skipTurn`.
+- `rooms/{id}/meta` — fixed setup: deck `kind` (`emoji` with a `theme` from `lib/memotestDecks.ts` + `pairs`, `fotos` with `images` uploaded to Storage as `rooms/{id}/card-{i}.jpg`, or `texto` with `textPairs`) and `rules` (`mode` turnos/colab, `extraTurn`, `turnSeconds`). Read it through `normalizeMeta` (early rooms have no `kind`/`rules`).
+- `rooms/{id}/memo` — status, `seed` (per game, so "Jugar de nuevo" reshuffles), turn `order`, `players`, `turn`, `flipped`, `matched`, `moves`, server-time `startedAt`/`finishedAt`/`turnStartedAt` (`lib/serverTime.ts`).
+- The deck is `buildDeck(seed, config)`, computed locally; cards match by `pair`, not by face (text pairs have different faces). Its card order before shuffling must stay as is, or rooms created earlier get a different layout.
+- Everyone who enters joins the turn order. A miss stays face up for `MISMATCH_REVEAL_MS`, then any client's `resolveMismatch` turns it down (and passes the turn in turnos). When the turn timer runs out, or a player left, any client calls `passTurn`, guarded by the expected `turn` + `turnStartedAt`. In colab anyone can flip and nobody has a turn.
 
 ## Gotchas
 

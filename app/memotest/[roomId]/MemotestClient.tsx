@@ -9,18 +9,21 @@ import {
   flipCard,
   getMemoMeta,
   joinMemo,
-  MEMO_SIZES,
   MISMATCH_REVEAL_MS,
+  normalizeMeta,
+  passTurn,
   resolveMismatch,
   restartMemo,
   scores,
-  skipTurn,
   startMemo,
   subscribeMemo,
+  type CardFace,
+  type MemoConfig,
   type MemoState,
 } from "@/lib/memotest";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import { useRoomPresence } from "@/hooks/useRoomPresence";
+import { useServerNow } from "@/hooks/useServerNow";
 import NamePrompt from "@/components/NamePrompt";
 import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
@@ -30,12 +33,17 @@ import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
+function formatClock(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
 export default function MemotestClient({ roomId }: { roomId: string }) {
   const identity = useClientIdentity();
   const router = useRouter();
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
-  const [pairs, setPairs] = useState(0);
+  const [config, setConfig] = useState<MemoConfig | null>(null);
   const [state, setState] = useState<MemoState | null>(null);
 
   const me = identity.clientId && identity.name
@@ -43,7 +51,7 @@ export default function MemotestClient({ roomId }: { roomId: string }) {
     : null;
   const presence = useRoomPresence(roomId, status === "ready" ? me : null);
 
-  // Load the room's meta, then follow its game state.
+  // Load the room's setup, then follow its game state.
   useEffect(() => {
     if (!configured || !identity.clientId || !identity.name) return;
     let cancelled = false;
@@ -54,7 +62,7 @@ export default function MemotestClient({ roomId }: { roomId: string }) {
         if (cancelled) return;
         if (!meta) return setStatus("not-found");
         if (meta.game !== "memotest") return router.replace(`/sala/${roomId}`);
-        setPairs(meta.pairs ?? MEMO_SIZES[0].pairs);
+        setConfig(normalizeMeta(meta));
         unsub = subscribeMemo(roomId, setState);
         setStatus("ready");
       })
@@ -79,30 +87,65 @@ export default function MemotestClient({ roomId }: { roomId: string }) {
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
 
   const seed = state?.seed;
-  const deck = useMemo(() => (seed !== undefined && pairs ? buildDeck(seed, pairs) : []), [seed, pairs]);
+  const deck = useMemo(
+    () => (seed !== undefined && config ? buildDeck(seed, config) : []),
+    [seed, config]
+  );
+  const rules = config?.rules;
 
   // A non-matching pair: show it for a moment, then flip it back. Every client
   // schedules this; the transaction makes sure it only happens once.
   const flippedKey = state?.flipped.join(",") ?? "";
   useEffect(() => {
     const pair = flippedKey.split(",").filter(Boolean).map(Number);
-    if (pair.length !== 2 || deck[pair[0]] === deck[pair[1]]) return;
-    const t = setTimeout(() => resolveMismatch(roomId, pair).catch(console.error), MISMATCH_REVEAL_MS);
+    if (!rules || pair.length !== 2 || deck[pair[0]]?.pair === deck[pair[1]]?.pair) return;
+    const t = setTimeout(
+      () => resolveMismatch(roomId, pair, rules).catch(console.error),
+      MISMATCH_REVEAL_MS
+    );
     return () => clearTimeout(t);
-  }, [flippedKey, deck, roomId]);
+  }, [flippedKey, deck, roomId, rules]);
+
+  // Clocks: per-turn countdown (turnos with a limit) or elapsed time (colab).
+  const playing = state?.status === "playing";
+  const timed = !!rules && (rules.mode === "colab" || rules.turnSeconds > 0);
+  const now = useServerNow(playing && timed);
+  const turnDeadline =
+    rules && rules.mode === "turnos" && rules.turnSeconds > 0 && state
+      ? state.turnStartedAt + rules.turnSeconds * 1000
+      : 0;
+  const turnExpired = playing && turnDeadline > 0 && now > 0 && now >= turnDeadline;
+
+  // Time's up: any client passes the turn; the guard in passTurn applies it once.
+  const turn = state?.turn ?? 0;
+  const turnStartedAt = state?.turnStartedAt ?? 0;
+  useEffect(() => {
+    if (turnExpired) passTurn(roomId, turn, turnStartedAt).catch(console.error);
+  }, [turnExpired, roomId, turn, turnStartedAt]);
 
   if (!configured) return <FirebaseSetupNotice />;
 
-  const cols = MEMO_SIZES.find((s) => s.pairs === pairs)?.cols ?? Math.ceil(Math.sqrt(pairs * 2));
-  const currentId = state && state.status === "playing" ? state.order[state.turn] : undefined;
-  const myTurn = currentId === identity.clientId;
-  const canFlip = myTurn && state !== null && state.flipped.length < 2;
+  const isColab = rules?.mode === "colab";
+  const currentId = state && playing && !isColab ? state.order[state.turn] : undefined;
+  const canFlip = !!state && playing && state.flipped.length < 2 && (isColab || currentId === identity.clientId);
+
+  const total = deck.length;
+  const isText = config?.kind === "texto";
+  const cols = total <= 16 ? 4 : isText && total <= 24 ? 4 : 6;
+  const cardMax = isText ? 120 : 96;
 
   return (
     <div className="flex min-h-dvh flex-col">
       <RoomHeader
         game="memotest"
         roomId={roomId}
+        badges={
+          isColab && (
+            <span className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-300">
+              🤝 Cooperativo
+            </span>
+          )
+        }
         right={status === "ready" && <PlayerBadges presence={presence} myClientId={identity.clientId} />}
       />
 
@@ -115,42 +158,70 @@ export default function MemotestClient({ roomId }: { roomId: string }) {
         {status === "not-found" && <RoomNotFound />}
         {status === "error" && <RoomError message="No se pudo cargar la sala." />}
 
-        {status === "ready" && state && (
+        {status === "ready" && state && config && (
           <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-4 lg:flex-row lg:items-start">
             <div className="flex-1">
-              <TurnBanner state={state} myClientId={identity.clientId} presence={presence} roomId={roomId} />
+              <TurnBanner
+                state={state}
+                config={config}
+                myClientId={identity.clientId}
+                presence={presence}
+                roomId={roomId}
+                now={now}
+                turnDeadline={turnDeadline}
+              />
 
               <div
                 className="mx-auto mt-4 grid gap-2 sm:gap-3"
                 style={{
                   gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-                  maxWidth: `${cols * 96}px`,
+                  maxWidth: `${cols * cardMax}px`,
                 }}
               >
-                {deck.map((face, i) => {
+                {deck.map((card, i) => {
                   const owner = state.matched[cardKey(i)];
                   const faceUp = owner !== undefined || state.flipped.includes(i);
-                  const ownerColor = owner ? state.players[owner]?.color : undefined;
                   return (
                     <MemoCard
                       key={`${state.seed}-${i}`}
-                      face={face}
+                      face={card.face}
                       faceUp={faceUp}
-                      ownerColor={ownerColor}
+                      ownerColor={owner ? state.players[owner]?.color : undefined}
                       disabled={!canFlip || faceUp}
-                      onFlip={() => flipCard(roomId, identity.clientId, i, deck).catch(console.error)}
+                      onFlip={() =>
+                        flipCard(roomId, identity.clientId, i, deck, config.rules).catch(console.error)
+                      }
                     />
                   );
                 })}
               </div>
             </div>
 
-            <Scoreboard state={state} myClientId={identity.clientId} presence={presence} />
+            <Scoreboard state={state} isColab={isColab} myClientId={identity.clientId} presence={presence} />
           </div>
         )}
       </main>
     </div>
   );
+}
+
+function CardFaceContent({ face }: { face: CardFace }) {
+  if (face.kind === "image") {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={face.url} alt="" draggable={false} className="h-full w-full rounded-[10px] object-cover" />;
+  }
+  if (face.kind === "text") {
+    return (
+      <span
+        className={`break-words px-1 text-center text-[11px] font-semibold leading-tight sm:text-sm ${
+          face.side === 0 ? "text-violet-200" : "text-cyan-200"
+        }`}
+      >
+        {face.value}
+      </span>
+    );
+  }
+  return <span className="text-3xl sm:text-4xl">{face.value}</span>;
 }
 
 function MemoCard({
@@ -160,7 +231,7 @@ function MemoCard({
   disabled,
   onFlip,
 }: {
-  face: string;
+  face: CardFace;
   faceUp: boolean;
   ownerColor?: string;
   disabled: boolean;
@@ -170,7 +241,7 @@ function MemoCard({
     <button
       onClick={onFlip}
       disabled={disabled}
-      aria-label={faceUp ? face : "Carta boca abajo"}
+      aria-label={faceUp ? (face.kind === "image" ? "Foto" : face.value) : "Carta boca abajo"}
       className={`group relative aspect-square [perspective:600px] ${disabled ? "cursor-default" : "cursor-pointer"}`}
     >
       <div
@@ -186,14 +257,14 @@ function MemoCard({
           ✦
         </div>
         <div
-          className="absolute inset-0 flex items-center justify-center rounded-xl border-2 bg-slate-800 text-3xl [backface-visibility:hidden] [transform:rotateY(180deg)] sm:text-4xl"
+          className="absolute inset-0 flex items-center justify-center overflow-hidden rounded-xl border-2 bg-slate-800 [backface-visibility:hidden] [transform:rotateY(180deg)]"
           style={{
             borderColor: ownerColor ?? "rgba(148,163,184,0.4)",
             boxShadow: ownerColor ? `0 0 14px ${ownerColor}88` : undefined,
             opacity: ownerColor ? 0.85 : 1,
           }}
         >
-          {face}
+          <CardFaceContent face={face} />
         </div>
       </div>
     </button>
@@ -202,21 +273,32 @@ function MemoCard({
 
 function TurnBanner({
   state,
+  config,
   myClientId,
   presence,
   roomId,
+  now,
+  turnDeadline,
 }: {
   state: MemoState;
+  config: MemoConfig;
   myClientId: string;
   presence: Record<string, unknown>;
   roomId: string;
+  now: number;
+  turnDeadline: number;
 }) {
+  const isColab = config.rules.mode === "colab";
+
   if (state.status === "waiting") {
     return (
       <div className={`${CARD} flex flex-col items-center gap-3 text-center`}>
         <p className="font-display text-lg font-semibold text-slate-100">Esperando jugadores…</p>
         <p className="text-sm text-slate-400">
-          Compartí el enlace de la sala. Cuando estén todos, cualquiera puede arrancar.
+          {isColab
+            ? "Modo cooperativo: todos juegan a la vez contra el reloj. "
+            : "Por turnos. "}
+          Compartí el enlace de la sala; cuando estén todos, cualquiera puede arrancar.
         </p>
         <button onClick={() => startMemo(roomId)} className={`w-full max-w-xs ${PRIMARY_BUTTON}`}>
           Empezar partida
@@ -226,23 +308,48 @@ function TurnBanner({
   }
 
   if (state.status === "finished") {
-    const s = scores(state);
-    const best = Math.max(...Object.values(s));
-    const winners = state.order.filter((id) => s[id] === best);
-    const names = winners.map((id) => (id === myClientId ? "vos" : state.players[id]?.name ?? "?"));
-    const iWon = winners.includes(myClientId);
+    let title: string;
+    let detail: string;
+    let celebrate = true;
+    if (isColab) {
+      title = "🎉 ¡Lo resolvieron!";
+      detail = `En ${formatClock(state.finishedAt - state.startedAt)} y ${state.moves} intentos.`;
+    } else {
+      const s = scores(state);
+      const best = Math.max(...Object.values(s));
+      const winners = state.order.filter((id) => s[id] === best);
+      const names = winners.map((id) => (id === myClientId ? "vos" : state.players[id]?.name ?? "?"));
+      celebrate = winners.includes(myClientId);
+      title = celebrate ? "🎉 ¡Ganaste!" : "🏁 ¡Terminó la partida!";
+      detail = `${winners.length > 1 ? `Empate entre ${names.join(" y ")}` : `Ganó ${names[0]}`} con ${best} ${
+        best === 1 ? "par" : "pares"
+      }.`;
+    }
     return (
-      <div className="animate-celebration-in flex flex-col items-center gap-3 rounded-2xl border border-emerald-500/25 bg-slate-900 p-5 text-center shadow-[0_0_40px_rgba(52,211,153,0.2)]">
-        <p className="font-display text-xl font-semibold text-slate-100">
-          {iWon ? "🎉 ¡Ganaste!" : "🏁 ¡Terminó la partida!"}
-        </p>
-        <p className="text-sm text-slate-400">
-          {winners.length > 1 ? `Empate entre ${names.join(" y ")}` : `Ganó ${names[0]}`} con {best}{" "}
-          {best === 1 ? "par" : "pares"}.
-        </p>
+      <div
+        className={`animate-celebration-in flex flex-col items-center gap-3 rounded-2xl border bg-slate-900 p-5 text-center ${
+          celebrate
+            ? "border-emerald-500/25 shadow-[0_0_40px_rgba(52,211,153,0.2)]"
+            : "border-violet-500/20"
+        }`}
+      >
+        <p className="font-display text-xl font-semibold text-slate-100">{title}</p>
+        <p className="text-sm text-slate-400">{detail}</p>
         <button onClick={() => restartMemo(roomId)} className={`w-full max-w-xs ${PRIMARY_BUTTON}`}>
           Jugar de nuevo
         </button>
+      </div>
+    );
+  }
+
+  if (isColab) {
+    return (
+      <div className="flex flex-wrap items-center justify-center gap-4 text-center">
+        <p className="font-display text-lg font-semibold text-emerald-300">
+          ¡Todos a la vez! Encuentren los pares.
+        </p>
+        <span className="font-mono text-lg text-slate-200">⏱ {formatClock(now - state.startedAt)}</span>
+        <span className="text-sm text-slate-400">{state.moves} intentos</span>
       </div>
     );
   }
@@ -251,15 +358,25 @@ function TurnBanner({
   const current = state.players[currentId];
   const isMe = currentId === myClientId;
   const away = !isMe && !(currentId in presence);
+  const secondsLeft = turnDeadline && now ? Math.max(0, Math.ceil((turnDeadline - now) / 1000)) : null;
 
   return (
     <div className="flex flex-wrap items-center justify-center gap-3 text-center">
       <p className="font-display text-lg font-semibold" style={{ color: current?.color }}>
         {isMe ? "¡Te toca! Dá vuelta dos cartas." : `Le toca a ${current?.name ?? "?"}`}
       </p>
+      {secondsLeft !== null && (
+        <span
+          className={`rounded-md px-2 py-0.5 font-mono text-sm ${
+            secondsLeft <= 5 ? "bg-red-500/15 text-red-300" : "bg-slate-800 text-slate-300"
+          }`}
+        >
+          ⏱ {secondsLeft}s
+        </span>
+      )}
       {away && (
         <button
-          onClick={() => skipTurn(roomId, state.turn)}
+          onClick={() => passTurn(roomId, state.turn, state.turnStartedAt)}
           className={`px-3 py-1 text-sm ${SECONDARY_BUTTON}`}
         >
           Se fue · saltar turno
@@ -271,19 +388,23 @@ function TurnBanner({
 
 function Scoreboard({
   state,
+  isColab,
   myClientId,
   presence,
 }: {
   state: MemoState;
+  isColab: boolean;
   myClientId: string;
   presence: Record<string, unknown>;
 }) {
   const s = scores(state);
-  const currentId = state.status === "playing" ? state.order[state.turn] : undefined;
+  const currentId = state.status === "playing" && !isColab ? state.order[state.turn] : undefined;
 
   return (
     <aside className={`${CARD} w-full lg:w-64`}>
-      <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-slate-500">Pares</h2>
+      <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-slate-500">
+        {isColab ? "Pares encontrados" : "Pares"}
+      </h2>
       <ul className="flex flex-col gap-1.5">
         {state.order.map((id) => {
           const p = state.players[id];
