@@ -21,8 +21,8 @@ const balooTwo = Baloo_2({
 });
 
 export const metadata: Metadata = {
-  title: "Rompecabezas Colaborativo",
-  description: "Armá rompecabezas en tiempo real con otras personas, en salas compartidas.",
+  title: "Salón de Juegos",
+  description: "Jugá en tiempo real con otras personas, en salas compartidas.",
 };
 
 // The puzzle board has its own pinch-to-zoom; locking the page viewport keeps

@@ -3,9 +3,27 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { generateClientId, colorForClient } from "@/lib/ids";
 
-const CLIENT_ID_KEY = "rompecabezas.clientId";
-const NAME_KEY = "rompecabezas.playerName";
-const NAME_CHANGE_EVENT = "rompecabezas:name-changed";
+// Identity is shared by every game in the salón, so keys aren't game-scoped.
+const CLIENT_ID_KEY = "salon.clientId";
+const NAME_KEY = "salon.playerName";
+const NAME_CHANGE_EVENT = "salon:name-changed";
+
+// Keys from when the puzzle was the only game; migrated on first read so
+// returning players keep their id (and therefore color) and name.
+const LEGACY_KEYS: Record<string, string> = {
+  [CLIENT_ID_KEY]: "rompecabezas.clientId",
+  [NAME_KEY]: "rompecabezas.playerName",
+};
+
+function readMigrated(key: string): string | null {
+  const value = localStorage.getItem(key);
+  if (value !== null) return value;
+  const legacy = localStorage.getItem(LEGACY_KEYS[key]);
+  if (legacy === null) return null;
+  localStorage.setItem(key, legacy);
+  localStorage.removeItem(LEGACY_KEYS[key]);
+  return legacy;
+}
 
 function subscribeNever() {
   return () => {};
@@ -17,7 +35,7 @@ function subscribeNameChanges(onStoreChange: () => void) {
 }
 
 function readClientId(): string {
-  let id = localStorage.getItem(CLIENT_ID_KEY);
+  let id = readMigrated(CLIENT_ID_KEY);
   if (!id) {
     id = generateClientId();
     localStorage.setItem(CLIENT_ID_KEY, id);
@@ -26,7 +44,7 @@ function readClientId(): string {
 }
 
 function readName(): string | null {
-  return localStorage.getItem(NAME_KEY);
+  return readMigrated(NAME_KEY);
 }
 
 const getClientIdServerSnapshot = () => "";

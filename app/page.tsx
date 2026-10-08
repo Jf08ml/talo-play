@@ -4,8 +4,11 @@ import { isFirebaseConfigured } from "@/lib/firebase";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import GameCard from "@/components/GameCard";
 import { PuzzleThumbnail, ComingSoonThumbnail } from "@/components/GameThumbnails";
+import PlayerIdentity from "@/components/PlayerIdentity";
+import { useClientIdentity } from "@/hooks/useClientIdentity";
 
 export default function GamesHub() {
+  const identity = useClientIdentity();
   const configured = isFirebaseConfigured();
 
   if (!configured) return <FirebaseSetupNotice />;
@@ -23,6 +26,10 @@ export default function GamesHub() {
           Elegí un juego para armar en tiempo real con otras personas, en una sala
           compartida.
         </p>
+
+        <div className="mt-6">
+          <PlayerIdentity identity={identity} />
+        </div>
 
         <div className="mt-8 grid gap-6 sm:grid-cols-2">
           <GameCard

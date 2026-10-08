@@ -8,6 +8,7 @@ import { createRoom, type RoomMode } from "@/lib/room";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import ImageDropzone from "@/components/ImageDropzone";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
+import PlayerIdentity from "@/components/PlayerIdentity";
 
 const DIFFICULTIES = [
   { label: "Fácil", pieces: 24 },
@@ -21,7 +22,6 @@ export default function RompecabezasHome() {
   const router = useRouter();
   const configured = isFirebaseConfigured();
 
-  const [nameInput, setNameInput] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [pieceCount, setPieceCount] = useState(54);
   const [mode, setMode] = useState<RoomMode>("colab");
@@ -33,13 +33,6 @@ export default function RompecabezasHome() {
   if (!configured) return <FirebaseSetupNotice />;
 
   const name = identity.name;
-
-  const handleSetName = (e: FormEvent) => {
-    e.preventDefault();
-    const trimmed = nameInput.trim();
-    if (!trimmed) return;
-    identity.setName(trimmed.slice(0, 24));
-  };
 
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
@@ -86,28 +79,9 @@ export default function RompecabezasHome() {
           quieras, en una sala compartida.
         </p>
 
-        {identity.clientId && !name && (
-          <form
-            onSubmit={handleSetName}
-            className="mx-auto mt-8 flex max-w-sm gap-2 rounded-xl border border-violet-500/20 bg-slate-900/70 p-4 shadow-[0_0_30px_rgba(139,92,246,0.12)] backdrop-blur"
-          >
-            <input
-              autoFocus
-              value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
-              placeholder="¿Cómo te llamás?"
-              maxLength={24}
-              className="flex-1 rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none placeholder:text-slate-500 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30"
-            />
-            <button
-              type="submit"
-              disabled={!nameInput.trim()}
-              className="rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 font-medium text-white shadow-[0_0_20px_rgba(217,70,239,0.35)] transition hover:from-violet-500 hover:to-fuchsia-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
-            >
-              Listo
-            </button>
-          </form>
-        )}
+        <div className="mt-6">
+          <PlayerIdentity identity={identity} />
+        </div>
 
         {name && (
           <div className="mt-8 grid gap-6 sm:grid-cols-2">
