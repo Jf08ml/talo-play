@@ -196,27 +196,46 @@ export function DibujoThumbnail() {
   );
 }
 
-export function ComingSoonThumbnail() {
+export function CodigoThumbnail() {
+  // 3×3 slice of a board: revealed agents in team colors, the rest face down.
+  const cells = [
+    { w: "BANCO", fill: "#fb3a5d", ink: "#fff" },
+    { w: "LUNA", fill: "#f1ead8", ink: "#1e1b16" },
+    { w: "PILA", fill: "#0891b2", ink: "#fff" },
+    { w: "CARTA", fill: "#f1ead8", ink: "#1e1b16" },
+    { w: "💣", fill: "#020617", ink: "#e2e8f0" },
+    { w: "TORRE", fill: "#f1ead8", ink: "#1e1b16" },
+    { w: "OLA", fill: "#d6c7a1", ink: "#3f3a2e" },
+    { w: "RED", fill: "#f1ead8", ink: "#1e1b16" },
+    { w: "ESPÍA", fill: "#fb3a5d", ink: "#fff" },
+  ];
   return (
     <svg viewBox="0 0 400 240" className="h-full w-full">
       <defs>
-        <radialGradient id="soon-bg" cx="50%" cy="50%" r="80%">
-          <stop offset="0%" stopColor="#1e293b" />
+        <radialGradient id="codigo-bg" cx="50%" cy="10%" r="90%">
+          <stop offset="0%" stopColor="#1e1b4b" />
           <stop offset="100%" stopColor="#0b0a14" />
         </radialGradient>
       </defs>
-      <rect width="400" height="240" fill="url(#soon-bg)" />
-      <text
-        x="200"
-        y="140"
-        textAnchor="middle"
-        fontSize="64"
-        fill="#334155"
-        fontFamily="system-ui, sans-serif"
-        fontWeight="700"
-      >
-        ?
-      </text>
+      <rect width="400" height="240" fill="url(#codigo-bg)" />
+      <g transform="translate(92 34) rotate(-4 108 86)">
+        {cells.map((c, i) => (
+          <g key={i} transform={`translate(${(i % 3) * 74} ${Math.floor(i / 3) * 58})`}>
+            <rect width="68" height="50" rx="7" fill={c.fill} stroke="#00000033" strokeWidth="2" />
+            <text
+              x="34"
+              y="30"
+              textAnchor="middle"
+              fontSize={c.w.length > 2 ? 12 : 22}
+              fontWeight="700"
+              fill={c.ink}
+              fontFamily="system-ui, sans-serif"
+            >
+              {c.w}
+            </text>
+          </g>
+        ))}
+      </g>
     </svg>
   );
 }

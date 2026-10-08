@@ -10,7 +10,7 @@ import {
   MemotestThumbnail,
   TuttiThumbnail,
   DibujoThumbnail,
-  ComingSoonThumbnail,
+  CodigoThumbnail,
 } from "@/components/GameThumbnails";
 import PlayerIdentity from "@/components/PlayerIdentity";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
@@ -65,12 +65,10 @@ export default function GamesHub() {
             thumbnail={<DibujoThumbnail />}
           />
           <GameCard
-            href="#"
-            title="Más juegos"
-            description="Estamos sumando nuevos juegos al salón. Volvé pronto."
-            thumbnail={<ComingSoonThumbnail />}
-            badge="Próximamente"
-            disabled
+            href={`/${GAMES.codigo.path}`}
+            title={`${GAMES.codigo.emoji} ${GAMES.codigo.title}`}
+            description="Rojos contra azules. Los jefes de espías dan pistas de una palabra para encontrar a sus agentes… sin tocar la bomba."
+            thumbnail={<CodigoThumbnail />}
           />
           {identity.name && <JoinRoomForm />}
         </div>

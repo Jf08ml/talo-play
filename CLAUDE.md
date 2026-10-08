@@ -16,7 +16,7 @@ There is no test suite. `next.config.ts` allows `*.trycloudflare.com` as a dev o
 
 ## What this is
 
-"Salón de Juegos": a hub (`app/page.tsx`) of real-time multiplayer browser games. Each game has a lobby at `/{game}` and rooms at `/{game}/[roomId]`; games so far: `rompecabezas` (collaborative/versus jigsaw), `memotest` (pairs), `tutti` (Tutti Frutti, at `/tutti-frutti`) and `dibujo` (Dibujá y adiviná). UI text is in Spanish (rioplatense voseo: "Subí", "Elegí") — keep that tone.
+"Salón de Juegos": a hub (`app/page.tsx`) of real-time multiplayer browser games. Each game has a lobby at `/{game}` and rooms at `/{game}/[roomId]`; games so far: `rompecabezas` (collaborative/versus jigsaw), `memotest` (pairs), `tutti` (Tutti Frutti, at `/tutti-frutti`), `dibujo` (Dibujá y adiviná) and `codigo` (Código secreto, at `/codigo-secreto`). UI text is in Spanish (rioplatense voseo: "Subí", "Elegí") — keep that tone.
 
 Stack: Next.js 16 App Router + React 19, Tailwind v4, Konva/react-konva for the puzzle board, Firebase Realtime Database + Storage. **There is no backend of our own and no Firebase Auth** — everything runs client-side. Firebase config comes from `NEXT_PUBLIC_FIREBASE_*` env vars (in `.env`, gitignored); when missing, pages render `FirebaseSetupNotice` instead of crashing. The Firebase project is `talo-play` (`.firebaserc`); rules live in `database.rules.json` / `storage.rules`. The Storage bucket needs the CORS config in `cors.json` (applied with `gcloud storage buckets update gs://talo-play.firebasestorage.app --cors-file=cors.json`, not by `firebase deploy`) because the puzzle loads its image with `crossOrigin` to cut it on a canvas.
 
@@ -62,6 +62,11 @@ Stack: Next.js 16 App Router + React 19, Tailwind v4, Konva/react-konva for the 
 - `rooms/{id}/dibujo/state` — turn flow `choosing → drawing → reveal` (then the next turn or `finished`), with `drawer` fixed when each turn starts (players joining mid-turn don't shift it), the chosen `word`, `guessed` and cumulative `scores`. All via transactions guarded by `turnNo`; phase timeouts (`CHOOSE_SECONDS`, `drawSeconds`, `REVEAL_MS`) and absent drawers are handled by whichever client notices.
 - `strokes/{turnKey}/{pushId}` — `{color, width, points}` in a 1000×750 logical canvas (`components/dibujo/DrawingCanvas.tsx`, plain 2D canvas, no Konva), resent every 80 ms while drawing and followed with child events. `chat/{turnKey}` holds wrong guesses; correct ones are checked locally (`checkGuess`, accent-insensitive, "¡Casi!" at edit distance 1) and only recorded through `submitCorrectGuess`.
 - The secret word lives in the state, so it's readable with DevTools — accepted, there is no backend to hide it.
+
+### Código secreto (`app/codigo-secreto`, `lib/codigo.ts`)
+
+- Codenames-style, red vs blue (`lib/teams.ts`). `buildBoard(seed)` derives the 25 words (`lib/codigoWords.ts`) and the key (9 for `startingTeam(seed)`, 8, 7 neutral, 1 bomb) locally; spymasters just render it.
+- `rooms/{id}/codigo/state` — `players` with `team` + `spymaster` (one per team; mid-game joiners can only enter as agents), `turn`, `phase` (`clue` / `guess`), `guessesLeft`, `revealed`, `clues`, `winner`/`endReason`. All moves are transactions that check the caller's role (`giveClue`, `revealCard`, `endGuessing` guarded by the clue count). Revealing a team's last card wins it the game, even if the rival revealed it; the bomb loses. "Nueva partida" goes back to team setup with a new seed.
 
 ## Gotchas
 
