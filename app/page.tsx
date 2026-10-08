@@ -11,6 +11,7 @@ import {
   TuttiThumbnail,
   DibujoThumbnail,
   CodigoThumbnail,
+  DeslizanteThumbnail,
 } from "@/components/GameThumbnails";
 import PlayerIdentity from "@/components/PlayerIdentity";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
@@ -45,6 +46,12 @@ export default function GamesHub() {
             title={`${GAMES.rompecabezas.emoji} ${GAMES.rompecabezas.title}`}
             description="Subí una imagen, convertila en un rompecabezas y armala con quien quieras — de a uno, o por equipos a las apuradas."
             thumbnail={<PuzzleThumbnail />}
+          />
+          <GameCard
+            href={`/${GAMES.deslizante.path}`}
+            title={`${GAMES.deslizante.emoji} ${GAMES.deslizante.title}`}
+            description="Las fichas están mezcladas y falta una: deslizalas por el hueco hasta rearmar la imagen. Todos con la misma mezcla, gana el más rápido."
+            thumbnail={<DeslizanteThumbnail />}
           />
           <GameCard
             href={`/${GAMES.memotest.path}`}

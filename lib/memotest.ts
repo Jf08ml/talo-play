@@ -5,6 +5,7 @@ import { generateRoomCode } from "./ids";
 import { makeSeed, seededShuffle } from "./random";
 import { serverNow } from "./serverTime";
 import { transactState } from "./transact";
+import { cropSquare } from "./images";
 import { EMOJI_THEMES, type TextPair } from "./memotestDecks";
 
 /**
@@ -182,31 +183,6 @@ function memoRef(roomId: string) {
   return ref(getDb(), `rooms/${roomId}/memo`);
 }
 
-/** Center-crops an image to a square JPEG small enough for a card face. */
-async function prepareCardImage(file: File, size = 320): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  if (bitmap.width === 0 || bitmap.height === 0) {
-    throw new Error(
-      `No se pudo leer "${file.name}" (¿está dañada o en un formato no soportado, como HEIC?). Probá con JPG, PNG o WEBP.`
-    );
-  }
-  const side = Math.min(bitmap.width, bitmap.height);
-  const out = Math.min(size, side);
-  const canvas = document.createElement("canvas");
-  canvas.width = out;
-  canvas.height = out;
-  canvas
-    .getContext("2d")!
-    .drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, out, out);
-  return new Promise((resolve, reject) =>
-    canvas.toBlob(
-      (b) => (b ? resolve(b) : reject(new Error("No se pudo procesar la imagen"))),
-      "image/jpeg",
-      0.85
-    )
-  );
-}
-
 export type CreateMemoParams =
   | { kind: "emoji"; theme: string; pairs: number; rules: MemoRules }
   | { kind: "fotos"; files: File[]; rules: MemoRules }
@@ -229,7 +205,7 @@ export async function createMemotestRoom(params: CreateMemoParams): Promise<stri
     const storage = getStorageInstance();
     meta.images = await Promise.all(
       params.files.map(async (file, i) => {
-        const blob = await prepareCardImage(file);
+        const blob = await cropSquare(file, 320);
         const fileRef = storageRef(storage, `rooms/${roomId}/card-${i}.jpg`);
         await uploadBytes(fileRef, blob, { contentType: "image/jpeg" });
         return getDownloadURL(fileRef);

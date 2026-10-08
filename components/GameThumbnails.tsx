@@ -239,3 +239,36 @@ export function CodigoThumbnail() {
     </svg>
   );
 }
+
+export function DeslizanteThumbnail() {
+  // A 3×3 board one move away from solved, with the gap glowing.
+  const order = [1, 2, 3, 4, 5, 6, 7, 0, 8];
+  const colors = ["#7c3aed", "#8b5cf6", "#a855f7", "#c026d3", "#d946ef", "#e879f9", "#0891b2", "#22d3ee"];
+  return (
+    <svg viewBox="0 0 400 240" className="h-full w-full">
+      <defs>
+        <radialGradient id="desliz-bg" cx="70%" cy="30%" r="90%">
+          <stop offset="0%" stopColor="#312e81" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#desliz-bg)" />
+      <g transform="translate(125 25)">
+        <rect x="-6" y="-6" width="162" height="162" rx="14" fill="#0f172a" stroke="#8b5cf6" strokeOpacity="0.5" strokeWidth="2" />
+        {order.map((tile, pos) =>
+          tile === 0 ? (
+            <rect key={pos} x={(pos % 3) * 50 + 2} y={Math.floor(pos / 3) * 50 + 2} width="46" height="46" rx="8" fill="none" stroke="#22d3ee" strokeDasharray="4 4" strokeWidth="2" />
+          ) : (
+            <g key={pos} transform={`translate(${(pos % 3) * 50 + 2} ${Math.floor(pos / 3) * 50 + 2})`}>
+              <rect width="46" height="46" rx="8" fill={colors[tile - 1]} />
+              <text x="23" y="30" textAnchor="middle" fontSize="18" fontWeight="700" fill="#fff" fontFamily="system-ui, sans-serif">
+                {tile}
+              </text>
+            </g>
+          )
+        )}
+        <path d="M120 125 h-22 m6 -6 l-6 6 l6 6" stroke="#fff" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </g>
+    </svg>
+  );
+}
