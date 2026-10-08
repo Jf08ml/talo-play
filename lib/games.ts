@@ -6,7 +6,7 @@ import { getDb } from "./firebase";
  * `rooms/{id}/meta/game`; room codes are global, so one code is enough to
  * find (and redirect to) any game's room.
  */
-export type GameId = "rompecabezas" | "memotest" | "tutti";
+export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo";
 
 export interface GameInfo {
   id: GameId;
@@ -34,6 +34,12 @@ export const GAMES: Record<GameId, GameInfo> = {
     emoji: "📝",
     title: "Tutti Frutti",
     path: "tutti-frutti",
+  },
+  dibujo: {
+    id: "dibujo",
+    emoji: "🎨",
+    title: "Dibujá y adiviná",
+    path: "dibujo",
   },
 };
 

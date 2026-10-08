@@ -4,6 +4,7 @@ import { generateRoomCode } from "./ids";
 import { makeSeed, seededShuffle } from "./random";
 import { serverNow } from "./serverTime";
 import { transactState } from "./transact";
+import { normalizeText } from "./text";
 import { EASY_LETTERS } from "./tuttiCategories";
 
 /**
@@ -93,15 +94,7 @@ export function letterFor(seed: number, letters: string, round: number): string 
   return order[round % order.length];
 }
 
-/** Lowercase, no accents, single spaces: "  Peñarol " and "penarol" compare equal. */
-export function normalizeAnswer(text: string): string {
-  return text
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, " ");
-}
+export const normalizeAnswer = normalizeText;
 
 export function startsWithLetter(text: string, letter: string): boolean {
   return normalizeAnswer(text).startsWith(normalizeAnswer(letter));

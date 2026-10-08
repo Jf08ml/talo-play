@@ -154,6 +154,48 @@ export function TuttiThumbnail() {
   );
 }
 
+export function DibujoThumbnail() {
+  return (
+    <svg viewBox="0 0 400 240" className="h-full w-full">
+      <defs>
+        <radialGradient id="dibujo-bg" cx="80%" cy="80%" r="90%">
+          <stop offset="0%" stopColor="#3b0764" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+        <filter id="dibujo-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="5" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      <rect width="400" height="240" fill="url(#dibujo-bg)" />
+      <g transform="rotate(-3 200 120)">
+        <rect x="70" y="38" width="200" height="150" rx="12" fill="#f8fafc" />
+        {/* A quick sun-over-a-house doodle */}
+        <g fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="5">
+          <path d="M118 150 V112 L150 86 L182 112 V150 Z" stroke="#8b5cf6" />
+          <path d="M142 150 V128 H158 V150" stroke="#ec4899" />
+          <circle cx="226" cy="76" r="14" stroke="#eab308" />
+          <path d="M226 50 V56 M226 96 V102 M200 76 H206 M246 76 H252" stroke="#eab308" />
+          <path d="M92 160 Q170 150 250 162" stroke="#22c55e" />
+        </g>
+      </g>
+      <g filter="url(#dibujo-glow)" transform="translate(296 70)">
+        <rect width="78" height="30" rx="15" fill="#0f172a" stroke="#22d3ee" strokeWidth="2" />
+        <text x="39" y="20" textAnchor="middle" fontSize="13" fill="#e2e8f0" fontFamily="system-ui, sans-serif">
+          ¿casa?
+        </text>
+        <rect y="42" width="78" height="30" rx="15" fill="#064e3b" stroke="#34d399" strokeWidth="2" />
+        <text x="39" y="62" textAnchor="middle" fontSize="13" fill="#a7f3d0" fontFamily="system-ui, sans-serif">
+          ✓ +92
+        </text>
+      </g>
+    </svg>
+  );
+}
+
 export function ComingSoonThumbnail() {
   return (
     <svg viewBox="0 0 400 240" className="h-full w-full">

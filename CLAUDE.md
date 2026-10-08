@@ -16,7 +16,7 @@ There is no test suite. `next.config.ts` allows `*.trycloudflare.com` as a dev o
 
 ## What this is
 
-"Salón de Juegos": a hub (`app/page.tsx`) of real-time multiplayer browser games. Each game has a lobby at `/{game}` and rooms at `/{game}/[roomId]`; games so far: `rompecabezas` (collaborative/versus jigsaw), `memotest` (pairs) and `tutti` (Tutti Frutti, at `/tutti-frutti`). UI text is in Spanish (rioplatense voseo: "Subí", "Elegí") — keep that tone.
+"Salón de Juegos": a hub (`app/page.tsx`) of real-time multiplayer browser games. Each game has a lobby at `/{game}` and rooms at `/{game}/[roomId]`; games so far: `rompecabezas` (collaborative/versus jigsaw), `memotest` (pairs), `tutti` (Tutti Frutti, at `/tutti-frutti`) and `dibujo` (Dibujá y adiviná). UI text is in Spanish (rioplatense voseo: "Subí", "Elegí") — keep that tone.
 
 Stack: Next.js 16 App Router + React 19, Tailwind v4, Konva/react-konva for the puzzle board, Firebase Realtime Database + Storage. **There is no backend of our own and no Firebase Auth** — everything runs client-side. Firebase config comes from `NEXT_PUBLIC_FIREBASE_*` env vars (in `.env`, gitignored); when missing, pages render `FirebaseSetupNotice` instead of crashing. The Firebase project is `talo-play` (`.firebaserc`); rules live in `database.rules.json` / `storage.rules`. The Storage bucket needs the CORS config in `cors.json` (applied with `gcloud storage buckets update gs://talo-play.firebasestorage.app --cors-file=cors.json`, not by `firebase deploy`) because the puzzle loads its image with `crossOrigin` to cut it on a canvas.
 
@@ -55,6 +55,13 @@ Stack: Next.js 16 App Router + React 19, Tailwind v4, Konva/react-konva for the 
 - `rooms/{id}/tutti/state` — round flow `waiting → writing → reviewing → … → finished`, mutated only by transactions (`endRound`, `advanceRound`, `setReady`…). `gameNo` bumps on "Jugar de nuevo"; round data is keyed `g{gameNo}r{round}` (`roundKey`).
 - `rooms/{id}/tutti/answers/{rk}/{clientId}` (`c{cat}` → text, saved debounced while typing) and `votes/{rk}/{authorId}__c{cat}/{voterId}` (true = rejected) are plain writes outside the state transaction.
 - Scores are never stored: `scoreRound` computes them on every client from answers + votes (invalid if wrong letter or rejected by more than half of the other players; 20 only valid / 10 unique / 5 repeated, compared with `normalizeAnswer`). The round advances when every connected player is `ready`.
+
+### Dibujá y adiviná (`app/dibujo`, `lib/dibujo.ts`)
+
+- `rooms/{id}/meta` — `rounds` (times each player draws), `drawSeconds`, optional `customWords` + `useDefaultWords` (`lib/dibujoWords.ts`). Word options per turn come from `wordOptions(seed, wordPool(meta), turnNo)`.
+- `rooms/{id}/dibujo/state` — turn flow `choosing → drawing → reveal` (then the next turn or `finished`), with `drawer` fixed when each turn starts (players joining mid-turn don't shift it), the chosen `word`, `guessed` and cumulative `scores`. All via transactions guarded by `turnNo`; phase timeouts (`CHOOSE_SECONDS`, `drawSeconds`, `REVEAL_MS`) and absent drawers are handled by whichever client notices.
+- `strokes/{turnKey}/{pushId}` — `{color, width, points}` in a 1000×750 logical canvas (`components/dibujo/DrawingCanvas.tsx`, plain 2D canvas, no Konva), resent every 80 ms while drawing and followed with child events. `chat/{turnKey}` holds wrong guesses; correct ones are checked locally (`checkGuess`, accent-insensitive, "¡Casi!" at edit distance 1) and only recorded through `submitCorrectGuess`.
+- The secret word lives in the state, so it's readable with DevTools — accepted, there is no backend to hide it.
 
 ## Gotchas
 

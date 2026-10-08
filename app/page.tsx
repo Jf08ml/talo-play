@@ -9,6 +9,7 @@ import {
   PuzzleThumbnail,
   MemotestThumbnail,
   TuttiThumbnail,
+  DibujoThumbnail,
   ComingSoonThumbnail,
 } from "@/components/GameThumbnails";
 import PlayerIdentity from "@/components/PlayerIdentity";
@@ -56,6 +57,12 @@ export default function GamesHub() {
             title={`${GAMES.tutti.emoji} ${GAMES.tutti.title}`}
             description="Sale una letra y hay que llenar cada categoría. El primero que termina grita ¡Basta! Después se votan las respuestas."
             thumbnail={<TuttiThumbnail />}
+          />
+          <GameCard
+            href={`/${GAMES.dibujo.path}`}
+            title={`${GAMES.dibujo.emoji} ${GAMES.dibujo.title}`}
+            description="Uno dibuja una palabra secreta y los demás la adivinan en el chat. Cuanto más rápido, más puntos."
+            thumbnail={<DibujoThumbnail />}
           />
           <GameCard
             href="#"
