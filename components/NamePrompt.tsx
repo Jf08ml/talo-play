@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { GAMES, type GameId } from "@/lib/games";
 import { TaloMark } from "./TaloLogo";
+import GameIcon from "./GameIcon";
 
 export default function NamePrompt({
   onSubmit,
@@ -44,8 +45,8 @@ export default function NamePrompt({
             <TaloMark className="h-8 w-8 shrink-0" />
             <p className="text-sm text-slate-300">
               Te invitaron a jugar{" "}
-              <span className="font-semibold text-slate-100">
-                {GAMES[invitedTo].emoji} {GAMES[invitedTo].title}
+              <span className="inline-flex items-center gap-1 align-middle font-semibold text-slate-100">
+                <GameIcon game={invitedTo} size="sm" /> {GAMES[invitedTo].title}
               </span>{" "}
               en Talo
             </p>

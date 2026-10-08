@@ -8,6 +8,8 @@ import { useClientIdentity } from "@/hooks/useClientIdentity";
 import FirebaseSetupNotice from "./FirebaseSetupNotice";
 import PlayerIdentity from "./PlayerIdentity";
 import { TaloMark } from "./TaloLogo";
+import GameIcon from "./GameIcon";
+import { ChevronLeft, Clock, Users } from "lucide-react";
 import { CARD } from "./ui";
 
 /**
@@ -25,17 +27,22 @@ export default function GameLobby({ game, children }: { game: GameId; children: 
     <div className="flex flex-1 flex-col items-center px-4 py-8">
       <div className="w-full max-w-3xl">
         <Link href="/" className="mb-5 inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-violet-300">
-          ← <TaloMark className="h-5 w-5" /> Volver a Talo
+          <ChevronLeft className="h-4 w-4" /> <TaloMark className="h-5 w-5" /> Volver a Talo
         </Link>
 
         <div className="text-center">
-          <h1 className="font-display text-3xl font-bold tracking-tight text-slate-100 sm:text-4xl">
-            {info.emoji} {info.title}
+          <h1 className="flex items-center justify-center gap-3 font-display text-3xl font-bold tracking-tight text-slate-100 sm:text-4xl">
+            <GameIcon game={game} size="lg" />
+            {info.title}
           </h1>
           <p className="mx-auto mt-2 max-w-xl text-slate-400">{info.tagline}</p>
           <div className="mt-3 flex justify-center gap-2 text-xs text-slate-400">
-            <span className="rounded-full bg-slate-800 px-2.5 py-1">👤 {playersLabel(info)} jugadores</span>
-            <span className="rounded-full bg-slate-800 px-2.5 py-1">⏱ {info.duration}</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-2.5 py-1">
+              <Users className="h-3.5 w-3.5" /> {playersLabel(info)} jugadores
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-2.5 py-1">
+              <Clock className="h-3.5 w-3.5" /> {info.duration}
+            </span>
           </div>
         </div>
 

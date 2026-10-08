@@ -3,7 +3,9 @@
 import type { ReactNode } from "react";
 import { GAMES, type GameId } from "@/lib/games";
 import type { PresenceMap } from "@/lib/presence";
+import { Crown } from "lucide-react";
 import InviteCard from "./InviteCard";
+import GameIcon from "./GameIcon";
 import { CARD, PRIMARY_BUTTON } from "./ui";
 
 export interface WaitingPlayer {
@@ -69,8 +71,9 @@ export default function WaitingRoom({
   return (
     <div className={`${CARD} flex flex-col gap-5`}>
       <div className="text-center">
-        <p className="font-display text-2xl font-semibold text-slate-100">
-          {info.emoji} {info.title}
+        <p className="flex items-center justify-center gap-2.5 font-display text-2xl font-semibold text-slate-100">
+          <GameIcon game={game} />
+          {info.title}
         </p>
         {summary && <p className="mt-1 text-sm text-slate-400">{summary}</p>}
       </div>
@@ -95,7 +98,7 @@ export default function WaitingRoom({
               </span>
               {p.name}
               {p.id === myId && <span className="text-slate-500">(vos)</span>}
-              {p.id === hostId && <span title="Anfitrión">👑</span>}
+              {p.id === hostId && <Crown className="h-4 w-4 text-amber-300" aria-label="Anfitrión" />}
             </li>
           ))}
         </ul>

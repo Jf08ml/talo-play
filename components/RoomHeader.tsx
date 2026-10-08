@@ -5,6 +5,8 @@ import Link from "next/link";
 import { GAMES, type GameId } from "@/lib/games";
 import { shareInvite } from "@/lib/share";
 import { TaloMark } from "./TaloLogo";
+import GameIcon from "./GameIcon";
+import { Check, Share2 } from "lucide-react";
 
 /**
  * Top bar shared by every game's room: back to Talo, which game, room code
@@ -37,8 +39,8 @@ export default function RoomHeader({
         <Link href="/" aria-label="Volver a Talo" className="flex items-center gap-1.5 hover:opacity-80">
           <TaloMark className="h-6 w-6" />
         </Link>
-        <span className="font-display text-sm font-semibold text-slate-200">
-          {GAMES[game].emoji} <span className="hidden sm:inline">{GAMES[game].title}</span>
+        <span className="flex items-center gap-1.5 font-display text-sm font-semibold text-slate-200">
+          <GameIcon game={game} size="sm" /> <span className="hidden sm:inline">{GAMES[game].title}</span>
         </span>
         <span className="text-slate-700">·</span>
         <span className="rounded-md border border-violet-500/20 bg-slate-800 px-2 py-1 font-mono text-sm font-semibold text-violet-200">
@@ -47,9 +49,10 @@ export default function RoomHeader({
         {badges}
         <button
           onClick={invite}
-          className="rounded-md bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-200 ring-1 ring-cyan-400/30 transition hover:bg-cyan-500/25"
+          className="flex items-center gap-1.5 rounded-md bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-200 ring-1 ring-cyan-400/30 transition hover:bg-cyan-500/25"
         >
-          {copied ? "¡Link copiado!" : "📤 Invitar"}
+          {copied ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
+          {copied ? "¡Link copiado!" : "Invitar"}
         </button>
       </div>
 

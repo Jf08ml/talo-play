@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
+import { Check, Link, Share2 } from "lucide-react";
 import type { GameId } from "@/lib/games";
 import { canNativeShare, copyInvite, shareInvite, whatsappUrl } from "@/lib/share";
 
@@ -40,18 +41,19 @@ export default function InviteCard({ game, roomId }: { game: GameId; roomId: str
         {nativeShare && (
           <button
             onClick={() => shareInvite(game, roomId)}
-            className="rounded-lg border border-slate-600 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800"
+            className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-600 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800"
           >
-            📤 Compartir
+            <Share2 className="h-4 w-4" /> Compartir
           </button>
         )}
         <button
           onClick={copy}
-          className={`rounded-lg border border-slate-600 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800 ${
+          className={`flex items-center justify-center gap-1.5 rounded-lg border border-slate-600 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800 ${
             nativeShare ? "" : "col-span-2"
           }`}
         >
-          {copied ? "¡Link copiado!" : "🔗 Copiar link"}
+          {copied ? <Check className="h-4 w-4" /> : <Link className="h-4 w-4" />}
+          {copied ? "¡Link copiado!" : "Copiar link"}
         </button>
       </div>
     </div>

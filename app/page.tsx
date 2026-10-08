@@ -8,6 +8,7 @@ import GameCard from "@/components/GameCard";
 import JoinRoomForm from "@/components/JoinRoomForm";
 import TaloLogo from "@/components/TaloLogo";
 import PlayerIdentity from "@/components/PlayerIdentity";
+import { CONTEXT_ICONS } from "@/components/GameIcon";
 import {
   PuzzleThumbnail,
   MemotestThumbnail,
@@ -61,6 +62,7 @@ export default function Home() {
           <div className="mx-auto mt-4 grid max-w-2xl grid-cols-2 gap-2 sm:grid-cols-4">
             {CONTEXTS.map((c) => {
               const active = context === c.id;
+              const Icon = CONTEXT_ICONS[c.id];
               return (
                 <button
                   key={c.id}
@@ -72,7 +74,7 @@ export default function Home() {
                       : "border-slate-700/80 bg-slate-900/50 hover:border-slate-500"
                   }`}
                 >
-                  <span className="text-2xl">{c.emoji}</span>
+                  <Icon className={`h-6 w-6 ${active ? "text-fuchsia-300" : "text-slate-300"}`} />
                   <span className="font-semibold text-slate-100">{c.label}</span>
                   <span className="text-xs text-slate-500">{c.hint}</span>
                 </button>

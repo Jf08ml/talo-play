@@ -11,16 +11,15 @@ export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo"
 /** Who you're playing with: the first question the home page asks. */
 export type PlayContext = "pareja" | "amigos" | "grupo" | "solo";
 
-export const CONTEXTS: { id: PlayContext; emoji: string; label: string; hint: string }[] = [
-  { id: "pareja", emoji: "❤️", label: "En pareja", hint: "De a dos" },
-  { id: "amigos", emoji: "👥", label: "Con amigos", hint: "3 a 6" },
-  { id: "grupo", emoji: "🎉", label: "En grupo", hint: "Reuniones y fiestas" },
-  { id: "solo", emoji: "🧍", label: "Solo", hint: "Un rato para vos" },
+export const CONTEXTS: { id: PlayContext; label: string; hint: string }[] = [
+  { id: "pareja", label: "En pareja", hint: "De a dos" },
+  { id: "amigos", label: "Con amigos", hint: "3 a 6" },
+  { id: "grupo", label: "En grupo", hint: "Reuniones y fiestas" },
+  { id: "solo", label: "Solo", hint: "Un rato para vos" },
 ];
 
 export interface GameInfo {
   id: GameId;
-  emoji: string;
   title: string;
   /** URL segment: the lobby lives at `/{path}` and rooms at `/{path}/{roomId}`. */
   path: string;
@@ -38,7 +37,6 @@ export interface GameInfo {
 export const GAMES: Record<GameId, GameInfo> = {
   rompecabezas: {
     id: "rompecabezas",
-    emoji: "🧩",
     title: "Rompecabezas",
     path: "rompecabezas",
     tagline: "Convertí una foto en un rompecabezas y armalo en equipo, o en una carrera rojos contra azules.",
@@ -54,7 +52,6 @@ export const GAMES: Record<GameId, GameInfo> = {
   },
   deslizante: {
     id: "deslizante",
-    emoji: "🔲",
     title: "Rompecabezas deslizante",
     path: "deslizante",
     tagline: "Las fichas están mezcladas y falta una. Misma mezcla para todos: gana quien lo ordena primero.",
@@ -70,7 +67,6 @@ export const GAMES: Record<GameId, GameInfo> = {
   },
   memotest: {
     id: "memotest",
-    emoji: "🃏",
     title: "Memotest",
     path: "memotest",
     tagline: "Dá vuelta las cartas y encontrá los pares: con emojis, fotos propias o pares de palabras.",
@@ -86,7 +82,6 @@ export const GAMES: Record<GameId, GameInfo> = {
   },
   tutti: {
     id: "tutti",
-    emoji: "📝",
     title: "Tutti Frutti",
     path: "tutti-frutti",
     tagline: "Sale una letra y hay que llenar cada categoría. El primero que termina grita ¡Basta!",
@@ -97,12 +92,11 @@ export const GAMES: Record<GameId, GameInfo> = {
     howTo: [
       "Sale una letra: completá cada categoría con una palabra que empiece con ella.",
       "Cuando terminás, tocá ¡Basta! y se cierra la ronda para todos.",
-      "Revisen las respuestas y voten 👎 las que no valen. Las únicas suman más.",
+      "Revisen las respuestas y voten las que no valen. Las únicas suman más.",
     ],
   },
   dibujo: {
     id: "dibujo",
-    emoji: "🎨",
     title: "Dibujá y adiviná",
     path: "dibujo",
     tagline: "Uno dibuja una palabra secreta y los demás la adivinan en el chat. Cuanto más rápido, más puntos.",
@@ -118,7 +112,6 @@ export const GAMES: Record<GameId, GameInfo> = {
   },
   codigo: {
     id: "codigo",
-    emoji: "🕵️",
     title: "Código secreto",
     path: "codigo-secreto",
     tagline: "Rojos contra azules. Los jefes de espías dan pistas de una palabra para encontrar a sus agentes.",
