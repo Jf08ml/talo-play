@@ -19,6 +19,7 @@ import {
   CuatroThumbnail,
   PalabraThumbnail,
   TriviaThumbnail,
+  ImpostorThumbnail,
 } from "@/components/GameThumbnails";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 
@@ -32,6 +33,7 @@ const THUMBNAILS: Record<GameId, ReactNode> = {
   cuatro: <CuatroThumbnail />,
   palabra: <PalabraThumbnail />,
   trivia: <TriviaThumbnail />,
+  impostor: <ImpostorThumbnail />,
 };
 
 export default function Home() {

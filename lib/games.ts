@@ -6,7 +6,7 @@
  * Every room stores its game in `rooms/{id}/meta/game`; room codes are
  * global, so one code is enough to find any game's room (`lib/roomLookup.ts`).
  */
-export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia";
+export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor";
 
 /** Who you're playing with: the first question the home page asks. */
 export type PlayContext = "pareja" | "amigos" | "grupo" | "solo";
@@ -155,6 +155,21 @@ export const GAMES: Record<GameId, GameInfo> = {
       "Acertar suma de 500 a 1000 puntos: cuanto más rápido, más.",
     ],
   },
+  impostor: {
+    id: "impostor",
+    title: "El impostor",
+    path: "impostor",
+    tagline: "Todos tienen la misma palabra menos uno, que tiene que disimular. Den pistas, sospechen y voten.",
+    minPlayers: 3,
+    maxPlayers: 12,
+    duration: "5–10 min",
+    contexts: ["amigos", "grupo"],
+    howTo: [
+      "Mirá tu carta a escondidas: tiene la palabra secreta, o te dice que sos el impostor.",
+      "Por turnos, cada uno da una pista de una palabra, sin regalarla.",
+      "Voten quién es el impostor. Si lo descubren, todavía puede ganar adivinando la palabra.",
+    ],
+  },
   codigo: {
     id: "codigo",
     title: "Código secreto",
@@ -173,7 +188,7 @@ export const GAMES: Record<GameId, GameInfo> = {
 };
 
 /** Home page order: quickest to start first. */
-export const GAME_ORDER: GameId[] = ["memotest", "trivia", "palabra", "cuatro", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
+export const GAME_ORDER: GameId[] = ["memotest", "impostor", "trivia", "palabra", "cuatro", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
 
 export function roomPath(game: GameId, roomId: string): string {
   return `/${GAMES[game].path}/${roomId}`;

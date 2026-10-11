@@ -393,3 +393,46 @@ export function TriviaThumbnail() {
     </svg>
   );
 }
+
+export function ImpostorThumbnail() {
+  // A row of identical cards and one that's different.
+  const cards = [
+    { x: 58, r: -8, impostor: false },
+    { x: 130, r: -3, impostor: false },
+    { x: 202, r: 3, impostor: true },
+    { x: 274, r: 8, impostor: false },
+  ];
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="impostor-bg" cx="55%" cy="40%" r="80%">
+          <stop offset="0%" stopColor="#500724" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+        <filter id="impostor-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="6" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      <rect width="400" height="240" fill="url(#impostor-bg)" />
+      {cards.map((c, i) => (
+        <g key={i} transform={`translate(${c.x} 58) rotate(${c.r} 34 62)`} filter={c.impostor ? "url(#impostor-glow)" : undefined}>
+          <rect
+            width="68"
+            height="124"
+            rx="10"
+            fill={c.impostor ? "#4c0519" : "#1e293b"}
+            stroke={c.impostor ? "#fb7185" : "#a78bfa"}
+            strokeWidth="2.5"
+          />
+          <text x="34" y="74" textAnchor="middle" fontSize={c.impostor ? 34 : 13} fontWeight="700" fill="#e2e8f0" fontFamily="system-ui, sans-serif">
+            {c.impostor ? "?" : "PIZZA"}
+          </text>
+        </g>
+      ))}
+    </svg>
+  );
+}
