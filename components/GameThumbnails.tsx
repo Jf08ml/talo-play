@@ -349,3 +349,47 @@ export function PalabraThumbnail() {
     </svg>
   );
 }
+
+export function TriviaThumbnail() {
+  // A question card with four colored answers, one marked right.
+  const options = [
+    { color: "#ef4444", w: 92 },
+    { color: "#3b82f6", w: 70, right: true },
+    { color: "#eab308", w: 84 },
+    { color: "#22c55e", w: 60 },
+  ];
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="trivia-bg" cx="50%" cy="0%" r="100%">
+          <stop offset="0%" stopColor="#713f12" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#trivia-bg)" />
+      <g transform="translate(70 26)">
+        <rect width="260" height="64" rx="12" fill="#0f172a" stroke="#facc15" strokeOpacity="0.5" strokeWidth="2" />
+        <text x="130" y="41" textAnchor="middle" fontSize="26" fontWeight="700" fill="#fde68a" fontFamily="system-ui, sans-serif">
+          ¿ ? ? ?
+        </text>
+        {options.map((o, i) => (
+          <g key={i} transform={`translate(${(i % 2) * 134} ${80 + Math.floor(i / 2) * 52})`}>
+            <rect
+              width="126"
+              height="42"
+              rx="9"
+              fill={`${o.color}33`}
+              stroke={o.right ? "#10b981" : o.color}
+              strokeWidth={o.right ? 3 : 2}
+            />
+            <rect x="8" y="9" width="24" height="24" rx="6" fill={o.color} />
+            <rect x="40" y="18" width={o.w - 20} height="7" rx="3.5" fill="#e2e8f0" opacity="0.7" />
+            {o.right && (
+              <path d="M14 21 l5 5 l9 -10" stroke="#fff" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            )}
+          </g>
+        ))}
+      </g>
+    </svg>
+  );
+}

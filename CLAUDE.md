@@ -16,7 +16,7 @@ There is no test suite. `next.config.ts` allows `*.trycloudflare.com` as a dev o
 
 ## What this is
 
-**Talo**: social games to play together — in pairs, with friends, in groups or solo. The core flow is: pick a game, create a room, send the link (WhatsApp), others tap it, type a name and play; no sign-up. The home (`app/page.tsx`) asks "¿Con quién vas a jugar?" and filters games by `PlayContext`. Each game has a lobby at `/{game}` and rooms at `/{game}/[roomId]`; games so far: `rompecabezas` (collaborative/versus jigsaw), `memotest` (pairs), `tutti` (Tutti Frutti, at `/tutti-frutti`), `dibujo` (Dibujá y adiviná), `codigo` (Código secreto, at `/codigo-secreto`), `deslizante` (sliding puzzle race), `cuatro` (4 en línea, at `/4-en-linea`) and `palabra` (Palabra secreta, a Wordle race, at `/palabra-secreta`). UI text is in Spanish (rioplatense voseo: "Subí", "Elegí") — keep that tone.
+**Talo**: social games to play together — in pairs, with friends, in groups or solo. The core flow is: pick a game, create a room, send the link (WhatsApp), others tap it, type a name and play; no sign-up. The home (`app/page.tsx`) asks "¿Con quién vas a jugar?" and filters games by `PlayContext`. Each game has a lobby at `/{game}` and rooms at `/{game}/[roomId]`; games so far: `rompecabezas` (collaborative/versus jigsaw), `memotest` (pairs), `tutti` (Tutti Frutti, at `/tutti-frutti`), `dibujo` (Dibujá y adiviná), `codigo` (Código secreto, at `/codigo-secreto`), `deslizante` (sliding puzzle race), `cuatro` (4 en línea, at `/4-en-linea`), `palabra` (Palabra secreta, a Wordle race, at `/palabra-secreta`) and `trivia`. UI text is in Spanish (rioplatense voseo: "Subí", "Elegí") — keep that tone.
 
 Stack: Next.js 16 App Router + React 19, Tailwind v4, Konva/react-konva for the puzzle board, Firebase Realtime Database + Storage. **There is no backend of our own and no Firebase Auth** — everything runs client-side. Firebase config comes from `NEXT_PUBLIC_FIREBASE_*` env vars (in `.env`, gitignored); when missing, pages render `FirebaseSetupNotice` instead of crashing. The Firebase project is `talo-play` (`.firebaserc`); rules live in `database.rules.json` / `storage.rules`. The Storage bucket needs the CORS config in `cors.json` (applied with `gcloud storage buckets update gs://talo-play.firebasestorage.app --cors-file=cors.json`, not by `firebase deploy`) because the puzzle loads its image with `crossOrigin` to cut it on a canvas.
 
@@ -87,6 +87,11 @@ Stack: Next.js 16 App Router + React 19, Tailwind v4, Konva/react-konva for the 
 - Wordle race, same shape as the deslizante race: the word is `secretWord(seed)`, picked by index from `lib/palabraWords.ts` (append-only). Guesses are compared with `normalizeWord` (uppercase, no accents, but Ñ kept). There's no dictionary: any 5 letters count as a guess.
 - Each player writes only `rooms/{id}/palabra/boards/g{gameNo}/{clientId}` (`{guesses}`); rivals render just the colors (`scoreGuess`), never the letters.
 - `palabra/state` — `startedAt` (countdown), `results` (`reportFinish`, once per player, solved or out of tries), `winner` (first to solve) and `wins` per player. "Nueva palabra" can only be asked by someone who already finished.
+
+### Trivia (`app/trivia`, `lib/trivia.ts`)
+
+- `rooms/{id}/meta` — `questionCount`, `seconds`, `categories` (read through `normalizeMeta`). The game's questions are `pickQuestions(seed, categories, count)` — indexes into `lib/triviaQuestions.ts` (append-only; `a[0]` is the right answer) — and each one's option order is `questionView(seed, index)`.
+- `rooms/{id}/trivia/state` — flow `question → reveal → … → finished`, like dibujo: `phaseStartedAt` (the first question's is `COUNTDOWN_MS` ahead), `answers` for the current question (`{choice, points}`, choice 0 = right) and cumulative `scores`. `submitAnswer` scores by time left (500–1000) and reveals once every connected player answered; otherwise any client calls `revealAnswer` / `nextQuestion` when the phase times out, guarded by `qNo`.
 
 ## Gotchas
 
