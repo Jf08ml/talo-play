@@ -6,7 +6,7 @@
  * Every room stores its game in `rooms/{id}/meta/game`; room codes are
  * global, so one code is enough to find any game's room (`lib/roomLookup.ts`).
  */
-export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro";
+export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra";
 
 /** Who you're playing with: the first question the home page asks. */
 export type PlayContext = "pareja" | "amigos" | "grupo" | "solo";
@@ -125,6 +125,21 @@ export const GAMES: Record<GameId, GameInfo> = {
       "Gana quien alinea cuatro en horizontal, vertical o diagonal. Los demás miran.",
     ],
   },
+  palabra: {
+    id: "palabra",
+    title: "Palabra secreta",
+    path: "palabra-secreta",
+    tagline: "Adiviná la palabra de cinco letras en seis intentos. Todos tienen la misma: gana quien la saca primero.",
+    minPlayers: 1,
+    maxPlayers: 8,
+    duration: "3–5 min",
+    contexts: ["solo", "pareja", "amigos"],
+    howTo: [
+      "Escribí una palabra de cinco letras y mandala.",
+      "Verde: letra en su lugar. Amarillo: está, pero en otro lugar. Gris: no está.",
+      "Mirá los colores de los demás en vivo: gana el primero que la adivina.",
+    ],
+  },
   codigo: {
     id: "codigo",
     title: "Código secreto",
@@ -143,7 +158,7 @@ export const GAMES: Record<GameId, GameInfo> = {
 };
 
 /** Home page order: quickest to start first. */
-export const GAME_ORDER: GameId[] = ["memotest", "cuatro", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
+export const GAME_ORDER: GameId[] = ["memotest", "palabra", "cuatro", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
 
 export function roomPath(game: GameId, roomId: string): string {
   return `/${GAMES[game].path}/${roomId}`;

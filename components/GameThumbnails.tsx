@@ -308,3 +308,44 @@ export function CuatroThumbnail() {
     </svg>
   );
 }
+
+export function PalabraThumbnail() {
+  // Three guesses closing in on the word, Wordle-style.
+  const rows = [
+    { word: "LIMON", s: "y.yy." },
+    { word: "NOCHE", s: ".g..y" },
+    { word: "MOTEL", s: "ggggg" },
+  ];
+  const fill: Record<string, string> = { g: "#10b981", y: "#fbbf24", ".": "#334155" };
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="palabra-bg" cx="80%" cy="20%" r="90%">
+          <stop offset="0%" stopColor="#064e3b" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#palabra-bg)" />
+      <g transform="translate(97 36)">
+        {rows.map((row, r) =>
+          [...row.word].map((ch, i) => (
+            <g key={`${r}-${i}`} transform={`translate(${i * 42} ${r * 58})`}>
+              <rect width="38" height="50" rx="6" fill={fill[row.s[i]]} />
+              <text
+                x="19"
+                y="33"
+                textAnchor="middle"
+                fontSize="22"
+                fontWeight="700"
+                fill={row.s[i] === "y" ? "#0f172a" : "#fff"}
+                fontFamily="system-ui, sans-serif"
+              >
+                {ch}
+              </text>
+            </g>
+          ))
+        )}
+      </g>
+    </svg>
+  );
+}
