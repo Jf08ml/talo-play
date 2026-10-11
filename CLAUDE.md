@@ -16,7 +16,7 @@ There is no test suite. `next.config.ts` allows `*.trycloudflare.com` as a dev o
 
 ## What this is
 
-**Talo**: social games to play together — in pairs, with friends, in groups or solo. The core flow is: pick a game, create a room, send the link (WhatsApp), others tap it, type a name and play; no sign-up. The home (`app/page.tsx`) asks "¿Con quién vas a jugar?" and filters games by `PlayContext`. Each game has a lobby at `/{game}` and rooms at `/{game}/[roomId]`; games so far: `rompecabezas` (collaborative/versus jigsaw), `memotest` (pairs), `tutti` (Tutti Frutti, at `/tutti-frutti`), `dibujo` (Dibujá y adiviná), `codigo` (Código secreto, at `/codigo-secreto`) and `deslizante` (sliding puzzle race). UI text is in Spanish (rioplatense voseo: "Subí", "Elegí") — keep that tone.
+**Talo**: social games to play together — in pairs, with friends, in groups or solo. The core flow is: pick a game, create a room, send the link (WhatsApp), others tap it, type a name and play; no sign-up. The home (`app/page.tsx`) asks "¿Con quién vas a jugar?" and filters games by `PlayContext`. Each game has a lobby at `/{game}` and rooms at `/{game}/[roomId]`; games so far: `rompecabezas` (collaborative/versus jigsaw), `memotest` (pairs), `tutti` (Tutti Frutti, at `/tutti-frutti`), `dibujo` (Dibujá y adiviná), `codigo` (Código secreto, at `/codigo-secreto`), `deslizante` (sliding puzzle race) and `cuatro` (4 en línea, at `/4-en-linea`). UI text is in Spanish (rioplatense voseo: "Subí", "Elegí") — keep that tone.
 
 Stack: Next.js 16 App Router + React 19, Tailwind v4, Konva/react-konva for the puzzle board, Firebase Realtime Database + Storage. **There is no backend of our own and no Firebase Auth** — everything runs client-side. Firebase config comes from `NEXT_PUBLIC_FIREBASE_*` env vars (in `.env`, gitignored); when missing, pages render `FirebaseSetupNotice` instead of crashing. The Firebase project is `talo-play` (`.firebaserc`); rules live in `database.rules.json` / `storage.rules`. The Storage bucket needs the CORS config in `cors.json` (applied with `gcloud storage buckets update gs://talo-play.firebasestorage.app --cors-file=cors.json`, not by `firebase deploy`) because the puzzle loads its image with `crossOrigin` to cut it on a canvas.
 
@@ -76,6 +76,11 @@ Stack: Next.js 16 App Router + React 19, Tailwind v4, Konva/react-konva for the 
 - Race mode: `rooms/{id}/meta` has `size` (3–5), `imageUrl` (square crop via `lib/images.ts`, Storage `rooms/{id}/image.jpg`) and `showNumbers`. Everyone starts from `scramble(size, seed)` — a seeded random walk of the gap from the solved board, so it's always solvable.
 - A board is `tiles[position] = tile` (tile `t` belongs at `t - 1`, 0 = gap). Each player writes only their own `rooms/{id}/desliz/boards/g{gameNo}/{clientId}` (`{tiles, moves}`); others render it as a live preview. Moves are validated client-side (`slide`).
 - `desliz/state` — `startedAt` (server time, `COUNTDOWN_MS` ahead, moves locked until then), `results` (`reportFinish`, once per player) and `winner` (first to report). "Nueva carrera" needs a winner and goes back to waiting with a new seed.
+
+### 4 en línea (`app/4-en-linea`, `lib/cuatro.ts`)
+
+- `rooms/{id}/cuatro/state` — `seats` (`a` red / `b` yellow → client id), `cells` (a 42-char string, row-major from the top: `.` empty, `a`/`b` a disc), `turn`, `starter` (alternates on each "Revancha"), `lastMove`, `winner` (`a`/`b`/`draw`) and `wins` per client id. Everyone else in the room watches.
+- Joining before the game auto-sits you in a free seat. A seat whose player left can be taken (`takeSeat`, guarded by the occupant you saw), also mid-game by a spectator. `dropDisc` is guarded by the move count so a double tap can't play twice; the win (`findWin`) is checked inside the transaction.
 
 ## Gotchas
 

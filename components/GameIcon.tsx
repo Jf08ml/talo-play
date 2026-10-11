@@ -1,6 +1,7 @@
 import {
   Brain,
   Brush,
+  CircleDot,
   Grid3x3,
   Heart,
   NotebookPen,
@@ -20,6 +21,7 @@ const GAME_ICONS: Record<GameId, { icon: LucideIcon; gradient: string }> = {
   memotest: { icon: Brain, gradient: "from-cyan-500 to-sky-600" },
   tutti: { icon: NotebookPen, gradient: "from-fuchsia-500 to-pink-600" },
   dibujo: { icon: Brush, gradient: "from-amber-400 to-orange-500" },
+  cuatro: { icon: CircleDot, gradient: "from-rose-500 to-amber-400" },
   codigo: { icon: VenetianMask, gradient: "from-rose-500 to-red-600" },
   deslizante: { icon: Grid3x3, gradient: "from-indigo-500 to-violet-600" },
   rompecabezas: { icon: Puzzle, gradient: "from-violet-500 to-purple-600" },

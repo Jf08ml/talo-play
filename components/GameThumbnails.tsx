@@ -272,3 +272,39 @@ export function DeslizanteThumbnail() {
     </svg>
   );
 }
+
+export function CuatroThumbnail() {
+  // A 7×6 board mid-game, with red about to complete a diagonal.
+  const rows = [
+    ".......",
+    ".......",
+    "...a...",
+    "..ab...",
+    ".abba..",
+    "babab.b",
+  ];
+  const fill: Record<string, string> = { a: "#fb3a5d", b: "#facc15", ".": "#0b0a14" };
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="cuatro-bg" cx="20%" cy="20%" r="90%">
+          <stop offset="0%" stopColor="#4c0519" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#cuatro-bg)" />
+      <g transform="translate(100 34)">
+        <rect width="200" height="172" rx="14" fill="#1d4ed8" stroke="#60a5fa" strokeOpacity="0.6" strokeWidth="2" />
+        {rows.map((row, r) =>
+          [...row].map((c, col) => (
+            <circle key={`${r}-${col}`} cx={18 + col * 27.3} cy={17 + r * 27.6} r="10.5" fill={fill[c]} />
+          ))
+        )}
+      </g>
+      <g transform="translate(100 34)">
+        <circle cx={18 + 0 * 27.3} cy={17 - 34} r="10.5" fill="#fb3a5d" />
+        <path d="M18 -4 v10 m-5 -5 l5 5 l5 -5" stroke="#fff" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </g>
+    </svg>
+  );
+}
