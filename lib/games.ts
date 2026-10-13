@@ -6,7 +6,7 @@
  * Every room stores its game in `rooms/{id}/meta/game`; room codes are
  * global, so one code is enough to find any game's room (`lib/roomLookup.ts`).
  */
-export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor";
+export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa";
 
 /** Who you're playing with: the first question the home page asks. */
 export type PlayContext = "pareja" | "amigos" | "grupo" | "solo";
@@ -170,6 +170,186 @@ export const GAMES: Record<GameId, GameInfo> = {
       "Voten quién es el impostor. Si lo descubren, todavía puede ganar adivinando la palabra.",
     ],
   },
+  probable: {
+    id: "probable",
+    title: "¿Quién es más probable?",
+    path: "quien-es-mas-probable",
+    tagline: "«¿Quién es más probable que llegue tarde a su propio casamiento?» Todos votan a alguien del grupo… y se arma.",
+    minPlayers: 3,
+    maxPlayers: 12,
+    duration: "10 min",
+    contexts: ["grupo", "amigos"],
+    howTo: [
+      "Sale una frase: «¿Quién es más probable que…?».",
+      "Cada uno vota en secreto a alguien de la sala (vale votarse).",
+      "Se revela quién se lleva el título. Sumás un punto si votaste con la mayoría.",
+    ],
+  },
+  conoces: {
+    id: "conoces",
+    title: "¿Cuánto me conocés?",
+    path: "cuanto-me-conoces",
+    tagline: "Uno contesta preguntas sobre sí mismo a escondidas y los demás tienen que adivinar qué eligió.",
+    minPlayers: 2,
+    maxPlayers: 8,
+    duration: "10 min",
+    contexts: ["pareja", "amigos", "grupo"],
+    howTo: [
+      "Por turnos, a uno le toca una pregunta sobre sí mismo y elige su respuesta en secreto.",
+      "Al mismo tiempo, los demás eligen lo que creen que contestó.",
+      "Cada acierto suma un punto para quien adivinó y otro para el protagonista.",
+    ],
+  },
+  generala: {
+    id: "generala",
+    title: "Generala",
+    path: "generala",
+    tagline: "El clásico de los cinco dados: escalera, full, póker y generala. Tres tiros por turno y a llenar la planilla.",
+    minPlayers: 2,
+    maxPlayers: 6,
+    duration: "15–20 min",
+    contexts: ["pareja", "amigos"],
+    howTo: [
+      "En tu turno tirás los dados hasta tres veces; entre tiro y tiro, tocá los que quieras guardar.",
+      "Anotá el resultado en un casillero libre de tu planilla, o tachá uno con 0.",
+      "Cuando se llenan las planillas gana el que más suma. ¡La generala servida gana en el acto!",
+    ],
+  },
+  naval: {
+    id: "naval",
+    title: "Batalla naval",
+    path: "batalla-naval",
+    tagline: "Escondé tu flota y hundí la del rival antes que él. Uno contra uno, disparo a disparo.",
+    minPlayers: 2,
+    maxPlayers: 2,
+    duration: "10 min",
+    contexts: ["pareja", "amigos"],
+    howTo: [
+      "Ubicá tus cinco barcos en el mapa (o mezclalos al azar) y tocá «Listo».",
+      "Por turnos, tocá una casilla del mapa rival para disparar. Si le das, tirás de nuevo.",
+      "Gana el primero que hunde toda la flota del otro.",
+    ],
+  },
+  emojis: {
+    id: "emojis",
+    title: "Adiviná con emojis",
+    path: "adivina-con-emojis",
+    tagline: "🦁👑 = El rey león. Películas, series, dichos y lugares escondidos en emojis: el que escribe primero suma más.",
+    minPlayers: 1,
+    maxPlayers: 12,
+    duration: "5–10 min",
+    contexts: ["solo", "pareja", "amigos", "grupo"],
+    howTo: [
+      "Aparecen unos emojis y la categoría: película, serie, dicho o lugar.",
+      "Escribí lo que creés que es; podés probar todas las veces que quieras.",
+      "Acertar suma de 500 a 1000 puntos: cuanto más rápido, más.",
+    ],
+  },
+  verdades: {
+    id: "verdades",
+    title: "Dos verdades y una mentira",
+    path: "dos-verdades-una-mentira",
+    tagline: "Cada uno cuenta tres cosas sobre sí mismo y una es mentira. ¿Quién engaña mejor al grupo?",
+    minPlayers: 3,
+    maxPlayers: 12,
+    duration: "10–15 min",
+    contexts: ["amigos", "grupo"],
+    howTo: [
+      "Escribí tres frases sobre vos: dos verdaderas y una inventada. Marcá cuál es la mentira.",
+      "Por turnos, el grupo vota cuál de las tres frases de cada uno es la mentira.",
+      "Acertar suma un punto; y cada uno que se la cree suma un punto para el mentiroso.",
+    ],
+  },
+  damas: {
+    id: "damas",
+    title: "Damas",
+    path: "damas",
+    tagline: "El clásico de tablero: avanzá en diagonal, comé las fichas del rival y coroná tus damas.",
+    minPlayers: 2,
+    maxPlayers: 2,
+    duration: "10–15 min",
+    contexts: ["pareja", "amigos"],
+    howTo: [
+      "Las fichas avanzan en diagonal, de a una casilla. Comen saltando por encima, hacia adelante o hacia atrás.",
+      "Comer es obligatorio, y si después podés seguir comiendo, seguís con la misma ficha.",
+      "La ficha que llega al fondo se corona dama y se mueve lejos. Gana quien deja al otro sin jugadas.",
+    ],
+  },
+  cajas: {
+    id: "cajas",
+    title: "Puntos y cajas",
+    path: "puntos-y-cajas",
+    tagline: "Por turnos, uní dos puntos. Quien cierra un cuadrado se lo queda y vuelve a jugar.",
+    minPlayers: 2,
+    maxPlayers: 4,
+    duration: "5–10 min",
+    contexts: ["pareja", "amigos"],
+    howTo: [
+      "En tu turno, tocá el espacio entre dos puntos para trazar una línea.",
+      "Si cerrás un cuadrado, es tuyo y jugás de nuevo.",
+      "Cuando no quedan líneas, gana quien tiene más cuadrados.",
+    ],
+  },
+  reto: {
+    id: "reto",
+    title: "Verdad o reto",
+    path: "verdad-o-reto",
+    tagline: "Te toca: ¿verdad o reto? La app reparte las preguntas y los desafíos; el grupo decide si cumpliste.",
+    minPlayers: 3,
+    maxPlayers: 12,
+    duration: "Libre",
+    contexts: ["amigos", "grupo"],
+    howTo: [
+      "Por turnos, al que le toca elige: verdad o reto.",
+      "Aparece una pregunta para contestar con la verdad, o un desafío para cumplir.",
+      "Los demás votan si cumplió: suma un punto. Si se raja, queda registrado…",
+    ],
+  },
+  mimica: {
+    id: "mimica",
+    title: "Mímica",
+    path: "mimica",
+    tagline: "Dos equipos, un celular que muestra la palabra y un minuto para actuar sin hablar. ¿Cuántas sacan?",
+    minPlayers: 4,
+    maxPlayers: 16,
+    duration: "15–20 min",
+    contexts: ["grupo"],
+    howTo: [
+      "Armen dos equipos. Por turnos, uno de cada equipo actúa; solo él ve la palabra en su celular.",
+      "Representala con gestos, sin hablar ni señalar cosas. Su equipo grita lo que cree que es.",
+      "Cada palabra adivinada suma un punto. Si es muy difícil, pasala. Gana el equipo con más puntos.",
+    ],
+  },
+  ahorcado: {
+    id: "ahorcado",
+    title: "Ahorcado",
+    path: "ahorcado",
+    tagline: "Uno elige una palabra secreta y los demás proponen letras por turnos antes de que se complete el ahorcado.",
+    minPlayers: 2,
+    maxPlayers: 8,
+    duration: "10 min",
+    contexts: ["pareja", "amigos"],
+    howTo: [
+      "Por rondas, a uno le toca elegir la palabra secreta (o que la elija la app).",
+      "Los demás, por turnos, proponen una letra o arriesgan la palabra entera.",
+      "Cada letra que está suma; cada error dibuja una parte del ahorcado. ¡Seis errores y gana el que eligió!",
+    ],
+  },
+  sopa: {
+    id: "sopa",
+    title: "Sopa de letras",
+    path: "sopa-de-letras",
+    tagline: "Todos tienen la misma sopa: encontrá las palabras escondidas antes que los demás.",
+    minPlayers: 1,
+    maxPlayers: 8,
+    duration: "5 min",
+    contexts: ["solo", "pareja", "amigos"],
+    howTo: [
+      "Las palabras están escondidas en línea recta: horizontal, vertical o en diagonal.",
+      "Tocá la primera letra y después la última para marcar una palabra.",
+      "Cada palabra es de quien la marca primero. Gana quien encuentra más.",
+    ],
+  },
   codigo: {
     id: "codigo",
     title: "Código secreto",
@@ -188,7 +368,7 @@ export const GAMES: Record<GameId, GameInfo> = {
 };
 
 /** Home page order: quickest to start first. */
-export const GAME_ORDER: GameId[] = ["memotest", "impostor", "trivia", "palabra", "cuatro", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
+export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "generala", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
 
 export function roomPath(game: GameId, roomId: string): string {
   return `/${GAMES[game].path}/${roomId}`;

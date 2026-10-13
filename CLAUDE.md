@@ -16,7 +16,7 @@ There is no test suite. `next.config.ts` allows `*.trycloudflare.com` as a dev o
 
 ## What this is
 
-**Talo**: social games to play together — in pairs, with friends, in groups or solo. The core flow is: pick a game, create a room, send the link (WhatsApp), others tap it, type a name and play; no sign-up. The home (`app/page.tsx`) asks "¿Con quién vas a jugar?" and filters games by `PlayContext`. Each game has a lobby at `/{game}` and rooms at `/{game}/[roomId]`; games so far: `rompecabezas` (collaborative/versus jigsaw), `memotest` (pairs), `tutti` (Tutti Frutti, at `/tutti-frutti`), `dibujo` (Dibujá y adiviná), `codigo` (Código secreto, at `/codigo-secreto`), `deslizante` (sliding puzzle race), `cuatro` (4 en línea, at `/4-en-linea`), `palabra` (Palabra secreta, a Wordle race, at `/palabra-secreta`), `trivia` and `impostor` (El impostor). UI text is in Spanish (rioplatense voseo: "Subí", "Elegí") — keep that tone.
+**Talo**: social games to play together — in pairs, with friends, in groups or solo. The core flow is: pick a game, create a room, send the link (WhatsApp), others tap it, type a name and play; no sign-up. The home (`app/page.tsx`) asks "¿Con quién vas a jugar?" and filters games by `PlayContext`. Each game has a lobby at `/{game}` and rooms at `/{game}/[roomId]`; games so far: `rompecabezas` (collaborative/versus jigsaw), `memotest` (pairs), `tutti` (Tutti Frutti, at `/tutti-frutti`), `dibujo` (Dibujá y adiviná), `codigo` (Código secreto, at `/codigo-secreto`), `deslizante` (sliding puzzle race), `cuatro` (4 en línea, at `/4-en-linea`), `palabra` (Palabra secreta, a Wordle race, at `/palabra-secreta`), `trivia`, `impostor` (El impostor), `naval` (Batalla naval, at `/batalla-naval`), `probable` (¿Quién es más probable?, at `/quien-es-mas-probable`), `conoces` (¿Cuánto me conocés?, at `/cuanto-me-conoces`), `generala`, `emojis` (Adiviná con emojis, at `/adivina-con-emojis`), `verdades` (Dos verdades y una mentira, at `/dos-verdades-una-mentira`), `damas`, `cajas` (Puntos y cajas, at `/puntos-y-cajas`), `reto` (Verdad o reto, at `/verdad-o-reto`), `mimica`, `ahorcado` and `sopa` (Sopa de letras, at `/sopa-de-letras`). UI text is in Spanish (rioplatense voseo: "Subí", "Elegí") — keep that tone.
 
 Stack: Next.js 16 App Router + React 19, Tailwind v4, Konva/react-konva for the puzzle board, Firebase Realtime Database + Storage. **There is no backend of our own and no Firebase Auth** — everything runs client-side. Firebase config comes from `NEXT_PUBLIC_FIREBASE_*` env vars (in `.env`, gitignored); when missing, pages render `FirebaseSetupNotice` instead of crashing. The Firebase project is `talo-play` (`.firebaserc`); rules live in `database.rules.json` / `storage.rules`. The Storage bucket needs the CORS config in `cors.json` (applied with `gcloud storage buckets update gs://talo-play.firebasestorage.app --cors-file=cors.json`, not by `firebase deploy`) because the puzzle loads its image with `crossOrigin` to cut it on a canvas.
 
@@ -97,6 +97,65 @@ Stack: Next.js 16 App Router + React 19, Tailwind v4, Konva/react-konva for the 
 
 - `rooms/{id}/meta` — `categories`, `clueMode` (`app`: clues typed by turns; `voz`: said out loud, the app only deals cards and runs the vote), `clueRounds`, `impostorHint` (the impostor sees the category). Read through `normalizeMeta`. The word is `secretFor(seed, categories)` from `lib/impostorWords.ts` (append-only).
 - `rooms/{id}/impostor/state` — flow `clues → voting → guess → result` per round. Each round fixes `order` (the connected players, shuffled; later joiners watch until the next one) and `impostor` (random, stored in the state). `giveClue` is guarded by the clue count and speaker; `castVote` resolves once every connected player in the round voted (or `closeVote` on timeout): a tie or a wrong accusation makes the impostor win; catching them leads to `guess`, where `submitGuess` (checked locally with `guessMatches`) or `guessTimeout` ends it. Scores: crew +1 each, impostor +2.
+
+### Batalla naval (`app/batalla-naval`, `lib/naval.ts`)
+
+- Seats `a`/`b` like 4 en línea (auto-sit before the game, `takeSeat` of a left player, also mid-game by a spectator who inherits the fleet). Flow `waiting → placing → playing → finished`.
+- Maps are 100-char strings, row-major on 10×10: `fleets/{seat}` has `.` water or the ship index (`FLEET`, `0`–`4`); `shots/{seat}` are the shots *fired by* that seat (`x`). Placement is local (`placeShip`, `randomFleet`) until `submitFleet`, which checks `validFleet`; when both are `ready` the battle starts. `fire` is guarded by the shooter's shot count; a hit shoots again. Both fleets are in the state (readable with DevTools — accepted); the UI only shows the rival's sunk ships until the end.
+
+### ¿Quién es más probable? (`app/quien-es-mas-probable`, `lib/probable.ts`)
+
+- `rooms/{id}/meta` — `decks` (`lib/probablePrompts.ts`, append-only), optional `customPrompts`, `questions`. The phrase is `promptFor(seed, promptPool(meta), qNo)`; the room plays `min(questions, pool size)`.
+- `probable/state` — `voting → reveal → … → finished`. Anyone connected votes for anyone (themselves too); `castVote` resolves once every connected player voted, else `closeVote` on timeout. Voting with the most voted (`topVoted`, ties share) is +1; the most voted get a `titles` count and the question's `history`. "Siguiente" is any player's tap, no timer.
+
+### ¿Cuánto me conocés? (`app/cuanto-me-conoces`, `lib/conoces.ts`)
+
+- `meta.rounds` = questions per player. `conoces/state` fixes `order` (protagonists) at start; turn `n`'s protagonist is `order[n % len]` and its question `questionFor(seed, n)` (`lib/conocesQuestions.ts`, append-only).
+- `answering → reveal`: the protagonist's `answer` and everyone else's `guesses` are submitted at the same time; it reveals when all connected players are in, on timeout (`closeTurn`), or skips (`skipTurn`) if the protagonist left without answering. Each right guess is +1 for the guesser and +1 for the protagonist; `hits` (`{protagonist}__{guesser}`) feeds "quién conoce mejor a quién".
+
+### Generala (`app/generala`, `lib/generala.ts`)
+
+- `generala/state` — `order` fixed per game (joiners watch), `turnNo` (player = `order[turnNo % len]`), `dice` (5 digits, "" before the first roll), `held` (`0`/`1` ×5), `rolls`, `sheets/{clientId}/{category}` (missing = empty box, 0 = crossed out). Dice are rolled with Math.random inside the `rollDice` transaction.
+- Argentine rules in `scoreFor`: escalera 20/25 (1-5, 2-6 or 3-4-5-6-1), full 30/35, póker 40/45 servido, generala 50, generala servida wins on the spot, doble generala 100 only with the generala already at 50. If the player in turn left, anyone can `skipTurn` (crosses out their first empty box).
+
+### Adiviná con emojis (`app/adivina-con-emojis`, `lib/emojis.ts`)
+
+- Trivia's flow and timing (`question → reveal → … → finished`, countdown, auto-advance after `REVEAL_MS`), but answers are typed. Puzzles are `pickPuzzles(seed, categories, count)` — indexes into `lib/emojiPuzzles.ts` (append-only; `alt` = other accepted answers).
+- `checkAnswer` runs locally (no accents/punctuation, leading article dropped, typo tolerance grows with length so refranes can be fuzzy; "close" → "¡Casi!"). Unlimited tries; only a right one is written (`submitSolved`, 500–1000 by time left), and the puzzle reveals once every connected player solved it. The answer hint shows each word's first letter from half time.
+
+### Dos verdades y una mentira (`app/dos-verdades-una-mentira`, `lib/verdades.ts`)
+
+- `verdades/state` — `writing → voting → reveal → … → finished`. In `writing` each player saves `statements/{clientId}` (`{s: [3 strings], lie}`) and can withdraw to edit; voting starts (`startVoting`, fixes a shuffled `order` of authors) when every connected player wrote, or earlier from an author's "Empezar sin esperar" (needs `MIN_AUTHORS`).
+- Per author: the rest vote the lie's index (`castVote`, resolves when all connected non-authors voted, or `closeVote` on timeout). Right vote +1 to the voter; wrong vote +1 to the author. "Siguiente" is any player's tap. The lie is in the state (DevTools) — accepted.
+
+### Damas (`app/damas`, `lib/damas.ts`)
+
+- Seats like 4 en línea; `a` = blancas (bottom, move first), `b` = negras, whose board is drawn flipped. `cells` is a 64-char string (`.`, `a`/`b` men, `A`/`B` kings). Rules in `legalMoves`: men step forward, capture both ways; capture is mandatory (any, not the longest); a capturing piece continues while it can (`chain` = its square, same turn, captured pieces removed at once); crowning only when the move ends on the far row; kings fly. No legal moves = loss.
+- `makeMove` is one step/jump guarded by `moveNo`. Also `resign` and `offerDraw` (the rival offering too = draw; any move clears the offer). "Revancha" swaps seats so colors alternate.
+
+### Puntos y cajas (`app/puntos-y-cajas`, `lib/cajas.ts`)
+
+- `meta.size` = boxes per side. `cajas/state` has `order` (up to `MAX_PLAYERS` of the connected, shuffled), `turn` (index in `order`), `lines` and `boxes` strings (`.` or the owner's index; horizontal lines first, then vertical — `hLine`/`vLine`/`boxLines`). `drawLine` is guarded by the drawn-line count; closing a box keeps the turn. If the player in turn left, anyone can `skipTurn`.
+
+### Verdad o reto (`app/verdad-o-reto`, `lib/reto.ts`)
+
+- `meta.levels` picks the decks of `lib/retoPrompts.ts` (append-only; `retoPools` concatenates them in catalog order). Endless: `reto/state` has `current`, `order` and `turnNo`; `advance` appends connected players not yet in `order` and skips the absent ones.
+- `choosing → card`: the player in turn picks verdad/reto and `pickCard` draws a random index not in `used` (`v{i}`/`r{i}`; reset per kind when exhausted). Anyone else `judge`s it (done +1, else `chickens` +1) and the turn moves on; `skipTurn` if the player left.
+
+### Mímica (`app/mimica`, `lib/mimica.ts`)
+
+- In person, two teams (`lib/teams.ts`), chosen in the waiting room (`chooseTeam`, `shuffleTeams`; joiners can pick mid-game); needs `MIN_PER_TEAM` connected per team. `meta` has `seconds` and `turns` per team.
+- `ready → acting → ready …`: the team's `actor` rotates by `acted[team]` among its connected members (`changeActor` skips). The actor starts the clock (`startActing`) and walks the words with `nextWord` (hit or pass, guarded by `wordNo`); the word is `wordFor(seed, wordNo)` over `lib/mimicaWords.ts` (append-only), shown to the actor and to the rival team, never to the actor's team. `endTurn` on timeout from any client, guarded by `turnNo`.
+
+### Ahorcado (`app/ahorcado`, `lib/ahorcado.ts`)
+
+- Each player in `order` sets one round's word (`chooseWord`, or `null` = the app picks from `DEFAULT_WORDS` of dibujo; then `fromApp` and the setter guesses too). Words are stored `cleanWord`ed (uppercase, no accents, Ñ and single spaces kept).
+- `guessing`: guessers rotate by `turnNo`; `guess` takes a letter or the whole word (a wrong word counts as a miss). +1 per right letter, +3 to whoever completes/guesses it, +3 to the setter if `MAX_MISSES` is reached (not when the app picked). `skipGuesser` for absent ones; `nextRound` until everyone set a word.
+
+### Sopa de letras (`app/sopa-de-letras`, `lib/sopa.ts`)
+
+- The board is `buildSoup(seed, theme, level)` — fully deterministic (words from `lib/sopaWords.ts`, append-only; directions per `LEVELS`). Changing the generator or the lists changes existing rooms' boards.
+- Players mark a word by tapping its first and last letter (`lineBetween` + `wordAt`, either direction). `claimWord` writes `found/{WORD}` = clientId if nobody did; the last word ends it (most words wins, `wins` counted). Countdown like the races (`startedAt`).
 
 ## Gotchas
 

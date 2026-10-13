@@ -436,3 +436,476 @@ export function ImpostorThumbnail() {
     </svg>
   );
 }
+
+export function NavalThumbnail() {
+  // A slice of the rival's map: misses, hits, and a ship going down.
+  const shots: { x: number; y: number; hit?: boolean }[] = [
+    { x: 1, y: 1 },
+    { x: 4, y: 0 },
+    { x: 2, y: 3, hit: true },
+    { x: 3, y: 3, hit: true },
+    { x: 4, y: 3, hit: true },
+    { x: 6, y: 1 },
+    { x: 7, y: 4 },
+    { x: 0, y: 4 },
+    { x: 5, y: 2 },
+  ];
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="naval-bg" cx="30%" cy="70%" r="90%">
+          <stop offset="0%" stopColor="#0c4a6e" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+        <filter id="naval-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="4" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      <rect width="400" height="240" fill="url(#naval-bg)" />
+      <g transform="translate(76 36)">
+        {Array.from({ length: 6 }, (_, r) =>
+          Array.from({ length: 8 }, (_, c) => (
+            <rect key={`${r}-${c}`} x={c * 31} y={r * 29} width="28" height="26" rx="4" fill="#0c4a6e" opacity="0.7" />
+          ))
+        )}
+        {shots.map((s, i) =>
+          s.hit ? (
+            <g key={i} filter="url(#naval-glow)">
+              <rect x={s.x * 31} y={s.y * 29} width="28" height="26" rx="4" fill="#f43f5e" />
+              <path
+                d={`M${s.x * 31 + 8} ${s.y * 29 + 7} l12 12 m0 -12 l-12 12`}
+                stroke="#fff"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+            </g>
+          ) : (
+            <circle key={i} cx={s.x * 31 + 14} cy={s.y * 29 + 13} r="4" fill="#bae6fd" opacity="0.8" />
+          )
+        )}
+        <g transform="translate(155 120)">
+          <circle r="22" fill="none" stroke="#e879f9" strokeWidth="2.5" />
+          <path d="M-30 0 h20 M10 0 h20 M0 -30 v20 M0 10 v20" stroke="#e879f9" strokeWidth="2.5" strokeLinecap="round" />
+        </g>
+      </g>
+    </svg>
+  );
+}
+
+export function ProbableThumbnail() {
+  // Votes piling up on one friend.
+  const people = [
+    { x: 110, color: "#22d3ee", votes: 1 },
+    { x: 200, color: "#f472b6", votes: 4, crown: true },
+    { x: 290, color: "#a78bfa", votes: 2 },
+  ];
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="probable-bg" cx="50%" cy="30%" r="90%">
+          <stop offset="0%" stopColor="#831843" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#probable-bg)" />
+      <text x="200" y="44" textAnchor="middle" fontSize="15" fontWeight="600" fill="#fbcfe8" fontFamily="system-ui, sans-serif">
+        ¿Quién es más probable que…?
+      </text>
+      {people.map((p) => (
+        <g key={p.x} transform={`translate(${p.x} 0)`}>
+          {Array.from({ length: p.votes }, (_, i) => (
+            <rect key={i} x="-22" y={178 - i * 16} width="44" height="12" rx="4" fill={p.color} opacity={0.35 + i * 0.15} />
+          ))}
+          <circle cy="206" r="16" fill={p.color} />
+          {p.crown && (
+            <path d="M-16 92 l6 -14 l10 9 l10 -9 l6 14 z" fill="#fcd34d" transform="translate(0 0)" />
+          )}
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+export function ConocesThumbnail() {
+  // Two players, one secret answer, and a match.
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="conoces-bg" cx="50%" cy="50%" r="80%">
+          <stop offset="0%" stopColor="#881337" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#conoces-bg)" />
+      <g transform="translate(70 40)" fontFamily="system-ui, sans-serif">
+        <rect width="260" height="40" rx="10" fill="#0f172a" stroke="#fb7185" strokeOpacity="0.6" strokeWidth="2" />
+        <text x="130" y="26" textAnchor="middle" fontSize="15" fontWeight="600" fill="#ffe4e6">
+          ¿Playa o montaña?
+        </text>
+        {[
+          { label: "Playa", y: 56, right: true },
+          { label: "Montaña", y: 104 },
+        ].map((o) => (
+          <g key={o.label} transform={`translate(0 ${o.y})`}>
+            <rect
+              width="260"
+              height="38"
+              rx="10"
+              fill={o.right ? "#064e3b" : "#1e293b"}
+              stroke={o.right ? "#34d399" : "#475569"}
+              strokeWidth="2"
+            />
+            <text x="16" y="25" fontSize="15" fill="#e2e8f0">
+              {o.label}
+            </text>
+            {o.right && (
+              <>
+                <circle cx="206" cy="19" r="11" fill="#f472b6" />
+                <circle cx="226" cy="19" r="11" fill="#38bdf8" />
+                <path d="M238 19 l5 5 l9 -10" stroke="#6ee7b7" strokeWidth="3" fill="none" strokeLinecap="round" />
+              </>
+            )}
+          </g>
+        ))}
+      </g>
+    </svg>
+  );
+}
+
+export function GeneralaThumbnail() {
+  // Five dice: a full house, two of them held.
+  const dice = [
+    { v: 3, x: 70, r: -10, held: true },
+    { v: 3, x: 128, r: 6, held: true },
+    { v: 3, x: 186, r: -4 },
+    { v: 5, x: 244, r: 9 },
+    { v: 5, x: 302, r: -7 },
+  ];
+  const pips: Record<number, [number, number][]> = {
+    3: [
+      [12, 12],
+      [24, 24],
+      [36, 36],
+    ],
+    5: [
+      [12, 12],
+      [36, 12],
+      [24, 24],
+      [12, 36],
+      [36, 36],
+    ],
+  };
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="generala-bg" cx="50%" cy="80%" r="90%">
+          <stop offset="0%" stopColor="#14532d" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#generala-bg)" />
+      {dice.map((d, i) => (
+        <g key={i} transform={`translate(${d.x - 24} ${d.held ? 82 : 96}) rotate(${d.r} 24 24)`}>
+          <rect
+            width="48"
+            height="48"
+            rx="10"
+            fill={d.held ? "#fef3c7" : "#f1f5f9"}
+            stroke={d.held ? "#fbbf24" : "none"}
+            strokeWidth="3"
+          />
+          {pips[d.v].map(([x, y], j) => (
+            <circle key={j} cx={x} cy={y} r="4.5" fill="#0f172a" />
+          ))}
+        </g>
+      ))}
+      <text x="200" y="188" textAnchor="middle" fontSize="20" fontWeight="700" fill="#bbf7d0" fontFamily="system-ui, sans-serif">
+        FULL · 30
+      </text>
+    </svg>
+  );
+}
+
+export function EmojisThumbnail() {
+  // A puzzle card and the answer's blanks.
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="emojis-bg" cx="50%" cy="30%" r="90%">
+          <stop offset="0%" stopColor="#713f12" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#emojis-bg)" />
+      <g transform="translate(80 40)">
+        <rect width="240" height="100" rx="18" fill="#0f172a" stroke="#facc15" strokeOpacity="0.6" strokeWidth="2" />
+        <text x="120" y="68" textAnchor="middle" fontSize="48">
+          🦁👑
+        </text>
+      </g>
+      <text x="200" y="182" textAnchor="middle" fontSize="20" fontWeight="700" letterSpacing="4" fill="#fde68a" fontFamily="monospace">
+        E_ R__ L___
+      </text>
+    </svg>
+  );
+}
+
+export function VerdadesThumbnail() {
+  // Three statements; one is the lie.
+  const rows = [
+    { w: 180, lie: false },
+    { w: 150, lie: true },
+    { w: 200, lie: false },
+  ];
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="verdades-bg" cx="70%" cy="20%" r="90%">
+          <stop offset="0%" stopColor="#3730a3" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#verdades-bg)" />
+      {rows.map((r, i) => (
+        <g key={i} transform={`translate(70 ${42 + i * 56})`}>
+          <rect
+            width="260"
+            height="44"
+            rx="10"
+            fill={r.lie ? "#4c0519" : "#1e293b"}
+            stroke={r.lie ? "#fb7185" : "#475569"}
+            strokeWidth="2"
+          />
+          <rect x="16" y="18" width={r.w - 40} height="8" rx="4" fill="#e2e8f0" opacity="0.7" />
+          <text
+            x="244"
+            y="28"
+            textAnchor="end"
+            fontSize="12"
+            fontWeight="700"
+            fill={r.lie ? "#fda4af" : "#6ee7b7"}
+            fontFamily="system-ui, sans-serif"
+          >
+            {r.lie ? "MENTIRA" : "VERDAD"}
+          </text>
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+export function DamasThumbnail() {
+  // A corner of the board with a crowned piece.
+  const pieces: Record<string, "w" | "b" | "W"> = { "0-1": "b", "0-3": "b", "1-2": "b", "2-1": "W", "3-4": "w", "3-2": "w", "4-1": "w" };
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="damas-bg" cx="30%" cy="30%" r="90%">
+          <stop offset="0%" stopColor="#7c2d12" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#damas-bg)" />
+      <g transform="translate(110 25) rotate(-4 90 95)">
+        {Array.from({ length: 5 }, (_, r) =>
+          Array.from({ length: 5 }, (_, c) => {
+            const p = pieces[`${r}-${c}`];
+            return (
+              <g key={`${r}-${c}`}>
+                <rect x={c * 38} y={r * 38} width="38" height="38" fill={(r + c) % 2 ? "#451a03" : "#fde68a"} opacity={(r + c) % 2 ? 1 : 0.85} />
+                {p && (
+                  <circle
+                    cx={c * 38 + 19}
+                    cy={r * 38 + 19}
+                    r="14"
+                    fill={p === "b" ? "#1f2937" : "#f5efe0"}
+                    stroke={p === "b" ? "#64748b" : "#d6c7a1"}
+                    strokeWidth="3"
+                  />
+                )}
+                {p === "W" && (
+                  <path
+                    d={`M${c * 38 + 11} ${r * 38 + 24} l2 -10 l6 5 l6 -5 l2 10 z`}
+                    fill="#d97706"
+                  />
+                )}
+              </g>
+            );
+          })
+        )}
+      </g>
+    </svg>
+  );
+}
+
+export function CajasThumbnail() {
+  // A 3×3 dots-and-boxes board, half played.
+  const S = 52;
+  const lines: [number, number, number, number, string][] = [
+    [0, 0, 1, 0, "#22d3ee"],
+    [1, 0, 2, 0, "#f472b6"],
+    [0, 0, 0, 1, "#22d3ee"],
+    [1, 0, 1, 1, "#f472b6"],
+    [0, 1, 1, 1, "#22d3ee"],
+    [2, 0, 2, 1, "#22d3ee"],
+    [1, 1, 2, 1, "#f472b6"],
+    [3, 1, 3, 2, "#f472b6"],
+    [2, 2, 3, 2, "#22d3ee"],
+    [1, 2, 1, 3, "#f472b6"],
+  ];
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="cajas-bg" cx="60%" cy="40%" r="90%">
+          <stop offset="0%" stopColor="#164e63" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#cajas-bg)" />
+      <g transform="translate(122 42)">
+        <rect x="4" y="4" width={S - 8} height={S - 8} rx="5" fill="#22d3ee" opacity="0.3" />
+        <rect x={S + 4} y="4" width={S - 8} height={S - 8} rx="5" fill="#f472b6" opacity="0.3" />
+        {lines.map(([x1, y1, x2, y2, color], i) => (
+          <line key={i} x1={x1 * S} y1={y1 * S} x2={x2 * S} y2={y2 * S} stroke={color} strokeWidth="6" strokeLinecap="round" />
+        ))}
+        {Array.from({ length: 16 }, (_, d) => (
+          <circle key={d} cx={(d % 4) * S} cy={Math.floor(d / 4) * S} r="6" fill="#e2e8f0" />
+        ))}
+      </g>
+    </svg>
+  );
+}
+
+export function RetoThumbnail() {
+  // Two cards: verdad and reto.
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="reto-bg" cx="50%" cy="50%" r="80%">
+          <stop offset="0%" stopColor="#7c2d12" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+        <linearGradient id="reto-v" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#0ea5e9" />
+          <stop offset="100%" stopColor="#4f46e5" />
+        </linearGradient>
+        <linearGradient id="reto-r" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#f97316" />
+          <stop offset="100%" stopColor="#dc2626" />
+        </linearGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#reto-bg)" />
+      <g fontFamily="system-ui, sans-serif" fontWeight="800" fontSize="24" textAnchor="middle" fill="#fff">
+        <g transform="translate(92 50) rotate(-8 60 70)">
+          <rect width="120" height="140" rx="16" fill="url(#reto-v)" />
+          <text x="60" y="80">VERDAD</text>
+        </g>
+        <g transform="translate(190 46) rotate(7 60 70)">
+          <rect width="120" height="140" rx="16" fill="url(#reto-r)" />
+          <text x="60" y="80">RETO</text>
+        </g>
+      </g>
+    </svg>
+  );
+}
+
+export function MimicaThumbnail() {
+  // A stick figure acting, a word card and a clock.
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="mimica-bg" cx="40%" cy="40%" r="90%">
+          <stop offset="0%" stopColor="#115e59" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#mimica-bg)" />
+      <g stroke="#e2e8f0" strokeWidth="6" strokeLinecap="round" fill="none" transform="translate(130 40)">
+        <circle cx="0" cy="22" r="18" />
+        <path d="M0 40 V110 M0 60 L-40 30 M0 60 L38 82 M0 110 L-28 160 M0 110 L30 158" />
+      </g>
+      <g transform="translate(220 64)">
+        <rect width="130" height="70" rx="12" fill="#0f172a" stroke="#2dd4bf" strokeWidth="2" />
+        <text x="65" y="44" textAnchor="middle" fontSize="20" fontWeight="700" fill="#ccfbf1" fontFamily="system-ui, sans-serif">
+          Pingüino
+        </text>
+      </g>
+      <text x="285" y="178" textAnchor="middle" fontSize="28" fontWeight="700" fill="#5eead4" fontFamily="monospace">
+        0:42
+      </text>
+    </svg>
+  );
+}
+
+export function AhorcadoThumbnail() {
+  // The gallows mid-game and a half-guessed word.
+  const word = ["M", "", "T", "E"];
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="ahorcado-bg" cx="30%" cy="30%" r="90%">
+          <stop offset="0%" stopColor="#334155" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#ahorcado-bg)" />
+      <g transform="translate(70 30)">
+        <path d="M10 180 H90 M40 180 V10 H120 V34" stroke="#94a3b8" strokeWidth="6" strokeLinecap="round" fill="none" />
+        <g stroke="#f8fafc" strokeWidth="5" strokeLinecap="round" fill="none">
+          <circle cx="120" cy="52" r="18" />
+          <path d="M120 70 V120 M120 84 L98 104 M120 84 L142 104" />
+        </g>
+      </g>
+      <g transform="translate(220 150)" fontFamily="monospace" fontSize="30" fontWeight="700" fill="#f1f5f9" textAnchor="middle">
+        {word.map((ch, i) => (
+          <g key={i} transform={`translate(${i * 36} 0)`}>
+            <text x="14" y="0">
+              {ch}
+            </text>
+            <line x1="0" y1="8" x2="28" y2="8" stroke="#94a3b8" strokeWidth="3" />
+          </g>
+        ))}
+      </g>
+    </svg>
+  );
+}
+
+export function SopaThumbnail() {
+  // A letter grid with two words circled.
+  const rows = ["GATOXQ", "LMPERO", "EOSAPO", "ÑNRUAT", "TOLEON", "BZAPIS"];
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="sopa-bg" cx="60%" cy="30%" r="90%">
+          <stop offset="0%" stopColor="#365314" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#sopa-bg)" />
+      <g transform="translate(110 22)">
+        <rect x="-4" y="2" width="128" height="30" rx="15" fill="#22d3ee" opacity="0.35" />
+        <rect x="58" y="126" width="122" height="30" rx="15" fill="#f472b6" opacity="0.35" />
+        {rows.map((row, r) =>
+          [...row].map((ch, c) => (
+            <text
+              key={`${r}-${c}`}
+              x={c * 31 + 14}
+              y={r * 32 + 24}
+              textAnchor="middle"
+              fontSize="20"
+              fontWeight="700"
+              fill="#ecfccb"
+              fontFamily="monospace"
+            >
+              {ch}
+            </text>
+          ))
+        )}
+      </g>
+    </svg>
+  );
+}

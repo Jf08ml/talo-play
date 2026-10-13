@@ -20,6 +20,18 @@ import {
   PalabraThumbnail,
   TriviaThumbnail,
   ImpostorThumbnail,
+  NavalThumbnail,
+  ProbableThumbnail,
+  ConocesThumbnail,
+  GeneralaThumbnail,
+  EmojisThumbnail,
+  VerdadesThumbnail,
+  DamasThumbnail,
+  CajasThumbnail,
+  RetoThumbnail,
+  MimicaThumbnail,
+  AhorcadoThumbnail,
+  SopaThumbnail,
 } from "@/components/GameThumbnails";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 
@@ -34,6 +46,18 @@ const THUMBNAILS: Record<GameId, ReactNode> = {
   palabra: <PalabraThumbnail />,
   trivia: <TriviaThumbnail />,
   impostor: <ImpostorThumbnail />,
+  naval: <NavalThumbnail />,
+  probable: <ProbableThumbnail />,
+  conoces: <ConocesThumbnail />,
+  generala: <GeneralaThumbnail />,
+  emojis: <EmojisThumbnail />,
+  verdades: <VerdadesThumbnail />,
+  damas: <DamasThumbnail />,
+  cajas: <CajasThumbnail />,
+  reto: <RetoThumbnail />,
+  mimica: <MimicaThumbnail />,
+  ahorcado: <AhorcadoThumbnail />,
+  sopa: <SopaThumbnail />,
 };
 
 export default function Home() {
