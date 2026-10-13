@@ -1,6 +1,7 @@
 import {
   Brain,
   Brush,
+  Car,
   Dices,
   Flame,
   PersonStanding,
@@ -52,6 +53,7 @@ const GAME_ICONS: Record<GameId, { icon: LucideIcon; gradient: string }> = {
   mimica: { icon: PersonStanding, gradient: "from-teal-400 to-cyan-600" },
   ahorcado: { icon: Skull, gradient: "from-slate-500 to-zinc-700" },
   sopa: { icon: TextSearch, gradient: "from-green-500 to-lime-500" },
+  carreras: { icon: Car, gradient: "from-red-500 to-cyan-500" },
   codigo: { icon: VenetianMask, gradient: "from-rose-500 to-red-600" },
   deslizante: { icon: Grid3x3, gradient: "from-indigo-500 to-violet-600" },
   rompecabezas: { icon: Puzzle, gradient: "from-violet-500 to-purple-600" },

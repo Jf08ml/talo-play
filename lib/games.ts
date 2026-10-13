@@ -6,7 +6,7 @@
  * Every room stores its game in `rooms/{id}/meta/game`; room codes are
  * global, so one code is enough to find any game's room (`lib/roomLookup.ts`).
  */
-export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa";
+export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras";
 
 /** Who you're playing with: the first question the home page asks. */
 export type PlayContext = "pareja" | "amigos" | "grupo" | "solo";
@@ -350,6 +350,21 @@ export const GAMES: Record<GameId, GameInfo> = {
       "Cada palabra es de quien la marca primero. Gana quien encuentra más.",
     ],
   },
+  carreras: {
+    id: "carreras",
+    title: "Carreras",
+    path: "carreras",
+    tagline: "La pista se ve en la tele o el proyector y cada uno maneja su auto desde el teléfono.",
+    minPlayers: 2,
+    maxPlayers: 2,
+    duration: "3–5 min",
+    contexts: ["pareja", "amigos", "grupo"],
+    howTo: [
+      "Abrí la pantalla en una compu conectada a la tele o al proyector.",
+      "Cada jugador entra desde su teléfono con el código: el teléfono es el volante.",
+      "Manejá con botones o inclinando el teléfono. Gana el primero en completar las vueltas.",
+    ],
+  },
   codigo: {
     id: "codigo",
     title: "Código secreto",
@@ -368,7 +383,7 @@ export const GAMES: Record<GameId, GameInfo> = {
 };
 
 /** Home page order: quickest to start first. */
-export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "generala", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
+export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "generala", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
 
 export function roomPath(game: GameId, roomId: string): string {
   return `/${GAMES[game].path}/${roomId}`;

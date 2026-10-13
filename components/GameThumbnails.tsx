@@ -909,3 +909,35 @@ export function SopaThumbnail() {
     </svg>
   );
 }
+
+export function CarrerasThumbnail() {
+  // Two cars on a curve, seen from above, with the start line.
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="carreras-bg" cx="50%" cy="40%" r="90%">
+          <stop offset="0%" stopColor="#14532d" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+        <pattern id="carreras-check" width="12" height="12" patternUnits="userSpaceOnUse">
+          <rect width="12" height="12" fill="#f8fafc" />
+          <rect width="6" height="6" fill="#0f172a" />
+          <rect x="6" y="6" width="6" height="6" fill="#0f172a" />
+        </pattern>
+      </defs>
+      <rect width="400" height="240" fill="url(#carreras-bg)" />
+      <path d="M-20 200 C 120 200, 160 40, 300 50 S 420 120, 430 120" fill="none" stroke="#f8fafc" strokeWidth="92" opacity="0.9" strokeDasharray="14 14" />
+      <path d="M-20 200 C 120 200, 160 40, 300 50 S 420 120, 430 120" fill="none" stroke="#334155" strokeWidth="80" />
+      <path d="M-20 200 C 120 200, 160 40, 300 50 S 420 120, 430 120" fill="none" stroke="#e2e8f0" strokeWidth="3" strokeDasharray="16 14" opacity="0.6" />
+      <rect x="60" y="160" width="12" height="80" fill="url(#carreras-check)" />
+      <g transform="translate(150 125) rotate(-62)">
+        <rect x="-22" y="-12" width="44" height="24" rx="7" fill="#fb3a5d" />
+        <rect x="2" y="-9" width="11" height="18" rx="3" fill="#0f172a" opacity="0.7" />
+      </g>
+      <g transform="translate(232 70) rotate(-20)">
+        <rect x="-22" y="-12" width="44" height="24" rx="7" fill="#22d3ee" />
+        <rect x="2" y="-9" width="11" height="18" rx="3" fill="#0f172a" opacity="0.7" />
+      </g>
+    </svg>
+  );
+}

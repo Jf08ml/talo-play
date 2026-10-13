@@ -32,6 +32,7 @@ import {
   MimicaThumbnail,
   AhorcadoThumbnail,
   SopaThumbnail,
+  CarrerasThumbnail,
 } from "@/components/GameThumbnails";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 
@@ -58,6 +59,7 @@ const THUMBNAILS: Record<GameId, ReactNode> = {
   mimica: <MimicaThumbnail />,
   ahorcado: <AhorcadoThumbnail />,
   sopa: <SopaThumbnail />,
+  carreras: <CarrerasThumbnail />,
 };
 
 export default function Home() {
