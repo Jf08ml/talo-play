@@ -152,6 +152,7 @@ const ACCEL = 320;
 const BRAKE = 700;
 const MAX_REVERSE = 120;
 const ROLL_DRAG = 0.25;
+const COAST_DECEL = 160;
 const TURN_RATE = 3.1;
 /** Below this speed steering is proportionally weaker (no spinning in place). */
 const TURN_FULL_SPEED = 140;
@@ -163,6 +164,8 @@ export interface CarInput {
   /** -1 (left) … 1 (right). */
   steer: number;
   brake: boolean;
+  /** false = foot off the gas (after the finish line); gas is automatic otherwise. */
+  gas?: boolean;
 }
 
 export interface Car {
@@ -181,25 +184,30 @@ export interface Car {
   bump: number;
 }
 
-/** Cars side by side, a bit behind the start line, facing the driving direction. */
-export function gridCars(track: Track, count: number): Car[] {
+/**
+ * Starting grid behind the start line, two cars per row, facing the driving
+ * direction. Slot `k` is always the same place, whoever else is racing.
+ */
+export function gridCar(track: Track, k: number): Car {
   const n = track.xs.length;
-  const back = n - 4;
-  const i = back;
+  const i = n - 4 - Math.floor(k / 2) * 6;
   const j = (i + 1) % n;
-  const dx = track.xs[j] - track.xs[i];
-  const dy = track.ys[j] - track.ys[i];
-  const heading = Math.atan2(dy, dx);
+  const heading = Math.atan2(track.ys[j] - track.ys[i], track.xs[j] - track.xs[i]);
   const nx = -Math.sin(heading);
   const ny = Math.cos(heading);
-  const offset = Math.min(32, track.def.width / 4);
-  return Array.from({ length: count }, (_, k) => {
-    const side = count === 1 ? 0 : k === 0 ? -offset : offset;
-    const x = track.xs[i] + nx * side;
-    const y = track.ys[i] + ny * side;
-    const s = track.cum[i];
-    return { x, y, heading, vx: 0, vy: 0, seg: i, s, progress: s - track.length, bump: 0 };
-  });
+  const side = (k % 2 ? 1 : -1) * Math.min(28, track.def.width / 4);
+  const s = track.cum[i];
+  return {
+    x: track.xs[i] + nx * side,
+    y: track.ys[i] + ny * side,
+    heading,
+    vx: 0,
+    vy: 0,
+    seg: i,
+    s,
+    progress: s - track.length,
+    bump: 0,
+  };
 }
 
 function wrapDelta(d: number, length: number): number {
@@ -217,8 +225,10 @@ export function stepCar(car: Car, input: CarInput, track: Track, dt: number) {
 
   if (input.brake) {
     forward = forward > 0 ? Math.max(0, forward - BRAKE * dt) : Math.max(-MAX_REVERSE, forward - ACCEL * 0.5 * dt);
-  } else {
+  } else if (input.gas !== false) {
     forward += (forward < 0 ? BRAKE : ACCEL * (1 - Math.max(0, forward) / (MAX_SPEED * 1.05))) * dt;
+  } else {
+    forward -= Math.sign(forward) * Math.min(Math.abs(forward), COAST_DECEL * dt);
   }
   forward -= forward * ROLL_DRAG * dt;
   forward = Math.min(forward, MAX_SPEED);
@@ -281,6 +291,27 @@ export function collideCars(a: Car, b: Car) {
     a.vy += ny * j;
     b.vx -= nx * j;
     b.vy -= ny * j;
+  }
+}
+
+/**
+ * Bumps a car off another one it can't move (a rival driven by another
+ * phone): only `car` is pushed and loses the speed going into the other.
+ */
+export function collideWithGhost(car: Car, ox: number, oy: number, ovx: number, ovy: number) {
+  const dx = ox - car.x;
+  const dy = oy - car.y;
+  const dist = Math.hypot(dx, dy);
+  const min = CAR_RADIUS * 2;
+  if (dist >= min || dist === 0) return;
+  const nx = dx / dist;
+  const ny = dy / dist;
+  car.x -= nx * (min - dist);
+  car.y -= ny * (min - dist);
+  const rel = (car.vx - ovx) * nx + (car.vy - ovy) * ny;
+  if (rel > 0) {
+    car.vx -= nx * rel * 1.2;
+    car.vy -= ny * rel * 1.2;
   }
 }
 

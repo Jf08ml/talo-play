@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight, Hand, Smartphone, Gamepad2 } from "lucide-re
 export type ControlMode = "botones" | "inclinacion";
 
 const MODE_KEY = "carreras.controlMode";
-/** Minimum time between two input writes. */
+/** Minimum time between two input writes (pantalla mode). */
 const SEND_MS = 50;
 /** Tilt (degrees) that turns the wheel all the way. */
 const FULL_TILT_DEG = 30;
@@ -15,7 +15,7 @@ const DEAD_ZONE = 0.06;
 
 type Zone = "left" | "right" | "brake";
 
-export function readMode(): ControlMode {
+function readMode(): ControlMode {
   try {
     return localStorage.getItem(MODE_KEY) === "inclinacion" ? "inclinacion" : "botones";
   } catch {
@@ -55,6 +55,10 @@ function tiltSteer(e: DeviceOrientationEvent): number | null {
 
 type PermissionRequester = { requestPermission?: () => Promise<"granted" | "denied"> };
 
+function tiltNeedsPermission(): boolean {
+  return typeof DeviceOrientationEvent !== "undefined" && !!(DeviceOrientationEvent as unknown as PermissionRequester).requestPermission;
+}
+
 /** iOS asks for permission to read motion, and only from a tap. */
 async function enableTilt(): Promise<boolean> {
   if (typeof DeviceOrientationEvent === "undefined") return false;
@@ -68,7 +72,7 @@ async function enableTilt(): Promise<boolean> {
 }
 
 /** Keeps the phone from dimming its screen mid-race. */
-function useWakeLock() {
+export function useWakeLock() {
   useEffect(() => {
     let lock: WakeLockSentinel | null = null;
     let cancelled = false;
@@ -93,33 +97,14 @@ function useWakeLock() {
 }
 
 /**
- * The phone as a steering wheel. Gas is automatic; the player steers (two
- * big buttons, or tilting the phone) and holds "Frenar" to slow down or
- * reverse. Inputs go to the screen as they change, at most every SEND_MS.
+ * Pantalla mode: sends this phone's input to the screen as it changes, at
+ * most every SEND_MS (the last value always goes out).
  */
-export default function Controller({
-  roomId,
-  clientId,
-  color,
-  locked,
-}: {
-  roomId: string;
-  clientId: string;
-  color: string;
-  /** Countdown still running: controls show, but the car won't move yet. */
-  locked: boolean;
-}) {
-  const [mode, setMode] = useState<ControlMode>(readMode);
-  const [tiltError, setTiltError] = useState<string | null>(null);
-  const [pressed, setPressed] = useState<Record<Zone, boolean>>({ left: false, right: false, brake: false });
-  const [tilt, setTilt] = useState(0);
-  const pointers = useRef(new Map<number, Zone>());
+export function useInputSender(roomId: string, clientId: string): (input: CarInputWire) => void {
   const sender = useRef<ReturnType<typeof openInput> | null>(null);
   const pending = useRef<CarInputWire>({ s: 0, b: false });
   const lastSent = useRef<{ wire: CarInputWire; at: number } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useWakeLock();
 
   useEffect(() => {
     const s = openInput(roomId, clientId);
@@ -127,8 +112,10 @@ export default function Controller({
     s.send({ s: 0, b: false });
     return () => {
       if (timer.current) clearTimeout(timer.current);
+      timer.current = null;
       s.close();
       sender.current = null;
+      lastSent.current = null;
     };
   }, [roomId, clientId]);
 
@@ -141,12 +128,44 @@ export default function Controller({
     sender.current?.send(wire);
   };
 
-  const push = (wire: CarInputWire) => {
+  return (wire: CarInputWire) => {
     pending.current = { s: Math.round(wire.s * 20) / 20, b: wire.b };
     if (timer.current) return;
     const wait = lastSent.current ? SEND_MS - (Date.now() - lastSent.current.at) : 0;
     if (wait <= 0) flush();
     else timer.current = setTimeout(flush, wait);
+  };
+}
+
+/**
+ * The phone as a steering wheel. Gas is automatic; the player steers (two
+ * big buttons, or tilting the phone) and holds "Frenar" to slow down or
+ * reverse. `panel` fills a page (pantalla mode); `overlay` sits on top of the
+ * 3D view (telefono mode).
+ */
+export default function Controller({
+  color,
+  locked,
+  onInput,
+  variant = "panel",
+}: {
+  color: string;
+  /** Countdown still running: controls show, but the car won't move yet. */
+  locked: boolean;
+  onInput: (input: CarInputWire) => void;
+  variant?: "panel" | "overlay";
+}) {
+  const [mode, setMode] = useState<ControlMode>(readMode);
+  const [tiltError, setTiltError] = useState<string | null>(null);
+  const [tiltReady, setTiltReady] = useState(false);
+  const [pressed, setPressed] = useState<Record<Zone, boolean>>({ left: false, right: false, brake: false });
+  const [tilt, setTilt] = useState(0);
+  const pointers = useRef(new Map<number, Zone>());
+  const current = useRef<CarInputWire>({ s: 0, b: false });
+
+  const emit = (wire: CarInputWire) => {
+    current.current = wire;
+    onInput(wire);
   };
 
   // Buttons: every finger is tracked by pointer id, so left + brake works at once.
@@ -154,8 +173,8 @@ export default function Controller({
     const zones = new Set(pointers.current.values());
     const next = { left: zones.has("left"), right: zones.has("right"), brake: zones.has("brake") };
     setPressed(next);
-    const steer = mode === "botones" ? (next.right ? 1 : 0) - (next.left ? 1 : 0) : pending.current.s;
-    push({ s: steer, b: next.brake });
+    const steer = mode === "botones" ? (next.right ? 1 : 0) - (next.left ? 1 : 0) : current.current.s;
+    emit({ s: steer, b: next.brake });
   };
 
   const down = (e: ReactPointerEvent<HTMLElement>) => {
@@ -184,7 +203,7 @@ export default function Controller({
       const steer = tiltSteer(e);
       if (steer === null) return;
       setTilt(steer);
-      push({ s: steer, b: pending.current.b });
+      emit({ s: steer, b: current.current.b });
     };
     window.addEventListener("deviceorientation", onTilt);
     return () => window.removeEventListener("deviceorientation", onTilt);
@@ -196,41 +215,110 @@ export default function Controller({
       setTiltError("No pudimos leer la inclinación del teléfono. Revisá los permisos o usá los botones.");
       return;
     }
+    if (next === "inclinacion") setTiltReady(true);
     saveMode(next);
     setMode(next);
     setTilt(0);
-    push({ s: 0, b: pending.current.b });
+    emit({ s: 0, b: current.current.b });
   };
 
   // A tilt mode remembered from last time still needs iOS's permission: ask on the first tap.
-  const [tiltReady, setTiltReady] = useState(false);
-  const needsTiltTap =
-    mode === "inclinacion" &&
-    !tiltReady &&
-    typeof DeviceOrientationEvent !== "undefined" &&
-    !!(DeviceOrientationEvent as unknown as PermissionRequester).requestPermission;
+  const needsTiltTap = mode === "inclinacion" && !tiltReady && tiltNeedsPermission();
+  const overlay = variant === "overlay";
+
+  const modeToggle = (
+    <div className={`grid grid-cols-2 gap-1 rounded-xl p-1 ring-1 ${overlay ? "bg-slate-950/60 ring-white/15" : "bg-slate-900/80 ring-slate-700"}`}>
+      {(["botones", "inclinacion"] as ControlMode[]).map((m) => (
+        <button
+          key={m}
+          onClick={() => switchMode(m)}
+          className={`flex items-center justify-center gap-1.5 rounded-lg font-medium transition ${overlay ? "px-2 py-1 text-xs" : "py-2 text-sm"} ${
+            mode === m ? "bg-violet-600 text-white shadow-[0_0_15px_rgba(139,92,246,0.5)]" : "text-slate-300"
+          }`}
+        >
+          {m === "botones" ? <Gamepad2 className="h-4 w-4" /> : <Smartphone className="h-4 w-4" />}
+          {m === "botones" ? "Botones" : "Inclinación"}
+        </button>
+      ))}
+    </div>
+  );
 
   const zoneClass = (on: boolean) =>
     `flex select-none items-center justify-center rounded-3xl border-2 transition-transform ${
-      on ? "scale-[0.97] bg-white/15" : "bg-white/5"
+      on ? "scale-[0.97] bg-white/25" : overlay ? "bg-white/10 backdrop-blur-[2px]" : "bg-white/5"
     }`;
+
+  const wheel = (size: string) => (
+    <div
+      className={`relative flex items-center justify-center rounded-full border-[8px] ${size}`}
+      style={{ borderColor: color, transform: `rotate(${tilt * 90}deg)`, transition: "transform 60ms linear" }}
+    >
+      <span className="absolute top-0 h-4 w-1.5 rounded-full bg-white" />
+      <span className="h-1.5 w-full" style={{ backgroundColor: color }} />
+    </div>
+  );
+
+  const brake = (big: boolean) => (
+    <div
+      data-zone="brake"
+      onPointerDown={down}
+      className={`${zoneClass(pressed.brake)} flex-col gap-1 border-slate-400/70 text-slate-100 ${big ? "flex-1" : ""}`}
+    >
+      <Hand className={big ? "h-10 w-10" : "h-8 w-8"} />
+      <span className="text-xs font-semibold uppercase tracking-wide">Frenar</span>
+    </div>
+  );
+
+  const tiltTap = (
+    <button
+      onClick={async () => {
+        if (await enableTilt()) setTiltReady(true);
+        else switchMode("botones");
+      }}
+      className="flex flex-1 flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-violet-400/60 bg-slate-950/50 p-4 text-violet-100"
+    >
+      <Smartphone className="h-10 w-10" />
+      Tocá para activar la inclinación
+    </button>
+  );
+
+  if (overlay) {
+    return (
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 flex h-[46%] items-stretch gap-3 p-3"
+        style={{ touchAction: "none" }}
+        onContextMenu={(e) => e.preventDefault()}
+      >
+        {mode === "botones" ? (
+          <>
+            <div data-zone="left" onPointerDown={down} className={`pointer-events-auto flex-1 ${zoneClass(pressed.left)}`} style={{ borderColor: color }}>
+              <ChevronLeft className="h-16 w-16" style={{ color }} />
+            </div>
+            <div className="pointer-events-auto flex w-[28%] flex-col gap-2">
+              {modeToggle}
+              {brake(true)}
+            </div>
+            <div data-zone="right" onPointerDown={down} className={`pointer-events-auto flex-1 ${zoneClass(pressed.right)}`} style={{ borderColor: color }}>
+              <ChevronRight className="h-16 w-16" style={{ color }} />
+            </div>
+          </>
+        ) : (
+          <div className="pointer-events-auto flex flex-1 flex-col gap-2">
+            <div className="flex items-center justify-between gap-2">
+              {modeToggle}
+              {!needsTiltTap && wheel("h-12 w-12")}
+            </div>
+            {tiltError && <p className="text-xs text-amber-300">{tiltError}</p>}
+            {needsTiltTap ? tiltTap : brake(true)}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-3" style={{ touchAction: "none" }} onContextMenu={(e) => e.preventDefault()}>
-      <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-900/80 p-1 ring-1 ring-slate-700">
-        {(["botones", "inclinacion"] as ControlMode[]).map((m) => (
-          <button
-            key={m}
-            onClick={() => switchMode(m)}
-            className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition ${
-              mode === m ? "bg-violet-600 text-white shadow-[0_0_15px_rgba(139,92,246,0.5)]" : "text-slate-400"
-            }`}
-          >
-            {m === "botones" ? <Gamepad2 className="h-4 w-4" /> : <Smartphone className="h-4 w-4" />}
-            {m === "botones" ? "Botones" : "Inclinación"}
-          </button>
-        ))}
-      </div>
+      {modeToggle}
       {tiltError && <p className="text-center text-xs text-amber-300">{tiltError}</p>}
 
       {mode === "botones" ? (
@@ -238,41 +326,20 @@ export default function Controller({
           <div data-zone="left" onPointerDown={down} className={zoneClass(pressed.left)} style={{ borderColor: color }}>
             <ChevronLeft className="h-20 w-20" style={{ color }} />
           </div>
-          <div data-zone="brake" onPointerDown={down} className={`${zoneClass(pressed.brake)} flex-col gap-1 border-slate-500 text-slate-300`}>
-            <Hand className="h-10 w-10" />
-            <span className="text-sm font-semibold uppercase tracking-wide">Frenar</span>
-          </div>
+          {brake(false)}
           <div data-zone="right" onPointerDown={down} className={zoneClass(pressed.right)} style={{ borderColor: color }}>
             <ChevronRight className="h-20 w-20" style={{ color }} />
           </div>
         </div>
       ) : needsTiltTap ? (
-        <button
-          onClick={async () => {
-            if (await enableTilt()) setTiltReady(true);
-            else switchMode("botones");
-          }}
-          className="flex min-h-56 flex-1 flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-violet-400/60 text-violet-200"
-        >
-          <Smartphone className="h-10 w-10" />
-          Tocá para activar la inclinación
-        </button>
+        <div className="flex min-h-56 flex-1">{tiltTap}</div>
       ) : (
         <div className="flex min-h-56 flex-1 flex-col gap-3">
           <div className="flex flex-col items-center gap-2 py-2">
-            <div
-              className="relative flex h-24 w-24 items-center justify-center rounded-full border-[10px]"
-              style={{ borderColor: color, transform: `rotate(${tilt * 90}deg)`, transition: "transform 60ms linear" }}
-            >
-              <span className="absolute top-0 h-5 w-2 rounded-full bg-white" />
-              <span className="h-2 w-full" style={{ backgroundColor: color }} />
-            </div>
+            {wheel("h-24 w-24")}
             <p className="text-xs text-slate-400">Inclinalo como un volante, con la pantalla hacia vos.</p>
           </div>
-          <div data-zone="brake" onPointerDown={down} className={`${zoneClass(pressed.brake)} flex-1 flex-col gap-1 border-slate-500 text-slate-300`}>
-            <Hand className="h-10 w-10" />
-            <span className="text-sm font-semibold uppercase tracking-wide">Mantené para frenar</span>
-          </div>
+          {brake(true)}
         </div>
       )}
 

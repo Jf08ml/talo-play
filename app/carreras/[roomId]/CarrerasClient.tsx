@@ -7,12 +7,10 @@ import { isFirebaseConfigured } from "@/lib/firebase";
 import {
   CARS,
   SEATS,
-  backToWaiting,
   getCarrerasMeta,
   joinCarreras,
   leaveSeat,
   normalizeMeta,
-  rematch,
   seatOf,
   startRace,
   subscribeCarreras,
@@ -34,10 +32,11 @@ import WaitingRoom from "@/components/WaitingRoom";
 import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
-import Controller from "@/components/carreras/Controller";
+import Controller, { useInputSender, useWakeLock } from "@/components/carreras/Controller";
+import PhoneRace from "@/components/carreras/PhoneRace";
+import { CarDot, Standings, driverName, useRaceCloser } from "@/components/carreras/shared";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
-import { MonitorPlay } from "lucide-react";
+import { MonitorPlay, Smartphone } from "lucide-react";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -65,8 +64,10 @@ export default function CarrerasClient({ roomId }: { roomId: string }) {
         if (cancelled) return;
         if (!raw) return setStatus("not-found");
         if (raw.game !== "carreras") return router.replace(`/sala/${roomId}`);
-        setMeta(normalizeMeta(raw));
-        unsubs.push(subscribeCarreras(roomId, setState), subscribeLive(roomId, setLive));
+        const m = normalizeMeta(raw);
+        setMeta(m);
+        unsubs.push(subscribeCarreras(roomId, setState));
+        if (m.mode === "pantalla") unsubs.push(subscribeLive(roomId, setLive));
         setStatus("ready");
       })
       .catch((err) => {
@@ -86,12 +87,18 @@ export default function CarrerasClient({ roomId }: { roomId: string }) {
     joinCarreras(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
 
-  const now = useServerNow(state?.status === "racing");
+  useRaceCloser(roomId, state, presence, presenceLoaded);
 
   if (!configured) return <FirebaseSetupNotice />;
 
   const isAway = (id: string) => presenceLoaded && !!id && !(id in presence);
   const mySeat = state ? seatOf(state, myId) : null;
+  const racing = status === "ready" && state && meta && state.status !== "waiting";
+
+  // Telefono mode: the race takes the whole screen.
+  if (racing && meta.mode === "telefono") {
+    return <PhoneRace roomId={roomId} meta={meta} state={state} myId={myId} />;
+  }
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -119,28 +126,30 @@ export default function CarrerasClient({ roomId }: { roomId: string }) {
               players={Object.entries(state.players).map(([id, p]) => ({ id, ...p }))}
               presence={presence}
               myId={myId}
-              summary={`${TRACKS[meta.track].label} · ${meta.laps} vueltas`}
+              summary={`${TRACKS[meta.track].label} · ${meta.laps} vueltas · ${
+                meta.mode === "pantalla" ? "en pantalla grande" : "cada uno en su teléfono"
+              }`}
               onStart={() => startRace(roomId)}
             >
-              <ScreenHint roomId={roomId} />
+              <ModeHint roomId={roomId} meta={meta} />
               <SeatPicker roomId={roomId} state={state} myId={myId} isAway={isAway} />
             </WaitingRoom>
           </div>
         )}
 
-        {status === "ready" && state && meta && state.status !== "waiting" && (
+        {racing && (
           <div className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-3 p-4">
-            {state.status === "finished" && <ResultBanner roomId={roomId} state={state} myId={myId} />}
-            {mySeat ? (
-              <>
-                <RaceInfo seat={mySeat} meta={meta} state={state} live={live} now={now} />
-                {state.status === "racing" && (
-                  <Controller roomId={roomId} clientId={myId} color={CARS[mySeat].color} locked={now < state.startedAt} />
-                )}
-              </>
-            ) : (
-              <Spectator roomId={roomId} state={state} myId={myId} isAway={isAway} />
+            {state.status === "finished" && (
+              <div className="flex justify-center">
+                <Standings roomId={roomId} state={state} myId={myId} />
+              </div>
             )}
+            {state.status === "racing" &&
+              (mySeat && state.racers.includes(mySeat) ? (
+                <Driver roomId={roomId} myId={myId} seat={mySeat} meta={meta} state={state} live={live} />
+              ) : (
+                <Spectator roomId={roomId} state={state} myId={myId} isAway={isAway} />
+              ))}
           </div>
         )}
       </main>
@@ -148,21 +157,15 @@ export default function CarrerasClient({ roomId }: { roomId: string }) {
   );
 }
 
-function playerName(state: CarrerasState, id: string, myId: string): string {
-  if (id === myId) return "Vos";
-  return state.players[id]?.name ?? "?";
-}
-
-function CarDot({ seat, className = "h-5 w-5" }: { seat: Seat; className?: string }) {
-  return (
-    <span
-      className={`inline-block shrink-0 rounded-md ${className}`}
-      style={{ backgroundColor: CARS[seat].color, boxShadow: `0 0 10px ${CARS[seat].glow}` }}
-    />
-  );
-}
-
-function ScreenHint({ roomId }: { roomId: string }) {
+function ModeHint({ roomId, meta }: { roomId: string; meta: CarrerasMeta }) {
+  if (meta.mode === "telefono") {
+    return (
+      <div className="flex gap-2.5 rounded-xl bg-violet-500/10 p-3 text-sm text-violet-100 ring-1 ring-violet-400/20">
+        <Smartphone className="mt-0.5 h-5 w-5 shrink-0" />
+        <p>Cada uno ve la carrera en 3D en su teléfono y maneja desde ahí. Conviene ponerlo horizontal.</p>
+      </div>
+    );
+  }
   return (
     <div className="flex gap-2.5 rounded-xl bg-cyan-500/10 p-3 text-sm text-cyan-100 ring-1 ring-cyan-400/20">
       <MonitorPlay className="mt-0.5 h-5 w-5 shrink-0" />
@@ -189,6 +192,7 @@ function SeatPicker({
   isAway: (id: string) => boolean;
 }) {
   const mySeat = seatOf(state, myId);
+  const seated = SEATS.filter((seat) => state.seats[seat]).length;
   return (
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-2 gap-2">
@@ -198,13 +202,13 @@ function SeatPicker({
           return (
             <div
               key={seat}
-              className="flex flex-col items-center gap-2 rounded-xl border bg-slate-950/40 p-3 text-center"
+              className="flex flex-col items-center gap-1.5 rounded-xl border bg-slate-950/40 p-3 text-center"
               style={{ borderColor: `${CARS[seat].color}55` }}
             >
-              <CarDot seat={seat} className="h-6 w-10" />
+              <CarDot seat={seat} className="h-5 w-9" />
               <p className="text-xs uppercase tracking-wide text-slate-500">{CARS[seat].label}</p>
               <p className={`text-sm font-medium ${occupant && !isAway(occupant) ? "text-slate-100" : "text-slate-500"}`}>
-                {occupant ? playerName(state, occupant, myId) : "Libre"}
+                {occupant ? driverName(state, seat, myId) : "Libre"}
                 {occupant && isAway(occupant) && " (se fue)"}
               </p>
               {occupant !== myId && free && (
@@ -226,78 +230,69 @@ function SeatPicker({
         })}
       </div>
       <p className="text-center text-xs text-slate-500">
-        {!state.seats.a || !state.seats.b
-          ? "Falta un piloto: mandale el link a tu rival (o largá solo para practicar)."
+        {seated < 2
+          ? "Hasta 4 pilotos: mandales el link (o largá solo para practicar contra el reloj)."
           : mySeat
             ? "Cuando larguen, tu teléfono es el volante."
-            : "Los dos autos tienen piloto: vas a mirar la carrera."}
+            : seated === SEATS.length
+              ? "Los cuatro autos tienen piloto: vas a mirar la carrera."
+              : "Elegí un auto libre para correr."}
       </p>
     </div>
   );
 }
 
-function RaceInfo({
+/** Pantalla mode, my phone as a controller. */
+function Driver({
+  roomId,
+  myId,
   seat,
   meta,
   state,
   live,
-  now,
 }: {
+  roomId: string;
+  myId: string;
   seat: Seat;
   meta: CarrerasMeta;
   state: CarrerasState;
   live: CarrerasLive | null;
-  now: number;
 }) {
+  const send = useInputSender(roomId, myId);
+  const now = useServerNow(true, 100);
+  useWakeLock();
   const info = live?.gameNo === state.gameNo ? live.cars[seat] : undefined;
   const left = Math.ceil((state.startedAt - now) / 1000);
-  const counting = state.status === "racing" && now > 0 && left > 0;
-  return (
-    <div
-      className="flex items-center gap-3 rounded-xl border bg-slate-900/70 p-3"
-      style={{ borderColor: CARS[seat].color, boxShadow: `0 0 20px ${CARS[seat].glow}` }}
-    >
-      <CarDot seat={seat} className="h-8 w-12" />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-slate-100">{CARS[seat].label}</p>
-        <p className="text-xs text-slate-400">
-          {counting
-            ? "Largan en…"
-            : info
-              ? `Vuelta ${Math.min(info.lap, meta.laps)}/${meta.laps}`
-              : `${meta.laps} vueltas`}
-        </p>
-      </div>
-      <p className="font-display text-3xl font-bold text-slate-100">
-        {counting ? left : info ? `${info.place}°` : ""}
-      </p>
-    </div>
-  );
-}
+  const counting = now > 0 && left > 0;
+  const result = state.results[seat];
 
-function ResultBanner({ roomId, state, myId }: { roomId: string; state: CarrerasState; myId: string }) {
-  const mySeat = seatOf(state, myId);
-  const winner = state.winner || null;
-  const iWon = !!winner && winner === mySeat;
-  const winnerName = winner ? playerName(state, state.seats[winner], myId) : "";
-  const title = iWon ? "🏆 ¡Ganaste!" : winner ? (mySeat ? `😬 Ganó ${winnerName}` : `🏆 ¡Ganó ${winnerName}!`) : "";
   return (
-    <div
-      className={`animate-celebration-in flex flex-col items-center gap-3 rounded-2xl border bg-slate-900 p-4 text-center ${
-        iWon ? "border-emerald-500/25 shadow-[0_0_40px_rgba(52,211,153,0.2)]" : "border-violet-500/20"
-      }`}
-    >
-      <p className="font-display text-xl font-semibold text-slate-100">{title}</p>
-      {state.winnerMs > 0 && <p className="text-sm text-slate-400">Tiempo: {formatRaceTime(state.winnerMs)}</p>}
-      <div className="grid w-full max-w-xs gap-2">
-        <button onClick={() => rematch(roomId, state.gameNo)} className={mySeat ? PRIMARY_BUTTON : SECONDARY_BUTTON}>
-          Revancha
-        </button>
-        <button onClick={() => backToWaiting(roomId, state.gameNo)} className="text-sm text-slate-400 hover:text-slate-200">
-          Cambiar pilotos
-        </button>
+    <>
+      <div
+        className="flex items-center gap-3 rounded-xl border bg-slate-900/70 p-3"
+        style={{ borderColor: CARS[seat].color, boxShadow: `0 0 20px ${CARS[seat].glow}` }}
+      >
+        <CarDot seat={seat} className="h-8 w-12" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-slate-100">{CARS[seat].label}</p>
+          <p className="text-xs text-slate-400">
+            {counting
+              ? "Largan en…"
+              : result !== undefined
+                ? `¡Llegaste! ${formatRaceTime(result)}`
+                : info
+                  ? `Vuelta ${Math.min(info.lap, meta.laps)}/${meta.laps}`
+                  : `${meta.laps} vueltas`}
+          </p>
+        </div>
+        <p className="font-display text-3xl font-bold text-slate-100">{counting ? left : info ? `${info.place}°` : ""}</p>
       </div>
-    </div>
+      {result === undefined ? (
+        <Controller color={CARS[seat].color} locked={counting} onInput={send} />
+      ) : (
+        <p className="rounded-xl bg-slate-900/70 p-4 text-center text-slate-300">Esperando a que lleguen los demás…</p>
+      )}
+    </>
   );
 }
 
@@ -327,7 +322,7 @@ function Spectator({
             onClick={() => takeSeat(roomId, myId, seat, id)}
             className="flex items-center justify-center gap-2 rounded-lg border border-cyan-400/60 py-2 text-sm text-cyan-300"
           >
-            <CarDot seat={seat} /> {playerName(state, id, myId)} se fue: tomar su auto
+            <CarDot seat={seat} /> {driverName(state, seat, myId)} se fue: tomar su auto
           </button>
         );
       })}

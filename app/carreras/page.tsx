@@ -2,18 +2,34 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { LAP_OPTIONS, createCarrerasRoom } from "@/lib/carreras";
+import { LAP_OPTIONS, createCarrerasRoom, type CarrerasMode } from "@/lib/carreras";
 import { TRACKS, TRACK_ORDER, type TrackId } from "@/lib/carrerasTrack";
 import { roomPath } from "@/lib/games";
 import GameLobby from "@/components/GameLobby";
 import TrackPreview from "@/components/carreras/TrackPreview";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import { CARD, PRIMARY_BUTTON, SECTION_LABEL, chipClass } from "@/components/ui";
-import { MonitorPlay } from "lucide-react";
+import { MonitorPlay, Smartphone } from "lucide-react";
+
+const MODES: { id: CarrerasMode; label: string; hint: string; icon: typeof MonitorPlay }[] = [
+  {
+    id: "pantalla",
+    label: "Pantalla grande",
+    hint: "Creá la sala desde la compu conectada a la tele o al proyector: esa pantalla muestra la carrera (dividida en 3D o desde arriba) y los teléfonos son los volantes.",
+    icon: MonitorPlay,
+  },
+  {
+    id: "telefono",
+    label: "Cada uno en su teléfono",
+    hint: "Sin proyector: cada uno ve la carrera en 3D en su teléfono y maneja desde ahí. Sirve también para jugar a distancia.",
+    icon: Smartphone,
+  },
+];
 
 export default function CarrerasHome() {
   const router = useRouter();
   const identity = useClientIdentity();
+  const [mode, setMode] = useState<CarrerasMode>("pantalla");
   const [track, setTrack] = useState<TrackId>("ovalo");
   const [laps, setLaps] = useState(5);
   const [creating, setCreating] = useState(false);
@@ -24,8 +40,8 @@ export default function CarrerasHome() {
     setCreating(true);
     setCreateError(null);
     try {
-      const roomId = await createCarrerasRoom(identity.clientId, track, laps);
-      router.push(`${roomPath("carreras", roomId)}/pantalla`);
+      const roomId = await createCarrerasRoom(identity.clientId, { mode, track, laps });
+      router.push(mode === "pantalla" ? `${roomPath("carreras", roomId)}/pantalla` : roomPath("carreras", roomId));
     } catch (err) {
       console.error(err);
       setCreateError("No se pudo crear la sala. Probá de nuevo.");
@@ -38,11 +54,18 @@ export default function CarrerasHome() {
       <form onSubmit={handleCreate} className={`${CARD} flex flex-col gap-4`}>
         <h2 className="font-display text-lg font-semibold text-slate-100">Crear una sala nueva</h2>
 
-        <p className="flex gap-2 rounded-lg bg-cyan-500/10 p-3 text-sm text-cyan-100 ring-1 ring-cyan-400/20">
-          <MonitorPlay className="mt-0.5 h-4 w-4 shrink-0" />
-          Creá la sala desde la compu conectada a la tele o al proyector: esta pantalla se convierte en la pista.
-          Los jugadores entran desde el teléfono con el código.
-        </p>
+        <div>
+          <p className={SECTION_LABEL}>Dónde se ve la carrera</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {MODES.map((m) => (
+              <button key={m.id} type="button" onClick={() => setMode(m.id)} className={`${chipClass(mode === m.id)} flex items-center justify-center gap-1.5 py-2`}>
+                <m.icon className="h-4 w-4" />
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-xs text-slate-500">{MODES.find((m) => m.id === mode)!.hint}</p>
+        </div>
 
         <div>
           <p className={SECTION_LABEL}>Pista</p>
@@ -71,7 +94,7 @@ export default function CarrerasHome() {
         {createError && <p className="text-sm text-red-400">{createError}</p>}
 
         <button type="submit" disabled={creating} className={`mt-auto ${PRIMARY_BUTTON}`}>
-          {creating ? "Creando sala…" : "Crear sala y abrir la pista"}
+          {creating ? "Creando sala…" : mode === "pantalla" ? "Crear sala y abrir la pista" : "Crear sala"}
         </button>
       </form>
     </GameLobby>

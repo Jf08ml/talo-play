@@ -10,8 +10,9 @@ import {
   backToWaiting,
   getCarrerasMeta,
   normalizeMeta,
-  rematch,
-  reportWinner,
+  racersOf,
+  reportFinish,
+  roomCarsKey,
   startRace,
   subscribeCarreras,
   subscribeInputs,
@@ -22,40 +23,29 @@ import {
   type LiveCar,
   type Seat,
 } from "@/lib/carreras";
-import {
-  CAR_LENGTH,
-  CAR_WIDTH,
-  TRACKS,
-  WORLD_H,
-  WORLD_W,
-  collideCars,
-  getTrack,
-  gridCars,
-  lapsDone,
-  stepCar,
-  type Car,
-  type CarInput,
-  type Track,
-} from "@/lib/carrerasTrack";
+import { TRACKS, collideCars, getTrack, gridCar, lapsDone, stepCar, type Car, type CarInput } from "@/lib/carrerasTrack";
+import { RaceScene, type CameraMode } from "@/lib/carreras3d";
+import { drawMinimap, drawTopView, type DrawCar } from "@/lib/carrerasDraw";
 import { subscribePresence, type PresenceMap } from "@/lib/presence";
 import { serverNow } from "@/lib/serverTime";
-import { formatRaceTime } from "@/lib/format";
 import { roomPath } from "@/lib/games";
 import { useServerNow } from "@/hooks/useServerNow";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import TrackPreview from "@/components/carreras/TrackPreview";
+import { Standings, driverName, useCameraMode, useRaceCloser } from "@/components/carreras/shared";
 import { TaloMark } from "@/components/TaloLogo";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
-import { Maximize, Minimize, Smartphone } from "lucide-react";
+import { PRIMARY_BUTTON } from "@/components/ui";
+import { Box, Eye, Map as MapIcon, Maximize, Minimize, Smartphone, X } from "lucide-react";
 
 type Status = "loading" | "not-found" | "ready" | "error";
+type ViewMode = "3d" | "arriba";
 
 const subscribeNever = () => () => {};
-
 const STEP = 1 / 120;
+const VIEW_KEY = "carreras.screenView";
 /** Keyboard driving on the screen itself, to try it without phones. */
-const KEYS: Record<Seat, { left: string[]; right: string[]; brake: string[] }> = {
+const KEYS: Partial<Record<Seat, { left: string[]; right: string[]; brake: string[] }>> = {
   a: { left: ["a", "A"], right: ["d", "D"], brake: ["s", "S"] },
   b: { left: ["ArrowLeft"], right: ["ArrowRight"], brake: ["ArrowDown"] },
 };
@@ -63,16 +53,33 @@ const KEYS: Record<Seat, { left: string[]; right: string[]; brake: string[] }> =
 interface Engine {
   /** Which race (or pre-race grid) these cars belong to. */
   key: string;
-  track: Track;
   cars: Partial<Record<Seat, Car>>;
-  reported: boolean;
+  reported: Set<Seat>;
   lastLive: string;
+}
+
+/** Cars go back on the grid when this changes: a new race, or who's seated while waiting. */
+function engineKey(s: CarrerasState): string {
+  return s.status === "waiting" ? `w${s.gameNo}:${roomCarsKey(s)}` : `r${s.gameNo}`;
+}
+
+/** Seats with a car on track: the racers, or everyone seated before the start. */
+function carSeats(s: CarrerasState): Seat[] {
+  return s.status === "waiting" ? SEATS.filter((seat) => s.seats[seat]) : racersOf(s);
+}
+
+function readView(): ViewMode {
+  try {
+    return localStorage.getItem(VIEW_KEY) === "arriba" ? "arriba" : "3d";
+  } catch {
+    return "3d";
+  }
 }
 
 /**
  * The race screen (a computer on a TV or projector). It never joins the room
- * as a player: it simulates the cars from the phones' inputs, draws them and
- * reports the winner.
+ * as a player: it simulates every car from the phones' inputs, draws them
+ * (split-screen 3D or from above) and reports each finish.
  */
 export default function PantallaClient({ roomId }: { roomId: string }) {
   const router = useRouter();
@@ -81,16 +88,34 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
   const [meta, setMeta] = useState<CarrerasMeta | null>(null);
   const [state, setState] = useState<CarrerasState | null>(null);
   const [presence, setPresence] = useState<PresenceMap>({});
+  const [presenceLoaded, setPresenceLoaded] = useState(false);
   const [hud, setHud] = useState<Partial<Record<Seat, LiveCar>>>({});
+  const [view, setView] = useState<ViewMode>(readView);
+  const [camera, toggleCamera] = useCameraMode();
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvas3dRef = useRef<HTMLCanvasElement>(null);
+  const canvas2dRef = useRef<HTMLCanvasElement>(null);
+  const minimapRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<CarrerasState | null>(null);
+  const viewRef = useRef<ViewMode>(view);
+  const cameraRef = useRef<CameraMode>(camera);
   const inputsRef = useRef<Record<string, CarInputWire>>({});
   const keysRef = useRef(new Set<string>());
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+  useEffect(() => {
+    viewRef.current = view;
+    try {
+      localStorage.setItem(VIEW_KEY, view);
+    } catch {
+      // Not remembered.
+    }
+  }, [view]);
+  useEffect(() => {
+    cameraRef.current = camera;
+  }, [camera]);
 
   useEffect(() => {
     if (!configured) return;
@@ -102,10 +127,15 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
         if (cancelled) return;
         if (!raw) return setStatus("not-found");
         if (raw.game !== "carreras") return router.replace(`/sala/${roomId}`);
-        setMeta(normalizeMeta(raw));
+        const m = normalizeMeta(raw);
+        if (m.mode !== "pantalla") return router.replace(roomPath("carreras", roomId));
+        setMeta(m);
         unsubs.push(
           subscribeCarreras(roomId, setState),
-          subscribePresence(roomId, setPresence),
+          subscribePresence(roomId, (p) => {
+            setPresence(p);
+            setPresenceLoaded(true);
+          }),
           subscribeInputs(roomId, (inputs) => {
             inputsRef.current = inputs;
           })
@@ -138,36 +168,31 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
     };
   }, []);
 
+  useRaceCloser(roomId, state, presence, presenceLoaded);
+
   // The race loop: fixed-step physics, then a draw, every animation frame.
   const trackId = meta?.track;
   const laps = meta?.laps ?? 5;
   useEffect(() => {
-    if (!trackId) return;
+    if (!trackId || !canvas3dRef.current) return;
     const track = getTrack(trackId);
+    const scene = new RaceScene(canvas3dRef.current, trackId);
     let engine: Engine | null = null;
     let frame = 0;
     let last = performance.now();
     let acc = 0;
 
     const inputFor = (seat: Seat, s: CarrerasState): CarInput => {
+      if (s.status === "finished" || s.results[seat] !== undefined) return { steer: 0, brake: false, gas: false };
       const k = KEYS[seat];
       const keys = keysRef.current;
       const has = (list: string[]) => list.some((key) => keys.has(key));
-      if (has(k.left) || has(k.right) || has(k.brake)) {
+      if (k && (has(k.left) || has(k.right) || has(k.brake))) {
         return { steer: (has(k.right) ? 1 : 0) - (has(k.left) ? 1 : 0), brake: has(k.brake) };
       }
       const wire = inputsRef.current[s.seats[seat]];
       // No phone connected (or it dropped): the car brakes instead of driving into a wall.
-      return wire ? { steer: wire.s ?? 0, brake: !!wire.b } : { steer: 0, brake: true };
-    };
-
-    const resetFor = (s: CarrerasState): Engine => {
-      const grid = gridCars(track, 2);
-      const cars: Partial<Record<Seat, Car>> = {};
-      SEATS.forEach((seat, i) => {
-        if (s.seats[seat] || s.status === "waiting") cars[seat] = grid[i];
-      });
-      return { key: engineKey(s), track, cars, reported: false, lastLive: "" };
+      return wire ? { steer: wire.s ?? 0, brake: !!wire.b } : { steer: 0, brake: false, gas: false };
     };
 
     const tick = (t: number) => {
@@ -177,7 +202,14 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
       const s = stateRef.current;
       if (!s) return;
 
-      if (!engine || engine.key !== engineKey(s)) engine = resetFor(s);
+      if (!engine || engine.key !== engineKey(s)) {
+        const cars: Partial<Record<Seat, Car>> = {};
+        for (const seat of carSeats(s)) cars[seat] = gridCar(track, SEATS.indexOf(seat));
+        engine = { key: engineKey(s), cars, reported: new Set(), lastLive: "" };
+        scene.setCars({});
+      }
+      const seats = SEATS.filter((seat) => engine!.cars[seat]);
+      scene.setCars(Object.fromEntries(seats.map((seat) => [seat, { color: CARS[seat].color, label: driverName(s, seat) }])));
 
       const now = serverNow();
       const moving = s.status !== "waiting" && now >= s.startedAt;
@@ -185,31 +217,32 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
         acc += dt;
         while (acc >= STEP) {
           acc -= STEP;
-          for (const seat of SEATS) {
-            const car = engine.cars[seat];
-            if (car) stepCar(car, inputFor(seat, s), track, STEP);
+          for (const seat of seats) stepCar(engine.cars[seat]!, inputFor(seat, s), track, STEP);
+          for (let i = 0; i < seats.length; i++) {
+            for (let j = i + 1; j < seats.length; j++) collideCars(engine.cars[seats[i]]!, engine.cars[seats[j]]!);
           }
-          if (engine.cars.a && engine.cars.b) collideCars(engine.cars.a, engine.cars.b);
         }
       } else {
         acc = 0;
       }
 
-      // Finish line.
-      if (s.status === "racing" && moving && !engine.reported) {
-        const done = SEATS.filter((seat) => (engine!.cars[seat]?.progress ?? -Infinity) >= laps * track.length);
-        if (done.length) {
-          engine.reported = true;
-          const first = done.sort((x, y) => engine!.cars[y]!.progress - engine!.cars[x]!.progress)[0];
-          reportWinner(roomId, s.gameNo, first, now - s.startedAt).catch(console.error);
+      // Finish line, once per car.
+      if (s.status === "racing" && moving) {
+        for (const seat of seats) {
+          if (engine.reported.has(seat) || engine.cars[seat]!.progress < laps * track.length) continue;
+          engine.reported.add(seat);
+          reportFinish(roomId, s.gameNo, seat, now - s.startedAt).catch(console.error);
         }
       }
 
-      // Laps and places, for the HUD and the phones (only when they change).
+      // Places: finishers by time, then by distance driven.
+      const ranked = [...seats].sort((x, y) => {
+        const fx = s.results[x];
+        const fy = s.results[y];
+        if (fx !== undefined || fy !== undefined) return (fx ?? Infinity) - (fy ?? Infinity);
+        return engine!.cars[y]!.progress - engine!.cars[x]!.progress;
+      });
       if (s.status !== "waiting") {
-        const ranked = SEATS.filter((seat) => engine!.cars[seat]).sort(
-          (x, y) => engine!.cars[y]!.progress - engine!.cars[x]!.progress
-        );
         const cars: Partial<Record<Seat, LiveCar>> = {};
         ranked.forEach((seat, i) => {
           cars[seat] = { lap: lapsDone(engine!.cars[seat]!, track) + 1, place: i + 1 };
@@ -222,11 +255,28 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
         }
       }
 
-      draw(canvasRef.current, track, engine, s);
+      const drawCars: DrawCar[] = seats.map((seat) => {
+        const car = engine!.cars[seat]!;
+        return { x: car.x, y: car.y, heading: car.heading, color: CARS[seat].color, label: driverName(s, seat), bump: car.bump };
+      });
+      if (viewRef.current === "arriba") {
+        drawTopView(canvas2dRef.current, track, drawCars);
+      } else {
+        for (const seat of seats) {
+          const car = engine.cars[seat]!;
+          scene.setPose(seat, car.x, car.y, car.heading, Math.hypot(car.vx, car.vy));
+        }
+        // Before the start with nobody seated: an aerial view of the track.
+        scene.render(seats.length ? seats.map((key) => ({ key })) : [{ key: "" }], cameraRef.current, dt);
+        drawMinimap(minimapRef.current, track, drawCars);
+      }
     };
 
     frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      scene.dispose();
+    };
   }, [trackId, laps, roomId]);
 
   const now = useServerNow(state?.status === "racing", 100);
@@ -243,15 +293,19 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
 
   if (!configured) return <FirebaseSetupNotice />;
 
-  const name = (seat: Seat) => (state ? state.players[state.seats[seat]]?.name ?? "" : "");
   const here = (seat: Seat) => !!state?.seats[seat] && state.seats[seat] in presence;
   const left = state ? Math.ceil((state.startedAt - now) / 1000) : 0;
   const counting = state?.status === "racing" && now > 0 && left > 0;
   const go = state?.status === "racing" && now > 0 && left <= 0 && now - state.startedAt < 900;
+  const onTrack = state ? carSeats(state) : [];
+  const is3d = view === "3d";
+
+  const chip = "pointer-events-auto flex items-center gap-1.5 rounded-xl bg-slate-950/70 px-3 py-2 text-sm text-slate-200 backdrop-blur hover:text-white";
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-[#0b2a18] text-slate-100">
-      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+    <div className="fixed inset-0 flex flex-col bg-sky-300 text-slate-100">
+      <canvas ref={canvas3dRef} className={`absolute inset-0 h-full w-full ${is3d ? "" : "invisible"}`} />
+      <canvas ref={canvas2dRef} className={`absolute inset-0 h-full w-full ${is3d ? "hidden" : ""}`} />
 
       {status === "loading" && <RoomLoading text="Armando la pista…" />}
       {status === "not-found" && <RoomNotFound />}
@@ -259,48 +313,56 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
 
       {status === "ready" && state && meta && (
         <>
-          {/* Top bar: brand, code and each car's lap/place. */}
-          <div className="pointer-events-none relative z-10 flex items-start justify-between gap-3 p-3 sm:p-4">
+          {/* One tag per split-screen view, in the same order the 3D views are laid out. */}
+          {is3d && state.status !== "waiting" && (
+            <ViewTags seats={onTrack} state={state} hud={hud} laps={meta.laps} here={here} />
+          )}
+
+          <div className="pointer-events-none relative z-10 flex items-start justify-between gap-3 p-3">
             <div className="pointer-events-auto flex items-center gap-2 rounded-xl bg-slate-950/70 px-3 py-2 backdrop-blur">
               <Link href="/" aria-label="Volver a Talo">
                 <TaloMark className="h-6 w-6" />
               </Link>
               <span className="font-mono text-lg font-bold tracking-widest text-cyan-200">{roomId}</span>
             </div>
-            {state.status !== "waiting" && (
-              <div className="flex gap-2">
-                {SEATS.filter((seat) => state.seats[seat]).map((seat) => (
-                  <div
-                    key={seat}
-                    className="flex items-center gap-3 rounded-xl bg-slate-950/70 px-4 py-2 backdrop-blur"
-                    style={{ boxShadow: `inset 0 0 0 2px ${CARS[seat].color}` }}
-                  >
-                    <span className="font-display text-3xl font-bold">{hud[seat] ? `${hud[seat]!.place}°` : "–"}</span>
-                    <div>
-                      <p className="max-w-40 truncate text-sm font-semibold" style={{ color: CARS[seat].color }}>
-                        {name(seat)}
-                        {!here(seat) && <span className="text-slate-400"> (sin conexión)</span>}
-                      </p>
-                      <p className="text-xs text-slate-300">
-                        Vuelta {Math.min(hud[seat]?.lap ?? 1, meta.laps)}/{meta.laps}
-                      </p>
-                    </div>
-                  </div>
+            {!is3d && state.status !== "waiting" && (
+              <div className="flex flex-wrap justify-center gap-2">
+                {onTrack.map((seat) => (
+                  <SeatTag key={seat} seat={seat} state={state} hud={hud} laps={meta.laps} here={here} />
                 ))}
               </div>
             )}
-            <button
-              onClick={toggleFullscreen}
-              className="pointer-events-auto rounded-xl bg-slate-950/70 p-2.5 text-slate-300 backdrop-blur hover:text-white"
-              aria-label={fullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
-            >
-              {fullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => setView(is3d ? "arriba" : "3d")} className={chip}>
+                {is3d ? <MapIcon className="h-4 w-4" /> : <Box className="h-4 w-4" />}
+                {is3d ? "Ver desde arriba" : "Ver en 3D"}
+              </button>
+              {is3d && (
+                <button onClick={toggleCamera} className={chip}>
+                  <Eye className="h-4 w-4" /> {camera === "detras" ? "Detrás" : "Cabina"}
+                </button>
+              )}
+              {state.status === "racing" && (
+                <button onClick={() => backToWaiting(roomId, state.gameNo)} className={chip} aria-label="Cancelar carrera" title="Cancelar carrera">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+              <button onClick={toggleFullscreen} className={chip} aria-label={fullscreen ? "Salir de pantalla completa" : "Pantalla completa"}>
+                {fullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
 
+          {is3d && state.status !== "waiting" && (
+            <canvas
+              ref={minimapRef}
+              className="pointer-events-none absolute bottom-3 left-1/2 z-10 h-28 w-48 -translate-x-1/2 rounded-2xl bg-slate-950/45 backdrop-blur"
+            />
+          )}
+
           {state.status === "waiting" && (
-            <div className="relative z-10 flex flex-1 items-center justify-center p-4">
-              <JoinCard roomId={roomId} meta={meta} name={name} here={here} />
+            <div className="relative z-10 flex flex-1 items-center justify-center overflow-y-auto p-4">
+              <JoinCard roomId={roomId} meta={meta} state={state} here={here} />
             </div>
           )}
 
@@ -316,28 +378,9 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
             </div>
           )}
 
-          {state.status === "finished" && state.winner && (
+          {state.status === "finished" && (
             <div className="relative z-10 flex flex-1 items-center justify-center p-4">
-              <div className="animate-celebration-in flex flex-col items-center gap-3 rounded-3xl bg-slate-950/85 px-10 py-8 text-center shadow-2xl backdrop-blur">
-                <p className="text-6xl">🏆</p>
-                <p className="font-display text-5xl font-bold" style={{ color: CARS[state.winner].color }}>
-                  ¡Ganó {name(state.winner) || CARS[state.winner].label}!
-                </p>
-                <p className="text-lg text-slate-300">Tiempo: {formatRaceTime(state.winnerMs)}</p>
-                {SEATS.filter((seat) => state.seats[seat]).length > 1 && (
-                  <p className="text-sm text-slate-400">
-                    {SEATS.map((seat) => `${name(seat)} ${state.wins[state.seats[seat]] ?? 0}`).join(" · ")}
-                  </p>
-                )}
-                <div className="mt-2 flex gap-3">
-                  <button onClick={() => rematch(roomId, state.gameNo)} className={`px-8 ${PRIMARY_BUTTON}`}>
-                    Revancha
-                  </button>
-                  <button onClick={() => backToWaiting(roomId, state.gameNo)} className={`px-6 ${SECONDARY_BUTTON}`}>
-                    Cambiar pilotos
-                  </button>
-                </div>
-              </div>
+              <Standings roomId={roomId} state={state} big />
             </div>
           )}
         </>
@@ -346,26 +389,87 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
   );
 }
 
-/** Cars are put back on the grid when this changes: a new race, or leaving/entering the waiting screen. */
-function engineKey(s: CarrerasState): string {
-  return `${s.gameNo}:${s.status === "waiting" ? "w" : "r"}`;
+function SeatTag({
+  seat,
+  state,
+  hud,
+  laps,
+  here,
+}: {
+  seat: Seat;
+  state: CarrerasState;
+  hud: Partial<Record<Seat, LiveCar>>;
+  laps: number;
+  here: (seat: Seat) => boolean;
+}) {
+  const done = state.results[seat] !== undefined;
+  return (
+    <div
+      className="flex items-center gap-3 rounded-xl bg-slate-950/70 px-4 py-2 backdrop-blur"
+      style={{ boxShadow: `inset 0 0 0 2px ${CARS[seat].color}` }}
+    >
+      <span className="font-display text-3xl font-bold">{hud[seat] ? `${hud[seat]!.place}°` : "–"}</span>
+      <div>
+        <p className="max-w-40 truncate text-sm font-semibold" style={{ color: CARS[seat].color }}>
+          {driverName(state, seat)}
+          {!here(seat) && <span className="text-slate-400"> (sin conexión)</span>}
+        </p>
+        <p className="text-xs text-slate-300">
+          {done ? "¡Llegó! 🏁" : `Vuelta ${Math.min(hud[seat]?.lap ?? 1, laps)}/${laps}`}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** Each player's tag at the bottom of their own split-screen view. */
+function ViewTags({
+  seats,
+  state,
+  hud,
+  laps,
+  here,
+}: {
+  seats: Seat[];
+  state: CarrerasState;
+  hud: Partial<Record<Seat, LiveCar>>;
+  laps: number;
+  here: (seat: Seat) => boolean;
+}) {
+  const n = Math.max(1, seats.length);
+  const cols = n === 1 ? 1 : 2;
+  const rows = n <= 2 ? 1 : 2;
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 z-10 grid"
+      style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)` }}
+    >
+      {seats.map((seat) => (
+        <div key={seat} className="relative" style={{ boxShadow: n > 1 ? "inset 0 0 0 2px rgba(2,6,23,0.6)" : undefined }}>
+          <div className="absolute bottom-3 left-3">
+            <SeatTag seat={seat} state={state} hud={hud} laps={laps} here={here} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function JoinCard({
   roomId,
   meta,
-  name,
+  state,
   here,
 }: {
   roomId: string;
   meta: CarrerasMeta;
-  name: (seat: Seat) => string;
+  state: CarrerasState;
   here: (seat: Seat) => boolean;
 }) {
   const host = useSyncExternalStore(subscribeNever, () => window.location.host, () => "");
   const ready = SEATS.some(here);
   return (
-    <div className="flex w-full max-w-3xl flex-col items-center gap-6 rounded-3xl bg-slate-950/85 p-8 text-center shadow-2xl backdrop-blur">
+    <div className="flex w-full max-w-3xl flex-col items-center gap-5 rounded-3xl bg-slate-950/85 p-8 text-center shadow-2xl backdrop-blur">
       <div className="flex items-center gap-3 text-slate-300">
         <Smartphone className="h-7 w-7 text-cyan-300" />
         <p className="text-xl">Entrá desde tu teléfono</p>
@@ -382,20 +486,17 @@ function JoinCard({
         <p className="mt-1 text-sm text-slate-500">o en la página de Talo: «¿Te invitaron?» y este código</p>
       </div>
 
-      <div className="grid w-full grid-cols-2 gap-4">
+      <div className="grid w-full grid-cols-2 gap-3">
         {SEATS.map((seat) => (
           <div
             key={seat}
-            className="flex items-center gap-3 rounded-2xl bg-slate-900 p-4"
-            style={{ boxShadow: `inset 0 0 0 2px ${CARS[seat].color}${here(seat) ? "" : "55"}` }}
+            className="flex items-center gap-3 rounded-2xl bg-slate-900 p-3"
+            style={{ boxShadow: `inset 0 0 0 2px ${CARS[seat].color}${here(seat) ? "" : "40"}` }}
           >
-            <span className="h-8 w-14 shrink-0 rounded-lg" style={{ backgroundColor: CARS[seat].color }} />
-            <div className="min-w-0 text-left">
-              <p className="text-xs uppercase tracking-wide text-slate-500">{CARS[seat].label}</p>
-              <p className={`truncate text-xl font-semibold ${here(seat) ? "text-slate-100" : "text-slate-500"}`}>
-                {here(seat) ? name(seat) : "Esperando piloto…"}
-              </p>
-            </div>
+            <span className="h-7 w-12 shrink-0 rounded-lg" style={{ backgroundColor: CARS[seat].color, opacity: here(seat) ? 1 : 0.4 }} />
+            <p className={`truncate text-lg font-semibold ${here(seat) ? "text-slate-100" : "text-slate-500"}`}>
+              {here(seat) ? driverName(state, seat) : "Libre"}
+            </p>
           </div>
         ))}
       </div>
@@ -411,129 +512,8 @@ function JoinCard({
         {ready ? "¡Largar!" : "Esperando pilotos…"}
       </button>
       <p className="text-xs text-slate-500">
-        También se puede largar desde un teléfono. Para probar sin teléfonos: A/D y S, o las flechas.
+        Hasta 4 pilotos. También se puede largar desde un teléfono. Para probar sin teléfonos: A/D y S, o las flechas.
       </p>
     </div>
   );
-}
-
-// ---- Drawing --------------------------------------------------------------
-
-function tracePath(ctx: CanvasRenderingContext2D, track: Track) {
-  ctx.beginPath();
-  ctx.moveTo(track.xs[0], track.ys[0]);
-  for (let i = 1; i < track.xs.length; i++) ctx.lineTo(track.xs[i], track.ys[i]);
-  ctx.closePath();
-}
-
-function draw(canvas: HTMLCanvasElement | null, track: Track, engine: Engine, s: CarrerasState) {
-  if (!canvas) return;
-  const dpr = window.devicePixelRatio || 1;
-  const cw = Math.round(canvas.clientWidth * dpr);
-  const ch = Math.round(canvas.clientHeight * dpr);
-  if (canvas.width !== cw || canvas.height !== ch) {
-    canvas.width = cw;
-    canvas.height = ch;
-  }
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = "#0b2a18";
-  ctx.fillRect(0, 0, cw, ch);
-
-  const scale = Math.min(cw / WORLD_W, ch / WORLD_H);
-  ctx.setTransform(scale, 0, 0, scale, (cw - WORLD_W * scale) / 2, (ch - WORLD_H * scale) / 2);
-
-  // Grass.
-  ctx.fillStyle = "#14532d";
-  ctx.fillRect(0, 0, WORLD_W, WORLD_H);
-  ctx.fillStyle = "#166534";
-  for (let x = 0; x < WORLD_W; x += 120) ctx.fillRect(x, 0, 60, WORLD_H);
-
-  const w = track.def.width;
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-
-  // Curbs (red and white), asphalt, center line.
-  tracePath(ctx, track);
-  ctx.lineWidth = w + 18;
-  ctx.strokeStyle = "#f8fafc";
-  ctx.setLineDash([]);
-  ctx.stroke();
-  ctx.strokeStyle = "#dc2626";
-  ctx.setLineDash([22, 22]);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.lineWidth = w;
-  ctx.strokeStyle = "#3f3f46";
-  ctx.stroke();
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = "rgba(248,250,252,0.35)";
-  ctx.setLineDash([26, 26]);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Checkered start/finish line at the first sample.
-  const dx = track.xs[1] - track.xs[0];
-  const dy = track.ys[1] - track.ys[0];
-  ctx.save();
-  ctx.translate(track.xs[0], track.ys[0]);
-  ctx.rotate(Math.atan2(dy, dx));
-  const sq = 9;
-  for (let r = 0; r < Math.ceil(w / sq); r++) {
-    for (let c = 0; c < 2; c++) {
-      ctx.fillStyle = (r + c) % 2 ? "#0f172a" : "#f8fafc";
-      ctx.fillRect(c * sq - sq, r * sq - w / 2, sq, sq);
-    }
-  }
-  ctx.restore();
-
-  // Cars.
-  for (const seat of SEATS) {
-    const car = engine.cars[seat];
-    if (!car) continue;
-    const color = CARS[seat].color;
-    ctx.save();
-    ctx.translate(car.x, car.y);
-    ctx.rotate(car.heading);
-    ctx.shadowColor = "rgba(0,0,0,0.5)";
-    ctx.shadowBlur = 8;
-    ctx.shadowOffsetY = 4;
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.roundRect(-CAR_LENGTH / 2, -CAR_WIDTH / 2, CAR_LENGTH, CAR_WIDTH, 6);
-    ctx.fill();
-    ctx.shadowColor = "transparent";
-    ctx.fillStyle = "rgba(15,23,42,0.75)";
-    ctx.fillRect(2, -CAR_WIDTH / 2 + 3, 8, CAR_WIDTH - 6);
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.fillRect(CAR_LENGTH / 2 - 3, -CAR_WIDTH / 2 + 2, 3, 4);
-    ctx.fillRect(CAR_LENGTH / 2 - 3, CAR_WIDTH / 2 - 6, 3, 4);
-    ctx.restore();
-
-    if (car.bump > 0) {
-      ctx.fillStyle = "#fde047";
-      for (let i = 0; i < 5; i++) {
-        const a = Math.random() * Math.PI * 2;
-        const r = 14 + Math.random() * 10;
-        ctx.fillRect(car.x + Math.cos(a) * r, car.y + Math.sin(a) * r, 3, 3);
-      }
-    }
-
-    // Driver's name above the car.
-    const label = s.players[s.seats[seat]]?.name;
-    if (label) {
-      ctx.font = "600 16px system-ui, sans-serif";
-      const tw = ctx.measureText(label).width;
-      ctx.fillStyle = "rgba(2,6,23,0.7)";
-      ctx.beginPath();
-      ctx.roundRect(car.x - tw / 2 - 6, car.y - 44, tw + 12, 22, 6);
-      ctx.fill();
-      ctx.fillStyle = color;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(label, car.x, car.y - 33);
-    }
-  }
 }
