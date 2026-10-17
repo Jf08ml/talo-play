@@ -1227,3 +1227,32 @@ export function ChinchonThumbnail() {
     </svg>
   );
 }
+
+export function TrucoThumbnail() {
+  // The "ancho de espada" and "ancho de basto" on green felt, and a "¡Truco!" bubble.
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="truco-bg" cx="50%" cy="50%" r="80%">
+          <stop offset="0%" stopColor="#166534" />
+          <stop offset="100%" stopColor="#052e16" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#truco-bg)" />
+      <g transform="rotate(-10 150 130)">
+        <rect x="100" y="60" width="90" height="135" rx="10" fill="#fffbeb" stroke="#d6d3d1" strokeWidth="2" />
+        <text x="110" y="84" fontSize="20" fontWeight="800" fill="#2563eb" fontFamily="system-ui, sans-serif">1</text>
+        <path d="M145 88 l9 14 v44 h-18 v-44 z M127 146 h36 v8 h-36 z M141 154 h8 v16 h-8 z" fill="#2563eb" />
+      </g>
+      <g transform="rotate(8 240 130)">
+        <rect x="200" y="60" width="90" height="135" rx="10" fill="#fffbeb" stroke="#d6d3d1" strokeWidth="2" />
+        <text x="210" y="84" fontSize="20" fontWeight="800" fill="#15803d" fontFamily="system-ui, sans-serif">1</text>
+        <path d="M236 175 l5 -70 c-6 -4 -7 -13 -1 -17 c7 -5 19 -1 19 8 c0 6 -3 9 -6 11 l5 68 z" fill="#15803d" />
+      </g>
+      <g transform="translate(270 22)">
+        <rect width="110" height="44" rx="22" fill="#f43f5e" />
+        <text x="55" y="29" textAnchor="middle" fontSize="20" fontWeight="900" fill="#fff" fontFamily="system-ui, sans-serif">¡TRUCO!</text>
+      </g>
+    </svg>
+  );
+}

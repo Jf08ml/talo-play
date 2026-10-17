@@ -6,7 +6,7 @@
  * Every room stores its game in `rooms/{id}/meta/game`; room codes are
  * global, so one code is enough to find any game's room (`lib/roomLookup.ts`).
  */
-export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena" | "yonunca" | "onda" | "telefono" | "ludo" | "lobo" | "ajedrez" | "chinchon";
+export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena" | "yonunca" | "onda" | "telefono" | "ludo" | "lobo" | "ajedrez" | "chinchon" | "truco";
 
 /** Who you're playing with: the first question the home page asks. */
 export type PlayContext = "pareja" | "amigos" | "grupo" | "solo";
@@ -515,10 +515,25 @@ export const GAMES: Record<GameId, GameInfo> = {
       "Cortá cuando tengas todo ligado salvo una carta de 5 o menos. Las sueltas suman puntos: quien pasa el límite queda afuera.",
     ],
   },
+  truco: {
+    id: "truco",
+    title: "Truco",
+    path: "truco",
+    tagline: "El truco argentino de siempre, mano a mano o dos contra dos: envido, real envido, truco, retruco y vale cuatro, desde el celular.",
+    minPlayers: 2,
+    maxPlayers: 4,
+    duration: "20–40 min",
+    contexts: ["pareja", "amigos"],
+    howTo: [
+      "Jueguen mano a mano o de a cuatro (dos contra dos). Cada uno recibe tres cartas en su celular.",
+      "En la primera baza podés cantar envido; en cualquier momento de tu turno, truco. Los rivales contestan quiero, no quiero o suben la apuesta.",
+      "Gana la mano quien gana dos de las tres bazas. La app cuenta el envido y anota los porotos hasta 15 o 30.",
+    ],
+  },
 };
 
 /** Home page order: quickest to start first. */
-export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "yonunca", "onda", "telefono", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "lobo", "arena", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "ajedrez", "generala", "chinchon", "ludo", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
+export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "yonunca", "onda", "telefono", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "lobo", "arena", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "ajedrez", "generala", "chinchon", "truco", "ludo", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
 
 export function roomPath(game: GameId, roomId: string): string {
   return `/${GAMES[game].path}/${roomId}`;

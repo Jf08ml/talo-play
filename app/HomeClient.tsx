@@ -42,6 +42,7 @@ import {
   LoboThumbnail,
   AjedrezThumbnail,
   ChinchonThumbnail,
+  TrucoThumbnail,
 } from "@/components/GameThumbnails";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 
@@ -78,6 +79,7 @@ const THUMBNAILS: Record<GameId, ReactNode> = {
   lobo: <LoboThumbnail />,
   ajedrez: <AjedrezThumbnail />,
   chinchon: <ChinchonThumbnail />,
+  truco: <TrucoThumbnail />,
 };
 
 export default function HomeClient() {

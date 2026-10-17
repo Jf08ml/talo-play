@@ -35,6 +35,7 @@ import {
   Moon,
   Castle,
   Spade,
+  Club,
   type LucideIcon,
 } from "lucide-react";
 import type { GameId, PlayContext } from "@/lib/games";
@@ -75,6 +76,7 @@ const GAME_ICONS: Record<GameId, { icon: LucideIcon; gradient: string }> = {
   lobo: { icon: Moon, gradient: "from-indigo-600 to-red-700" },
   ajedrez: { icon: Castle, gradient: "from-stone-400 to-amber-800" },
   chinchon: { icon: Spade, gradient: "from-emerald-600 to-yellow-600" },
+  truco: { icon: Club, gradient: "from-sky-600 to-amber-600" },
 };
 
 export const CONTEXT_ICONS: Record<PlayContext, LucideIcon> = {
