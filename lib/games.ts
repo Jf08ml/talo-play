@@ -392,7 +392,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     howTo: [
       "Armen dos equipos (los lugares vacíos pueden ser bots). Cada uno pelea desde su teléfono o su compu.",
       "Arrancás con una daga: corré a agarrar espadas, hachas, mazas, lanzas, arcos y escudos tirados por la arena.",
-      "Atacá, bloqueá de frente y cuidá el aguante. Gana la ronda el equipo que queda en pie.",
+      "Corré, esquivá, encadená combos y bloqueá de frente, cuidando el aguante. Hay pociones para curarte. Gana la ronda el equipo que queda en pie.",
     ],
   },
   codigo: {

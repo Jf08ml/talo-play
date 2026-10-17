@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  REGEN_DELAY_MS,
+  REGEN_EVERY_MS,
   ROUND_END_MS,
   ROUND_SECONDS,
   alive,
@@ -13,6 +15,8 @@ import {
   nextRound,
   openPose,
   pickItem,
+  regenerate,
+  respawnItems,
   roundKey,
   shootArrow,
   startMatch,
@@ -66,7 +70,7 @@ import { MOUSE_LOOK, TOUCH_LOOK, TouchControls, newControls, useDesktopControls,
 import { Eye, Maximize, MousePointerClick, RotateCw, Shield, Users, Volume2, VolumeX } from "lucide-react";
 
 const STEP = 1 / 60;
-const POSE_MS = 66;
+const POSE_MS = 50;
 /** A person gone this long from the room falls (so a round never hangs). */
 const ABSENT_MS = 5000;
 /** After you fall, the camera stays on you this long before following a teammate. */
@@ -173,10 +177,12 @@ export default function Battle({
   const audioRef = useRef<ArenaAudio | null>(null);
   const [hud, setHud] = useState<Hud | null>(null);
   const [hurt, setHurt] = useState(false);
+  const [healed, setHealed] = useState(false);
   const [clock, setClock] = useState(0);
   const spectateRef = useRef(0);
   const fine = useFinePointer();
-  const locked = useDesktopControls(controlsRef, canvasRef, fine);
+  const canFight = state.status === "fighting" && !!hud?.alive && myId in state.roster;
+  const locked = useDesktopControls(controlsRef, canvasRef, fine, canFight);
 
   useWakeLock();
   useEffect(() => {
@@ -243,6 +249,10 @@ export default function Battle({
     let lastItems: unknown = null;
     let pickPending = 0;
     let hurtTimer: ReturnType<typeof setTimeout> | undefined;
+    let healTimer: ReturnType<typeof setTimeout> | undefined;
+    let lastHp = -1;
+    /** First-person feel: tilt when strafing, wider view when running or dodging. */
+    const feel = { roll: 0, fov: 72 };
     const mySend = myId in stateRef.current.roster ? openPose(roomId, myId, true) : null;
 
     /** Calls a state change once in a while (every client may; transactions keep it single). */
@@ -256,7 +266,10 @@ export default function Battle({
     const gearOf = (s: ArenaState, id: string): Gear => s.gear[id] ?? START_GEAR;
 
     /** How a fighter looks to this client right now. */
-    const viewOf = (s: ArenaState, id: string): FighterView & { act: string; actAt: number; actLen: number; draw: number; speed: number; pitch: number } => {
+    const viewOf = (
+      s: ArenaState,
+      id: string
+    ): FighterView & { act: string; actAt: number; actLen: number; draw: number; speed: number; pitch: number; combo: number; running: boolean } => {
       const team = s.roster[id];
       const local = id === myId ? me : bots.get(id)?.f;
       if (local) {
@@ -276,6 +289,9 @@ export default function Battle({
           actLen: local.actLen,
           draw: local.draw,
           speed: local.speed,
+          combo: local.combo,
+          running: local.sprinting,
+          dodging: local.act === "dodge",
         };
       }
       const g = ghosts.get(id);
@@ -296,6 +312,9 @@ export default function Battle({
         actLen: p?.al ?? 0,
         draw: p?.dr ?? 0,
         speed: p?.sp ?? 0,
+        combo: p?.cb ?? 0,
+        running: !!p?.rn,
+        dodging: !!p && ACTS[p.a] === "dodge",
       };
     };
 
@@ -324,6 +343,8 @@ export default function Battle({
       b: f.blocking ? 1 : 0,
       dr: Math.round(f.draw * 100) / 100,
       sp: Math.round(f.speed * 10) / 10,
+      cb: f.combo,
+      rn: f.sprinting ? 1 : 0,
       t: Math.round(serverNow()),
     });
 
@@ -334,6 +355,7 @@ export default function Battle({
       for (const ev of events) {
         const [vol, pan] = where(f.x, f.z);
         if (ev.type === "windup") audio?.swing(gear.w === "hacha" || gear.w === "maza" ? 0.8 : gear.w === "daga" ? 0 : 0.35, vol, pan);
+        if (ev.type === "dodge") audio?.swing(0.1, vol * 0.7, pan);
         if (ev.type === "strike") {
           const views = Object.keys(s.roster).map((o) => viewOf(s, o));
           const hits = meleeStrikes(viewOf(s, id), gear, views);
@@ -502,7 +524,17 @@ export default function Battle({
             }),
           ];
           if (me && myAlive) {
-            const input: FighterInput = { mx: c.mx, mz: c.mz, yaw: look.yaw, pitch: look.pitch, jump: c.jump, attack: c.attack, block: c.block };
+            const input: FighterInput = {
+              mx: c.mx,
+              mz: c.mz,
+              yaw: look.yaw,
+              pitch: look.pitch,
+              jump: c.jump,
+              attack: c.attack,
+              block: c.block,
+              sprint: c.sprint || (!fine && c.mz > 0.6 && Math.hypot(c.mx, c.mz) > 0.92),
+              dodge: c.dodge,
+            };
             const before = me.act;
             const evs = me.step(input, gearOf(s, myId), STEP, solidsFor(myId));
             // A new act (or the same one again, like a second flinch): note when it started.
@@ -520,7 +552,7 @@ export default function Battle({
                 return { ...v, act: v.act as BotEnemy["act"], actAt: v.actAt, weapon: gearOf(s, o).w };
               });
             const items = Object.entries(s.items).map(([iid, it]) => ({ id: iid, ...it }));
-            const { input, pick } = botInput(run.f, gearOf(s, id), run.mind, { enemies, items }, STEP, Math.random);
+            const { input, pick } = botInput(run.f, gearOf(s, id), s.hp[id] ?? 0, run.mind, { enemies, items }, STEP, Math.random);
             if (pick && performance.now() - run.pickAt > 800) {
               run.pickAt = performance.now();
               pickItem(roomId, key, id, pick, run.f.x, run.f.z).catch(console.error);
@@ -587,7 +619,7 @@ export default function Battle({
       }
 
       // Everyone else, from their poses.
-      const ease = 1 - Math.exp(-dt * 14);
+      const ease = 1 - Math.exp(-dt * 18);
       for (const id of ids) {
         if (id === myId || bots.has(id)) continue;
         const p = poses[id];
@@ -646,6 +678,21 @@ export default function Battle({
       }
       if (s.status === "fighting" && now > s.startedAt + ROUND_SECONDS * 1000) once("timeout", () => timeoutRound(roomId, key));
       if (s.status === "roundEnd" && now > s.roundEndedAt + ROUND_END_MS) once("next", () => nextRound(roomId, key));
+      if (fighting && Object.values(s.respawns).some((r) => r.at <= now)) once("respawn", () => respawnItems(roomId, key));
+      if (fighting && s.regen) {
+        for (const id of [myId, ...bots.keys()]) {
+          if (!alive(s, id) || (s.hp[id] ?? 0) >= MAX_HP || now - (s.hits[id]?.t ?? 0) < REGEN_DELAY_MS) continue;
+          once(`regen:${id}`, () => regenerate(roomId, key, id), REGEN_EVERY_MS);
+        }
+      }
+      const myHp = s.hp[myId] ?? 0;
+      if (lastHp >= 0 && myHp > lastHp && s.status === "fighting") {
+        audio?.heal();
+        setHealed(true);
+        clearTimeout(healTimer);
+        healTimer = setTimeout(() => setHealed(false), 450);
+      }
+      lastHp = myHp;
 
       // Publish my pose and my bots'.
       if (t - lastPose >= POSE_MS) {
@@ -672,6 +719,8 @@ export default function Battle({
           blocking: v.blocking,
           draw: v.draw,
           speed: v.speed,
+          running: v.running,
+          combo: v.combo,
           alive: v.alive,
           gear: gearOf(s, id),
         };
@@ -722,7 +771,10 @@ export default function Battle({
         }
       }
       const fv = follow ? viewOf(s, follow) : null;
-      const camLook = follow === myId ? look : { yaw: fv?.yaw ?? 0, pitch: -0.2 };
+      const fe = 1 - Math.exp(-dt * 8);
+      feel.roll += ((myAlive ? -c.mx * 0.035 : 0) - feel.roll) * fe;
+      feel.fov += (72 + (me?.sprinting ? 9 : 0) + (me?.act === "dodge" ? 12 : 0) - feel.fov) * fe;
+      const camLook = follow === myId ? { ...look, roll: feel.roll, fov: feel.fov } : { yaw: fv?.yaw ?? 0, pitch: -0.2 };
       const mode: ArenaCamera = follow === myId && myAlive ? cameraRef.current : "tercera";
       if (fv) {
         earX = fv.x;
@@ -758,6 +810,7 @@ export default function Battle({
     return () => {
       cancelAnimationFrame(frame);
       clearTimeout(hurtTimer);
+      clearTimeout(healTimer);
       unsubPoses();
       unsubArrows();
       mySend?.close();
@@ -783,6 +836,11 @@ export default function Battle({
       <div
         className="pointer-events-none absolute inset-0 transition-opacity duration-300"
         style={{ opacity: hurt ? 1 : 0, boxShadow: "inset 0 0 120px 30px rgba(220,38,38,0.65)" }}
+      />
+      {/* Healing: a green glow. */}
+      <div
+        className="pointer-events-none absolute inset-0 transition-opacity duration-500"
+        style={{ opacity: healed ? 1 : 0, boxShadow: "inset 0 0 120px 30px rgba(74,222,128,0.5)" }}
       />
 
       {inRoster && hud?.alive && state.status === "fighting" && !fine && (
@@ -877,7 +935,7 @@ export default function Battle({
         <div className="pointer-events-none absolute inset-x-0 bottom-24 z-20 flex justify-center">
           <p className="flex items-center gap-2 rounded-xl bg-slate-950/75 px-4 py-2 text-sm text-white backdrop-blur">
             <MousePointerClick className="h-4 w-4" />
-            Hacé clic en la arena para pelear · WASD moverte · clic atacar · clic derecho o Shift bloquear · E agarrar · espacio saltar · V cámara
+            Hacé clic en la arena para pelear · WASD moverte · Shift correr · clic atacar (de nuevo = combo) · clic derecho o F bloquear · Q esquivar · E agarrar · espacio saltar · V cámara · Esc soltar el mouse
           </p>
         </div>
       )}

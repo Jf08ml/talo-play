@@ -30,7 +30,8 @@ import { Bot, Eye, Shuffle, Smartphone } from "lucide-react";
 type Status = "loading" | "not-found" | "ready" | "error";
 
 export function settingsSummary(meta: ArenaMeta): string {
-  return `${meta.size} contra ${meta.size} · al mejor de ${meta.wins * 2 - 1} rondas${meta.bots ? " · con bots" : ""}`;
+  const extras = [meta.bots && "con bots", meta.potions && "pociones", meta.regen && "regeneración"].filter(Boolean);
+  return `${meta.size} contra ${meta.size} · al mejor de ${meta.wins * 2 - 1} rondas${extras.map((e) => ` · ${e}`).join("")}`;
 }
 
 /** An arena room: teams while waiting, then the battle full screen. */

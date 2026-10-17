@@ -5,7 +5,18 @@ import { serverNow } from "./serverTime";
 import { transactState } from "./transact";
 import { makeSeed } from "./random";
 import { TEAMS, type TeamId } from "./teams";
-import { BOT_NAMES, MAX_HP, START_GEAR, roundItems, type ArenaItem, type Gear, type ItemKind, type Strike } from "./arenaSim";
+import {
+  BOT_NAMES,
+  MAX_HP,
+  POTION_HEAL,
+  RESPAWN_PREFIX,
+  START_GEAR,
+  roundItems,
+  type ArenaItem,
+  type Gear,
+  type ItemKind,
+  type Strike,
+} from "./arenaSim";
 
 /**
  * Arena medieval: red against blue, 1v1 to 3v3, best of 3 or 5 rounds; each
@@ -35,6 +46,12 @@ export const ROUND_END_MS = 4500;
 export const SIZE_OPTIONS = [1, 2, 3] as const;
 /** Rounds to win the match: best of 3 or 5. */
 export const WINS_OPTIONS = [2, 3] as const;
+/** A potion comes back to its place this long after being taken. */
+export const POTION_RESPAWN_MS = 20000;
+/** Regeneration: starts this long after the last hit taken, a few points at a time. */
+export const REGEN_DELAY_MS = 6000;
+export const REGEN_STEP = 4;
+export const REGEN_EVERY_MS = 1000;
 
 export type ArenaStatus = "waiting" | "fighting" | "roundEnd" | "finished";
 
@@ -47,6 +64,10 @@ export interface ArenaMeta {
   wins: number;
   /** Fill empty places with bots. */
   bots: boolean;
+  /** Potions on the floor (they come back after a while). */
+  potions: boolean;
+  /** Health slowly comes back when nobody hits you for a while. */
+  regen: boolean;
   createdAt: number | object;
 }
 
@@ -65,6 +86,8 @@ export interface HitNote {
   /** Where the attacker was (pushes the target away from there). */
   x: number;
   z: number;
+  /** Server time of the hit (regeneration waits after it). */
+  t: number;
 }
 
 export interface ArenaState {
@@ -88,6 +111,13 @@ export interface ArenaState {
   gear: Record<string, Gear>;
   items: Record<string, ArenaItem>;
   itemSeq: number;
+  /** Potions taken, back at their place at `at` (server time). */
+  respawns: Record<string, ArenaItem & { at: number }>;
+  /** This match's healing rules (copied from the room's settings). */
+  potions: boolean;
+  regen: boolean;
+  /** Last regeneration tick per fighter (server time). */
+  healAt: Record<string, number>;
   hits: Record<string, HitNote>;
   score: Record<TeamId, number>;
   roundWinner: TeamId | "draw" | "";
@@ -112,6 +142,9 @@ export interface ArenaPose {
   a: number;
   at: number;
   al: number;
+  /** Swing number in a combo (odd ones come from the other side), and running. */
+  cb: number;
+  rn: number;
   b: number;
   dr: number;
   sp: number;
@@ -144,6 +177,8 @@ export function normalizeMeta(raw: Partial<ArenaMeta>): ArenaMeta {
     size: Math.max(1, Math.min(3, raw.size ?? 1)),
     wins: raw.wins === 3 ? 3 : 2,
     bots: raw.bots ?? true,
+    potions: raw.potions ?? true,
+    regen: raw.regen ?? false,
     createdAt: raw.createdAt ?? 0,
   };
 }
@@ -171,6 +206,10 @@ function normalizeState(raw: Partial<ArenaState> | null): ArenaState | null {
     gear,
     items: raw.items ?? {},
     itemSeq: raw.itemSeq ?? 0,
+    respawns: raw.respawns ?? {},
+    potions: raw.potions ?? false,
+    regen: raw.regen ?? false,
+    healAt: raw.healAt ?? {},
     hits: raw.hits ?? {},
     score: { red: raw.score?.red ?? 0, blue: raw.score?.blue ?? 0 },
     roundWinner: raw.roundWinner ?? "",
@@ -210,7 +249,9 @@ function mutate(roomId: string, fn: (state: ArenaState) => ArenaState | null) {
   return transactState(statePath(roomId), normalizeState, fn);
 }
 
-export async function createArenaRoom(hostId: string, settings: { size: number; wins: number; bots: boolean }): Promise<string> {
+export type ArenaSettings = Pick<ArenaMeta, "size" | "wins" | "bots" | "potions" | "regen">;
+
+export async function createArenaRoom(hostId: string, settings: ArenaSettings): Promise<string> {
   const roomId = generateRoomCode();
   const meta: ArenaMeta = { game: "arena", hostId, ...settings, createdAt: serverTimestamp() };
   const state: Partial<ArenaState> = { status: "waiting", gameNo: 0 };
@@ -288,8 +329,10 @@ function setupRound(s: ArenaState, round: number): ArenaState {
     startedAt: serverNow() + COUNTDOWN_MS,
     hp,
     gear,
-    items: roundItems(s.seed, round),
+    items: roundItems(s.seed, round, s.potions),
     itemSeq: 0,
+    respawns: {},
+    healAt: {},
     hits: {},
     roundWinner: "",
     roundEndedAt: 0,
@@ -301,7 +344,7 @@ function setupRound(s: ArenaState, round: number): ArenaState {
  * each), plus bots to fill the places when `bots` is on. Each team needs
  * somebody, and at least one person has to fight.
  */
-export function startMatch(roomId: string, settings: { size: number; wins: number; bots: boolean }, connected: string[]) {
+export function startMatch(roomId: string, settings: ArenaSettings, connected: string[]) {
   return mutate(roomId, (s) => {
     if (s.status !== "waiting" && s.status !== "finished") return null;
     const roster: Record<string, TeamId> = {};
@@ -329,6 +372,8 @@ export function startMatch(roomId: string, settings: { size: number; wins: numbe
       gameNo: s.gameNo + 1,
       seed: makeSeed(),
       need: settings.wins,
+      potions: settings.potions,
+      regen: settings.regen,
       roster,
       bots,
       score: { red: 0, blue: 0 },
@@ -405,6 +450,7 @@ export function strike(
         d: Math.round(st.drain),
         x: Math.round(attackerAt.x * 100) / 100,
         z: Math.round(attackerAt.z * 100) / 100,
+        t: Math.round(serverNow()),
       };
       if (hp[t] === 0) {
         kills[attacker] = (kills[attacker] ?? 0) + 1;
@@ -428,7 +474,8 @@ export function forfeit(roomId: string, key: number, id: string, x: number, z: n
 
 /**
  * Picks up an item: a shield goes in the other hand, a weapon replaces the
- * one in hand (which is left on the floor at (x, z), unless it's the dagger).
+ * one in hand (which is left on the floor at (x, z), unless it's the dagger),
+ * a potion is drunk on the spot (only when hurt) and comes back later.
  */
 export function pickItem(roomId: string, key: number, id: string, itemId: string, x: number, z: number) {
   return mutate(roomId, (s) => {
@@ -439,6 +486,14 @@ export function pickItem(roomId: string, key: number, id: string, itemId: string
     const items = { ...s.items };
     delete items[itemId];
     let itemSeq = s.itemSeq;
+    if (item.kind === "pocion") {
+      const hp = s.hp[id] ?? 0;
+      if (hp >= MAX_HP) return null;
+      const respawns = itemId.startsWith(RESPAWN_PREFIX)
+        ? { ...s.respawns, [itemId]: { ...item, at: serverNow() + POTION_RESPAWN_MS } }
+        : s.respawns;
+      return { ...s, items, respawns, hp: { ...s.hp, [id]: Math.min(MAX_HP, hp + POTION_HEAL) } };
+    }
     let next: Gear;
     if (item.kind === "escudo") {
       if (gear.sh) return null;
@@ -448,6 +503,34 @@ export function pickItem(roomId: string, key: number, id: string, itemId: string
       next = { ...gear, w: item.kind };
     }
     return { ...s, items, itemSeq, gear: { ...s.gear, [id]: next } };
+  });
+}
+
+/** Potions whose time came are back at their places. */
+export function respawnItems(roomId: string, key: number) {
+  return mutate(roomId, (s) => {
+    if (!inRound(s, key)) return null;
+    const now = serverNow();
+    const due = Object.entries(s.respawns).filter(([, r]) => r.at <= now);
+    if (!due.length) return null;
+    const items = { ...s.items };
+    const respawns = { ...s.respawns };
+    for (const [id, { kind, x, z }] of due) {
+      items[id] = { kind, x, z };
+      delete respawns[id];
+    }
+    return { ...s, items, respawns };
+  });
+}
+
+/** Regeneration (when the match has it): a few points back, if `id` hasn't been hit for a while. */
+export function regenerate(roomId: string, key: number, id: string) {
+  return mutate(roomId, (s) => {
+    if (!s.regen || !inRound(s, key) || !alive(s, id)) return null;
+    const now = serverNow();
+    const hp = s.hp[id] ?? 0;
+    if (hp >= MAX_HP || now - (s.hits[id]?.t ?? 0) < REGEN_DELAY_MS || now - (s.healAt[id] ?? 0) < REGEN_EVERY_MS - 100) return null;
+    return { ...s, hp: { ...s.hp, [id]: Math.min(MAX_HP, hp + REGEN_STEP) }, healAt: { ...s.healAt, [id]: now } };
   });
 }
 

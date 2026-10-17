@@ -26,20 +26,32 @@ export const EYE_HEIGHT = 1.62;
 export const MAX_HP = 100;
 export const MAX_STAMINA = 100;
 
-const WALK_SPEED = 4.6;
-const GRAVITY = 15;
-const JUMP_SPEED = 5.2;
-const STAMINA_REGEN = 24;
-const STAMINA_REGEN_BLOCKING = 7;
+export const WALK_SPEED = 5.2;
+/** Running (forward only): faster, and it spends stamina. */
+export const SPRINT = 1.5;
+const SPRINT_STAMINA = 13;
+const GRAVITY = 16;
+const JUMP_SPEED = 5.6;
+const STAMINA_REGEN = 28;
+const STAMINA_REGEN_BLOCKING = 8;
 const JUMP_STAMINA = 8;
+/** A dodge: a quick dash (nothing touches you while it lasts). */
+const DODGE_SECONDS = 0.28;
+const DODGE_SPEED = 11.5;
+const DODGE_STAMINA = 22;
 /** A clean hit makes the target flinch (and loses any attack it was winding up). */
-const FLINCH_SECONDS = 0.35;
+const FLINCH_SECONDS = 0.3;
 /** Running out of stamina while blocking. */
-const GUARD_BREAK_SECONDS = 1.0;
-const KNOCKBACK = 4;
+const GUARD_BREAK_SECONDS = 0.9;
+const KNOCKBACK = 5.5;
+/** Each swing carries the attacker forward a little. */
+const LUNGE = 3.2;
+/** A follow-up attack chained during the recovery: it cuts the recovery short and winds up faster. */
+const COMBO_CUT = 0.45;
+const COMBO_WINDUP = 0.7;
 
 export type WeaponId = "daga" | "espada" | "hacha" | "maza" | "lanza" | "arco";
-export type ItemKind = WeaponId | "escudo";
+export type ItemKind = WeaponId | "escudo" | "pocion";
 
 export interface WeaponSpec {
   label: string;
@@ -61,24 +73,28 @@ export interface WeaponSpec {
 const deg = (d: number) => (d * Math.PI) / 180;
 
 export const WEAPONS: Record<WeaponId, WeaponSpec> = {
-  daga: { label: "Daga", damage: 14, reach: 1.55, arc: deg(70), windup: 0.28, recover: 0.32, stamina: 10, pierce: 0, drain: 0.8 },
-  espada: { label: "Espada", damage: 26, reach: 2.1, arc: deg(100), windup: 0.42, recover: 0.38, stamina: 18, pierce: 0, drain: 1 },
-  hacha: { label: "Hacha", damage: 40, reach: 2.0, arc: deg(90), windup: 0.68, recover: 0.55, stamina: 28, pierce: 0.2, drain: 1.6 },
-  maza: { label: "Maza", damage: 32, reach: 1.85, arc: deg(90), windup: 0.58, recover: 0.48, stamina: 24, pierce: 0.35, drain: 1.8 },
-  lanza: { label: "Lanza", damage: 28, reach: 3.0, arc: deg(36), windup: 0.5, recover: 0.45, stamina: 20, pierce: 0, drain: 1 },
-  arco: { label: "Arco", damage: 42, reach: 30, arc: 0, windup: 0, recover: 0.45, stamina: 12, pierce: 0, drain: 1, ranged: true },
+  daga: { label: "Daga", damage: 13, reach: 1.6, arc: deg(75), windup: 0.2, recover: 0.24, stamina: 9, pierce: 0, drain: 0.8 },
+  espada: { label: "Espada", damage: 24, reach: 2.15, arc: deg(105), windup: 0.3, recover: 0.3, stamina: 15, pierce: 0, drain: 1 },
+  hacha: { label: "Hacha", damage: 38, reach: 2.05, arc: deg(95), windup: 0.5, recover: 0.42, stamina: 25, pierce: 0.2, drain: 1.6 },
+  maza: { label: "Maza", damage: 30, reach: 1.9, arc: deg(95), windup: 0.42, recover: 0.36, stamina: 21, pierce: 0.35, drain: 1.8 },
+  lanza: { label: "Lanza", damage: 26, reach: 3.0, arc: deg(40), windup: 0.36, recover: 0.34, stamina: 17, pierce: 0, drain: 1 },
+  arco: { label: "Arco", damage: 40, reach: 30, arc: 0, windup: 0, recover: 0.3, stamina: 10, pierce: 0, drain: 1, ranged: true },
 };
 
 export const ITEM_LABEL: Record<ItemKind, string> = {
   ...(Object.fromEntries(Object.entries(WEAPONS).map(([k, v]) => [k, v.label])) as Record<WeaponId, string>),
   escudo: "Escudo",
+  pocion: "Poción",
 };
 
+/** Health a potion gives back. */
+export const POTION_HEAL = 40;
+
 /** Bow: the least draw that shoots, and the time to a full draw. */
-export const BOW_MIN_DRAW = 0.3;
-export const BOW_FULL_DRAW = 1.0;
-const ARROW_MIN_SPEED = 24;
-const ARROW_MAX_SPEED = 46;
+export const BOW_MIN_DRAW = 0.25;
+export const BOW_FULL_DRAW = 0.85;
+const ARROW_MIN_SPEED = 26;
+const ARROW_MAX_SPEED = 50;
 const ARROW_MIN_DAMAGE = 16;
 export const ARROW_GRAVITY = 9.8;
 const HEADSHOT = 1.5;
@@ -96,9 +112,9 @@ export interface Gear {
 
 export const START_GEAR: Gear = { w: "daga", sh: false };
 
-/** What a fighter is doing; others see it in the pose to animate it. */
-export type Act = "idle" | "windup" | "recover" | "draw" | "stagger";
-export const ACTS: Act[] = ["idle", "windup", "recover", "draw", "stagger"];
+/** What a fighter is doing; others see it in the pose to animate it. Append only (poses send the index). */
+export type Act = "idle" | "windup" | "recover" | "draw" | "stagger" | "dodge";
+export const ACTS: Act[] = ["idle", "windup", "recover", "draw", "stagger", "dodge"];
 
 export interface FighterInput {
   /** Strafe (-1 left … 1 right) and forward (-1 back … 1 forward), joystick-style. */
@@ -107,17 +123,21 @@ export interface FighterInput {
   yaw: number;
   pitch: number;
   jump: boolean;
-  /** Held: melee attacks when pressed, the bow draws while held and shoots on release. */
+  /** Held: melee attacks when pressed (again during the recovery = combo), the bow draws while held and shoots on release. */
   attack: boolean;
   block: boolean;
+  sprint: boolean;
+  /** Pressed: a dodge toward where you move (backward if standing). */
+  dodge: boolean;
 }
 
-export const IDLE_INPUT: FighterInput = { mx: 0, mz: 0, yaw: 0, pitch: 0, jump: false, attack: false, block: false };
+export const IDLE_INPUT: FighterInput = { mx: 0, mz: 0, yaw: 0, pitch: 0, jump: false, attack: false, block: false, sprint: false, dodge: false };
 
 export type FighterEvent =
-  /** An attack starts winding up (a whoosh), or a jump. */
+  /** An attack starts winding up (a whoosh), a jump or a dodge. */
   | { type: "windup" }
   | { type: "jump" }
+  | { type: "dodge" }
   /** The swing lands now: the caller checks what it hit. */
   | { type: "strike" }
   /** The bow shoots with this much draw (0–1). */
@@ -173,22 +193,29 @@ export class Fighter {
   vy = 0;
   yaw: number;
   pitch = 0;
-  /** Knockback velocity, fading. */
+  /** Knockback (and lunge) velocity, fading. */
   kx = 0;
   kz = 0;
-  /** Horizontal speed this step (for the walk animation). */
+  /** Horizontal speed this step (for the walk animation), and whether running. */
   speed = 0;
+  sprinting = false;
   act: Act = "idle";
   /** Seconds since the act started. */
   actT = 0;
-  /** How long the current act lasts (stagger, windup, recover). */
+  /** How long the current act lasts (stagger, windup, recover, dodge). */
   actLen = 0;
   blocking = false;
   stamina = MAX_STAMINA;
   /** Bow draw, 0–1. */
   draw = 0;
+  /** Swings chained so far (0 = the first); odd ones come from the other side. */
+  combo = 0;
+  private queued = false;
+  private dodgeX = 0;
+  private dodgeZ = 0;
   private attackWas = false;
   private jumpWas = false;
+  private dodgeWas = false;
 
   constructor(
     public x: number,
@@ -208,24 +235,67 @@ export class Fighter {
     this.actLen = len;
   }
 
+  private windup(weapon: WeaponSpec, chained: boolean, events: FighterEvent[]) {
+    this.stamina = Math.max(0, this.stamina - weapon.stamina);
+    this.combo = chained ? this.combo + 1 : 0;
+    this.start("windup", weapon.windup * (chained ? COMBO_WINDUP : 1));
+    events.push({ type: "windup" });
+  }
+
   step(input: FighterInput, gear: Gear, dt: number, solids: Solid[]): FighterEvent[] {
     const events: FighterEvent[] = [];
     const weapon = WEAPONS[gear.w];
     this.yaw = input.yaw;
     this.pitch = Math.max(-1.3, Math.min(1.3, input.pitch));
     this.actT += dt;
-
-    // The act in progress.
-    if (this.act === "windup" && this.actT >= this.actLen) {
-      events.push({ type: "strike" });
-      this.start("recover", weapon.recover);
-    } else if ((this.act === "recover" || this.act === "stagger") && this.actT >= this.actLen) {
-      this.start("idle", 0);
-    }
+    const [fx, fz] = forward(this.yaw);
 
     const pressed = input.attack && !this.attackWas;
     const released = !input.attack && this.attackWas;
     this.attackWas = input.attack;
+    const dodge = input.dodge && !this.dodgeWas;
+    this.dodgeWas = input.dodge;
+
+    // The act in progress.
+    if (this.act === "windup" && this.actT >= this.actLen) {
+      events.push({ type: "strike" });
+      this.kx += fx * LUNGE;
+      this.kz += fz * LUNGE;
+      this.start("recover", weapon.recover);
+    } else if (this.act === "recover") {
+      if (pressed && !weapon.ranged && this.actT > this.actLen * 0.2) this.queued = true;
+      if (this.queued && this.actT >= this.actLen * COMBO_CUT && this.stamina >= weapon.stamina * 0.5) {
+        this.queued = false;
+        this.windup(weapon, true, events);
+      } else if (this.actT >= this.actLen) {
+        this.queued = false;
+        this.combo = 0;
+        this.start("idle", 0);
+      }
+    } else if ((this.act === "stagger" || this.act === "dodge") && this.actT >= this.actLen) {
+      this.start("idle", 0);
+    }
+
+    // Dodging: from idle or late in a recovery, toward where you move.
+    const free = this.act === "idle" || (this.act === "recover" && this.actT > this.actLen * 0.5) || this.act === "draw";
+    if (dodge && free && this.onGround && this.stamina >= DODGE_STAMINA) {
+      let mx = input.mx;
+      let mz = input.mz;
+      if (Math.hypot(mx, mz) < 0.2) {
+        mx = 0;
+        mz = -1;
+      }
+      const len = Math.hypot(mx, mz);
+      const rx = -fz;
+      const rz = fx;
+      this.dodgeX = ((fx * mz + rx * mx) / len) * DODGE_SPEED;
+      this.dodgeZ = ((fz * mz + rz * mx) / len) * DODGE_SPEED;
+      this.stamina -= DODGE_STAMINA;
+      this.queued = false;
+      this.draw = 0;
+      this.start("dodge", DODGE_SECONDS);
+      events.push({ type: "dodge" });
+    }
 
     // Blocking: only when free; it also cancels an attack being wound up (a feint).
     const canBlock = !weapon.ranged && (this.act === "idle" || this.act === "windup");
@@ -254,16 +324,9 @@ export class Fighter {
         this.draw = 0;
       }
     } else if (pressed && this.act === "idle" && !this.blocking && this.stamina >= weapon.stamina * 0.5) {
-      this.stamina = Math.max(0, this.stamina - weapon.stamina);
-      this.start("windup", weapon.windup);
-      events.push({ type: "windup" });
+      this.windup(weapon, false, events);
     }
     if (!weapon.ranged && this.act === "draw") this.start("idle", 0);
-
-    // Stamina comes back unless swinging.
-    if (this.act === "idle" || this.act === "recover" || this.act === "draw") {
-      this.stamina = Math.min(MAX_STAMINA, this.stamina + (this.blocking ? STAMINA_REGEN_BLOCKING : STAMINA_REGEN) * dt);
-    }
 
     // Moving.
     let mx = Math.max(-1, Math.min(1, input.mx));
@@ -273,19 +336,29 @@ export class Fighter {
       mx /= len;
       mz /= len;
     }
+    this.sprinting = input.sprint && mz > 0.3 && this.stamina > 4 && this.act === "idle" && !this.blocking && this.onGround;
     let speed = WALK_SPEED;
-    if (mz < 0) speed *= 0.75;
+    if (this.sprinting) {
+      speed *= SPRINT;
+      this.stamina -= SPRINT_STAMINA * dt;
+    }
+    if (mz < 0) speed *= 0.8;
     if (this.blocking) speed *= 0.55;
-    if (this.act === "windup") speed *= 0.6;
-    if (this.act === "draw") speed *= 0.5;
-    if (this.act === "stagger") speed *= 0.25;
-    if (!this.onGround) speed *= 0.85;
-    const [fx, fz] = forward(this.yaw);
+    if (this.act === "windup") speed *= 0.7;
+    if (this.act === "draw") speed *= 0.55;
+    if (this.act === "stagger") speed *= 0.3;
+    if (!this.onGround) speed *= 0.9;
     const rx = -fz;
     const rz = fx;
-    const vx = (fx * mz + rx * mx) * speed + this.kx;
-    const vz = (fz * mz + rz * mx) * speed + this.kz;
-    const decay = Math.exp(-dt * 6);
+    let vx = (fx * mz + rx * mx) * speed + this.kx;
+    let vz = (fz * mz + rz * mx) * speed + this.kz;
+    if (this.act === "dodge") {
+      // The dash fades out toward the end.
+      const k = 1 - Math.pow(this.actT / this.actLen, 2) * 0.6;
+      vx = this.dodgeX * k + this.kx;
+      vz = this.dodgeZ * k + this.kz;
+    }
+    const decay = Math.exp(-dt * 7);
     this.kx *= decay;
     this.kz *= decay;
     const px = this.x;
@@ -295,9 +368,14 @@ export class Fighter {
     pushOut(this, FIGHTER_RADIUS, solids);
     this.speed = Math.hypot(this.x - px, this.z - pz) / dt;
 
+    // Stamina comes back unless swinging, running or dodging.
+    if ((this.act === "idle" || this.act === "recover" || this.act === "draw") && !this.sprinting) {
+      this.stamina = Math.min(MAX_STAMINA, this.stamina + (this.blocking ? STAMINA_REGEN_BLOCKING : STAMINA_REGEN) * dt);
+    }
+
     const jump = input.jump && !this.jumpWas;
     this.jumpWas = input.jump;
-    if (jump && this.onGround && this.act !== "stagger" && this.stamina >= JUMP_STAMINA) {
+    if (jump && this.onGround && this.act !== "stagger" && this.act !== "dodge" && this.stamina >= JUMP_STAMINA) {
       this.vy = JUMP_SPEED;
       this.stamina -= JUMP_STAMINA;
       events.push({ type: "jump" });
@@ -323,8 +401,8 @@ export class Fighter {
     const d = Math.hypot(dx, dz) || 1;
     if (blocked) {
       this.stamina -= drain;
-      this.kx += (dx / d) * KNOCKBACK * 0.4;
-      this.kz += (dz / d) * KNOCKBACK * 0.4;
+      this.kx += (dx / d) * KNOCKBACK * 0.45;
+      this.kz += (dz / d) * KNOCKBACK * 0.45;
       if (this.stamina <= 0) {
         this.stamina = 0;
         this.blocking = false;
@@ -334,7 +412,8 @@ export class Fighter {
     }
     this.kx += (dx / d) * KNOCKBACK;
     this.kz += (dz / d) * KNOCKBACK;
-    if (this.act !== "recover") this.start("stagger", FLINCH_SECONDS);
+    if (this.act !== "recover" && this.act !== "dodge") this.start("stagger", FLINCH_SECONDS);
+    this.queued = false;
     this.draw = 0;
   }
 }
@@ -352,6 +431,8 @@ export interface FighterView {
   blocking: boolean;
   shield: boolean;
   alive: boolean;
+  /** Mid-dodge: nothing touches it. */
+  dodging?: boolean;
 }
 
 export interface Strike {
@@ -387,7 +468,7 @@ export function meleeStrikes(me: FighterView, gear: Gear, others: FighterView[])
   const w = WEAPONS[gear.w];
   const out: Strike[] = [];
   for (const t of others) {
-    if (!t.alive || t.team === me.team || t.id === me.id) continue;
+    if (!t.alive || t.dodging || t.team === me.team || t.id === me.id) continue;
     const dx = t.x - me.x;
     const dz = t.z - me.z;
     const dist = Math.hypot(dx, dz);
@@ -452,7 +533,7 @@ export function flyArrow(a: Arrow, t0: number, t1: number, shooterTeam: TeamId, 
     if (y <= 0 || Math.hypot(x, z) >= ARENA_RADIUS || t1 > 4) return { stop: true };
     for (const [px, pz] of PILLARS) if (Math.hypot(x - px, z - pz) < PILLAR_RADIUS) return { stop: true };
     for (const t of others) {
-      if (!t.alive || t.team === shooterTeam) continue;
+      if (!t.alive || t.dodging || t.team === shooterTeam) continue;
       if (Math.hypot(x - t.x, z - t.z) > FIGHTER_RADIUS + 0.05 || y < t.y || y > t.y + FIGHTER_HEIGHT) continue;
       const blocked = guarded(t, t.x - a.vx, t.z - a.vz, true);
       const head = y > t.y + EYE_HEIGHT - 0.2;
@@ -478,11 +559,15 @@ export interface ArenaItem {
   z: number;
 }
 
+/** Items whose id starts with this come back a while after being taken (potions). */
+export const RESPAWN_PREFIX = "p";
+
 /**
- * The weapons laid out for a round: mirrored pairs (same weapon on both
- * sides, so it's fair) plus one in the middle, shuffled by the seed.
+ * The items laid out for a round: mirrored weapon pairs (same weapon on both
+ * sides, so it's fair) plus one in the middle, shuffled by the seed; and
+ * with `potions`, two mirrored pairs of potions.
  */
-export function roundItems(seed: number, round: number): Record<string, ArenaItem> {
+export function roundItems(seed: number, round: number, potions = false): Record<string, ArenaItem> {
   const rand = mulberry32((seed ^ Math.imul(round + 1, 0x85ebca6b)) >>> 0);
   const pairs: ItemKind[] = ["espada", "escudo", "lanza", "maza", "arco", "espada"];
   for (let i = pairs.length - 1; i > 0; i--) {
@@ -504,14 +589,25 @@ export function roundItems(seed: number, round: number): Record<string, ArenaIte
     items[`i${i}b`] = { kind: pairs[i], x: -x, z: -z };
   });
   items.c = { kind: rand() < 0.5 ? "hacha" : "maza", x: 0, z: 0 };
+  if (potions) {
+    const potionSpots: [number, number][] = [
+      [-8.5, 0],
+      [-1.5, 13.5],
+    ];
+    potionSpots.forEach(([x, z], i) => {
+      items[`${RESPAWN_PREFIX}${i}r`] = { kind: "pocion", x, z };
+      items[`${RESPAWN_PREFIX}${i}b`] = { kind: "pocion", x: -x, z: -z };
+    });
+  }
   return items;
 }
 
 /** How close a fighter has to be to pick an item up. */
 export const PICK_RADIUS = 1.6;
 
-/** Is this item better than what `gear` has? (bots use it; people decide for themselves) */
-export function wants(gear: Gear, kind: ItemKind): boolean {
+/** Is this item worth getting? (bots use it; people decide for themselves) */
+export function wants(gear: Gear, kind: ItemKind, hp = MAX_HP): boolean {
+  if (kind === "pocion") return hp < 65;
   if (kind === "escudo") return !gear.sh && gear.w !== "arco";
   if (gear.w === "daga") return true;
   return false;
@@ -530,10 +626,13 @@ export interface BotMind {
   seen: Record<string, number>;
   /** Bow: draw to release at. */
   releaseAt: number;
+  /** Swings left to chain in this flurry, and the swing it last pressed for. */
+  chain: number;
+  pressFor: number;
 }
 
 export function newMind(): BotMind {
-  return { wait: 0.5, strafe: 0, strafeT: 0, blockT: 0, seen: {}, releaseAt: 0.8 };
+  return { wait: 0.5, strafe: 0, strafeT: 0, blockT: 0, seen: {}, releaseAt: 0.8, chain: 0, pressFor: -1 };
 }
 
 /** What a bot sees of an enemy: its view plus what it's doing and with what. */
@@ -550,11 +649,20 @@ export interface BotWorld {
 }
 
 /**
- * A bot's input for this step: go for a better weapon if one is near, then
- * close in (or keep its distance with the bow), strafe, attack when in reach
- * and block some of the swings it sees coming. `pick` = an item to grab.
+ * A bot's input for this step: go for a better weapon (or a potion when
+ * hurt) if one is near, then close in running (or keep its distance with
+ * the bow), strafe, attack in short combos when in reach, and block or dodge
+ * some of the swings it sees coming. `pick` = an item to grab.
  */
-export function botInput(f: Fighter, gear: Gear, mind: BotMind, world: BotWorld, dt: number, rand: () => number): { input: FighterInput; pick?: string } {
+export function botInput(
+  f: Fighter,
+  gear: Gear,
+  hp: number,
+  mind: BotMind,
+  world: BotWorld,
+  dt: number,
+  rand: () => number
+): { input: FighterInput; pick?: string } {
   const input: FighterInput = { ...IDLE_INPUT, yaw: f.yaw, pitch: 0 };
   const alive = world.enemies.filter((e) => e.alive);
   let target: BotEnemy | null = null;
@@ -567,14 +675,15 @@ export function botInput(f: Fighter, gear: Gear, mind: BotMind, world: BotWorld,
     }
   }
 
-  // A better weapon close by, and not much farther than the fight.
+  // Something worth getting close by, and not much farther than the fight (potions: farther when hurt).
   let goal: { x: number; z: number } | null = null;
   let pick: string | undefined;
   let itemDist = Infinity;
   for (const it of world.items) {
-    if (!wants(gear, it.kind)) continue;
+    if (!wants(gear, it.kind, hp)) continue;
     const d = Math.hypot(it.x - f.x, it.z - f.z);
-    if (d < itemDist && (d < 7 || d < targetDist * 0.8)) {
+    const range = it.kind === "pocion" ? 14 : 7;
+    if (d < itemDist && (d < range || d < targetDist * 0.8)) {
       itemDist = d;
       goal = it;
       if (d < PICK_RADIUS * 0.8) pick = it.id;
@@ -588,47 +697,65 @@ export function botInput(f: Fighter, gear: Gear, mind: BotMind, world: BotWorld,
 
   mind.strafeT -= dt;
   if (mind.strafeT <= 0) {
-    mind.strafe = rand() < 0.35 ? 0 : rand() < 0.5 ? -1 : 1;
-    mind.strafeT = 0.6 + rand() * 1.2;
+    mind.strafe = rand() < 0.3 ? 0 : rand() < 0.5 ? -1 : 1;
+    mind.strafeT = 0.5 + rand() * 1.0;
   }
 
   if (goal && !pick && (!target || itemDist < targetDist)) {
-    turnTo(yawTo(goal.x - f.x, goal.z - f.z), 7);
+    turnTo(yawTo(goal.x - f.x, goal.z - f.z), 8);
     input.mz = 1;
+    input.sprint = itemDist > 4 && f.stamina > 40;
   } else if (target) {
     const w = WEAPONS[gear.w];
     const dx = target.x - f.x;
     const dz = target.z - f.z;
     if (w.ranged) {
       // Lead the target a little and aim up for the drop.
-      const flight = targetDist / 38;
+      const flight = targetDist / 40;
       const aim = yawTo(dx + (rand() - 0.5) * 0.6, dz + (rand() - 0.5) * 0.6);
-      turnTo(aim, 5);
+      turnTo(aim, 6);
       input.pitch = Math.atan2(ARROW_GRAVITY * flight * flight * 0.5, targetDist) + 0.02;
       input.mz = targetDist < 7 ? -1 : targetDist > 13 ? 1 : 0;
       input.mx = mind.strafe;
+      if (targetDist < 4 && f.stamina > 40 && rand() < 0.02) input.dodge = true;
       const facing = Math.abs(angleDiff(aim, f.yaw)) < 0.12;
       if (f.act === "draw") input.attack = f.draw < mind.releaseAt;
       else if (f.act === "idle" && facing && mind.wait <= 0) {
         input.attack = true;
         mind.releaseAt = 0.55 + rand() * 0.45;
-        mind.wait = 0.3 + rand() * 0.6;
+        mind.wait = 0.25 + rand() * 0.5;
       }
     } else {
-      turnTo(yawTo(dx, dz), 6);
+      turnTo(yawTo(dx, dz), 7);
       const close = w.reach * 0.85;
       input.mz = targetDist > close ? 1 : targetDist < w.reach * 0.45 ? -0.6 : 0;
-      input.mx = targetDist < 6 ? mind.strafe * 0.7 : 0;
-      // Block a swing it sees coming, sometimes.
+      input.sprint = targetDist > 7 && f.stamina > 50;
+      input.mx = targetDist < 6 ? mind.strafe * 0.8 : 0;
+      // A swing it sees coming: block it, dodge it, or (sometimes) take it.
       if (target.act === "windup" && mind.seen[target.id] !== target.actAt) {
         mind.seen[target.id] = target.actAt;
         const reach = WEAPONS[target.weapon].reach + 1;
         const aimed = Math.abs(angleDiff(yawTo(f.x - target.x, f.z - target.z), target.yaw)) < 0.8;
-        if (targetDist < reach && aimed && rand() < (gear.sh ? 0.65 : 0.45)) mind.blockT = WEAPONS[target.weapon].windup + 0.25;
+        if (targetDist < reach && aimed) {
+          const r = rand();
+          if (r < (gear.sh ? 0.6 : 0.4)) mind.blockT = WEAPONS[target.weapon].windup + 0.2;
+          else if (r < 0.7 && f.stamina > 35) {
+            input.dodge = true;
+            input.mx = rand() < 0.5 ? -1 : 1;
+            input.mz = -0.4;
+          }
+        }
       }
       if (mind.blockT > 0) {
         mind.blockT -= dt;
         input.block = f.stamina > 15;
+      } else if (f.act === "recover" && mind.chain > 0) {
+        // Keep the flurry going: one press per swing, once the recovery accepts it.
+        if (mind.pressFor !== f.combo && f.actT > f.actLen * 0.25) {
+          mind.pressFor = f.combo;
+          input.attack = true;
+          mind.chain--;
+        }
       } else if (
         f.act === "idle" &&
         mind.wait <= 0 &&
@@ -637,7 +764,8 @@ export function botInput(f: Fighter, gear: Gear, mind: BotMind, world: BotWorld,
         f.stamina > w.stamina
       ) {
         input.attack = true;
-        mind.wait = 0.25 + rand() * 0.7;
+        mind.chain = rand() < 0.5 ? 1 + Math.floor(rand() * 2) : 0;
+        mind.wait = 0.2 + rand() * 0.6;
       }
     }
   }

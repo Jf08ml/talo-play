@@ -143,6 +143,13 @@ export class ArenaAudio {
     this.tone(990, t + 0.07, 0.18, "triangle", 0.13);
   }
 
+  /** Health coming back (a potion, or regeneration): a soft rising sparkle. */
+  heal() {
+    if (!this.live) return;
+    const t = this.ctx!.currentTime;
+    [523, 659, 784, 1047].forEach((f, i) => this.tone(f, t + i * 0.06, 0.22, "sine", 0.09));
+  }
+
   /** A fighter falls: a heavy armored crash. */
   fall(vol = 1, pan = 0) {
     if (!this.live) return;

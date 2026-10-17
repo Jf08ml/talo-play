@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
-import { Hand, MoveUp, Shield, Swords } from "lucide-react";
+import { Hand, MoveUp, Shield, Swords, Wind } from "lucide-react";
 
 /**
  * What the player is pressing, read by the battle loop every frame. Look
@@ -14,6 +14,8 @@ export interface ControlState {
   jump: boolean;
   attack: boolean;
   block: boolean;
+  sprint: boolean;
+  dodge: boolean;
   pick: boolean;
   camera: boolean;
   lookX: number;
@@ -21,7 +23,7 @@ export interface ControlState {
 }
 
 export function newControls(): ControlState {
-  return { mx: 0, mz: 0, jump: false, attack: false, block: false, pick: false, camera: false, lookX: 0, lookY: 0 };
+  return { mx: 0, mz: 0, jump: false, attack: false, block: false, sprint: false, dodge: false, pick: false, camera: false, lookX: 0, lookY: 0 };
 }
 
 /** Radians per pixel dragged (touch) or moved (mouse). */
@@ -44,12 +46,25 @@ export function useFinePointer(): boolean {
 
 /**
  * Mouse and keyboard: click the arena to lock the pointer and look around
- * with the mouse; WASD or arrows to move, click to attack (hold with the
- * bow), right click or Shift to block, space to jump, E to pick up, V to
- * switch the camera. Returns whether the pointer is locked.
+ * with the mouse; WASD or arrows to move, Shift to run, click to attack
+ * (again during the swing for a combo; hold with the bow), right click or F
+ * to block, Q to dodge, space to jump, E to pick up, V to switch the camera.
+ * The pointer is only captured while `canLock` (fighting and standing):
+ * it's let go at the end of a round, when you fall and with Esc, so the
+ * buttons on screen can be clicked. Returns whether it's locked.
  */
-export function useDesktopControls(controlsRef: RefObject<ControlState>, target: RefObject<HTMLElement | null>, enabled: boolean): boolean {
+export function useDesktopControls(
+  controlsRef: RefObject<ControlState>,
+  target: RefObject<HTMLElement | null>,
+  enabled: boolean,
+  canLock: boolean
+): boolean {
   const [locked, setLocked] = useState(false);
+  const canLockRef = useRef(canLock);
+  useEffect(() => {
+    canLockRef.current = canLock;
+    if (!canLock && document.pointerLockElement && document.pointerLockElement === target.current) document.exitPointerLock?.();
+  }, [canLock, target]);
   useEffect(() => {
     if (!enabled) return;
     const el = target.current;
@@ -60,13 +75,15 @@ export function useDesktopControls(controlsRef: RefObject<ControlState>, target:
       c.mx = (has("d", "arrowright") ? 1 : 0) - (has("a", "arrowleft") ? 1 : 0);
       c.mz = (has("w", "arrowup") ? 1 : 0) - (has("s", "arrowdown") ? 1 : 0);
       c.jump = has(" ");
-      c.block = has("shift") || mouseBlock;
+      c.sprint = has("shift");
+      c.dodge = has("q", "c");
+      c.block = has("f") || mouseBlock;
     };
     let mouseBlock = false;
     const down = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
       if (k.startsWith("arrow") || k === " ") e.preventDefault();
-      if (k === "e" || k === "f") c.pick = true;
+      if (k === "e") c.pick = true;
       if (k === "v" && !e.repeat) c.camera = true;
       keys.add(k);
       syncMove();
@@ -82,7 +99,7 @@ export function useDesktopControls(controlsRef: RefObject<ControlState>, target:
     };
     const mdown = (e: MouseEvent) => {
       if (document.pointerLockElement !== el) {
-        if (e.target === el) el?.requestPointerLock?.();
+        if (e.target === el && canLockRef.current) el?.requestPointerLock?.();
         return;
       }
       if (e.button === 0) c.attack = true;
@@ -200,7 +217,7 @@ export function TouchControls({
   };
 
   /** A button held with a finger (its own pointer, so looking keeps working). */
-  const hold = (key: "attack" | "block" | "jump") => ({
+  const hold = (key: "attack" | "block" | "jump" | "dodge") => ({
     onPointerDown: (e: ReactPointerEvent) => {
       e.stopPropagation();
       (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
@@ -238,7 +255,14 @@ export function TouchControls({
         </div>
       )}
 
-      <div className="absolute bottom-5 right-5 grid grid-cols-2 items-end gap-3">
+      <div className="absolute bottom-5 right-5 grid grid-cols-3 items-end gap-3">
+        <button
+          {...hold("dodge")}
+          aria-label="Esquivar"
+          className="flex h-14 w-14 items-center justify-center self-center rounded-full bg-emerald-500/35 text-white ring-2 ring-emerald-300/60 active:bg-emerald-500/70"
+        >
+          <Wind className="h-6 w-6" />
+        </button>
         <button
           {...hold("block")}
           aria-label="Bloquear"

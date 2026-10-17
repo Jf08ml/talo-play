@@ -50,8 +50,11 @@ export interface KnightPose {
   blocking: boolean;
   /** Bow draw 0–1. */
   draw: number;
-  /** Walking speed (m/s). */
+  /** Walking speed (m/s), and whether running. */
   speed: number;
+  running: boolean;
+  /** Swing number in the current combo (odd ones swing from the other side). */
+  combo: number;
   alive: boolean;
   gear: Gear;
 }
@@ -270,7 +273,24 @@ function arrowMesh(): THREE.Group {
   return g;
 }
 
+/** A round flask of red potion with a cork, glowing a little. */
+function potionMesh(): THREE.Group {
+  const g = new THREE.Group();
+  const glass = new THREE.MeshPhongMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.35, shininess: 120 });
+  const liquid = new THREE.MeshLambertMaterial({ color: 0xef4444, emissive: 0x991b1b, emissiveIntensity: 0.8 });
+  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), glass);
+  const fill = new THREE.Mesh(new THREE.SphereGeometry(0.145, 16, 12), liquid);
+  fill.position.y = -0.01;
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.16, 10), glass);
+  neck.position.y = 0.2;
+  const cork = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.06, 8), lambert(0xa16207));
+  cork.position.y = 0.3;
+  g.add(fill, bulb, neck, cork);
+  return g;
+}
+
 function itemMesh(kind: ItemKind): THREE.Group {
+  if (kind === "pocion") return potionMesh();
   return kind === "escudo" ? shieldMesh(null) : weaponMesh(kind);
 }
 
@@ -400,6 +420,8 @@ function knightMesh(team: TeamId, glow: THREE.Texture): Omit<Knight, "tag" | "ta
 }
 
 const ease = (t: number) => t * t * (3 - 2 * t);
+/** How high an item floats over the sand. */
+const itemHeight = (kind: ItemKind) => (kind === "escudo" || kind === "arco" ? 0.75 : kind === "pocion" ? 0.45 : 0.35);
 const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
@@ -414,6 +436,8 @@ const ARM_DOWN: ArmPose = { x: 0.15, y: 0, z: 0.08 };
 const ARM_GUARD: ArmPose = { x: 0.95, y: 0.15, z: 0.12 };
 const ARM_WOUND: ArmPose = { x: 0.35, y: -0.55, z: 1.45 };
 const ARM_SWUNG: ArmPose = { x: 0.6, y: 2.1, z: 1.35 };
+const ARM_WOUND_LEFT: ArmPose = { x: 0.5, y: 2.3, z: 1.25 };
+const ARM_SWUNG_LEFT: ArmPose = { x: 0.45, y: -0.6, z: 1.45 };
 
 function mixArm(a: ArmPose, b: ArmPose, t: number): ArmPose {
   return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t), z: lerp(a.z, b.z, t) };
@@ -432,6 +456,10 @@ function animateKnight(k: Knight, p: KnightPose, dt: number) {
   let weaponRoll = 0;
   const t = p.actLen > 0 ? clamp01(p.actT / p.actLen) : 0;
   const spear = p.gear.w === "lanza";
+  // Odd swings of a combo come back from the left.
+  const side = p.combo % 2 ? -1 : 1;
+  const wound = side > 0 ? ARM_WOUND : ARM_WOUND_LEFT;
+  const swung = side > 0 ? ARM_SWUNG : ARM_SWUNG_LEFT;
 
   if (weapon.ranged) {
     const aim = Math.PI / 2 + p.pitch;
@@ -449,23 +477,34 @@ function animateKnight(k: Knight, p: KnightPose, dt: number) {
       rArm = mixArm(ARM_GUARD, { x: 1.35, y: 0.1, z: 0.1 }, ease(t));
       thrust = -0.25 * ease(t);
     } else {
-      rArm = mixArm(ARM_GUARD, ARM_WOUND, ease(t));
-      twist = -0.45 * ease(t);
+      rArm = mixArm(ARM_GUARD, wound, ease(t));
+      twist = -0.45 * side * ease(t);
     }
   } else if (p.act === "recover") {
-    const swing = clamp01(t / 0.4);
-    const back = clamp01((t - 0.4) / 0.6);
+    const swing = clamp01(t / 0.35);
+    const back = clamp01((t - 0.35) / 0.65);
     if (spear) {
       rArm = { x: 1.45, y: 0.1, z: 0.1 };
       thrust = lerp(lerp(-0.25, 0.55, ease(swing)), 0, ease(back));
     } else {
-      rArm = mixArm(mixArm(ARM_WOUND, ARM_SWUNG, ease(swing)), ARM_GUARD, ease(back));
-      twist = lerp(lerp(-0.45, 0.5, ease(swing)), 0, ease(back));
+      rArm = mixArm(mixArm(wound, swung, ease(swing)), ARM_GUARD, ease(back));
+      twist = lerp(lerp(-0.45 * side, 0.5 * side, ease(swing)), 0, ease(back));
+      lean = -0.12 * Math.sin(swing * Math.PI);
     }
   } else if (p.act === "stagger") {
     lean = 0.3 * Math.sin(t * Math.PI);
     rArm = { x: 0.4, y: -0.2, z: 0.7 };
     lArm = { x: 0.4, y: 0.2, z: -0.7 };
+  } else if (p.act === "dodge") {
+    lean = -0.35;
+    rArm = { x: 0.6, y: 0.3, z: 0.3 };
+    lArm = { x: 0.6, y: -0.3, z: -0.3 };
+  } else if (p.running) {
+    // Running: lean in and pump the arms.
+    lean = -0.2;
+    const pump = Math.sin(k.walk) * 0.7;
+    rArm = { x: 0.5 - pump, y: 0, z: 0.1 };
+    if (!p.gear.sh) lArm = { x: 0.5 + pump, y: 0, z: 0.1 };
   }
 
   const k1 = 1 - Math.exp(-dt * 18);
@@ -496,7 +535,7 @@ function animateKnight(k: Knight, p: KnightPose, dt: number) {
   const air = p.y > 0.05 ? 0.4 : 0;
   k.legs[0].pivot.rotation.x = lerp(k.legs[0].pivot.rotation.x, swing - air, k1);
   k.legs[1].pivot.rotation.x = lerp(k.legs[1].pivot.rotation.x, -swing + air * 0.5, k1);
-  k.body.position.y = Math.abs(Math.sin(k.walk)) * 0.04 * moving;
+  k.body.position.y = Math.abs(Math.sin(k.walk)) * 0.04 * moving - (p.act === "dodge" ? 0.18 : 0);
 }
 
 // ---- Particles ----------------------------------------------------------------
@@ -637,8 +676,15 @@ function handPose(p: KnightPose, bob: number): { right: HandPose; left: HandPose
     return { right, left };
   }
   const spear = p.gear.w === "lanza";
-  const wound: HandPose = spear ? { px: 0.25, py: -0.28, pz: -0.25, rx: 0, ry: 0.05, rz: -0.1 } : { px: 0.6, py: -0.12, pz: -0.4, rx: 0.4, ry: -0.9, rz: -1.1 };
-  const swung: HandPose = spear ? { px: 0.12, py: -0.25, pz: -1.05, rx: 0, ry: 0, rz: -0.1 } : { px: -0.5, py: -0.36, pz: -0.55, rx: 0.1, ry: 0.9, rz: -1.3 };
+  // Odd swings of a combo come back from the left: the same arc, mirrored.
+  const side = p.combo % 2 ? -1 : 1;
+  const mirror = (h: HandPose): HandPose => (side > 0 ? h : { ...h, px: -h.px * 0.8, ry: -h.ry, rz: -h.rz - 0.4 });
+  const wound: HandPose = spear
+    ? { px: 0.25, py: -0.28, pz: -0.25, rx: 0, ry: 0.05, rz: -0.1 }
+    : mirror({ px: 0.6, py: -0.1, pz: -0.38, rx: 0.45, ry: -0.95, rz: -1.15 });
+  const swung: HandPose = spear
+    ? { px: 0.12, py: -0.25, pz: -1.05, rx: 0, ry: 0, rz: -0.1 }
+    : mirror({ px: -0.55, py: -0.36, pz: -0.55, rx: 0.1, ry: 0.95, rz: -1.3 });
   const mix = (a: HandPose, b: HandPose, k: number): HandPose => ({
     px: lerp(a.px, b.px, k),
     py: lerp(a.py, b.py, k),
@@ -653,11 +699,16 @@ function handPose(p: KnightPose, bob: number): { right: HandPose; left: HandPose
   } else if (p.act === "windup") {
     right = mix(right, wound, ease(t));
   } else if (p.act === "recover") {
-    const swing = clamp01(t / 0.4);
-    const back = clamp01((t - 0.4) / 0.6);
+    const swing = clamp01(t / 0.35);
+    const back = clamp01((t - 0.35) / 0.65);
     right = mix(mix(wound, swung, ease(swing)), right, ease(back));
   } else if (p.act === "stagger") {
     right = { ...right, py: right.py - 0.15, rz: right.rz - 0.4 };
+  } else if (p.act === "dodge") {
+    right = { ...right, py: right.py - 0.12, px: right.px + 0.08 };
+    left = { ...left, py: left.py - 0.12 };
+  } else if (p.running) {
+    right = { ...right, py: right.py - 0.05 + bob * 3, rx: right.rx - 0.25 };
   }
   return { right, left };
 }
@@ -695,6 +746,8 @@ export class ArenaScene {
   private handLeft = new THREE.Group();
   private handKind = "";
   private handShield: THREE.Group | null = null;
+  /** A bright arc in front of you while your swing goes through. */
+  private trail: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>;
   private handNow: { right: HandPose; left: HandPose } = { right: { ...HAND_IDLE }, left: { ...HAND_IDLE } };
   private bob = 0;
   private shake = 0;
@@ -722,7 +775,13 @@ export class ArenaScene {
     const key = new THREE.DirectionalLight(0xffffff, 1.2);
     key.position.set(0.5, 1, 0.3);
     this.handScene.add(key);
-    this.hands.add(this.handRight, this.handLeft);
+    this.trail = new THREE.Mesh(
+      new THREE.RingGeometry(0.62, 1.0, 32, 1, -0.25, Math.PI + 0.5),
+      new THREE.MeshBasicMaterial({ color: 0xfff7e0, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
+    );
+    this.trail.position.set(0, -0.42, -0.95);
+    this.trail.rotation.x = -1.05;
+    this.hands.add(this.handRight, this.handLeft, this.trail);
     this.handScene.add(this.hands);
   }
 
@@ -996,14 +1055,15 @@ export class ArenaScene {
       const group = new THREE.Group();
       const mesh = itemMesh(it.kind);
       // Shown upright and turning, so it's easy to spot.
-      mesh.rotation.x = it.kind === "arco" || it.kind === "escudo" ? 0 : -Math.PI / 2;
+      const upright = it.kind === "arco" || it.kind === "escudo" || it.kind === "pocion";
+      mesh.rotation.x = upright ? 0 : -Math.PI / 2;
       if (it.kind === "lanza") mesh.scale.setScalar(0.75);
       const spinner = new THREE.Group();
       spinner.add(mesh);
-      spinner.position.y = it.kind === "escudo" || it.kind === "arco" ? 0.75 : 0.35;
+      spinner.position.y = itemHeight(it.kind);
       const halo = new THREE.Mesh(
         new THREE.PlaneGeometry(1.6, 1.6),
-        new THREE.MeshBasicMaterial({ map: this.glow, color: 0xffd36b, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false })
+        new THREE.MeshBasicMaterial({ map: this.glow, color: it.kind === "pocion" ? 0xff6b6b : 0xffd36b, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false })
       );
       halo.rotation.x = -Math.PI / 2;
       halo.position.y = 0.03;
@@ -1103,7 +1163,7 @@ export class ArenaScene {
     for (const [, it] of this.items) {
       const spin = it.group.children[0];
       spin.rotation.y += dt * 1.4;
-      spin.position.y = (it.kind === "escudo" || it.kind === "arco" ? 0.75 : 0.35) + Math.sin(this.time * 2.5) * 0.06;
+      spin.position.y = itemHeight(it.kind) + Math.sin(this.time * 2.5) * 0.06;
     }
     for (const f of this.flames) f.scale.setScalar(0.6 + Math.sin(this.time * 13 + f.position.x) * 0.06 + this.rand() * 0.08);
     if (this.crowd && this.cheerT > 0) {
@@ -1170,6 +1230,11 @@ export class ArenaScene {
     };
     apply(this.handRight, this.handNow.right);
     apply(this.handLeft, this.handNow.left);
+    // The swing's trail: bright as it goes through, fading right after.
+    const melee = !WEAPONS[p.gear.w].ranged && p.gear.w !== "lanza";
+    const swingT = p.act === "recover" && p.actLen > 0 ? p.actT / p.actLen : 1;
+    this.trail.material.opacity = melee && swingT < 0.45 ? (1 - swingT / 0.45) * 0.5 : 0;
+    this.trail.scale.x = p.combo % 2 ? -1 : 1;
     // The bow's string follows the draw.
     const bow = this.handLeft.children.find((c) => c.userData.string) as THREE.Group | undefined;
     const string = bow?.userData.string as THREE.Line | undefined;
@@ -1185,7 +1250,7 @@ export class ArenaScene {
    * over its shoulder; `look` is where the camera points (your own look, or
    * the followed knight's). Nobody to follow: a slow tour around the arena.
    */
-  render(follow: string | null, mode: ArenaCamera, look: { yaw: number; pitch: number }, dt: number) {
+  render(follow: string | null, mode: ArenaCamera, look: { yaw: number; pitch: number; roll?: number; fov?: number }, dt: number) {
     const dpr = Math.min(window.devicePixelRatio || 1, this.maxDpr);
     const cw = this.canvas.clientWidth;
     const ch = this.canvas.clientHeight;
@@ -1193,8 +1258,10 @@ export class ArenaScene {
     if (this.renderer.getPixelRatio() !== dpr) this.renderer.setPixelRatio(dpr);
     const size = this.renderer.getSize(new THREE.Vector2());
     if (size.x !== cw || size.y !== ch) this.renderer.setSize(cw, ch, false);
-    if (this.camera.aspect !== cw / ch) {
+    const fov = look.fov ?? 72;
+    if (this.camera.aspect !== cw / ch || Math.abs(this.camera.fov - fov) > 0.05) {
       this.camera.aspect = cw / ch;
+      this.camera.fov = fov;
       this.camera.updateProjectionMatrix();
     }
     this.update(dt);
@@ -1211,7 +1278,7 @@ export class ArenaScene {
     } else if (mode === "primera" && p.alive) {
       firstPerson = true;
       cam.position.set(p.x, p.y + EYE_HEIGHT + Math.sin(this.bob * 2) * 0.02 * Math.min(1, p.speed / 4.6), p.z);
-      cam.rotation.set(look.pitch, look.yaw, 0);
+      cam.rotation.set(look.pitch, look.yaw, look.roll ?? 0);
       this.camReady = false;
     } else {
       // Over the right shoulder, pulled in if the wall is behind.
