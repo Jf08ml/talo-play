@@ -6,7 +6,7 @@
  * Every room stores its game in `rooms/{id}/meta/game`; room codes are
  * global, so one code is enough to find any game's room (`lib/roomLookup.ts`).
  */
-export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d";
+export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena";
 
 /** Who you're playing with: the first question the home page asks. */
 export type PlayContext = "pareja" | "amigos" | "grupo" | "solo";
@@ -380,6 +380,21 @@ export const GAMES: Record<GameId, GameInfo> = {
       "Manejá con botones o inclinando el teléfono, con cámara detrás del auto o desde la cabina.",
     ],
   },
+  arena: {
+    id: "arena",
+    title: "Arena medieval",
+    path: "arena-medieval",
+    tagline: "Combates de caballeros en 3D, de 1 contra 1 a 3 contra 3: corré a buscar armas por la arena y quedate en pie.",
+    minPlayers: 1,
+    maxPlayers: 6,
+    duration: "5–10 min",
+    contexts: ["pareja", "amigos", "grupo", "solo"],
+    howTo: [
+      "Armen dos equipos (los lugares vacíos pueden ser bots). Cada uno pelea desde su teléfono o su compu.",
+      "Arrancás con una daga: corré a agarrar espadas, hachas, mazas, lanzas, arcos y escudos tirados por la arena.",
+      "Atacá, bloqueá de frente y cuidá el aguante. Gana la ronda el equipo que queda en pie.",
+    ],
+  },
   codigo: {
     id: "codigo",
     title: "Código secreto",
@@ -398,7 +413,7 @@ export const GAMES: Record<GameId, GameInfo> = {
 };
 
 /** Home page order: quickest to start first. */
-export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "generala", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
+export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "arena", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "generala", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
 
 export function roomPath(game: GameId, roomId: string): string {
   return `/${GAMES[game].path}/${roomId}`;

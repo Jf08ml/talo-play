@@ -34,6 +34,7 @@ import {
   SopaThumbnail,
   CarrerasThumbnail,
   Carreras3dThumbnail,
+  ArenaThumbnail,
 } from "@/components/GameThumbnails";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 
@@ -62,6 +63,7 @@ const THUMBNAILS: Record<GameId, ReactNode> = {
   sopa: <SopaThumbnail />,
   carreras: <CarrerasThumbnail />,
   carreras3d: <Carreras3dThumbnail />,
+  arena: <ArenaThumbnail />,
 };
 
 export default function Home() {

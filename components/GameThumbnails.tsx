@@ -942,6 +942,62 @@ export function CarrerasThumbnail() {
   );
 }
 
+export function ArenaThumbnail() {
+  // Two knights facing off on the sand, crossed swords between them, the stands behind.
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <linearGradient id="arena-sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#3a6fb5" />
+          <stop offset="100%" stopColor="#f2c48d" />
+        </linearGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#arena-sky)" />
+      <path d="M0 70 Q200 40 400 70 V130 H0 Z" fill="#9c8f78" />
+      <g fill="#7c6f5a">
+        <rect y="88" width="400" height="5" />
+        <rect y="104" width="400" height="5" />
+      </g>
+      <g>
+        {Array.from({ length: 34 }, (_, i) => (
+          <circle key={i} cx={8 + i * 12} cy={82 + (i % 3) * 16} r="4" fill={["#dc2646", "#1d9bd1", "#f59e0b", "#a3e635"][i % 4]} opacity="0.85" />
+        ))}
+      </g>
+      <rect y="126" width="400" height="12" fill="#a39782" />
+      <rect y="138" width="400" height="102" fill="#d9b77e" />
+      <ellipse cx="200" cy="200" rx="120" ry="16" fill="#9a6b35" opacity="0.25" />
+      {/* Red knight */}
+      <g transform="translate(120 128)">
+        <rect x="-14" y="56" width="10" height="34" rx="3" fill="#5b6470" />
+        <rect x="4" y="56" width="10" height="34" rx="3" fill="#5b6470" />
+        <rect x="-20" y="14" width="40" height="46" rx="6" fill="#dc2646" />
+        <rect x="-12" y="-14" width="24" height="28" rx="8" fill="#b8c2cc" />
+        <rect x="-8" y="-2" width="16" height="3" fill="#0b0b0f" />
+        <rect x="-3" y="-30" width="6" height="18" rx="2" fill="#dc2646" />
+        <circle cx="-26" cy="34" r="16" fill="#dc2646" stroke="#5b6470" strokeWidth="3" />
+        <circle cx="-26" cy="34" r="4" fill="#d4a72c" />
+      </g>
+      {/* Blue knight */}
+      <g transform="translate(280 128)">
+        <rect x="-14" y="56" width="10" height="34" rx="3" fill="#5b6470" />
+        <rect x="4" y="56" width="10" height="34" rx="3" fill="#5b6470" />
+        <rect x="-20" y="14" width="40" height="46" rx="6" fill="#1d9bd1" />
+        <rect x="-12" y="-14" width="24" height="28" rx="8" fill="#b8c2cc" />
+        <rect x="-8" y="-2" width="16" height="3" fill="#0b0b0f" />
+        <rect x="-3" y="-30" width="6" height="18" rx="2" fill="#1d9bd1" />
+      </g>
+      {/* Crossed blades */}
+      <g strokeLinecap="round">
+        <line x1="150" y1="150" x2="232" y2="88" stroke="#e2e8f0" strokeWidth="6" />
+        <line x1="250" y1="150" x2="168" y2="88" stroke="#e2e8f0" strokeWidth="6" />
+        <line x1="142" y1="146" x2="156" y2="160" stroke="#d4a72c" strokeWidth="6" />
+        <line x1="258" y1="146" x2="244" y2="160" stroke="#d4a72c" strokeWidth="6" />
+      </g>
+      <circle cx="200" cy="104" r="10" fill="#fde047" opacity="0.8" />
+    </svg>
+  );
+}
+
 export function Carreras3dThumbnail() {
   // The road seen from behind a car, vanishing into the horizon.
   return (
