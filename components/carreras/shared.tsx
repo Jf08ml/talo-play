@@ -18,6 +18,7 @@ import type { PresenceMap } from "@/lib/presence";
 import { serverNow } from "@/lib/serverTime";
 import { formatRaceTime } from "@/lib/format";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
+import { Shuffle } from "lucide-react";
 
 export function CarDot({ seat, className = "h-5 w-8" }: { seat: Seat; className?: string }) {
   return (
@@ -81,17 +82,42 @@ export function useCameraMode(): [CameraMode, () => void] {
   return [mode, toggle];
 }
 
-/** Final positions with times, plus rematch / change drivers. */
+const SOUND_KEY = "carreras.sound";
+
+/** Sound on or off, remembered per device (on by default). */
+export function useSoundSetting(): [boolean, () => void] {
+  const [on, setOn] = useState(() => {
+    try {
+      return localStorage.getItem(SOUND_KEY) !== "off";
+    } catch {
+      return true;
+    }
+  });
+  const toggle = () =>
+    setOn((v) => {
+      try {
+        localStorage.setItem(SOUND_KEY, v ? "off" : "on");
+      } catch {
+        // Not remembered, that's all.
+      }
+      return !v;
+    });
+  return [on, toggle];
+}
+
+/** Final positions with times, plus rematch (on a new track too, if it's random) / change drivers. */
 export function Standings({
   roomId,
   state,
   myId = "",
   big = false,
+  randomTrack = false,
 }: {
   roomId: string;
   state: CarrerasState;
   myId?: string;
   big?: boolean;
+  randomTrack?: boolean;
 }) {
   const rows = standings(state);
   const mySeat = seatOf(state, myId);
@@ -135,6 +161,11 @@ export function Standings({
         <button onClick={() => rematch(roomId, state.gameNo)} className={`${big ? "text-lg" : ""} ${PRIMARY_BUTTON}`}>
           Revancha
         </button>
+        {randomTrack && (
+          <button onClick={() => rematch(roomId, state.gameNo, true)} className={`${SECONDARY_BUTTON} flex items-center justify-center gap-2`}>
+            <Shuffle className="h-4 w-4" /> Revancha en otra pista
+          </button>
+        )}
         <button onClick={() => backToWaiting(roomId, state.gameNo)} className={SECONDARY_BUTTON}>
           Cambiar pilotos
         </button>

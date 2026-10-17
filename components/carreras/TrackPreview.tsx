@@ -1,8 +1,8 @@
 import { WORLD_H, WORLD_W, getTrack, type TrackId } from "@/lib/carrerasTrack";
 
-/** The track's outline, for picking one in the lobby and the waiting room. */
-export default function TrackPreview({ track, className = "" }: { track: TrackId; className?: string }) {
-  const t = getTrack(track);
+/** The track's outline, for picking one in the lobby and the waiting room; `seed` shapes `aleatoria`. */
+export default function TrackPreview({ track, seed = 0, className = "" }: { track: TrackId; seed?: number; className?: string }) {
+  const t = getTrack(track, seed);
   const d = Array.from(t.xs, (x, i) => `${i ? "L" : "M"}${x.toFixed(0)} ${t.ys[i].toFixed(0)}`).join(" ") + "Z";
   return (
     <svg viewBox={`0 0 ${WORLD_W} ${WORLD_H}`} className={className} aria-hidden="true">

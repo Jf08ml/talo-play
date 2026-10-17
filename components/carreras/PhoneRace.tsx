@@ -10,13 +10,15 @@ import {
   reportFinish,
   seatOf,
   subscribePoses,
+  trackSeedOf,
   type CarInputWire,
   type CarPose,
   type CarrerasMeta,
   type CarrerasState,
   type Seat,
 } from "@/lib/carreras";
-import { collideWithGhost, getTrack, gridCar, lapsDone, stepCar, type Car } from "@/lib/carrerasTrack";
+import { MAX_SPEED, collideWithGhost, getTrack, gridCar, lapsDone, stepCar, type Car } from "@/lib/carrerasTrack";
+import { RaceAudio, RaceCues } from "@/lib/carrerasAudio";
 import { RaceScene, type CameraMode } from "@/lib/carreras3d";
 import { drawMinimap, type DrawCar } from "@/lib/carrerasDraw";
 import { serverNow } from "@/lib/serverTime";
@@ -24,8 +26,8 @@ import { formatRaceTime } from "@/lib/format";
 import { useServerNow } from "@/hooks/useServerNow";
 import { TaloMark } from "@/components/TaloLogo";
 import Controller, { useWakeLock } from "./Controller";
-import { Standings, driverName, useCameraMode } from "./shared";
-import { Eye, Maximize, RotateCw } from "lucide-react";
+import { Standings, driverName, useCameraMode, useSoundSetting } from "./shared";
+import { Eye, Maximize, RotateCw, Volume2, VolumeX } from "lucide-react";
 
 const STEP = 1 / 120;
 /** How often this phone publishes its car. */
@@ -78,6 +80,8 @@ export default function PhoneRace({
   const [camera, toggleCamera] = useCameraMode();
   const cameraRef = useRef<CameraMode>(camera);
   const [hud, setHud] = useState<Hud | null>(null);
+  const [sound, toggleSound] = useSoundSetting();
+  const audioRef = useRef<RaceAudio | null>(null);
   const now = useServerNow(true, 100);
 
   useWakeLock();
@@ -90,6 +94,19 @@ export default function PhoneRace({
   }, [camera]);
 
   useEffect(() => subscribePoses(roomId, (p) => (posesRef.current = p)), [roomId]);
+
+  // Sound lives as long as the race view (a new context would need another tap to start).
+  useEffect(() => {
+    const audio = new RaceAudio();
+    audioRef.current = audio;
+    return () => {
+      audio.dispose();
+      audioRef.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    audioRef.current?.setMuted(!sound);
+  }, [sound]);
 
   const mySeat = seatOf(state, myId);
   const driving = !!mySeat && state.racers.includes(mySeat);
@@ -107,13 +124,16 @@ export default function PhoneRace({
   }, [driving, roomId, myId]);
 
   const trackId = meta.track;
+  const trackSeed = trackSeedOf(meta, state);
   const laps = meta.laps;
   const racersKey = state.racers;
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const track = getTrack(trackId);
-    const scene = new RaceScene(canvas, trackId, { maxDpr: 1.5 });
+    const track = getTrack(trackId, trackSeed);
+    const scene = new RaceScene(canvas, track, { maxDpr: 1.5 });
+    const audio = audioRef.current;
+    const cues = new RaceCues(audio);
     let frame = 0;
     let last = performance.now();
     let acc = 0;
@@ -147,6 +167,7 @@ export default function PhoneRace({
       if (!isDriver) own = null;
 
       const moving = s.status !== "waiting" && now >= s.startedAt;
+      scene.setStartLights(cues.countdown(s.gameNo, s.status === "waiting" ? -1 : Math.max(0, Math.ceil((s.startedAt - now) / 1000))));
       if (own && moving) {
         acc += dt;
         while (acc >= STEP) {
@@ -155,12 +176,21 @@ export default function PhoneRace({
           const input = done
             ? { steer: 0, brake: false, gas: false }
             : { steer: inputRef.current.s, brake: inputRef.current.b };
-          stepCar(own, input, track, STEP);
-          for (const [, g] of ghosts) collideWithGhost(own, g.x, g.y, g.vx, g.vy);
+          const hit = stepCar(own, input, track, STEP);
+          if (cues.hit("wall", hit)) scene.impact(seat!, hit);
+          for (const [r, g] of ghosts) {
+            const bump = collideWithGhost(own, g.x, g.y, g.vx, g.vy);
+            if (cues.hit(r, bump)) {
+              scene.impact(seat!, bump);
+              scene.impact(r, bump);
+            }
+          }
         }
       }
+      if (own && s.status === "racing" && moving) cues.lap("own", lapsDone(own, track), laps);
       if (own && s.status === "racing" && moving && reportedGame !== s.gameNo && own.progress >= laps * track.length) {
         reportedGame = s.gameNo;
+        audio?.finish(Object.keys(s.results).length === 0);
         reportFinish(roomId, s.gameNo, seat!, now - s.startedAt).catch(console.error);
       }
       if (own && poseSender.current && t - lastPose >= POSE_MS) {
@@ -215,17 +245,34 @@ export default function PhoneRace({
       const dots: DrawCar[] = [];
       for (const r of racers) {
         if (r === seat && own) {
-          scene.setPose(r, own.x, own.y, own.heading, Math.hypot(own.vx, own.vy));
+          scene.setPose(r, { x: own.x, y: own.y, heading: own.heading, vx: own.vx, vy: own.vy, bump: own.bump });
           dots.push({ x: own.x, y: own.y, heading: own.heading, color: CARS[r].color });
         } else {
           const g = ghosts.get(r);
           if (!g) continue;
-          scene.setPose(r, g.x, g.y, g.h, Math.hypot(g.vx, g.vy));
+          scene.setPose(r, { x: g.x, y: g.y, heading: g.h, vx: g.vx, vy: g.vy });
           dots.push({ x: g.x, y: g.y, heading: g.h, color: CARS[r].color });
         }
       }
 
+      // Engines: mine loud, rivals by how close they are to the camera's car.
       const follow = own ? seat! : ranked[0];
+      if (audio) {
+        if (s.status === "waiting") audio.silence();
+        else {
+          const me = follow ? (follow === seat && own ? { x: own.x, y: own.y } : ghosts.get(follow)) : undefined;
+          for (const r of racers) {
+            const c = r === seat && own ? { x: own.x, y: own.y, vx: own.vx, vy: own.vy, h: own.heading } : ghosts.get(r);
+            if (!c) continue;
+            const isMine = r === follow;
+            const dist = me ? Math.hypot(c.x - me.x, c.y - me.y) : 0;
+            const volume = isMine ? 1 : Math.max(0, 1 - dist / 500) * 0.6;
+            const slip = isMine ? Math.abs(-c.vx * Math.sin(c.h) + c.vy * Math.cos(c.h)) : 0;
+            audio.engine(r, Math.hypot(c.vx, c.vy) / MAX_SPEED, (slip - 50) / 150, volume);
+          }
+          audio.silence(racers);
+        }
+      }
       scene.render(follow ? [{ key: follow }] : [], cameraRef.current, dt);
       drawMinimap(minimapRef.current, track, dots);
 
@@ -243,8 +290,9 @@ export default function PhoneRace({
     return () => {
       cancelAnimationFrame(frame);
       scene.dispose();
+      audio?.silence();
     };
-  }, [trackId, laps, roomId, myId, racersKey]);
+  }, [trackId, trackSeed, laps, roomId, myId, racersKey]);
 
   const left = Math.ceil((state.startedAt - now) / 1000);
   const counting = state.status === "racing" && now > 0 && left > 0;
@@ -278,6 +326,13 @@ export default function PhoneRace({
         <div className="pointer-events-auto flex items-start gap-2">
           <canvas ref={minimapRef} className="h-16 w-28 rounded-xl bg-slate-950/40 backdrop-blur" />
           <div className="flex flex-col gap-2">
+            <button
+              onClick={toggleSound}
+              aria-label={sound ? "Silenciar" : "Activar sonido"}
+              className="flex items-center justify-center rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur"
+            >
+              {sound ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            </button>
             <button
               onClick={toggleCamera}
               className="flex items-center gap-1 rounded-xl bg-slate-950/60 px-2.5 py-2 text-xs text-white backdrop-blur"
@@ -337,7 +392,7 @@ export default function PhoneRace({
 
       {state.status === "finished" && (
         <div className="absolute inset-0 flex items-center justify-center overflow-y-auto bg-slate-950/30 p-4">
-          <Standings roomId={roomId} state={state} myId={myId} />
+          <Standings roomId={roomId} state={state} myId={myId} randomTrack={meta.track === "aleatoria"} />
         </div>
       )}
     </div>

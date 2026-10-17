@@ -3,7 +3,8 @@ import { getDb } from "./firebase";
 import { generateRoomCode } from "./ids";
 import { serverNow } from "./serverTime";
 import { transactState } from "./transact";
-import { TRACKS, type TrackId } from "./carrerasTrack";
+import { makeSeed } from "./random";
+import { isTrackId, type TrackId } from "./carrerasTrack";
 
 /**
  * Carreras, two games on the same rooms, physics and controls: `carreras`
@@ -21,6 +22,8 @@ import { TRACKS, type TrackId } from "./carrerasTrack";
  *   each one reports its own finish.
  *
  * `carreras/state` (seats, countdown, results) only changes by transaction.
+ * It also holds `trackSeed`, which shapes the `aleatoria` track: it changes
+ * only while waiting (`newTrack`) or with "Nueva pista" after a race.
  */
 
 export const COUNTDOWN_MS = 3000;
@@ -62,6 +65,8 @@ export interface CarrerasState {
   players: Record<string, CarrerasPlayer>;
   /** Client id in each seat, "" if empty. */
   seats: Record<Seat, string>;
+  /** Shape of the `aleatoria` track (ignored by the fixed ones). */
+  trackSeed: number;
   /** Seats that started this race (e.g. "abd"). */
   racers: string;
   /** Server time when the cars may move (the countdown ends). */
@@ -116,7 +121,7 @@ export function normalizeMeta(raw: Partial<CarrerasMeta>): CarrerasMeta {
     game,
     hostId: raw.hostId,
     mode: game === "carreras3d" && raw.mode === "telefono" ? "telefono" : "pantalla",
-    track: raw.track && raw.track in TRACKS ? raw.track : "ovalo",
+    track: isTrackId(raw.track) ? raw.track : "ovalo",
     laps: raw.laps ?? 5,
     createdAt: raw.createdAt ?? 0,
   };
@@ -129,6 +134,7 @@ function normalizeState(raw: Partial<CarrerasState> | null): CarrerasState | nul
     gameNo: raw.gameNo ?? 0,
     players: raw.players ?? {},
     seats: { a: raw.seats?.a ?? "", b: raw.seats?.b ?? "", c: raw.seats?.c ?? "", d: raw.seats?.d ?? "" },
+    trackSeed: raw.trackSeed ?? 0,
     racers: raw.racers ?? "",
     startedAt: raw.startedAt ?? 0,
     results: raw.results ?? {},
@@ -136,6 +142,11 @@ function normalizeState(raw: Partial<CarrerasState> | null): CarrerasState | nul
     winner: raw.winner ?? "",
     wins: raw.wins ?? {},
   };
+}
+
+/** The seed that shapes the room's track: 0 for the fixed ones, so they never change. */
+export function trackSeedOf(meta: Pick<CarrerasMeta, "track">, state: Pick<CarrerasState, "trackSeed"> | null): number {
+  return meta.track === "aleatoria" ? state?.trackSeed ?? 0 : 0;
 }
 
 export function seatOf(state: Pick<CarrerasState, "seats">, clientId: string): Seat | null {
@@ -175,7 +186,7 @@ export async function createCarrerasRoom(
 ): Promise<string> {
   const roomId = generateRoomCode();
   const meta: CarrerasMeta = { game, hostId, ...settings, createdAt: serverTimestamp() };
-  const state: Partial<CarrerasState> = { status: "waiting", gameNo: 0 };
+  const state: Partial<CarrerasState> = { status: "waiting", gameNo: 0, trackSeed: makeSeed() };
   await update(ref(getDb()), {
     [`rooms/${roomId}/meta`]: meta,
     [statePath(roomId)]: state,
@@ -280,13 +291,23 @@ export function closeRace(roomId: string, expectedGame: number, othersGone: bool
   });
 }
 
-/** Same seats, straight into a new countdown (or back to waiting if nobody is seated). */
-export function rematch(roomId: string, expectedGame: number) {
+/**
+ * Same seats, straight into a new countdown (or back to waiting if nobody is
+ * seated). `newTrack` reshapes the random track first.
+ */
+export function rematch(roomId: string, expectedGame: number, newTrack = false) {
   return mutate(roomId, (s) => {
     if (s.status !== "finished" || s.gameNo !== expectedGame) return null;
-    const next = { ...s, gameNo: s.gameNo + 1 };
+    const next = { ...s, gameNo: s.gameNo + 1, trackSeed: newTrack ? makeSeed() : s.trackSeed };
     return raceFrom(next) ?? { ...next, status: "waiting" };
   });
+}
+
+/** Another random track, before the race (guarded by the seed I saw). */
+export function newTrack(roomId: string, expectedSeed: number) {
+  return mutate(roomId, (s) =>
+    s.status === "waiting" && s.trackSeed === expectedSeed ? { ...s, trackSeed: makeSeed() } : null
+  );
 }
 
 /** Back to the seats screen (to change drivers), also to abandon a race. */

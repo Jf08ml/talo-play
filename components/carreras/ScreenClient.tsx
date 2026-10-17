@@ -9,6 +9,7 @@ import {
   SEATS,
   backToWaiting,
   getCarrerasMeta,
+  newTrack,
   normalizeMeta,
   racersOf,
   reportFinish,
@@ -16,6 +17,7 @@ import {
   startRace,
   subscribeCarreras,
   subscribeInputs,
+  trackSeedOf,
   writeLive,
   type CarInputWire,
   type CarrerasGame,
@@ -24,7 +26,19 @@ import {
   type LiveCar,
   type Seat,
 } from "@/lib/carreras";
-import { TRACKS, collideCars, getTrack, gridCar, lapsDone, stepCar, type Car, type CarInput } from "@/lib/carrerasTrack";
+import {
+  MAX_SPEED,
+  WORLD_W,
+  collideCars,
+  getTrack,
+  gridCar,
+  lapsDone,
+  stepCar,
+  trackLabel,
+  type Car,
+  type CarInput,
+} from "@/lib/carrerasTrack";
+import { RaceAudio, RaceCues } from "@/lib/carrerasAudio";
 import { RaceScene, type CameraMode } from "@/lib/carreras3d";
 import { drawMinimap, drawTopView, type DrawCar } from "@/lib/carrerasDraw";
 import { subscribePresence, type PresenceMap } from "@/lib/presence";
@@ -33,11 +47,11 @@ import { roomPath } from "@/lib/games";
 import { useServerNow } from "@/hooks/useServerNow";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import TrackPreview from "@/components/carreras/TrackPreview";
-import { Standings, driverName, useCameraMode, useRaceCloser } from "@/components/carreras/shared";
+import { Standings, driverName, useCameraMode, useRaceCloser, useSoundSetting } from "@/components/carreras/shared";
 import { TaloMark } from "@/components/TaloLogo";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { PRIMARY_BUTTON } from "@/components/ui";
-import { Eye, Maximize, Minimize, Smartphone, X } from "lucide-react";
+import { Eye, Maximize, Minimize, Shuffle, Smartphone, Volume2, VolumeX, X } from "lucide-react";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -82,6 +96,7 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
   const [presenceLoaded, setPresenceLoaded] = useState(false);
   const [hud, setHud] = useState<Partial<Record<Seat, LiveCar>>>({});
   const [camera, toggleCamera] = useCameraMode();
+  const [sound, toggleSound] = useSoundSetting();
 
   const canvas3dRef = useRef<HTMLCanvasElement>(null);
   const canvas2dRef = useRef<HTMLCanvasElement>(null);
@@ -151,14 +166,32 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
 
   useRaceCloser(roomId, state, presence, presenceLoaded);
 
+  // Sound lives as long as the page (a new context would need another tap to start).
+  const audioRef = useRef<RaceAudio | null>(null);
+  useEffect(() => {
+    const audio = new RaceAudio();
+    audioRef.current = audio;
+    return () => {
+      audio.dispose();
+      audioRef.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    audioRef.current?.setMuted(!sound);
+  }, [sound]);
+
   // The race loop: fixed-step physics, then a draw, every animation frame.
   const trackId = meta?.track;
+  const trackSeed = meta ? trackSeedOf(meta, state) : 0;
+  const hasState = state !== null;
   const laps = meta?.laps ?? 5;
   const is3d = game === "carreras3d";
   useEffect(() => {
-    if (!trackId || !canvas3dRef.current) return;
-    const track = getTrack(trackId);
-    const scene = is3d ? new RaceScene(canvas3dRef.current, trackId) : null;
+    if (!trackId || !hasState || !canvas3dRef.current) return;
+    const track = getTrack(trackId, trackSeed);
+    const scene = is3d ? new RaceScene(canvas3dRef.current, track) : null;
+    const audio = audioRef.current;
+    const cues = new RaceCues(audio);
     let engine: Engine | null = null;
     let frame = 0;
     let last = performance.now();
@@ -195,26 +228,53 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
 
       const now = serverNow();
       const moving = s.status !== "waiting" && now >= s.startedAt;
+      const lights = cues.countdown(s.gameNo, s.status === "waiting" ? -1 : Math.max(0, Math.ceil((s.startedAt - now) / 1000)));
+      scene?.setStartLights(lights);
       if (moving) {
         acc += dt;
         while (acc >= STEP) {
           acc -= STEP;
-          for (const seat of seats) stepCar(engine.cars[seat]!, inputFor(seat, s), track, STEP);
+          for (const seat of seats) {
+            const hit = stepCar(engine.cars[seat]!, inputFor(seat, s), track, STEP);
+            if (cues.hit(seat, hit)) scene?.impact(seat, hit);
+          }
           for (let i = 0; i < seats.length; i++) {
-            for (let j = i + 1; j < seats.length; j++) collideCars(engine.cars[seats[i]]!, engine.cars[seats[j]]!);
+            for (let j = i + 1; j < seats.length; j++) {
+              const hit = collideCars(engine.cars[seats[i]]!, engine.cars[seats[j]]!);
+              if (cues.hit(seats[i] + seats[j], hit)) {
+                scene?.impact(seats[i], hit);
+                scene?.impact(seats[j], hit);
+              }
+            }
           }
         }
       } else {
         acc = 0;
       }
 
-      // Finish line, once per car.
+      // Finish line, once per car; a chime on every other lap.
       if (s.status === "racing" && moving) {
         for (const seat of seats) {
-          if (engine.reported.has(seat) || engine.cars[seat]!.progress < laps * track.length) continue;
+          const car = engine.cars[seat]!;
+          cues.lap(seat, lapsDone(car, track), laps);
+          if (engine.reported.has(seat) || car.progress < laps * track.length) continue;
           engine.reported.add(seat);
+          audio?.finish(engine.reported.size === 1);
           reportFinish(roomId, s.gameNo, seat, now - s.startedAt).catch(console.error);
         }
+      }
+
+      // Engines: panned to each player's half of the screen in 3D, to where the car is in 2D.
+      if (s.status === "waiting") {
+        audio?.silence();
+      } else if (audio) {
+        seats.forEach((seat, i) => {
+          const car = engine!.cars[seat]!;
+          const slip = Math.abs(-car.vx * Math.sin(car.heading) + car.vy * Math.cos(car.heading));
+          const pan = is3d ? (seats.length === 1 ? 0 : i % 2 ? 0.6 : -0.6) : (car.x / WORLD_W) * 1.6 - 0.8;
+          audio.engine(seat, Math.hypot(car.vx, car.vy) / MAX_SPEED, (slip - 50) / 150, seats.length > 1 ? 0.7 : 1, pan);
+        });
+        audio.silence(seats);
       }
 
       // Places: finishers by time, then by distance driven.
@@ -246,7 +306,7 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
       } else {
         for (const seat of seats) {
           const car = engine.cars[seat]!;
-          scene.setPose(seat, car.x, car.y, car.heading, Math.hypot(car.vx, car.vy));
+          scene.setPose(seat, { x: car.x, y: car.y, heading: car.heading, vx: car.vx, vy: car.vy, bump: car.bump });
         }
         // Before the start with nobody seated: an aerial view of the track.
         scene.render(seats.length ? seats.map((key) => ({ key })) : [{ key: "" }], cameraRef.current, dt);
@@ -258,8 +318,9 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
     return () => {
       cancelAnimationFrame(frame);
       scene?.dispose();
+      audio?.silence();
     };
-  }, [trackId, laps, roomId, is3d]);
+  }, [trackId, trackSeed, hasState, laps, roomId, is3d]);
 
   const now = useServerNow(state?.status === "racing", 100);
   const [fullscreen, setFullscreen] = useState(false);
@@ -314,6 +375,9 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
               </div>
             )}
             <div className="flex gap-2">
+              <button onClick={toggleSound} className={chip} aria-label={sound ? "Silenciar" : "Activar sonido"} title={sound ? "Silenciar" : "Activar sonido"}>
+                {sound ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+              </button>
               {is3d && (
                 <button onClick={toggleCamera} className={chip}>
                   <Eye className="h-4 w-4" /> {camera === "detras" ? "Detrás" : "Cabina"}
@@ -357,7 +421,7 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
 
           {state.status === "finished" && (
             <div className="relative z-10 flex flex-1 items-center justify-center p-4">
-              <Standings roomId={roomId} state={state} big />
+              <Standings roomId={roomId} state={state} big randomTrack={meta.track === "aleatoria"} />
             </div>
           )}
         </>
@@ -479,10 +543,18 @@ function JoinCard({
       </div>
 
       <div className="flex items-center gap-4 text-sm text-slate-400">
-        <TrackPreview track={meta.track} className="h-14 w-24" />
+        <TrackPreview track={meta.track} seed={trackSeedOf(meta, state)} className="h-14 w-24" />
         <span>
-          {TRACKS[meta.track].label} · {meta.laps} vueltas
+          Pista {trackLabel(meta.track)} · {meta.laps} vueltas
         </span>
+        {meta.track === "aleatoria" && (
+          <button
+            onClick={() => newTrack(roomId, state.trackSeed)}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-600 px-3 py-1.5 text-slate-200 hover:border-slate-400"
+          >
+            <Shuffle className="h-4 w-4" /> Otra pista
+          </button>
+        )}
       </div>
 
       <button onClick={() => startRace(roomId)} disabled={!ready} className={`w-full max-w-sm text-lg ${PRIMARY_BUTTON}`}>

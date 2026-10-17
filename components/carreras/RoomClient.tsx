@@ -10,19 +10,21 @@ import {
   getCarrerasMeta,
   joinCarreras,
   leaveSeat,
+  newTrack,
   normalizeMeta,
   seatOf,
   startRace,
   subscribeCarreras,
   subscribeLive,
   takeSeat,
+  trackSeedOf,
   type CarrerasGame,
   type CarrerasLive,
   type CarrerasMeta,
   type CarrerasState,
   type Seat,
 } from "@/lib/carreras";
-import { TRACKS } from "@/lib/carrerasTrack";
+import { trackLabel } from "@/lib/carrerasTrack";
 import { formatRaceTime } from "@/lib/format";
 import { roomPath } from "@/lib/games";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
@@ -35,9 +37,10 @@ import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import Controller, { useInputSender, useWakeLock } from "@/components/carreras/Controller";
 import PhoneRace from "@/components/carreras/PhoneRace";
+import TrackPreview from "@/components/carreras/TrackPreview";
 import { CarDot, Standings, driverName, useRaceCloser } from "@/components/carreras/shared";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
-import { MonitorPlay, Smartphone } from "lucide-react";
+import { MonitorPlay, Shuffle, Smartphone } from "lucide-react";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -128,12 +131,13 @@ export default function RoomClient({ game, roomId }: { game: CarrerasGame; roomI
               players={Object.entries(state.players).map(([id, p]) => ({ id, ...p }))}
               presence={presence}
               myId={myId}
-              summary={`${TRACKS[meta.track].label} · ${meta.laps} vueltas · ${
+              summary={`Pista ${trackLabel(meta.track)} · ${meta.laps} vueltas · ${
                 meta.mode === "pantalla" ? "en pantalla grande" : "cada uno en su teléfono"
               }`}
               onStart={() => startRace(roomId)}
             >
               <ModeHint roomId={roomId} meta={meta} />
+              <TrackCard roomId={roomId} meta={meta} state={state} />
               <SeatPicker roomId={roomId} state={state} myId={myId} isAway={isAway} />
             </WaitingRoom>
           </div>
@@ -143,7 +147,7 @@ export default function RoomClient({ game, roomId }: { game: CarrerasGame; roomI
           <div className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-3 p-4">
             {state.status === "finished" && (
               <div className="flex justify-center">
-                <Standings roomId={roomId} state={state} myId={myId} />
+                <Standings roomId={roomId} state={state} myId={myId} randomTrack={meta.track === "aleatoria"} />
               </div>
             )}
             {state.status === "racing" &&
@@ -178,6 +182,28 @@ function ModeHint({ roomId, meta }: { roomId: string; meta: CarrerasMeta }) {
         </Link>
         . Tu teléfono va a ser el volante.
       </p>
+    </div>
+  );
+}
+
+/** The track's shape (and, if it's random, a button for another one). */
+function TrackCard({ roomId, meta, state }: { roomId: string; meta: CarrerasMeta; state: CarrerasState }) {
+  const random = meta.track === "aleatoria";
+  return (
+    <div className="flex items-center gap-3 rounded-xl bg-slate-950/40 p-3 ring-1 ring-slate-800">
+      <TrackPreview track={meta.track} seed={trackSeedOf(meta, state)} className="h-14 w-24 shrink-0" />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-slate-100">Pista {trackLabel(meta.track)}</p>
+        <p className="text-xs text-slate-500">{random ? "Armada al azar para esta sala" : `${meta.laps} vueltas`}</p>
+      </div>
+      {random && (
+        <button
+          onClick={() => newTrack(roomId, state.trackSeed)}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-slate-400"
+        >
+          <Shuffle className="h-3.5 w-3.5" /> Otra pista
+        </button>
+      )}
     </div>
   );
 }

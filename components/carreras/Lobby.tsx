@@ -3,13 +3,13 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { LAP_OPTIONS, createCarrerasRoom, type CarrerasGame, type CarrerasMode } from "@/lib/carreras";
-import { TRACKS, TRACK_ORDER, type TrackId } from "@/lib/carrerasTrack";
+import { RANDOM_TRACK, TRACKS, TRACK_ORDER, type TrackId } from "@/lib/carrerasTrack";
 import { roomPath } from "@/lib/games";
 import GameLobby from "@/components/GameLobby";
 import TrackPreview from "@/components/carreras/TrackPreview";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import { CARD, PRIMARY_BUTTON, SECTION_LABEL, chipClass } from "@/components/ui";
-import { MonitorPlay, Smartphone } from "lucide-react";
+import { MonitorPlay, Shuffle, Smartphone } from "lucide-react";
 
 const MODES: { id: CarrerasMode; label: string; hint: string; icon: typeof MonitorPlay }[] = [
   {
@@ -81,14 +81,26 @@ export default function CarrerasLobby({ game }: { game: CarrerasGame }) {
         <div>
           <p className={SECTION_LABEL}>Pista</p>
           <div className="grid grid-cols-3 gap-1.5">
-            {TRACK_ORDER.map((id) => (
-              <button key={id} type="button" onClick={() => setTrack(id)} className={`${chipClass(track === id)} flex flex-col items-center gap-1`}>
-                <TrackPreview track={id} className="h-12 w-full" />
-                {TRACKS[id].label}
-                <span className="text-[10px] font-normal text-slate-500">{TRACKS[id].hint}</span>
-              </button>
-            ))}
+            {TRACK_ORDER.map((id) => {
+              const info = id === "aleatoria" ? RANDOM_TRACK : TRACKS[id];
+              return (
+                <button key={id} type="button" onClick={() => setTrack(id)} className={`${chipClass(track === id)} flex flex-col items-center gap-1`}>
+                  {id === "aleatoria" ? (
+                    <span className="flex h-12 w-full items-center justify-center">
+                      <Shuffle className="h-7 w-7" />
+                    </span>
+                  ) : (
+                    <TrackPreview track={id} className="h-12 w-full" />
+                  )}
+                  {info.label}
+                  <span className="text-[10px] font-normal text-slate-500">{info.hint}</span>
+                </button>
+              );
+            })}
           </div>
+          {track === "aleatoria" && (
+            <p className="mt-1.5 text-xs text-slate-500">Se arma una pista al azar. Si no les gusta, en la sala pueden pedir otra.</p>
+          )}
         </div>
 
         <div>

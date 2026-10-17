@@ -1,4 +1,4 @@
-import { CAR_LENGTH, CAR_WIDTH, WORLD_H, WORLD_W, type Track } from "./carrerasTrack";
+import { CAR_LENGTH, CAR_WIDTH, WORLD_H, WORLD_W, type Track, type TrackTheme } from "./carrerasTrack";
 
 /** Plain-canvas drawings of the race: the top view and the minimap. */
 
@@ -10,6 +10,15 @@ export interface DrawCar {
   label?: string;
   bump?: number;
 }
+
+/** Top view colors per theme: outside the world, ground stripes, curbs. */
+const TOP_COLORS: Record<TrackTheme, { bg: string; ground: [string, string]; curb: string; road: string }> = {
+  campo: { bg: "#0b2a18", ground: ["#14532d", "#166534"], curb: "#dc2626", road: "#3f3f46" },
+  atardecer: { bg: "#1f1a12", ground: ["#3f5f2a", "#466a2e"], curb: "#e11d48", road: "#3f3b46" },
+  desierto: { bg: "#3b2a14", ground: ["#c9a46a", "#c29c62"], curb: "#ea580c", road: "#45434a" },
+  nieve: { bg: "#1e293b", ground: ["#e2e8f0", "#d5dde8"], curb: "#2563eb", road: "#40424c" },
+  noche: { bg: "#020617", ground: ["#0f2a1a", "#11301d"], curb: "#b91c1c", road: "#2c2c35" },
+};
 
 function tracePath(ctx: CanvasRenderingContext2D, track: Track) {
   ctx.beginPath();
@@ -44,15 +53,16 @@ function fit(canvas: HTMLCanvasElement | null, padding = 0): CanvasRenderingCont
 export function drawTopView(canvas: HTMLCanvasElement | null, track: Track, cars: DrawCar[]) {
   const ctx = fit(canvas);
   if (!ctx || !canvas) return;
+  const colors = TOP_COLORS[track.def.theme] ?? TOP_COLORS.campo;
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = "#0b2a18";
+  ctx.fillStyle = colors.bg;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
 
-  ctx.fillStyle = "#14532d";
+  ctx.fillStyle = colors.ground[0];
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
-  ctx.fillStyle = "#166534";
+  ctx.fillStyle = colors.ground[1];
   for (let x = 0; x < WORLD_W; x += 120) ctx.fillRect(x, 0, 60, WORLD_H);
 
   const w = track.def.width;
@@ -63,12 +73,12 @@ export function drawTopView(canvas: HTMLCanvasElement | null, track: Track, cars
   ctx.strokeStyle = "#f8fafc";
   ctx.setLineDash([]);
   ctx.stroke();
-  ctx.strokeStyle = "#dc2626";
+  ctx.strokeStyle = colors.curb;
   ctx.setLineDash([22, 22]);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.lineWidth = w;
-  ctx.strokeStyle = "#3f3f46";
+  ctx.strokeStyle = colors.road;
   ctx.stroke();
   ctx.lineWidth = 4;
   ctx.strokeStyle = "rgba(248,250,252,0.35)";
