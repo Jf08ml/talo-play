@@ -10,5 +10,7 @@ export function inviteMetadata(game: GameId | null, roomId: string): Metadata {
     description,
     // A page's openGraph replaces the layout's whole object, image included, so it's repeated here.
     openGraph: { title: `${title} · Talo`, description, images: ["/opengraph-image"] },
+    // Rooms are temporary: keep them out of search results (the game's lobby is the canonical page).
+    robots: { index: false, follow: true },
   };
 }
