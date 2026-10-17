@@ -6,7 +6,7 @@
  * Every room stores its game in `rooms/{id}/meta/game`; room codes are
  * global, so one code is enough to find any game's room (`lib/roomLookup.ts`).
  */
-export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena" | "yonunca" | "onda" | "telefono" | "ludo" | "lobo" | "ajedrez";
+export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena" | "yonunca" | "onda" | "telefono" | "ludo" | "lobo" | "ajedrez" | "chinchon";
 
 /** Who you're playing with: the first question the home page asks. */
 export type PlayContext = "pareja" | "amigos" | "grupo" | "solo";
@@ -500,10 +500,25 @@ export const GAMES: Record<GameId, GameInfo> = {
       "Gana quien da jaque mate. También podés ofrecer tablas o abandonar; en la revancha se cambian los colores.",
     ],
   },
+  chinchon: {
+    id: "chinchon",
+    title: "Chinchón",
+    path: "chinchon",
+    tagline: "El clásico de cartas españolas: ligá tus cartas en piernas y escaleras, cortá con pocos puntos y no pases el límite.",
+    minPlayers: 2,
+    maxPlayers: 5,
+    duration: "20–40 min",
+    contexts: ["pareja", "amigos"],
+    howTo: [
+      "Cada uno recibe 7 cartas. En tu turno agarrás una del mazo o del pozo y tirás otra.",
+      "Juntá piernas (3 o 4 del mismo número) y escaleras (3 o más seguidas del mismo palo). Los comodines reemplazan cualquier carta.",
+      "Cortá cuando tengas todo ligado salvo una carta de 5 o menos. Las sueltas suman puntos: quien pasa el límite queda afuera.",
+    ],
+  },
 };
 
 /** Home page order: quickest to start first. */
-export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "yonunca", "onda", "telefono", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "lobo", "arena", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "ajedrez", "generala", "ludo", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
+export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "yonunca", "onda", "telefono", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "lobo", "arena", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "ajedrez", "generala", "chinchon", "ludo", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
 
 export function roomPath(game: GameId, roomId: string): string {
   return `/${GAMES[game].path}/${roomId}`;

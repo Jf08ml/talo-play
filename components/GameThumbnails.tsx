@@ -1202,3 +1202,28 @@ export function AjedrezThumbnail() {
     </svg>
   );
 }
+
+export function ChinchonThumbnail() {
+  // A fan of Spanish cards forming a run.
+  const cards: [string, string][] = [["4", "#2563eb"], ["5", "#2563eb"], ["6", "#2563eb"], ["7", "#2563eb"]];
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="chinchon-bg" cx="50%" cy="60%" r="80%">
+          <stop offset="0%" stopColor="#065f46" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#chinchon-bg)" />
+      {cards.map(([n, color], i) => (
+        <g key={n} transform={`rotate(${(i - 1.5) * 12} 200 330)`}>
+          <rect x="160" y="50" width="80" height="120" rx="10" fill="#fffbeb" stroke="#d6d3d1" strokeWidth="2" />
+          <text x="170" y="74" fontSize="20" fontWeight="800" fill={color} fontFamily="system-ui, sans-serif">
+            {n}
+          </text>
+          <path d="M200 88 l7 11 v32 h-14 v-32 z M186 131 h28 v6 h-28 z M197 137 h6 v12 h-6 z" fill={color} />
+        </g>
+      ))}
+    </svg>
+  );
+}
