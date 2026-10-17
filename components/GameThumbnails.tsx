@@ -1182,3 +1182,23 @@ export function LoboThumbnail() {
     </svg>
   );
 }
+
+export function AjedrezThumbnail() {
+  // A corner of the board with a king and a knight.
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <rect width="400" height="240" fill="#0b0a14" />
+      <g transform="translate(80 -20) rotate(8 120 140)">
+        {Array.from({ length: 36 }, (_, i) => {
+          const r = Math.floor(i / 6);
+          const c = i % 6;
+          return <rect key={i} x={c * 45} y={r * 45} width="45" height="45" fill={(r + c) % 2 ? "#b58863" : "#f0d9b5"} />;
+        })}
+      </g>
+      <g fontFamily='"Segoe UI Symbol", "DejaVu Sans", serif' fontSize="78" textAnchor="middle">
+        <text x="170" y="150" fill="#fafaf9" stroke="#0f172a" strokeWidth="2">♚&#xFE0E;</text>
+        <text x="250" y="190" fill="#1c1917" stroke="#e7e5e4" strokeWidth="1.5">♞&#xFE0E;</text>
+      </g>
+    </svg>
+  );
+}

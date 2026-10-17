@@ -33,6 +33,7 @@ import {
   Phone,
   Dice5,
   Moon,
+  Castle,
   type LucideIcon,
 } from "lucide-react";
 import type { GameId, PlayContext } from "@/lib/games";
@@ -71,6 +72,7 @@ const GAME_ICONS: Record<GameId, { icon: LucideIcon; gradient: string }> = {
   telefono: { icon: Phone, gradient: "from-lime-400 to-emerald-600" },
   ludo: { icon: Dice5, gradient: "from-red-500 to-blue-600" },
   lobo: { icon: Moon, gradient: "from-indigo-600 to-red-700" },
+  ajedrez: { icon: Castle, gradient: "from-stone-400 to-amber-800" },
 };
 
 export const CONTEXT_ICONS: Record<PlayContext, LucideIcon> = {
