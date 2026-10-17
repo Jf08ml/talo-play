@@ -1089,3 +1089,34 @@ export function OndaThumbnail() {
     </svg>
   );
 }
+
+export function TelefonoThumbnail() {
+  // A phrase, an arrow, a doodle, an arrow, a wrong guess.
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="telefono-bg" cx="50%" cy="40%" r="90%">
+          <stop offset="0%" stopColor="#14532d" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#telefono-bg)" />
+      <g fontFamily="system-ui, sans-serif" fontWeight="700" fontSize="15" textAnchor="middle">
+        <rect x="20" y="40" width="110" height="44" rx="10" fill="#0f172a" stroke="#a3e635" strokeWidth="2" />
+        <text x="75" y="67" fill="#ecfccb">Un gato DJ</text>
+        <rect x="270" y="156" width="110" height="44" rx="10" fill="#0f172a" stroke="#a3e635" strokeWidth="2" />
+        <text x="325" y="183" fill="#ecfccb">¿Un tostador?</text>
+      </g>
+      <rect x="140" y="72" width="120" height="96" rx="10" fill="#ffffff" />
+      <g fill="none" stroke="#0f172a" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="200" cy="112" r="22" />
+        <path d="M184 94 L186 80 L196 92 M216 94 L214 80 L204 92 M190 112 h0.1 M210 112 h0.1 M195 122 q5 5 10 0" />
+        <path d="M160 150 h80" stroke="#ef4444" />
+      </g>
+      <g stroke="#a3e635" strokeWidth="3" fill="none" strokeLinecap="round">
+        <path d="M100 92 q20 30 36 26" />
+        <path d="M264 140 q24 6 36 14" />
+      </g>
+    </svg>
+  );
+}
