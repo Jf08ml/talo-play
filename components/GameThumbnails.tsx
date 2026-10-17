@@ -1034,3 +1034,30 @@ export function Carreras3dThumbnail() {
     </svg>
   );
 }
+
+export function YoNuncaThumbnail() {
+  // A phrase card and two raised / crossed hands.
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="yonunca-bg" cx="50%" cy="30%" r="90%">
+          <stop offset="0%" stopColor="#78350f" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#yonunca-bg)" />
+      <g transform="translate(70 40)">
+        <rect width="260" height="70" rx="14" fill="#0f172a" stroke="#fbbf24" strokeWidth="2" />
+        <text x="130" y="44" textAnchor="middle" fontSize="22" fontWeight="800" fill="#fde68a" fontFamily="system-ui, sans-serif">
+          Yo nunca nunca…
+        </text>
+      </g>
+      <g fontFamily="system-ui, sans-serif" fontWeight="800" fontSize="18" textAnchor="middle">
+        <rect x="88" y="140" width="104" height="56" rx="14" fill="#f97316" />
+        <text x="140" y="174" fill="#fff">YO SÍ</text>
+        <rect x="208" y="140" width="104" height="56" rx="14" fill="#334155" />
+        <text x="260" y="174" fill="#cbd5e1">YO NO</text>
+      </g>
+    </svg>
+  );
+}

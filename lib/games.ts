@@ -6,7 +6,7 @@
  * Every room stores its game in `rooms/{id}/meta/game`; room codes are
  * global, so one code is enough to find any game's room (`lib/roomLookup.ts`).
  */
-export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena";
+export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena" | "yonunca";
 
 /** Who you're playing with: the first question the home page asks. */
 export type PlayContext = "pareja" | "amigos" | "grupo" | "solo";
@@ -410,10 +410,25 @@ export const GAMES: Record<GameId, GameInfo> = {
       "Su equipo toca las palabras que cree suyas. ¡Cuidado con la bomba!",
     ],
   },
+  yonunca: {
+    id: "yonunca",
+    title: "Yo nunca nunca",
+    path: "yo-nunca",
+    tagline: "Sale una frase y cada uno contesta en secreto: ¿lo hiciste o no? Después se revela quién sí… y hay que contar la historia.",
+    minPlayers: 2,
+    maxPlayers: 16,
+    duration: "10–20 min",
+    contexts: ["amigos", "grupo", "pareja"],
+    howTo: [
+      "Aparece una frase: “Yo nunca nunca…”.",
+      "Cada uno toca “Yo sí” o “Yo no” en su celular, sin que los demás vean.",
+      "Cuando contestan todos se revela quién lo hizo. Al final, ranking de quién vivió más.",
+    ],
+  },
 };
 
 /** Home page order: quickest to start first. */
-export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "arena", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "generala", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
+export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "yonunca", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "arena", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "generala", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
 
 export function roomPath(game: GameId, roomId: string): string {
   return `/${GAMES[game].path}/${roomId}`;
