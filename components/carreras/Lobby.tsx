@@ -32,7 +32,7 @@ export default function CarrerasLobby({ game }: { game: CarrerasGame }) {
   const identity = useClientIdentity();
   const [mode, setMode] = useState<CarrerasMode>("pantalla");
   const [track, setTrack] = useState<TrackId>("ovalo");
-  const [laps, setLaps] = useState(5);
+  const [laps, setLaps] = useState(3);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 

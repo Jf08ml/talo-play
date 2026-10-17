@@ -38,6 +38,9 @@ const MAX_EXTRAPOLATE_S = 0.35;
 interface Ghost {
   x: number;
   y: number;
+  /** Height, and how far above the road. */
+  z: number;
+  l: number;
   h: number;
   vx: number;
   vy: number;
@@ -179,13 +182,17 @@ export default function PhoneRace({
           const hit = stepCar(own, input, track, STEP);
           if (cues.hit("wall", hit)) scene.impact(seat!, hit);
           for (const [r, g] of ghosts) {
-            const bump = collideWithGhost(own, g.x, g.y, g.vx, g.vy);
+            const bump = collideWithGhost(own, g);
             if (cues.hit(r, bump)) {
               scene.impact(seat!, bump);
               scene.impact(r, bump);
             }
           }
         }
+      }
+      if (own) {
+        cues.air("own", own.air);
+        cues.boost("own", own.boost);
       }
       if (own && s.status === "racing" && moving) cues.lap("own", lapsDone(own, track), laps);
       if (own && s.status === "racing" && moving && reportedGame !== s.gameNo && own.progress >= laps * track.length) {
@@ -199,6 +206,8 @@ export default function PhoneRace({
           g: s.gameNo,
           x: Math.round(own.x * 10) / 10,
           y: Math.round(own.y * 10) / 10,
+          z: Math.round(own.z * 10) / 10,
+          l: Math.round((own.z - own.ground) * 10) / 10,
           h: Math.round(own.heading * 1000) / 1000,
           vx: Math.round(own.vx),
           vy: Math.round(own.vy),
@@ -215,16 +224,27 @@ export default function PhoneRace({
         let target: Ghost;
         if (pose && pose.g === s.gameNo) {
           const ahead = Math.max(0, Math.min(MAX_EXTRAPOLATE_S, (now - pose.t) / 1000));
-          target = { x: pose.x + pose.vx * ahead, y: pose.y + pose.vy * ahead, h: pose.h, vx: pose.vx, vy: pose.vy, p: pose.p };
+          target = {
+            x: pose.x + pose.vx * ahead,
+            y: pose.y + pose.vy * ahead,
+            z: pose.z ?? 0,
+            l: pose.l ?? 0,
+            h: pose.h,
+            vx: pose.vx,
+            vy: pose.vy,
+            p: pose.p,
+          };
         } else {
           const g = gridCar(track, SEATS.indexOf(r));
-          target = { x: g.x, y: g.y, h: g.heading, vx: 0, vy: 0, p: g.progress };
+          target = { x: g.x, y: g.y, z: g.z, l: 0, h: g.heading, vx: 0, vy: 0, p: g.progress };
         }
         const cur = ghosts.get(r);
         if (!cur || Math.hypot(cur.x - target.x, cur.y - target.y) > 150) ghosts.set(r, target);
         else {
           cur.x += (target.x - cur.x) * k;
           cur.y += (target.y - cur.y) * k;
+          cur.z += (target.z - cur.z) * k;
+          cur.l += (target.l - cur.l) * k;
           cur.h = angleLerp(cur.h, target.h, k);
           cur.vx = target.vx;
           cur.vy = target.vy;
@@ -245,12 +265,12 @@ export default function PhoneRace({
       const dots: DrawCar[] = [];
       for (const r of racers) {
         if (r === seat && own) {
-          scene.setPose(r, { x: own.x, y: own.y, heading: own.heading, vx: own.vx, vy: own.vy, bump: own.bump });
+          scene.setPose(r, { x: own.x, y: own.y, z: own.z, ground: own.ground, heading: own.heading, vx: own.vx, vy: own.vy, bump: own.bump });
           dots.push({ x: own.x, y: own.y, heading: own.heading, color: CARS[r].color });
         } else {
           const g = ghosts.get(r);
           if (!g) continue;
-          scene.setPose(r, { x: g.x, y: g.y, heading: g.h, vx: g.vx, vy: g.vy });
+          scene.setPose(r, { x: g.x, y: g.y, z: g.z, ground: g.z - g.l, heading: g.h, vx: g.vx, vy: g.vy });
           dots.push({ x: g.x, y: g.y, heading: g.h, color: CARS[r].color });
         }
       }

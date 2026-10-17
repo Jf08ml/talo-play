@@ -2,15 +2,27 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { mulberry32 } from "./random";
 import type { StartLights } from "./carrerasAudio";
-import { CAR_LENGTH, CAR_WIDTH, MAX_SPEED, WORLD_H, WORLD_W, type Track, type TrackTheme } from "./carrerasTrack";
+import {
+  BRIDGE_CLEARANCE,
+  CAR_LENGTH,
+  CAR_WIDTH,
+  MAX_SPEED,
+  RAMP_HEIGHT,
+  frameAt,
+  type Track,
+  type TrackTheme,
+  type Zone,
+} from "./carrerasTrack";
 
 /**
  * Carreras in 3D (three.js), browser only. The 2D world maps to the ground
- * plane: (x, y) → (x, 0, y), heading h → rotation.y = -h, so steering right
- * still turns right on screen. Everything is built from the track's sampled
- * centerline, dressed by its theme; road pieces are unlit (fog only), cars and
- * scenery are lit. Wheels, brake lights, smoke and sparks are worked out here
- * from the poses alone, so they look the same for local cars and rivals.
+ * plane: (x, y) → (x, 0, y), heights go up y, heading h → rotation.y = -h, so
+ * steering right still turns right on screen. Everything is built from the
+ * track's sampled centerline, dressed by its theme: the road rides on earth
+ * banks over the hills and on pillars where it crosses over itself. Road
+ * pieces are unlit (fog only), cars and scenery are lit. Wheels, pitch, brake
+ * lights, smoke, sparks and boost flames are worked out here from the poses
+ * alone, so they look the same for local cars and rivals.
  */
 
 export type CameraMode = "detras" | "cabina";
@@ -172,9 +184,10 @@ function trackNormals(track: Track): Normals {
 }
 
 /**
- * A flat band along the track between two offsets from the centerline (both
- * sides when `mirror`), one color per quad; null skips the quad. UVs run
- * across (u) and along the track (v, one unit every 64), for a grain texture.
+ * A band along the track between two offsets from the centerline (both sides
+ * when `mirror`), `y` above the road's height, one color per quad; null skips
+ * the quad. UVs run across (u) and along the track (v, one unit every 64), for
+ * a grain texture.
  */
 function band(
   track: Track,
@@ -195,7 +208,7 @@ function band(
       const c = color(i);
       if (!c) continue;
       const j = (i + 1) % n;
-      const p = (k: number, off: number) => [track.xs[k] + nm.nx[k] * off * side, y, track.ys[k] + nm.ny[k] * off * side];
+      const p = (k: number, off: number) => [track.xs[k] + nm.nx[k] * off * side, track.hs[k] + y, track.ys[k] + nm.ny[k] * off * side];
       const ai = p(i, inner);
       const bi = p(i, outer);
       const aj = p(j, inner);
@@ -230,9 +243,11 @@ function walls(track: Track, nm: Normals, offset: number, height: number, colors
       const x = (k: number, off = 0) => track.xs[k] + nm.nx[k] * (offset + off) * side;
       const z = (k: number, off = 0) => track.ys[k] + nm.ny[k] * (offset + off) * side;
       const c = Math.floor(track.cum[i] / 30) % 2 ? a : b;
+      const hi = track.hs[i];
+      const hj = track.hs[j];
       const quad = (y0: number, y1: number, o0: number, o1: number, cc: THREE.Color) => {
-        pos.push(x(i, o0), y0, z(i, o0), x(i, o1), y1, z(i, o1), x(j, o1), y1, z(j, o1));
-        pos.push(x(i, o0), y0, z(i, o0), x(j, o1), y1, z(j, o1), x(j, o0), y0, z(j, o0));
+        pos.push(x(i, o0), hi + y0, z(i, o0), x(i, o1), hi + y1, z(i, o1), x(j, o1), hj + y1, z(j, o1));
+        pos.push(x(i, o0), hi + y0, z(i, o0), x(j, o1), hj + y1, z(j, o1), x(j, o0), hj + y0, z(j, o0));
         for (let v = 0; v < 6; v++) col.push(cc.r, cc.g, cc.b);
       };
       quad(0, height, 0, 0, c);
@@ -243,6 +258,195 @@ function walls(track: Track, nm: Normals, offset: number, height: number, colors
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  return g;
+}
+
+/** How far the runoff reaches from the centerline; banks and bridge decks start there. */
+const edgeOf = (track: Track) => track.def.width / 2 + 26;
+/** Earth banks spread this much sideways per unit of height. */
+const BANK_SPREAD = 1.3;
+const DECK_DEPTH = 8;
+
+/**
+ * Samples that carry the road over a lower part of the track (a bridge): there
+ * the road rests on pillars instead of an earth bank, which would bury the
+ * road underneath.
+ */
+function bridgeSamples(track: Track): boolean[] {
+  const { xs, ys, hs, cum, length } = track;
+  const n = xs.length;
+  const edge = edgeOf(track);
+  const over = new Array<boolean>(n).fill(false);
+  for (let i = 0; i < n; i++) {
+    if (hs[i] < BRIDGE_CLEARANCE / 3) continue;
+    const reach = edge + hs[i] * BANK_SPREAD + track.def.width / 2 + 30;
+    for (let j = 0; j < n; j++) {
+      if (hs[j] > hs[i] - BRIDGE_CLEARANCE / 3) continue;
+      let along = Math.abs(cum[j] - cum[i]);
+      along = Math.min(along, length - along);
+      if (along < reach * 2 || Math.hypot(xs[j] - xs[i], ys[j] - ys[i]) > reach) continue;
+      over[i] = true;
+      break;
+    }
+  }
+  return over;
+}
+
+/**
+ * Under the raised road: sloping earth banks down to the ground (with an end
+ * wall where a bridge starts), or a concrete deck over the bridges.
+ */
+function embankments(track: Track, nm: Normals, over: boolean[], earth: THREE.Color, concrete: THREE.Color): THREE.BufferGeometry {
+  const pos: number[] = [];
+  const col: number[] = [];
+  const n = track.xs.length;
+  const edge = edgeOf(track);
+  const at = (k: number, off: number, y: number) => [track.xs[k] + nm.nx[k] * off, y, track.ys[k] + nm.ny[k] * off];
+  const quad = (a: number[], b: number[], c: number[], d: number[], color: THREE.Color) => {
+    pos.push(...a, ...b, ...c, ...a, ...c, ...d);
+    for (let v = 0; v < 6; v++) col.push(color.r, color.g, color.b);
+  };
+  const tri = (a: number[], b: number[], c: number[], color: THREE.Color) => {
+    pos.push(...a, ...b, ...c);
+    for (let v = 0; v < 3; v++) col.push(color.r, color.g, color.b);
+  };
+  const bankColor = earth.clone().multiplyScalar(0.82);
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const hi = track.hs[i];
+    const hj = track.hs[j];
+    if (hi < 0.5 && hj < 0.5) continue;
+    if (over[i] || over[j]) {
+      for (const side of [1, -1]) {
+        const o = edge * side;
+        quad(at(i, o, hi + 0.3), at(j, o, hj + 0.3), at(j, o, hj - DECK_DEPTH), at(i, o, hi - DECK_DEPTH), concrete);
+      }
+      quad(at(i, -edge, hi - DECK_DEPTH), at(j, -edge, hj - DECK_DEPTH), at(j, edge, hj - DECK_DEPTH), at(i, edge, hi - DECK_DEPTH), concrete);
+    } else {
+      for (const side of [1, -1]) {
+        quad(
+          at(i, edge * side, hi + 0.3),
+          at(j, edge * side, hj + 0.3),
+          at(j, (edge + hj * BANK_SPREAD) * side, 0),
+          at(i, (edge + hi * BANK_SPREAD) * side, 0),
+          bankColor
+        );
+      }
+    }
+    // Where the bank meets a bridge: a wall across, so the bank isn't hollow.
+    const k = over[i] && !over[j] ? j : !over[i] && over[j] ? i : -1;
+    if (k >= 0 && track.hs[k] > 0.5) {
+      const h = track.hs[k];
+      const spread = edge + h * BANK_SPREAD;
+      quad(at(k, -edge, h), at(k, edge, h), at(k, edge, 0), at(k, -edge, 0), concrete);
+      for (const side of [1, -1]) tri(at(k, edge * side, h), at(k, spread * side, 0), at(k, edge * side, 0), concrete);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+/** Pillars under the bridges, every so often, never standing on the road below. */
+function pillarSpots(track: Track, over: boolean[]): [number, number, number][] {
+  const { xs, ys, hs, cum } = track;
+  const n = xs.length;
+  const spots: [number, number, number][] = [];
+  const clear = track.def.width / 2 + 16;
+  const free = (x: number, y: number, h: number) => {
+    for (let j = 0; j < n; j++) {
+      if (hs[j] < h - BRIDGE_CLEARANCE / 3 && Math.hypot(xs[j] - x, ys[j] - y) < clear) return false;
+    }
+    return true;
+  };
+  let nextAt = -Infinity;
+  for (let i = 0; i < n; i++) {
+    if (!over[i] || cum[i] < nextAt || hs[i] < 14) continue;
+    if (free(xs[i], ys[i], hs[i])) {
+      spots.push([xs[i], ys[i], hs[i] - DECK_DEPTH]);
+      nextAt = cum[i] + 90;
+    }
+  }
+  return spots;
+}
+
+/** Where a point `d` along a zone and `lat` across it is, and the road's height under it. */
+function zonePoint(track: Track, zone: Zone, d: number, lat: number): [number, number, number] {
+  const f = frameAt(track, zone.s0 + d);
+  return [f.x - f.dy * lat, f.h, f.y + f.dx * lat];
+}
+
+/** A ramp: a striped wedge rising to its lip, with orange sides and a dark face at the drop. */
+function rampGeometry(track: Track, zone: Zone): THREE.BufferGeometry {
+  const pos: number[] = [];
+  const col: number[] = [];
+  const yellow = new THREE.Color(0xfacc15);
+  const dark = new THREE.Color(0x1f2937);
+  const side = new THREE.Color(0xf97316);
+  const tri = (a: number[], b: number[], c: number[], color: THREE.Color) => {
+    pos.push(...a, ...b, ...c);
+    for (let v = 0; v < 3; v++) col.push(color.r, color.g, color.b);
+  };
+  const steps = 8;
+  const y0 = ROAD_Y + 0.2;
+  const corner = (k: number, lat: number, top: boolean) => {
+    const d = (zone.len * k) / steps;
+    const [x, h, z] = zonePoint(track, zone, d, lat);
+    return [x, h + y0 + (top ? (RAMP_HEIGHT * k) / steps : 0), z];
+  };
+  for (let k = 0; k < steps; k++) {
+    const c = k % 2 ? dark : yellow;
+    const a = corner(k, zone.lo, true);
+    const b = corner(k, zone.hi, true);
+    const cc = corner(k + 1, zone.hi, true);
+    const d = corner(k + 1, zone.lo, true);
+    tri(a, b, cc, c);
+    tri(a, cc, d, c);
+    for (const lat of [zone.lo, zone.hi]) {
+      const top0 = corner(k, lat, true);
+      const top1 = corner(k + 1, lat, true);
+      const bot0 = corner(k, lat, false);
+      const bot1 = corner(k + 1, lat, false);
+      tri(bot0, top0, top1, side);
+      tri(bot0, top1, bot1, side);
+    }
+  }
+  const lipLo = corner(steps, zone.lo, true);
+  const lipHi = corner(steps, zone.hi, true);
+  const baseLo = corner(steps, zone.lo, false);
+  const baseHi = corner(steps, zone.hi, false);
+  tri(lipLo, lipHi, baseHi, dark);
+  tri(lipLo, baseHi, baseLo, dark);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+/** A boost pad: a strip on the road; its arrows (v runs along the track, square tiles) scroll forward. */
+function boostGeometry(track: Track, zone: Zone): THREE.BufferGeometry {
+  const pos: number[] = [];
+  const uv: number[] = [];
+  const steps = 6;
+  const across = zone.hi - zone.lo;
+  for (let k = 0; k < steps; k++) {
+    const d0 = (zone.len * k) / steps;
+    const d1 = (zone.len * (k + 1)) / steps;
+    const p = (d: number, lat: number) => {
+      const [x, h, z] = zonePoint(track, zone, d, lat);
+      return [x, h + ROAD_Y + 0.35, z];
+    };
+    pos.push(...p(d0, zone.lo), ...p(d0, zone.hi), ...p(d1, zone.hi), ...p(d0, zone.lo), ...p(d1, zone.hi), ...p(d1, zone.lo));
+    const v0 = d0 / across;
+    const v1 = d1 / across;
+    uv.push(0, v0, 1, v0, 1, v1, 0, v0, 1, v1, 0, v1);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
   return g;
 }
 
@@ -319,6 +523,24 @@ function glowTexture(): THREE.CanvasTexture {
   return t;
 }
 
+/** Boost pad tile: a bright chevron pointing forward (up the texture) on a translucent orange. */
+function arrowTexture(): THREE.CanvasTexture {
+  const t = canvasTexture(64, 64, (ctx) => {
+    ctx.fillStyle = "rgba(249,115,22,0.45)";
+    ctx.fillRect(0, 0, 64, 64);
+    ctx.strokeStyle = "#fde047";
+    ctx.lineWidth = 11;
+    ctx.lineJoin = "miter";
+    ctx.beginPath();
+    ctx.moveTo(10, 46);
+    ctx.lineTo(32, 20);
+    ctx.lineTo(54, 46);
+    ctx.stroke();
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
 function labelSprite(text: string, color: string): THREE.Sprite {
   const tex = canvasTexture(256, 64, (ctx) => {
     ctx.font = "bold 36px system-ui, sans-serif";
@@ -345,7 +567,13 @@ const TAIL_OFF = new THREE.Color(0x7f1d1d);
 const TAIL_ON = new THREE.Color(0xff2d2d);
 
 interface CarParts {
+  /** Placed at the car and turned to its heading. */
   group: THREE.Group;
+  /** The car itself, pitched with the climb or the flight. */
+  body: THREE.Group;
+  /** On the road under the car (blob shadow, headlight beam), pitched with the road. */
+  floor: THREE.Group;
+  shadow: THREE.MeshBasicMaterial;
   wheels: THREE.Object3D[];
   steering: THREE.Object3D[];
   tail: THREE.MeshBasicMaterial;
@@ -365,7 +593,11 @@ function wheelMesh(tire: THREE.Material, rim: THREE.Material, hub: THREE.Materia
 }
 
 function carMesh(color: string, night: boolean, glow: THREE.Texture): CarParts {
+  // root (position, heading) holds the body and the floor, each pitched about the lateral axis (z).
+  const root = new THREE.Group();
   const group = new THREE.Group();
+  const floor = new THREE.Group();
+  root.add(group, floor);
   const paint = new THREE.MeshPhongMaterial({ color, shininess: 90, specular: 0x777777 });
   const glass = new THREE.MeshPhongMaterial({ color: 0x0f172a, shininess: 120, specular: 0x9fb4ff });
   const black = new THREE.MeshLambertMaterial({ color: 0x0b0b0f });
@@ -455,14 +687,12 @@ function carMesh(color: string, night: boolean, glow: THREE.Texture): CarParts {
   }
 
   // Blob shadow: cheaper than real shadows and reads well from the chase camera.
-  const shadow = new THREE.Mesh(
-    new THREE.PlaneGeometry(CAR_LENGTH + 16, CAR_WIDTH + 14),
-    new THREE.MeshBasicMaterial({ map: glow, color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false })
-  );
+  const shadowMat = new THREE.MeshBasicMaterial({ map: glow, color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false });
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(CAR_LENGTH + 16, CAR_WIDTH + 14), shadowMat);
   shadow.rotation.x = -Math.PI / 2;
   shadow.position.y = ROAD_Y + 0.4;
   shadow.renderOrder = 1;
-  group.add(shadow);
+  floor.add(shadow);
 
   if (night) {
     // Headlight beam on the road.
@@ -480,9 +710,9 @@ function carMesh(color: string, night: boolean, glow: THREE.Texture): CarParts {
     beam.rotation.x = -Math.PI / 2;
     beam.position.set(half + 50, ROAD_Y + 0.5, 0);
     beam.renderOrder = 2;
-    group.add(beam);
+    floor.add(beam);
   }
-  return { group, wheels, steering, tail };
+  return { group: root, body: group, floor, shadow: shadowMat, wheels, steering, tail };
 }
 
 // ---- Particles ---------------------------------------------------------------
@@ -524,6 +754,8 @@ class Particles {
   private maxLife: Float32Array;
   private startAlpha: Float32Array;
   private grow: Float32Array;
+  /** Height each particle can't sink below (the road it came from). */
+  private floor: Float32Array;
   private next = 0;
 
   constructor(
@@ -540,6 +772,7 @@ class Particles {
     this.maxLife = new Float32Array(max);
     this.startAlpha = new Float32Array(max);
     this.grow = new Float32Array(max);
+    this.floor = new Float32Array(max);
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(this.pos, 3));
     g.setAttribute("pcolor", new THREE.BufferAttribute(this.col, 3));
@@ -558,7 +791,20 @@ class Particles {
     this.points.renderOrder = 3;
   }
 
-  spawn(x: number, y: number, z: number, vx: number, vy: number, vz: number, color: THREE.Color, size: number, life: number, alpha: number, grow: number) {
+  spawn(
+    x: number,
+    y: number,
+    z: number,
+    vx: number,
+    vy: number,
+    vz: number,
+    color: THREE.Color,
+    size: number,
+    life: number,
+    alpha: number,
+    grow: number,
+    floor = 0
+  ) {
     const i = this.next;
     this.next = (this.next + 1) % this.max;
     this.pos.set([x, y, z], i * 3);
@@ -570,6 +816,7 @@ class Particles {
     this.startAlpha[i] = alpha;
     this.alpha[i] = alpha;
     this.grow[i] = grow;
+    this.floor[i] = floor + 0.5;
   }
 
   update(dt: number) {
@@ -586,7 +833,7 @@ class Particles {
       this.vel[k + 2] *= drag;
       this.vel[k + 1] -= this.gravity * dt;
       this.pos[k] += this.vel[k] * dt;
-      this.pos[k + 1] = Math.max(0.5, this.pos[k + 1] + this.vel[k + 1] * dt);
+      this.pos[k + 1] = Math.max(this.floor[i], this.pos[k + 1] + this.vel[k + 1] * dt);
       this.pos[k + 2] += this.vel[k + 2] * dt;
       this.size[i] += this.grow[i] * dt;
       this.alpha[i] = this.startAlpha[i] * (this.life[i] / this.maxLife[i]);
@@ -618,19 +865,32 @@ interface CarObj extends CarParts {
   forward: number;
   lateral: number;
   heading: number;
+  /** Height of the car and of the road under it. */
+  z: number;
+  ground: number;
   bump: number;
   steer: number;
   brake: number;
   lastForward: number;
   lastHeading: number;
+  lastZ: number;
+  lastGround: number;
+  /** Nose up (+) or down, of the car and of the road under it. */
+  pitch: number;
+  groundPitch: number;
   /** Camera shake left after a hit. */
   shake: number;
   smokeAcc: number;
+  flameAcc: number;
 }
 
 export interface CarPoseInput {
   x: number;
   y: number;
+  /** Height of the car (0 if unknown). */
+  z?: number;
+  /** Height of the road under it (the car's own height if unknown). */
+  ground?: number;
   heading: number;
   vx: number;
   vy: number;
@@ -654,13 +914,21 @@ export class RaceScene {
   private glow: THREE.Texture;
   private smoke = new Particles(500, false, -6);
   private sparks = new Particles(300, true, 160);
+  private flames = new Particles(260, true, -20);
   private smokeColor: THREE.Color;
   private sparkColors = [new THREE.Color(0xfde047), new THREE.Color(0xfb923c), new THREE.Color(0xfffbeb)];
+  private flameColors = [new THREE.Color(0xfb923c), new THREE.Color(0xfde047), new THREE.Color(0x60a5fa)];
   private lights: THREE.MeshBasicMaterial[] = [];
   private clouds: THREE.Object3D | null = null;
   private snow: THREE.Points | null = null;
   private snowVel: Float32Array | null = null;
+  private arrows: THREE.Texture | null = null;
   private rand = mulberry32(99);
+  /** Middle of the track's world. */
+  private cx: number;
+  private cz: number;
+  private worldW: number;
+  private worldH: number;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -669,17 +937,23 @@ export class RaceScene {
   ) {
     this.maxDpr = opts.maxDpr ?? 2;
     this.look = LOOKS[track.def.theme] ?? LOOKS.campo;
+    this.worldW = track.worldW;
+    this.worldH = track.worldH;
+    this.cx = track.worldW / 2;
+    this.cz = track.worldH / 2;
     const L = this.look;
+    // Bigger worlds see a bit farther before the haze.
+    const far = Math.max(1, Math.min(1.4, track.worldW / 1800));
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
     this.renderer.setClearColor(L.horizon);
-    this.scene.fog = new THREE.Fog(L.horizon, L.fogNear, L.fogFar);
+    this.scene.fog = new THREE.Fog(L.horizon, L.fogNear * far, L.fogFar * far);
     this.scene.add(new THREE.HemisphereLight(L.hemi[0], L.hemi[1], L.hemi[2]));
     const sun = new THREE.DirectionalLight(L.sun[0], L.sun[1]);
     sun.position.set(L.sunDir[0] * 1000, L.sunDir[1] * 1000, L.sunDir[2] * 1000);
     this.scene.add(sun);
     this.glow = glowTexture();
     this.smokeColor = new THREE.Color(L.smoke);
-    this.scene.add(this.smoke.points, this.sparks.points);
+    this.scene.add(this.smoke.points, this.sparks.points, this.flames.points);
     this.build(track);
   }
 
@@ -688,8 +962,6 @@ export class RaceScene {
     const nm = trackNormals(track);
     const w = track.def.width;
     const rand = mulberry32(Math.round(track.length) * 7919 + track.xs.length);
-    const cx = WORLD_W / 2;
-    const cz = WORLD_H / 2;
 
     this.buildSky(rand);
 
@@ -698,7 +970,7 @@ export class RaceScene {
     ground.repeat.set(90, 90);
     const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000), new THREE.MeshLambertMaterial({ map: ground }));
     groundMesh.rotation.x = -Math.PI / 2;
-    groundMesh.position.set(cx, 0, cz);
+    groundMesh.position.set(this.cx, 0, this.cz);
     this.scene.add(groundMesh);
 
     // Runoff, asphalt, curbs inside the edge, center dashes, walls.
@@ -719,6 +991,34 @@ export class RaceScene {
     this.scene.add(new THREE.Mesh(band(track, nm, -1.5, 1.5, ROAD_Y + 0.15, (i) => (block(i, 26) ? white : null), false), unlit));
     this.scene.add(new THREE.Mesh(walls(track, nm, w / 2 + 3, 9, L.wall), unlit));
 
+    // What holds the raised road up: banks, bridge decks and pillars.
+    const over = bridgeSamples(track);
+    const lit = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, flatShading: true });
+    const concrete = new THREE.Color(L.night ? 0x64748b : 0xa8b3c2);
+    this.scene.add(new THREE.Mesh(embankments(track, nm, over, new THREE.Color(L.ground[0]), concrete), lit));
+    const pillars = pillarSpots(track, over);
+    if (pillars.length) {
+      const geo = new THREE.CylinderGeometry(7, 9, 1, 10);
+      geo.translate(0, 0.5, 0);
+      const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: concrete }), pillars.length);
+      const m = new THREE.Matrix4();
+      pillars.forEach(([x, z, h], i) => mesh.setMatrixAt(i, m.compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion(), new THREE.Vector3(1, h, 1))));
+      this.scene.add(mesh);
+    }
+
+    // Ramps and boost pads.
+    const rampMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, flatShading: true });
+    for (const r of track.ramps) this.scene.add(new THREE.Mesh(rampGeometry(track, r), rampMat));
+    if (track.boosts.length) {
+      this.arrows = arrowTexture();
+      const mat = new THREE.MeshBasicMaterial({ map: this.arrows, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+      for (const b of track.boosts) {
+        const pad = new THREE.Mesh(boostGeometry(track, b), mat);
+        pad.renderOrder = 1;
+        this.scene.add(pad);
+      }
+    }
+
     this.buildStart(track, w);
     const stand = this.buildGrandstand(track, nm, w, rand);
     if (L.night) this.buildLamps(track, nm, w);
@@ -727,8 +1027,7 @@ export class RaceScene {
 
   private buildSky(rand: () => number) {
     const L = this.look;
-    const cx = WORLD_W / 2;
-    const cz = WORLD_H / 2;
+    const { cx, cz } = this;
     const geo = new THREE.SphereGeometry(SKY_RADIUS, 32, 16);
     const top = new THREE.Color(L.skyTop);
     const hor = new THREE.Color(L.horizon);
@@ -809,9 +1108,9 @@ export class RaceScene {
       const p = new Float32Array(n * 3);
       this.snowVel = new Float32Array(n);
       for (let i = 0; i < n; i++) {
-        p[i * 3] = -400 + rand() * (WORLD_W + 800);
-        p[i * 3 + 1] = rand() * 420;
-        p[i * 3 + 2] = -300 + rand() * (WORLD_H + 600);
+        p[i * 3] = -400 + rand() * (this.worldW + 800);
+        p[i * 3 + 1] = rand() * 520;
+        p[i * 3 + 2] = -300 + rand() * (this.worldH + 600);
         this.snowVel[i] = 25 + rand() * 30;
       }
       const g = new THREE.BufferGeometry();
@@ -961,7 +1260,7 @@ export class RaceScene {
   /** Night: street lamps along the track, each with a pool of light on the asphalt. */
   private buildLamps(track: Track, nm: Normals, w: number) {
     const n = track.xs.length;
-    const spots: { x: number; z: number; px: number; pz: number }[] = [];
+    const spots: { x: number; y: number; z: number; px: number; pz: number }[] = [];
     let nextAt = 60;
     let side = 1;
     for (let i = 0; i < n; i++) {
@@ -970,6 +1269,7 @@ export class RaceScene {
       side = -side;
       spots.push({
         x: track.xs[i] + nm.nx[i] * side * (w / 2 + 16),
+        y: track.hs[i],
         z: track.ys[i] + nm.ny[i] * side * (w / 2 + 16),
         px: track.xs[i] + nm.nx[i] * side * (w / 4),
         pz: track.ys[i] + nm.ny[i] * side * (w / 4),
@@ -978,7 +1278,10 @@ export class RaceScene {
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const one = new THREE.Vector3(1, 1, 1);
-    const poles = new THREE.InstancedMesh(new THREE.CylinderGeometry(1.2, 1.8, 56, 6), new THREE.MeshLambertMaterial({ color: 0x334155 }), spots.length);
+    // Poles reach down to the ground, so they also stand beside the raised road.
+    const poleGeo = new THREE.CylinderGeometry(1.2, 1.8, 1, 6);
+    poleGeo.translate(0, 0.5, 0);
+    const poles = new THREE.InstancedMesh(poleGeo, new THREE.MeshLambertMaterial({ color: 0x334155 }), spots.length);
     const bulbs = new THREE.InstancedMesh(new THREE.SphereGeometry(3.5, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff3c4 }), spots.length);
     const flat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
     const pools = new THREE.InstancedMesh(
@@ -996,13 +1299,13 @@ export class RaceScene {
     pools.renderOrder = 2;
     const halos: number[] = [];
     spots.forEach((s, i) => {
-      m.compose(new THREE.Vector3(s.x, 28, s.z), q, one);
+      m.compose(new THREE.Vector3(s.x, 0, s.z), q, new THREE.Vector3(1, s.y + 56, 1));
       poles.setMatrixAt(i, m);
-      m.compose(new THREE.Vector3(s.x, 57, s.z), q, one);
+      m.compose(new THREE.Vector3(s.x, s.y + 57, s.z), q, one);
       bulbs.setMatrixAt(i, m);
-      m.compose(new THREE.Vector3(s.px, ROAD_Y + 0.45, s.pz), flat, new THREE.Vector3(170, 170, 1));
+      m.compose(new THREE.Vector3(s.px, s.y + ROAD_Y + 0.45, s.pz), flat, new THREE.Vector3(170, 170, 1));
       pools.setMatrixAt(i, m);
-      halos.push(s.x, 57, s.z);
+      halos.push(s.x, s.y + 57, s.z);
     });
     const hg = new THREE.BufferGeometry();
     hg.setAttribute("position", new THREE.Float32BufferAttribute(halos, 3));
@@ -1024,14 +1327,16 @@ export class RaceScene {
   private buildScenery(track: Track, w: number, rand: () => number, stand: [number, number] | null) {
     const L = this.look;
     const spots: [number, number, number][] = [];
+    // Clear of the road and of the banks under it.
     const clear = w / 2 + 50;
-    const count = L.scenery === "desierto" ? 110 : 190;
-    for (let tries = 0; tries < 2600 && spots.length < count; tries++) {
-      const x = -550 + rand() * (WORLD_W + 1100);
-      const z = -450 + rand() * (WORLD_H + 900);
+    const area = (this.worldW + 1100) * (this.worldH + 900);
+    const count = Math.round(((L.scenery === "desierto" ? 110 : 190) * area) / (2700 * 1800));
+    for (let tries = 0; tries < count * 14 && spots.length < count; tries++) {
+      const x = -550 + rand() * (this.worldW + 1100);
+      const z = -450 + rand() * (this.worldH + 900);
       let ok = !stand || Math.hypot(stand[0] - x, stand[1] - z) > 150;
       for (let i = 0; ok && i < track.xs.length; i += 2) {
-        if (Math.hypot(track.xs[i] - x, track.ys[i] - z) < clear) ok = false;
+        if (Math.hypot(track.xs[i] - x, track.ys[i] - z) < clear + track.hs[i] * BANK_SPREAD) ok = false;
       }
       if (ok) spots.push([x, z, 0.7 + rand() * 0.8]);
     }
@@ -1112,11 +1417,11 @@ export class RaceScene {
       : null;
     for (let i = 0; i < peaks; i++) {
       const a = (i / peaks) * Math.PI * 2 + rand() * 0.2;
-      const r = 2300 + rand() * 600;
+      const r = Math.hypot(this.worldW, this.worldH) / 2 + 1350 + rand() * 600;
       const h = 260 + rand() * 380;
       const s = 380 + rand() * 300;
-      const x = WORLD_W / 2 + Math.cos(a) * r;
-      const z = WORLD_H / 2 + Math.sin(a) * r;
+      const x = this.cx + Math.cos(a) * r;
+      const z = this.cz + Math.sin(a) * r;
       q.identity();
       m.compose(v.set(x, h / 2, z), q, s3.set(s, h, s));
       mountains.setMatrixAt(i, m);
@@ -1153,13 +1458,20 @@ export class RaceScene {
         forward: 0,
         lateral: 0,
         heading: 0,
+        z: 0,
+        ground: 0,
         bump: 0,
         steer: 0,
         brake: 0,
         lastForward: 0,
         lastHeading: NaN,
+        lastZ: NaN,
+        lastGround: NaN,
+        pitch: 0,
+        groundPitch: 0,
         shake: 0,
         smokeAcc: 0,
+        flameAcc: 0,
       });
     }
   }
@@ -1169,7 +1481,9 @@ export class RaceScene {
     if (!car) return;
     const fx = Math.cos(pose.heading);
     const fy = Math.sin(pose.heading);
-    car.group.position.set(pose.x, 0, pose.y);
+    car.z = pose.z ?? 0;
+    car.ground = Math.min(car.z, pose.ground ?? car.z);
+    car.group.position.set(pose.x, car.z, pose.y);
     car.group.rotation.y = -pose.heading;
     car.heading = pose.heading;
     car.forward = pose.vx * fx + pose.vy * fy;
@@ -1191,7 +1505,7 @@ export class RaceScene {
       const sp = 40 + this.rand() * 120;
       this.sparks.spawn(
         p.x + fx * 14,
-        6,
+        p.y + 6,
         p.z + fz * 14,
         Math.cos(a) * sp,
         40 + this.rand() * 90,
@@ -1200,7 +1514,8 @@ export class RaceScene {
         2.5 + this.rand() * 2,
         0.35 + this.rand() * 0.35,
         1,
-        -2
+        -2,
+        car.ground
       );
     }
   }
@@ -1212,9 +1527,10 @@ export class RaceScene {
     });
   }
 
-  /** Wheels, steering, brake lights, smoke and sparks; then the ambience. */
+  /** Wheels, steering, pitch, brake lights, smoke, sparks and flames; then the ambience. */
   private update(dt: number) {
     if (dt <= 0) return;
+    const ease = (k: number) => 1 - Math.exp(-dt * k);
     for (const car of this.cars.values()) {
       // Wheels roll with the speed; front wheels follow how fast the car turns.
       for (const w of car.wheels) w.rotation.z -= (car.forward * dt) / WHEEL_R;
@@ -1223,29 +1539,71 @@ export class RaceScene {
         if (d > Math.PI) d -= Math.PI * 2;
         if (d < -Math.PI) d += Math.PI * 2;
         const target = Math.max(-1, Math.min(1, d / dt / 2.4));
-        car.steer += (target - car.steer) * (1 - Math.exp(-dt * 12));
+        car.steer += (target - car.steer) * ease(12);
       }
       car.lastHeading = car.heading;
       for (const s of car.steering) s.rotation.y = -car.steer * 0.45;
 
+      // Pitch from how fast the car (and the road under it) goes up or down.
+      const run = Math.max(80, Math.abs(car.forward));
+      const lift = car.z - car.ground;
+      if (!Number.isNaN(car.lastZ)) {
+        const clamp = (v: number) => Math.max(-0.45, Math.min(0.45, v));
+        const climb = clamp(Math.atan2((car.ground - car.lastGround) / dt, run));
+        car.groundPitch += (climb - car.groundPitch) * ease(10);
+        const target = lift > 1 ? clamp(Math.atan2((car.z - car.lastZ) / dt, run) * 0.8) : car.groundPitch;
+        car.pitch += (target - car.pitch) * ease(lift > 1 ? 5 : 14);
+        // Touching down after a real jump: a puff of dust and a jolt.
+        if (car.lastZ - car.lastGround > 10 && lift < 1) {
+          const p = car.group.position;
+          for (let i = 0; i < 14; i++) {
+            const a = this.rand() * Math.PI * 2;
+            this.smoke.spawn(
+              p.x + Math.cos(a) * 10,
+              car.ground + 2,
+              p.z + Math.sin(a) * 10,
+              Math.cos(a) * 60,
+              10 + this.rand() * 15,
+              Math.sin(a) * 60,
+              this.smokeColor,
+              9,
+              0.7 + this.rand() * 0.4,
+              0.4,
+              22,
+              car.ground
+            );
+          }
+          car.shake = Math.max(car.shake, 0.25);
+        }
+      }
+      car.lastZ = car.z;
+      car.lastGround = car.ground;
+      car.body.rotation.z = car.pitch;
+      car.floor.rotation.z = car.groundPitch;
+      car.floor.position.y = -lift;
+      // The shadow spreads and fades the higher the car flies.
+      const spread = 1 + Math.min(1, lift / 60) * 0.6;
+      car.floor.scale.set(spread, 1, spread);
+      car.shadow.opacity = 0.55 / (spread * spread);
+
       const decel = (car.lastForward - car.forward) / dt;
       car.lastForward = car.forward;
-      const braking = car.forward > 20 && decel > 260 ? 1 : 0;
-      car.brake += (braking - car.brake) * (1 - Math.exp(-dt * 14));
+      const braking = car.forward > 20 && decel > 260 && lift < 1 ? 1 : 0;
+      car.brake += (braking - car.brake) * ease(14);
       car.tail.color.copy(TAIL_OFF).lerp(TAIL_ON, car.brake);
 
       const p = car.group.position;
       const fx = Math.cos(car.heading);
       const fz = Math.sin(car.heading);
       const slip = Math.abs(car.lateral);
-      if (slip > 55 && Math.abs(car.forward) > 60) {
+      if (slip > 55 && Math.abs(car.forward) > 60 && lift < 1) {
         car.smokeAcc += dt * Math.min(40, (slip - 40) * 0.35);
         while (car.smokeAcc >= 1) {
           car.smokeAcc -= 1;
           for (const side of [1, -1]) {
             this.smoke.spawn(
               p.x - fx * 11 - fz * side * 9 + (this.rand() - 0.5) * 3,
-              2,
+              p.y + 2,
               p.z - fz * 11 + fx * side * 9 + (this.rand() - 0.5) * 3,
               -fx * 20 + (this.rand() - 0.5) * 18,
               6 + this.rand() * 8,
@@ -1254,7 +1612,8 @@ export class RaceScene {
               7,
               0.9 + this.rand() * 0.5,
               0.32,
-              16
+              16,
+              car.ground
             );
           }
         }
@@ -1263,12 +1622,54 @@ export class RaceScene {
       }
       if (car.bump > 0 && this.rand() < 0.7) {
         const a = this.rand() * Math.PI * 2;
-        this.sparks.spawn(p.x, 4, p.z, Math.cos(a) * 70, 50 + this.rand() * 50, Math.sin(a) * 70, this.sparkColors[Math.floor(this.rand() * 3)], 2.5, 0.3, 1, -2);
+        this.sparks.spawn(
+          p.x,
+          p.y + 4,
+          p.z,
+          Math.cos(a) * 70,
+          50 + this.rand() * 50,
+          Math.sin(a) * 70,
+          this.sparkColors[Math.floor(this.rand() * 3)],
+          2.5,
+          0.3,
+          1,
+          -2,
+          car.ground
+        );
+      }
+      // Boosting (faster than the engine alone can go): flames out of the exhausts.
+      if (car.forward > MAX_SPEED * 1.06) {
+        car.flameAcc += dt * 90;
+        const back = CAR_LENGTH / 2 + 2;
+        const up = p.y + 6 - Math.sin(car.pitch) * back;
+        while (car.flameAcc >= 1) {
+          car.flameAcc -= 1;
+          for (const side of [1, -1]) {
+            this.flames.spawn(
+              p.x - fx * back - fz * side * 4.5,
+              up,
+              p.z - fz * back + fx * side * 4.5,
+              car.forward * fx * 0.6 - fx * 120 + (this.rand() - 0.5) * 20,
+              (this.rand() - 0.2) * 20,
+              car.forward * fz * 0.6 - fz * 120 + (this.rand() - 0.5) * 20,
+              this.flameColors[this.rand() < 0.15 ? 2 : Math.floor(this.rand() * 2)],
+              5 + this.rand() * 3,
+              0.12 + this.rand() * 0.1,
+              0.95,
+              -14,
+              car.ground
+            );
+          }
+        }
+      } else {
+        car.flameAcc = 0;
       }
       car.shake = Math.max(0, car.shake - dt);
     }
     this.smoke.update(dt);
     this.sparks.update(dt);
+    this.flames.update(dt);
+    if (this.arrows) this.arrows.offset.y -= dt * 2.2;
 
     if (this.clouds) this.clouds.rotation.y += dt * 0.004;
     if (this.snow && this.snowVel) {
@@ -1278,7 +1679,7 @@ export class RaceScene {
       for (let i = 0; i < this.snowVel.length; i++) {
         arr[i * 3 + 1] -= this.snowVel[i] * dt;
         arr[i * 3] += Math.sin(t + i) * 6 * dt;
-        if (arr[i * 3 + 1] < 0) arr[i * 3 + 1] += 420;
+        if (arr[i * 3 + 1] < 0) arr[i * 3 + 1] += 520;
       }
       pos.needsUpdate = true;
     }
@@ -1314,6 +1715,7 @@ export class RaceScene {
       const scale = (vh * dpr) / (2 * Math.tan((rig.camera.fov * Math.PI) / 360));
       this.smoke.setScale(scale);
       this.sparks.setScale(scale);
+      this.flames.setScale(scale);
       const own = this.cars.get(view.key);
       // Your own name tag would float in front of the camera.
       if (own?.label) own.label.visible = false;
@@ -1339,8 +1741,9 @@ export class RaceScene {
     if (!car) {
       // Nothing to follow: a slow aerial orbit around the track.
       const a = performance.now() / 14000;
-      cam.position.set(WORLD_W / 2 + Math.cos(a) * 900, 900, WORLD_H / 2 + Math.sin(a) * 900);
-      cam.lookAt(WORLD_W / 2, 0, WORLD_H / 2);
+      const r = Math.max(900, this.worldW * 0.55);
+      cam.position.set(this.cx + Math.cos(a) * r, r, this.cz + Math.sin(a) * r);
+      cam.lookAt(this.cx, 0, this.cz);
       if (cam.aspect !== aspect || cam.fov !== 60) {
         cam.aspect = aspect;
         cam.fov = 60;
@@ -1355,11 +1758,15 @@ export class RaceScene {
     let pos: THREE.Vector3;
     let look: THREE.Vector3;
     if (mode === "cabina") {
-      pos = new THREE.Vector3(p.x + fx * 2, 15, p.z + fz * 2);
-      look = new THREE.Vector3(p.x + fx * 80, 9, p.z + fz * 80);
+      const tilt = Math.tan(car.pitch);
+      pos = new THREE.Vector3(p.x + fx * 2, p.y + 15 + tilt * 2, p.z + fz * 2);
+      look = new THREE.Vector3(p.x + fx * 80, p.y + 9 + tilt * 80, p.z + fz * 80);
     } else {
-      pos = new THREE.Vector3(p.x - fx * 70, 30, p.z - fz * 70);
-      look = new THREE.Vector3(p.x + fx * 35, 8, p.z + fz * 35);
+      // Behind and above, following the slope; in a jump it rises less than the car.
+      const slope = Math.tan(car.groundPitch);
+      const y = car.ground + (p.y - car.ground) * 0.6;
+      pos = new THREE.Vector3(p.x - fx * 70, y + 30 - slope * 70, p.z - fz * 70);
+      look = new THREE.Vector3(p.x + fx * 35, p.y + 8 + slope * 35, p.z + fz * 35);
     }
     if (!rig.ready || mode === "cabina") {
       rig.pos.copy(pos);
@@ -1378,7 +1785,8 @@ export class RaceScene {
       cam.position.z += (this.rand() - 0.5) * s;
     }
     cam.lookAt(rig.look);
-    const fov = 66 + Math.min(14, (Math.abs(car.forward) / MAX_SPEED) * 14);
+    // Wider the faster, and wider still with a boost.
+    const fov = 66 + Math.min(22, (Math.abs(car.forward) / MAX_SPEED) * 14 + Math.max(0, car.forward / MAX_SPEED - 1) * 30);
     if (cam.aspect !== aspect || Math.abs(cam.fov - fov) > 0.1) {
       cam.aspect = aspect;
       cam.fov = fov;

@@ -28,7 +28,6 @@ import {
 } from "@/lib/carreras";
 import {
   MAX_SPEED,
-  WORLD_W,
   collideCars,
   getTrack,
   gridCar,
@@ -264,14 +263,16 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
         }
       }
 
-      // Engines: panned to each player's half of the screen in 3D, to where the car is in 2D.
+      // Engines, jumps and boosts: panned to each player's half of the screen in 3D, to where the car is in 2D.
       if (s.status === "waiting") {
         audio?.silence();
       } else if (audio) {
         seats.forEach((seat, i) => {
           const car = engine!.cars[seat]!;
           const slip = Math.abs(-car.vx * Math.sin(car.heading) + car.vy * Math.cos(car.heading));
-          const pan = is3d ? (seats.length === 1 ? 0 : i % 2 ? 0.6 : -0.6) : (car.x / WORLD_W) * 1.6 - 0.8;
+          const pan = is3d ? (seats.length === 1 ? 0 : i % 2 ? 0.6 : -0.6) : (car.x / track.worldW) * 1.6 - 0.8;
+          cues.air(seat, car.air, pan);
+          cues.boost(seat, car.boost, pan);
           audio.engine(seat, Math.hypot(car.vx, car.vy) / MAX_SPEED, (slip - 50) / 150, seats.length > 1 ? 0.7 : 1, pan);
         });
         audio.silence(seats);
@@ -299,14 +300,23 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
 
       const drawCars: DrawCar[] = seats.map((seat) => {
         const car = engine!.cars[seat]!;
-        return { x: car.x, y: car.y, heading: car.heading, color: CARS[seat].color, label: driverName(s, seat), bump: car.bump };
+        return {
+          x: car.x,
+          y: car.y,
+          z: car.z,
+          ground: car.ground,
+          heading: car.heading,
+          color: CARS[seat].color,
+          label: driverName(s, seat),
+          bump: car.bump,
+        };
       });
       if (!scene) {
         drawTopView(canvas2dRef.current, track, drawCars);
       } else {
         for (const seat of seats) {
           const car = engine.cars[seat]!;
-          scene.setPose(seat, { x: car.x, y: car.y, heading: car.heading, vx: car.vx, vy: car.vy, bump: car.bump });
+          scene.setPose(seat, { x: car.x, y: car.y, z: car.z, ground: car.ground, heading: car.heading, vx: car.vx, vy: car.vy, bump: car.bump });
         }
         // Before the start with nobody seated: an aerial view of the track.
         scene.render(seats.length ? seats.map((key) => ({ key })) : [{ key: "" }], cameraRef.current, dt);

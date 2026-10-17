@@ -1,7 +1,8 @@
 /**
  * Carreras sounds, synthesized with Web Audio (no files to load): an engine
- * per car whose pitch climbs through the gears, tire screech, hits, the
- * countdown beeps, lap chimes and the finish fanfare. Browser only.
+ * per car whose pitch climbs through the gears, tire screech, hits, jumps and
+ * landings, boosts, the countdown beeps, lap chimes and the finish fanfare.
+ * Browser only.
  *
  * Browsers keep audio suspended until a tap or a key press, so the context
  * resumes on the first one (`unlock` listeners) — before that it's silent.
@@ -182,6 +183,52 @@ export class RaceAudio {
     this.tone(110, t, 0.22, "sine", 0.5 * k, 45);
   }
 
+  /** A burst of filtered noise whose band sweeps from `f0` to `f1` (whooshes). */
+  private sweep(f0: number, f1: number, dur: number, vol: number, pan = 0) {
+    const ctx = this.ctx!;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    const band = ctx.createBiquadFilter();
+    band.type = "bandpass";
+    band.Q.value = 2.5;
+    band.frequency.setValueAtTime(f0, t);
+    band.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.25);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const out: AudioNode = typeof ctx.createStereoPanner === "function" ? ctx.createStereoPanner() : this.master!;
+    if (out !== this.master) {
+      (out as StereoPannerNode).pan.value = Math.max(-1, Math.min(1, pan));
+      out.connect(this.master!);
+    }
+    src.connect(band).connect(g).connect(out);
+    src.start(t, Math.random() * 0.4, dur + 0.05);
+  }
+
+  /** Taking off from a ramp or a crest: a rising whoosh. */
+  jump(pan = 0) {
+    if (!this.live) return;
+    this.sweep(500, 2200, 0.35, 0.35, pan);
+  }
+
+  /** Touching down; `strength` 0–1 by how long it flew. */
+  land(strength: number, pan = 0) {
+    if (!this.live) return;
+    const k = Math.max(0.2, Math.min(1, strength));
+    this.tone(90, this.ctx!.currentTime, 0.18, "sine", 0.45 * k, 40);
+    this.sweep(900, 250, 0.2, 0.3 * k, pan);
+  }
+
+  /** Over a boost pad: a fast rising whoosh with a little zap. */
+  boost(pan = 0) {
+    if (!this.live) return;
+    const t = this.ctx!.currentTime;
+    this.sweep(300, 3200, 0.5, 0.4, pan);
+    this.tone(330, t, 0.35, "sawtooth", 0.06, 990);
+  }
+
   /** Countdown: a short beep for 3, 2, 1 and a long high one for the start. */
   beep(go = false) {
     if (!this.live) return;
@@ -239,6 +286,9 @@ export class RaceCues {
   private count = -1;
   private laps = new Map<string, number>();
   private lastHit = new Map<string, number>();
+  /** Longest time in the air of the current flight, per car (absent = on the road). */
+  private flights = new Map<string, number>();
+  private boosts = new Map<string, number>();
 
   constructor(private audio: RaceAudio | null) {}
 
@@ -269,6 +319,32 @@ export class RaceCues {
     this.laps.set(key, done);
     if (prev === undefined || done <= prev || done >= total) return;
     this.audio?.lap(done === total - 1);
+  }
+
+  /**
+   * A car's seconds in the air (0 = on the road): a whoosh once it's really
+   * flying (not a little hop over a bump) and a thud when it lands.
+   */
+  air(key: string, seconds: number, pan = 0) {
+    const flight = this.flights.get(key);
+    if (seconds > 0) {
+      if (flight === undefined && seconds >= 0.12) {
+        this.flights.set(key, seconds);
+        this.audio?.jump(pan);
+      } else if (flight !== undefined) {
+        this.flights.set(key, seconds);
+      }
+    } else if (flight !== undefined) {
+      this.flights.delete(key);
+      this.audio?.land(flight / 0.5, pan);
+    }
+  }
+
+  /** A car's seconds of boost left: a whoosh each time a pad tops it up. */
+  boost(key: string, seconds: number, pan = 0) {
+    const prev = this.boosts.get(key) ?? 0;
+    this.boosts.set(key, seconds);
+    if (seconds > prev + 0.3) this.audio?.boost(pan);
   }
 
   /** A hit of `speed`; true when it's worth showing (sparks, shake) — it also sounds. */

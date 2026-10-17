@@ -29,7 +29,7 @@ import { isTrackId, type TrackId } from "./carrerasTrack";
 export const COUNTDOWN_MS = 3000;
 /** After the first car finishes, how long the rest have before the race closes. */
 export const FINISH_GRACE_MS = 25000;
-export const LAP_OPTIONS = [3, 5, 8];
+export const LAP_OPTIONS = [2, 3, 5];
 
 export type Seat = "a" | "b" | "c" | "d";
 export const SEATS: Seat[] = ["a", "b", "c", "d"];
@@ -102,6 +102,9 @@ export interface CarPose {
   g: number;
   x: number;
   y: number;
+  /** Height, and how far above the road it is (in a jump); absent = 0. */
+  z?: number;
+  l?: number;
   h: number;
   vx: number;
   vy: number;
