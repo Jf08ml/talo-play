@@ -1,4 +1,4 @@
-import CarrerasClient from "./CarrerasClient";
+import RoomClient from "@/components/carreras/RoomClient";
 import { inviteMetadata } from "@/lib/inviteMetadata";
 
 type Props = { params: Promise<{ roomId: string }> };
@@ -8,7 +8,7 @@ export async function generateMetadata({ params }: Props) {
   return inviteMetadata("carreras", roomId.toUpperCase());
 }
 
-export default async function CarrerasRoomPage({ params }: Props) {
+export default async function RoomPage({ params }: Props) {
   const { roomId } = await params;
-  return <CarrerasClient roomId={roomId.toUpperCase()} />;
+  return <RoomClient game="carreras" roomId={roomId.toUpperCase()} />;
 }

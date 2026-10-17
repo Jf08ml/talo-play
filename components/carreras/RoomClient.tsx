@@ -16,6 +16,7 @@ import {
   subscribeCarreras,
   subscribeLive,
   takeSeat,
+  type CarrerasGame,
   type CarrerasLive,
   type CarrerasMeta,
   type CarrerasState,
@@ -40,7 +41,8 @@ import { MonitorPlay, Smartphone } from "lucide-react";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
-export default function CarrerasClient({ roomId }: { roomId: string }) {
+/** A racing room on a phone (both games): seats, then the controller or the 3D race. */
+export default function RoomClient({ game, roomId }: { game: CarrerasGame; roomId: string }) {
   const identity = useClientIdentity();
   const router = useRouter();
   const configured = isFirebaseConfigured();
@@ -63,7 +65,7 @@ export default function CarrerasClient({ roomId }: { roomId: string }) {
       .then((raw) => {
         if (cancelled) return;
         if (!raw) return setStatus("not-found");
-        if (raw.game !== "carreras") return router.replace(`/sala/${roomId}`);
+        if (raw.game !== game) return router.replace(`/sala/${roomId}`);
         const m = normalizeMeta(raw);
         setMeta(m);
         unsubs.push(subscribeCarreras(roomId, setState));
@@ -79,7 +81,7 @@ export default function CarrerasClient({ roomId }: { roomId: string }) {
       cancelled = true;
       unsubs.forEach((u) => u());
     };
-  }, [configured, roomId, identity.clientId, identity.name, router]);
+  }, [configured, game, roomId, identity.clientId, identity.name, router]);
 
   const hasState = state !== null;
   useEffect(() => {
@@ -103,14 +105,14 @@ export default function CarrerasClient({ roomId }: { roomId: string }) {
   return (
     <div className="flex min-h-dvh flex-col">
       <RoomHeader
-        game="carreras"
+        game={game}
         roomId={roomId}
         right={status === "ready" && <PlayerBadges presence={presence} myClientId={myId} />}
       />
 
       <main className="relative flex flex-1 flex-col">
         {identity.clientId && !identity.name && (
-          <NamePrompt onSubmit={identity.setName} submitLabel="Entrar a la sala" invitedTo="carreras" />
+          <NamePrompt onSubmit={identity.setName} submitLabel="Entrar a la sala" invitedTo={game} />
         )}
 
         {status === "loading" && <RoomLoading text="Calentando motores…" />}
@@ -120,7 +122,7 @@ export default function CarrerasClient({ roomId }: { roomId: string }) {
         {status === "ready" && state && meta && state.status === "waiting" && (
           <div className="mx-auto w-full max-w-2xl p-4">
             <WaitingRoom
-              game="carreras"
+              game={game}
               roomId={roomId}
               hostId={meta.hostId ?? ""}
               players={Object.entries(state.players).map(([id, p]) => ({ id, ...p }))}
@@ -171,7 +173,7 @@ function ModeHint({ roomId, meta }: { roomId: string; meta: CarrerasMeta }) {
       <MonitorPlay className="mt-0.5 h-5 w-5 shrink-0" />
       <p>
         La carrera se ve en una pantalla grande. Si todavía no está abierta, entrá desde la compu a{" "}
-        <Link href={`${roomPath("carreras", roomId)}/pantalla`} className="font-semibold underline">
+        <Link href={`${roomPath(meta.game, roomId)}/pantalla`} className="font-semibold underline">
           la pista de esta sala
         </Link>
         . Tu teléfono va a ser el volante.

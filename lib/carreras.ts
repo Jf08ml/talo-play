@@ -6,7 +6,10 @@ import { transactState } from "./transact";
 import { TRACKS, type TrackId } from "./carrerasTrack";
 
 /**
- * Carreras, in two modes chosen when the room is created:
+ * Carreras, two games on the same rooms, physics and controls: `carreras`
+ * (2D, seen from above on a shared screen) and `carreras3d` (3D). Rooms run
+ * in one of two modes, chosen when the room is created (2D is always
+ * `pantalla`):
  *
  * - `pantalla`: the race runs on a shared screen (`/carreras/{id}/pantalla`, a
  *   computer on a TV or projector) and phones are only controllers. The
@@ -35,11 +38,12 @@ export const CARS: Record<Seat, { label: string; color: string; glow: string }> 
   d: { label: "Auto amarillo", color: "#facc15", glow: "rgba(250,204,21,0.55)" },
 };
 
+export type CarrerasGame = "carreras" | "carreras3d";
 export type CarrerasMode = "pantalla" | "telefono";
 export type CarrerasStatus = "waiting" | "racing" | "finished";
 
 export interface CarrerasMeta {
-  game: "carreras";
+  game: CarrerasGame;
   hostId?: string;
   mode: CarrerasMode;
   track: TrackId;
@@ -102,11 +106,16 @@ export interface CarPose {
   t: number;
 }
 
+export function isCarrerasGame(game: unknown): game is CarrerasGame {
+  return game === "carreras" || game === "carreras3d";
+}
+
 export function normalizeMeta(raw: Partial<CarrerasMeta>): CarrerasMeta {
+  const game = raw.game === "carreras3d" ? "carreras3d" : "carreras";
   return {
-    game: "carreras",
+    game,
     hostId: raw.hostId,
-    mode: raw.mode === "telefono" ? "telefono" : "pantalla",
+    mode: game === "carreras3d" && raw.mode === "telefono" ? "telefono" : "pantalla",
     track: raw.track && raw.track in TRACKS ? raw.track : "ovalo",
     laps: raw.laps ?? 5,
     createdAt: raw.createdAt ?? 0,
@@ -160,11 +169,12 @@ function mutate(roomId: string, fn: (state: CarrerasState) => CarrerasState | nu
 }
 
 export async function createCarrerasRoom(
+  game: CarrerasGame,
   hostId: string,
   settings: { mode: CarrerasMode; track: TrackId; laps: number }
 ): Promise<string> {
   const roomId = generateRoomCode();
-  const meta: CarrerasMeta = { game: "carreras", hostId, ...settings, createdAt: serverTimestamp() };
+  const meta: CarrerasMeta = { game, hostId, ...settings, createdAt: serverTimestamp() };
   const state: Partial<CarrerasState> = { status: "waiting", gameNo: 0 };
   await update(ref(getDb()), {
     [`rooms/${roomId}/meta`]: meta,

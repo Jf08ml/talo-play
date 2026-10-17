@@ -941,3 +941,40 @@ export function CarrerasThumbnail() {
     </svg>
   );
 }
+
+export function Carreras3dThumbnail() {
+  // The road seen from behind a car, vanishing into the horizon.
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <linearGradient id="c3d-sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#38bdf8" />
+          <stop offset="100%" stopColor="#bae6fd" />
+        </linearGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#c3d-sky)" />
+      <path d="M0 112 L60 70 L110 100 L170 55 L240 104 L300 64 L360 96 L400 80 V112 Z" fill="#64748b" opacity="0.7" />
+      <rect y="110" width="400" height="130" fill="#3f9a43" />
+      <path d="M180 110 L220 110 L360 240 L40 240 Z" fill="#3b3b44" />
+      <path d="M180 110 L172 110 L22 240 L40 240 Z" fill="#dc2626" />
+      <path d="M220 110 L228 110 L378 240 L360 240 Z" fill="#dc2626" />
+      <path d="M199 118 L201 118 L203 140 L197 140 Z M196 158 L204 158 L207 190 L193 190 Z" fill="#f8fafc" opacity="0.8" />
+      <g fill="#14532d">
+        <path d="M70 112 L82 80 L94 112 Z" />
+        <path d="M300 112 L314 74 L328 112 Z" />
+        <path d="M120 112 L128 92 L136 112 Z" />
+      </g>
+      <g transform="translate(240 128)">
+        <rect x="-13" y="0" width="26" height="12" rx="3" fill="#22d3ee" />
+        <rect x="-8" y="-5" width="16" height="6" rx="2" fill="#1e293b" />
+      </g>
+      <g transform="translate(200 205)">
+        <rect x="-62" y="-8" width="124" height="10" rx="3" fill="#b91c1c" />
+        <rect x="-50" y="-30" width="100" height="34" rx="9" fill="#fb3a5d" />
+        <rect x="-30" y="-48" width="60" height="22" rx="6" fill="#1e293b" />
+        <rect x="-60" y="2" width="22" height="24" rx="4" fill="#0b0b0f" />
+        <rect x="38" y="2" width="22" height="24" rx="4" fill="#0b0b0f" />
+      </g>
+    </svg>
+  );
+}

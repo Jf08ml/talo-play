@@ -1,4 +1,4 @@
-import PantallaClient from "./PantallaClient";
+import ScreenClient from "@/components/carreras/ScreenClient";
 import { inviteMetadata } from "@/lib/inviteMetadata";
 
 type Props = { params: Promise<{ roomId: string }> };
@@ -8,7 +8,7 @@ export async function generateMetadata({ params }: Props) {
   return inviteMetadata("carreras", roomId.toUpperCase());
 }
 
-export default async function CarrerasScreenPage({ params }: Props) {
+export default async function ScreenPage({ params }: Props) {
   const { roomId } = await params;
-  return <PantallaClient roomId={roomId.toUpperCase()} />;
+  return <ScreenClient game="carreras" roomId={roomId.toUpperCase()} />;
 }

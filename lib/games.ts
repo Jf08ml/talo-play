@@ -6,7 +6,7 @@
  * Every room stores its game in `rooms/{id}/meta/game`; room codes are
  * global, so one code is enough to find any game's room (`lib/roomLookup.ts`).
  */
-export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras";
+export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d";
 
 /** Who you're playing with: the first question the home page asks. */
 export type PlayContext = "pareja" | "amigos" | "grupo" | "solo";
@@ -354,15 +354,30 @@ export const GAMES: Record<GameId, GameInfo> = {
     id: "carreras",
     title: "Carreras",
     path: "carreras",
+    tagline: "La pista se ve desde arriba en la tele o el proyector y cada uno maneja su auto desde el teléfono.",
+    minPlayers: 1,
+    maxPlayers: 4,
+    duration: "3–5 min",
+    contexts: ["pareja", "amigos", "grupo"],
+    howTo: [
+      "Abrí la pantalla en una compu conectada a la tele o al proyector.",
+      "Cada piloto entra desde su teléfono con el código: el teléfono es el volante.",
+      "Manejá con botones o inclinando el teléfono. Gana el primero en completar las vueltas.",
+    ],
+  },
+  carreras3d: {
+    id: "carreras3d",
+    title: "Carreras 3D",
+    path: "carreras-3d",
     tagline: "Carreras en 3D de hasta 4: en la tele o el proyector con el teléfono de volante, o cada uno en su teléfono.",
     minPlayers: 1,
     maxPlayers: 4,
     duration: "3–5 min",
     contexts: ["pareja", "amigos", "grupo", "solo"],
     howTo: [
-      "Elegí dónde se ve: en una pantalla grande (tele o proyector) o cada uno en su teléfono.",
+      "Elegí dónde se ve: en una pantalla grande (tele o proyector, dividida por piloto) o cada uno en su teléfono.",
       "Cada piloto entra desde su teléfono con el código y elige un auto.",
-      "Manejá con botones o inclinando el teléfono. Gana el primero en completar las vueltas.",
+      "Manejá con botones o inclinando el teléfono, con cámara detrás del auto o desde la cabina.",
     ],
   },
   codigo: {
@@ -383,7 +398,7 @@ export const GAMES: Record<GameId, GameInfo> = {
 };
 
 /** Home page order: quickest to start first. */
-export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "generala", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
+export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "generala", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
 
 export function roomPath(game: GameId, roomId: string): string {
   return `/${GAMES[game].path}/${roomId}`;

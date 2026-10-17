@@ -18,6 +18,7 @@ import {
   subscribeInputs,
   writeLive,
   type CarInputWire,
+  type CarrerasGame,
   type CarrerasMeta,
   type CarrerasState,
   type LiveCar,
@@ -36,14 +37,12 @@ import { Standings, driverName, useCameraMode, useRaceCloser } from "@/component
 import { TaloMark } from "@/components/TaloLogo";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { PRIMARY_BUTTON } from "@/components/ui";
-import { Box, Eye, Map as MapIcon, Maximize, Minimize, Smartphone, X } from "lucide-react";
+import { Eye, Maximize, Minimize, Smartphone, X } from "lucide-react";
 
 type Status = "loading" | "not-found" | "ready" | "error";
-type ViewMode = "3d" | "arriba";
 
 const subscribeNever = () => () => {};
 const STEP = 1 / 120;
-const VIEW_KEY = "carreras.screenView";
 /** Keyboard driving on the screen itself, to try it without phones. */
 const KEYS: Partial<Record<Seat, { left: string[]; right: string[]; brake: string[] }>> = {
   a: { left: ["a", "A"], right: ["d", "D"], brake: ["s", "S"] },
@@ -68,20 +67,12 @@ function carSeats(s: CarrerasState): Seat[] {
   return s.status === "waiting" ? SEATS.filter((seat) => s.seats[seat]) : racersOf(s);
 }
 
-function readView(): ViewMode {
-  try {
-    return localStorage.getItem(VIEW_KEY) === "arriba" ? "arriba" : "3d";
-  } catch {
-    return "3d";
-  }
-}
-
 /**
  * The race screen (a computer on a TV or projector). It never joins the room
  * as a player: it simulates every car from the phones' inputs, draws them
  * (split-screen 3D or from above) and reports each finish.
  */
-export default function PantallaClient({ roomId }: { roomId: string }) {
+export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roomId: string }) {
   const router = useRouter();
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
@@ -90,14 +81,12 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
   const [presence, setPresence] = useState<PresenceMap>({});
   const [presenceLoaded, setPresenceLoaded] = useState(false);
   const [hud, setHud] = useState<Partial<Record<Seat, LiveCar>>>({});
-  const [view, setView] = useState<ViewMode>(readView);
   const [camera, toggleCamera] = useCameraMode();
 
   const canvas3dRef = useRef<HTMLCanvasElement>(null);
   const canvas2dRef = useRef<HTMLCanvasElement>(null);
   const minimapRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<CarrerasState | null>(null);
-  const viewRef = useRef<ViewMode>(view);
   const cameraRef = useRef<CameraMode>(camera);
   const inputsRef = useRef<Record<string, CarInputWire>>({});
   const keysRef = useRef(new Set<string>());
@@ -105,14 +94,6 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
-  useEffect(() => {
-    viewRef.current = view;
-    try {
-      localStorage.setItem(VIEW_KEY, view);
-    } catch {
-      // Not remembered.
-    }
-  }, [view]);
   useEffect(() => {
     cameraRef.current = camera;
   }, [camera]);
@@ -126,9 +107,9 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
       .then((raw) => {
         if (cancelled) return;
         if (!raw) return setStatus("not-found");
-        if (raw.game !== "carreras") return router.replace(`/sala/${roomId}`);
+        if (raw.game !== game) return router.replace(`/sala/${roomId}`);
         const m = normalizeMeta(raw);
-        if (m.mode !== "pantalla") return router.replace(roomPath("carreras", roomId));
+        if (m.mode !== "pantalla") return router.replace(roomPath(game, roomId));
         setMeta(m);
         unsubs.push(
           subscribeCarreras(roomId, setState),
@@ -151,7 +132,7 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
       cancelled = true;
       unsubs.forEach((u) => u());
     };
-  }, [configured, roomId, router]);
+  }, [configured, game, roomId, router]);
 
   useEffect(() => {
     const keys = keysRef.current;
@@ -173,10 +154,11 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
   // The race loop: fixed-step physics, then a draw, every animation frame.
   const trackId = meta?.track;
   const laps = meta?.laps ?? 5;
+  const is3d = game === "carreras3d";
   useEffect(() => {
     if (!trackId || !canvas3dRef.current) return;
     const track = getTrack(trackId);
-    const scene = new RaceScene(canvas3dRef.current, trackId);
+    const scene = is3d ? new RaceScene(canvas3dRef.current, trackId) : null;
     let engine: Engine | null = null;
     let frame = 0;
     let last = performance.now();
@@ -206,10 +188,10 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
         const cars: Partial<Record<Seat, Car>> = {};
         for (const seat of carSeats(s)) cars[seat] = gridCar(track, SEATS.indexOf(seat));
         engine = { key: engineKey(s), cars, reported: new Set(), lastLive: "" };
-        scene.setCars({});
+        scene?.setCars({});
       }
       const seats = SEATS.filter((seat) => engine!.cars[seat]);
-      scene.setCars(Object.fromEntries(seats.map((seat) => [seat, { color: CARS[seat].color, label: driverName(s, seat) }])));
+      scene?.setCars(Object.fromEntries(seats.map((seat) => [seat, { color: CARS[seat].color, label: driverName(s, seat) }])));
 
       const now = serverNow();
       const moving = s.status !== "waiting" && now >= s.startedAt;
@@ -259,7 +241,7 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
         const car = engine!.cars[seat]!;
         return { x: car.x, y: car.y, heading: car.heading, color: CARS[seat].color, label: driverName(s, seat), bump: car.bump };
       });
-      if (viewRef.current === "arriba") {
+      if (!scene) {
         drawTopView(canvas2dRef.current, track, drawCars);
       } else {
         for (const seat of seats) {
@@ -275,9 +257,9 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
     frame = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(frame);
-      scene.dispose();
+      scene?.dispose();
     };
-  }, [trackId, laps, roomId]);
+  }, [trackId, laps, roomId, is3d]);
 
   const now = useServerNow(state?.status === "racing", 100);
   const [fullscreen, setFullscreen] = useState(false);
@@ -298,13 +280,12 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
   const counting = state?.status === "racing" && now > 0 && left > 0;
   const go = state?.status === "racing" && now > 0 && left <= 0 && now - state.startedAt < 900;
   const onTrack = state ? carSeats(state) : [];
-  const is3d = view === "3d";
 
   const chip = "pointer-events-auto flex items-center gap-1.5 rounded-xl bg-slate-950/70 px-3 py-2 text-sm text-slate-200 backdrop-blur hover:text-white";
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-sky-300 text-slate-100">
-      <canvas ref={canvas3dRef} className={`absolute inset-0 h-full w-full ${is3d ? "" : "invisible"}`} />
+    <div className={`fixed inset-0 flex flex-col text-slate-100 ${is3d ? "bg-sky-300" : "bg-[#0b2a18]"}`}>
+      <canvas ref={canvas3dRef} className={`absolute inset-0 h-full w-full ${is3d ? "" : "hidden"}`} />
       <canvas ref={canvas2dRef} className={`absolute inset-0 h-full w-full ${is3d ? "hidden" : ""}`} />
 
       {status === "loading" && <RoomLoading text="Armando la pista…" />}
@@ -333,10 +314,6 @@ export default function PantallaClient({ roomId }: { roomId: string }) {
               </div>
             )}
             <div className="flex gap-2">
-              <button onClick={() => setView(is3d ? "arriba" : "3d")} className={chip}>
-                {is3d ? <MapIcon className="h-4 w-4" /> : <Box className="h-4 w-4" />}
-                {is3d ? "Ver desde arriba" : "Ver en 3D"}
-              </button>
               {is3d && (
                 <button onClick={toggleCamera} className={chip}>
                   <Eye className="h-4 w-4" /> {camera === "detras" ? "Detrás" : "Cabina"}
@@ -477,7 +454,7 @@ function JoinCard({
       <div>
         <p className="font-mono text-2xl text-slate-300">
           {host}
-          {roomPath("carreras", "")}
+          {roomPath(meta.game, "")}
           <span className="text-cyan-200">{roomId}</span>
         </p>
         <p className="mt-2 font-mono text-8xl font-bold tracking-[0.2em] text-cyan-200 drop-shadow-[0_0_20px_rgba(34,211,238,0.4)]">
