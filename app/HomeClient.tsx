@@ -39,6 +39,7 @@ import {
   OndaThumbnail,
   TelefonoThumbnail,
   LudoThumbnail,
+  LoboThumbnail,
 } from "@/components/GameThumbnails";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 
@@ -72,6 +73,7 @@ const THUMBNAILS: Record<GameId, ReactNode> = {
   onda: <OndaThumbnail />,
   telefono: <TelefonoThumbnail />,
   ludo: <LudoThumbnail />,
+  lobo: <LoboThumbnail />,
 };
 
 export default function HomeClient() {

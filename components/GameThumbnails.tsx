@@ -1154,3 +1154,31 @@ export function LudoThumbnail() {
     </svg>
   );
 }
+
+export function LoboThumbnail() {
+  // Full moon over a village skyline, two glowing eyes.
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="lobo-bg" cx="70%" cy="20%" r="100%">
+          <stop offset="0%" stopColor="#312e81" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+        <filter id="lobo-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="8" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      <rect width="400" height="240" fill="url(#lobo-bg)" />
+      <circle cx="285" cy="70" r="42" fill="#fef3c7" filter="url(#lobo-glow)" />
+      <path d="M0 240 V180 L30 160 L60 180 V150 H90 V180 L120 165 L150 185 V140 L175 120 L200 140 V190 L240 170 L270 190 V160 H300 V195 L340 175 L370 190 L400 170 V240 Z" fill="#0f0d1a" />
+      <g filter="url(#lobo-glow)">
+        <ellipse cx="110" cy="105" rx="9" ry="5" fill="#ef4444" />
+        <ellipse cx="140" cy="105" rx="9" ry="5" fill="#ef4444" />
+      </g>
+    </svg>
+  );
+}
