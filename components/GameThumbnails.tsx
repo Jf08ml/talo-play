@@ -1061,3 +1061,31 @@ export function YoNuncaThumbnail() {
     </svg>
   );
 }
+
+export function OndaThumbnail() {
+  // The half dial with scoring bands and a needle.
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="onda-bg" cx="50%" cy="90%" r="90%">
+          <stop offset="0%" stopColor="#1e1b4b" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+        <linearGradient id="onda-thumb-face" x1="0" x2="1">
+          <stop offset="0%" stopColor="#1d4ed8" />
+          <stop offset="100%" stopColor="#c2410c" />
+        </linearGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#onda-bg)" />
+      <path d="M60 205 A140 140 0 0 1 340 205 Z" fill="url(#onda-thumb-face)" />
+      <path d="M200 205 L266 81 A140 140 0 0 1 300 107 Z" fill="#22d3ee" />
+      <path d="M200 205 L276 88 A140 140 0 0 1 292 99 Z" fill="#facc15" />
+      <line x1="200" y1="205" x2="280" y2="92" stroke="#f8fafc" strokeWidth="7" strokeLinecap="round" />
+      <circle cx="200" cy="205" r="14" fill="#0f172a" stroke="#94a3b8" strokeWidth="3" />
+      <g fontFamily="system-ui, sans-serif" fontWeight="800" fontSize="16">
+        <text x="40" y="232" fill="#7dd3fc">FRÍO</text>
+        <text x="300" y="232" fill="#fdba74">CALIENTE</text>
+      </g>
+    </svg>
+  );
+}

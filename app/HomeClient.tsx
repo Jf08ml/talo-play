@@ -36,6 +36,7 @@ import {
   Carreras3dThumbnail,
   ArenaThumbnail,
   YoNuncaThumbnail,
+  OndaThumbnail,
 } from "@/components/GameThumbnails";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 
@@ -66,6 +67,7 @@ const THUMBNAILS: Record<GameId, ReactNode> = {
   carreras3d: <Carreras3dThumbnail />,
   arena: <ArenaThumbnail />,
   yonunca: <YoNuncaThumbnail />,
+  onda: <OndaThumbnail />,
 };
 
 export default function HomeClient() {
