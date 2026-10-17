@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { GAMES, type GameId } from "@/lib/games";
 import { shareInvite } from "@/lib/share";
+import { trackEvent } from "@/lib/analytics";
 import { TaloMark } from "./TaloLogo";
 import GameIcon from "./GameIcon";
 import { Check, Share2 } from "lucide-react";
@@ -27,6 +28,7 @@ export default function RoomHeader({
   const [copied, setCopied] = useState(false);
 
   const invite = async () => {
+    trackEvent("share", { game, method: "header" });
     if ((await shareInvite(game, roomId)) === "copied") {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);

@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { CLUE_ROUND_OPTIONS, createImpostorRoom, type ClueMode } from "@/lib/impostor";
@@ -29,6 +30,7 @@ export default function ImpostorHome() {
     setCreateError(null);
     try {
       const roomId = await createImpostorRoom({ categories, clueMode, clueRounds, impostorHint }, identity.clientId);
+      trackEvent("create_room", { game: "impostor" });
       router.push(roomPath("impostor", roomId));
     } catch (err) {
       console.error(err);

@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { LAP_OPTIONS, createCarrerasRoom, type CarrerasGame, type CarrerasMode } from "@/lib/carreras";
@@ -42,6 +43,7 @@ export default function CarrerasLobby({ game }: { game: CarrerasGame }) {
     setCreateError(null);
     try {
       const roomId = await createCarrerasRoom(game, identity.clientId, { mode, track, laps });
+      trackEvent("create_room", { game, mode });
       router.push(mode === "pantalla" ? `${roomPath(game, roomId)}/pantalla` : roomPath(game, roomId));
     } catch (err) {
       console.error(err);

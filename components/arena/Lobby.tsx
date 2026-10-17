@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { SIZE_OPTIONS, WINS_OPTIONS, createArenaRoom } from "@/lib/arena";
@@ -27,6 +28,7 @@ export default function ArenaLobby() {
     setCreateError(null);
     try {
       const roomId = await createArenaRoom(identity.clientId, { size, wins, bots, potions, regen });
+      trackEvent("create_room", { game: "arena" });
       router.push(roomPath("arena", roomId));
     } catch (err) {
       console.error(err);

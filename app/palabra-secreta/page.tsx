@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createPalabraRoom } from "@/lib/palabra";
@@ -20,6 +21,7 @@ export default function PalabraHome() {
     setCreateError(null);
     try {
       const roomId = await createPalabraRoom(identity.clientId);
+      trackEvent("create_room", { game: "palabra" });
       router.push(roomPath("palabra", roomId));
     } catch (err) {
       console.error(err);

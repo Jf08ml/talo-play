@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createEmojisRoom, QUESTION_COUNT_OPTIONS, SECONDS_OPTIONS } from "@/lib/emojis";
@@ -28,6 +29,7 @@ export default function EmojisHome() {
     setCreateError(null);
     try {
       const roomId = await createEmojisRoom({ questionCount, seconds, categories }, identity.clientId);
+      trackEvent("create_room", { game: "emojis" });
       router.push(roomPath("emojis", roomId));
     } catch (err) {
       console.error(err);

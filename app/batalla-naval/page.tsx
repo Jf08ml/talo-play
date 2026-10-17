@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createNavalRoom } from "@/lib/naval";
@@ -20,6 +21,7 @@ export default function NavalHome() {
     setCreateError(null);
     try {
       const roomId = await createNavalRoom(identity.clientId);
+      trackEvent("create_room", { game: "naval" });
       router.push(roomPath("naval", roomId));
     } catch (err) {
       console.error(err);

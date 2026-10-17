@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createRetoRoom } from "@/lib/reto";
@@ -25,6 +26,7 @@ export default function RetoHome() {
     setCreateError(null);
     try {
       const roomId = await createRetoRoom({ levels }, identity.clientId);
+      trackEvent("create_room", { game: "reto" });
       router.push(roomPath("reto", roomId));
     } catch (err) {
       console.error(err);

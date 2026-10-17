@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createCuatroRoom } from "@/lib/cuatro";
@@ -20,6 +21,7 @@ export default function CuatroHome() {
     setCreateError(null);
     try {
       const roomId = await createCuatroRoom(identity.clientId);
+      trackEvent("create_room", { game: "cuatro" });
       router.push(roomPath("cuatro", roomId));
     } catch (err) {
       console.error(err);

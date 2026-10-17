@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { LEVELS, createSopaRoom, type SopaLevel } from "@/lib/sopa";
@@ -25,6 +26,7 @@ export default function SopaHome() {
     setCreateError(null);
     try {
       const roomId = await createSopaRoom({ theme, level }, identity.clientId);
+      trackEvent("create_room", { game: "sopa" });
       router.push(roomPath("sopa", roomId));
     } catch (err) {
       console.error(err);

@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createDeslizRoom, SIZES } from "@/lib/deslizante";
@@ -25,6 +26,7 @@ export default function DeslizanteHome() {
     setCreateError(null);
     try {
       const roomId = await createDeslizRoom({ file, size, showNumbers }, identity.clientId);
+      trackEvent("create_room", { game: "deslizante" });
       router.push(roomPath("deslizante", roomId));
     } catch (err) {
       console.error(err);

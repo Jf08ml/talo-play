@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ROUND_OPTIONS, createConocesRoom } from "@/lib/conoces";
@@ -21,6 +22,7 @@ export default function ConocesHome() {
     setCreateError(null);
     try {
       const roomId = await createConocesRoom({ rounds }, identity.clientId);
+      trackEvent("create_room", { game: "conoces" });
       router.push(roomPath("conoces", roomId));
     } catch (err) {
       console.error(err);

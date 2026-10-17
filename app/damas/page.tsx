@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createDamasRoom } from "@/lib/damas";
@@ -20,6 +21,7 @@ export default function DamasHome() {
     setCreateError(null);
     try {
       const roomId = await createDamasRoom(identity.clientId);
+      trackEvent("create_room", { game: "damas" });
       router.push(roomPath("damas", roomId));
     } catch (err) {
       console.error(err);

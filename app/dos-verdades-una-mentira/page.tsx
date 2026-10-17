@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createVerdadesRoom } from "@/lib/verdades";
@@ -20,6 +21,7 @@ export default function VerdadesHome() {
     setCreateError(null);
     try {
       const roomId = await createVerdadesRoom(identity.clientId);
+      trackEvent("create_room", { game: "verdades" });
       router.push(roomPath("verdades", roomId));
     } catch (err) {
       console.error(err);

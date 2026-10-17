@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { MAX_CUSTOM_PROMPTS, MAX_PROMPT_LENGTH, QUESTION_OPTIONS, createProbableRoom } from "@/lib/probable";
@@ -46,6 +47,7 @@ export default function ProbableHome() {
     setCreateError(null);
     try {
       const roomId = await createProbableRoom({ decks, customPrompts, questions }, identity.clientId);
+      trackEvent("create_room", { game: "probable" });
       router.push(roomPath("probable", roomId));
     } catch (err) {
       console.error(err);

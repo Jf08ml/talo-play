@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createCodigoRoom } from "@/lib/codigo";
@@ -20,6 +21,7 @@ export default function CodigoHome() {
     setCreateError(null);
     try {
       const roomId = await createCodigoRoom(identity.clientId);
+      trackEvent("create_room", { game: "codigo" });
       router.push(roomPath("codigo", roomId));
     } catch (err) {
       console.error(err);

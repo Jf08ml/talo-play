@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -44,6 +45,7 @@ export default function DibujoHome() {
     setCreateError(null);
     try {
       const roomId = await createDibujoRoom({ rounds, drawSeconds, customWords, useDefaultWords }, identity.clientId);
+      trackEvent("create_room", { game: "dibujo" });
       router.push(roomPath("dibujo", roomId));
     } catch (err) {
       console.error(err);

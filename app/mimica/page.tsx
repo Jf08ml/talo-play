@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { SECONDS_OPTIONS, TURN_OPTIONS, createMimicaRoom } from "@/lib/mimica";
@@ -22,6 +23,7 @@ export default function MimicaHome() {
     setCreateError(null);
     try {
       const roomId = await createMimicaRoom({ seconds, turns }, identity.clientId);
+      trackEvent("create_room", { game: "mimica" });
       router.push(roomPath("mimica", roomId));
     } catch (err) {
       console.error(err);

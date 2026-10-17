@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createTriviaRoom, QUESTION_COUNT_OPTIONS, SECONDS_OPTIONS } from "@/lib/trivia";
@@ -28,6 +29,7 @@ export default function TriviaHome() {
     setCreateError(null);
     try {
       const roomId = await createTriviaRoom({ questionCount, seconds, categories }, identity.clientId);
+      trackEvent("create_room", { game: "trivia" });
       router.push(roomPath("trivia", roomId));
     } catch (err) {
       console.error(err);

@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createRoom, type RoomMode } from "@/lib/puzzleRoom";
@@ -31,6 +32,7 @@ export default function RompecabezasHome() {
     setCreateError(null);
     try {
       const { roomId } = await createRoom({ file, pieceCount, mode });
+      trackEvent("create_room", { game: "rompecabezas" });
       router.push(roomPath("rompecabezas", roomId));
     } catch (err) {
       console.error(err);

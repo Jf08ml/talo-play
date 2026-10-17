@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { SIZE_OPTIONS, createCajasRoom } from "@/lib/cajas";
@@ -21,6 +22,7 @@ export default function CajasHome() {
     setCreateError(null);
     try {
       const roomId = await createCajasRoom({ size }, identity.clientId);
+      trackEvent("create_room", { game: "cajas" });
       router.push(roomPath("cajas", roomId));
     } catch (err) {
       console.error(err);

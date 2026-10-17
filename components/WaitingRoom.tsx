@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { trackEvent } from "@/lib/analytics";
 import { GAMES, type GameId } from "@/lib/games";
 import type { PresenceMap } from "@/lib/presence";
 import { Crown } from "lucide-react";
@@ -67,6 +68,16 @@ export default function WaitingRoom({
   const host = players.find((p) => p.id === hostId);
   const { canStart, message } = startPermission(hostId, host?.name, presence, myId);
   const fewPlayers = online.length < info.minPlayers;
+  const isHost = hostId === myId;
+
+  useEffect(() => {
+    trackEvent("join_room", { game, host: isHost });
+  }, [game, roomId, isHost]);
+
+  const start = () => {
+    trackEvent("start_game", { game, players: online.length });
+    onStart();
+  };
 
   return (
     <div className={`${CARD} flex flex-col gap-5`}>
@@ -112,7 +123,7 @@ export default function WaitingRoom({
           </p>
         )}
         {canStart && (
-          <button onClick={onStart} className={`w-full max-w-xs ${PRIMARY_BUTTON}`}>
+          <button onClick={start}className={`w-full max-w-xs ${PRIMARY_BUTTON}`}>
             Empezar partida
           </button>
         )}

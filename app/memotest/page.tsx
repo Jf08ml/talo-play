@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -69,6 +70,7 @@ export default function MemotestHome() {
           : { kind, theme, pairs, rules };
     try {
       const roomId = await createMemotestRoom(params, identity.clientId);
+      trackEvent("create_room", { game: "memotest" });
       router.push(roomPath("memotest", roomId));
     } catch (err) {
       console.error(err);

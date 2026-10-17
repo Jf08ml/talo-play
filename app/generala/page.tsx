@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createGeneralaRoom } from "@/lib/generala";
@@ -20,6 +21,7 @@ export default function GeneralaHome() {
     setCreateError(null);
     try {
       const roomId = await createGeneralaRoom(identity.clientId);
+      trackEvent("create_room", { game: "generala" });
       router.push(roomPath("generala", roomId));
     } catch (err) {
       console.error(err);

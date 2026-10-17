@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createAhorcadoRoom } from "@/lib/ahorcado";
@@ -20,6 +21,7 @@ export default function AhorcadoHome() {
     setCreateError(null);
     try {
       const roomId = await createAhorcadoRoom(identity.clientId);
+      trackEvent("create_room", { game: "ahorcado" });
       router.push(roomPath("ahorcado", roomId));
     } catch (err) {
       console.error(err);

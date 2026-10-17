@@ -1,5 +1,6 @@
 "use client";
 
+import { trackEvent } from "@/lib/analytics";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -54,6 +55,7 @@ export default function TuttiHome() {
         },
         identity.clientId
       );
+      trackEvent("create_room", { game: "tutti" });
       router.push(roomPath("tutti", roomId));
     } catch (err) {
       console.error(err);

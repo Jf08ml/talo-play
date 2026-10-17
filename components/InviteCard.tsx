@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import { Check, Link, Share2 } from "lucide-react";
 import type { GameId } from "@/lib/games";
 import { canNativeShare, copyInvite, shareInvite, whatsappUrl } from "@/lib/share";
+import { trackEvent } from "@/lib/analytics";
 
 const subscribeNever = () => () => {};
 
@@ -14,6 +15,7 @@ export default function InviteCard({ game, roomId }: { game: GameId; roomId: str
   const nativeShare = useSyncExternalStore(subscribeNever, canNativeShare, () => false);
 
   const copy = async () => {
+    trackEvent("share", { game, method: "copiar" });
     if ((await copyInvite(game, roomId)) === "copied") {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
@@ -31,6 +33,7 @@ export default function InviteCard({ game, roomId }: { game: GameId; roomId: str
           href={whatsappUrl(game, roomId)}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => trackEvent("share", { game, method: "whatsapp" })}
           className="col-span-2 flex items-center justify-center gap-2 rounded-lg bg-[#25D366] py-2.5 font-semibold text-[#06290f] transition hover:brightness-110"
         >
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
@@ -40,7 +43,10 @@ export default function InviteCard({ game, roomId }: { game: GameId; roomId: str
         </a>
         {nativeShare && (
           <button
-            onClick={() => shareInvite(game, roomId)}
+            onClick={() => {
+              trackEvent("share", { game, method: "nativo" });
+              shareInvite(game, roomId);
+            }}
             className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-600 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800"
           >
             <Share2 className="h-4 w-4" /> Compartir
