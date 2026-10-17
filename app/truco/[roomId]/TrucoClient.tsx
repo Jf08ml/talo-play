@@ -262,7 +262,7 @@ function Game({
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-3 p-3 lg:flex-row lg:items-start">
-      <div className="flex min-w-0 flex-1 flex-col gap-3">
+      <div className="flex min-w-0 flex-col gap-3 lg:flex-1">
         <div className="relative rounded-3xl border-4 border-amber-900/60 bg-gradient-to-br from-emerald-800 to-emerald-950 p-3 shadow-[inset_0_0_40px_rgba(0,0,0,0.5)]">
           <div className="grid grid-cols-[1fr_auto_1fr] grid-rows-[auto_auto_auto] items-center gap-2">
             <div className="col-start-2 row-start-1">
@@ -270,7 +270,7 @@ function Game({
             </div>
             {layout.left && (
               <div className="col-start-1 row-start-2 justify-self-start">
-                <SeatSpot state={state} seat={layout.left} myId={myId} isAway={isAway} />
+                <SeatSpot state={state} seat={layout.left} myId={myId} isAway={isAway} side />
               </div>
             )}
             <div className="col-start-2 row-start-2 flex min-h-24 flex-col items-center justify-center gap-1">
@@ -283,7 +283,7 @@ function Game({
             </div>
             {layout.right && (
               <div className="col-start-3 row-start-2 justify-self-end">
-                <SeatSpot state={state} seat={layout.right} myId={myId} isAway={isAway} />
+                <SeatSpot state={state} seat={layout.right} myId={myId} isAway={isAway} side />
               </div>
             )}
             <div className="col-start-2 row-start-3">
@@ -370,23 +370,47 @@ function Game({
   );
 }
 
-function SeatSpot({ state, seat, myId, isAway }: { state: TrucoState; seat: Seat; myId: string; isAway: (id: string) => boolean }) {
+function SeatSpot({
+  state,
+  seat,
+  myId,
+  isAway,
+  side = false,
+}: {
+  state: TrucoState;
+  seat: Seat;
+  myId: string;
+  isAway: (id: string) => boolean;
+  /** Left/right seats of a 2 vs 2: played cards overlap so the table fits a phone. */
+  side?: boolean;
+}) {
   const team = teamOf(seat);
   const active = state.status === "playing" && state.turn === seat && !pendingSong(state);
   const cardsLeft = inHand(state, seat).length;
   const mine = state.seats[seat] === myId;
+  const played = [0, 1, 2].map((i) => playedIn(state, seat, i)).filter(Boolean);
   return (
     <div className="flex flex-col items-center gap-1">
-      <div className="flex gap-1">
-        {[0, 1, 2].map((i) => {
-          const c = playedIn(state, seat, i);
-          return c ? (
-            <Naipe key={i} code={c} size="sm" />
+      {side ? (
+        <div className="flex h-16 -space-x-7">
+          {played.length ? (
+            played.map((c) => <Naipe key={c} code={c} size="sm" />)
           ) : (
-            <span key={i} className="h-16 w-11 rounded-md border border-dashed border-emerald-200/15" />
-          );
-        })}
-      </div>
+            <span className="h-16 w-11 rounded-md border border-dashed border-emerald-200/15" />
+          )}
+        </div>
+      ) : (
+        <div className="flex gap-1">
+          {[0, 1, 2].map((i) => {
+            const c = playedIn(state, seat, i);
+            return c ? (
+              <Naipe key={i} code={c} size="sm" />
+            ) : (
+              <span key={i} className="h-16 w-11 rounded-md border border-dashed border-emerald-200/15" />
+            );
+          })}
+        </div>
+      )}
       <div
         className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${active ? "ring-2 ring-amber-300" : ""}`}
         style={{ backgroundColor: `${TEAM_COLOR[team]}33`, color: TEAM_COLOR[team] }}
@@ -521,7 +545,7 @@ function Score({ state, myTeam, myId }: { state: TrucoState; myTeam: Team | null
   return (
     <div className={`${CARD} !p-4 flex flex-col gap-3`}>
       <p className="text-xs uppercase tracking-wide text-slate-500">A {state.target} puntos</p>
-      {([0, 1] as Team[]).map((t) => {
+      {((myTeam === 1 ? [1, 0] : [0, 1]) as Team[]).map((t) => {
         const pts = scoreOf(state, t);
         const players = activeSeats(state)
           .filter((x) => teamOf(x) === t)

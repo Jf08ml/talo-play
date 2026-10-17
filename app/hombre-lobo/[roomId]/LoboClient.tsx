@@ -157,7 +157,7 @@ export default function LoboClient({ roomId }: { roomId: string }) {
 
         {status === "ready" && state && config && state.status !== "waiting" && (
           <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 p-4 lg:flex-row lg:items-start">
-            <div className="flex min-w-0 flex-1 flex-col gap-4">
+            <div className="flex min-w-0 flex-col gap-4 lg:flex-1">
               {myRole && state.status !== "finished" && <RoleCard role={myRole} dead={dead} />}
               {!inGame && state.status !== "finished" && (
                 <p className={`${CARD} !p-3 text-center text-sm text-slate-400`}>

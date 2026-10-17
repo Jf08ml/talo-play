@@ -126,7 +126,7 @@ export default function ChinchonClient({ roomId }: { roomId: string }) {
 
         {status === "ready" && state && config && state.status !== "waiting" && (
           <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 p-3 lg:flex-row lg:items-start">
-            <div className="flex min-w-0 flex-1 flex-col gap-4">
+            <div className="flex min-w-0 flex-col gap-4 lg:flex-1">
               {state.status === "playing" && (
                 <Table key={state.moveNo} roomId={roomId} state={state} myId={myId} limit={config.limit} isAway={isAway} />
               )}

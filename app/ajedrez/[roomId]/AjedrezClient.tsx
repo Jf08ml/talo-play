@@ -277,7 +277,7 @@ function Game({
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-3 p-3 lg:flex-row lg:items-start">
-      <div className="flex min-w-0 flex-1 flex-col items-center gap-2">
+      <div className="flex min-w-0 flex-col items-center gap-2 lg:flex-1">
         <PlayerRow state={state} seat={topSeat} myId={myId} isAway={isAway} roomId={roomId} mySeat={mySeat} />
         <div className="relative aspect-square w-full max-w-[min(94vw,560px)] overflow-hidden rounded-xl shadow-[0_0_35px_rgba(139,92,246,0.25)] ring-2 ring-slate-700">
           <div className="grid h-full w-full grid-cols-8 grid-rows-8">

@@ -136,7 +136,7 @@ export default function OndaClient({ roomId }: { roomId: string }) {
 
         {status === "ready" && state && config && state.status !== "waiting" && (
           <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 p-4 lg:flex-row lg:items-start">
-            <div className="flex min-w-0 flex-1 flex-col gap-4">
+            <div className="flex min-w-0 flex-col gap-4 lg:flex-1">
               {state.status === "finished" ? (
                 <FinalPanel state={state} myId={myId} onAgain={() => playAgain(roomId, state.gameNo)} />
               ) : (

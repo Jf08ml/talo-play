@@ -215,7 +215,7 @@ function Game({
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 p-3 lg:flex-row lg:items-start">
-      <div className="flex min-w-0 flex-1 flex-col items-center gap-3">
+      <div className="flex min-w-0 flex-col items-center gap-3 lg:flex-1">
         <Board state={state} movable={movable} onMove={(t) => moveToken(roomId, myId, t, state.moveNo)} />
       </div>
 
@@ -399,7 +399,7 @@ function Board({ state, movable, onMove }: { state: LudoState; movable: number[]
             style={{ ...pos(cell[0], cell[1]), transform: `translate(${nudge}%, ${-nudge}%)`, zIndex: canMove ? 20 : 10 + n }}
           >
             <span
-              className={`block h-[78%] w-[78%] rounded-full border-2 border-white shadow-md ${canMove ? "animate-pulse ring-4 ring-slate-900" : ""} ${p === GOAL ? "opacity-80" : ""}`}
+              className={`block h-[78%] w-[78%] rounded-full border-2 border-white shadow-md ${canMove ? "scale-125 ring-[3px] ring-slate-950 outline-2 outline-white animate-bounce" : ""} ${p === GOAL ? "opacity-80" : ""}`}
               style={{ backgroundColor: SEAT_INFO[seat].color, boxShadow: "inset 0 -3px 0 rgba(0,0,0,0.25), 0 2px 4px rgba(0,0,0,0.4)" }}
             />
           </button>
