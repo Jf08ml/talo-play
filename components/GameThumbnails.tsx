@@ -1120,3 +1120,37 @@ export function TelefonoThumbnail() {
     </svg>
   );
 }
+
+export function LudoThumbnail() {
+  // The cross-shaped board with four colored bases and a die.
+  const c = ["#ef4444", "#22c55e", "#eab308", "#3b82f6"];
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <rect width="400" height="240" fill="#0b0a14" />
+      <g transform="translate(110 10) scale(1.47)">
+        <rect width="150" height="150" rx="10" fill="#f1f5f9" />
+        <rect x="0" y="0" width="60" height="60" rx="8" fill={c[0]} />
+        <rect x="90" y="0" width="60" height="60" rx="8" fill={c[1]} />
+        <rect x="90" y="90" width="60" height="60" rx="8" fill={c[2]} />
+        <rect x="0" y="90" width="60" height="60" rx="8" fill={c[3]} />
+        {[[0, 0], [90, 0], [90, 90], [0, 90]].map(([x, y], i) => (
+          <g key={i}>
+            <rect x={x + 10} y={y + 10} width="40" height="40" rx="6" fill="#fff" />
+            <circle cx={x + 22} cy={y + 22} r="6" fill={c[i]} />
+            <circle cx={x + 38} cy={y + 38} r="6" fill={c[i]} />
+          </g>
+        ))}
+        <polygon points="60,60 90,60 75,75" fill={c[1]} />
+        <polygon points="90,60 90,90 75,75" fill={c[2]} />
+        <polygon points="90,90 60,90 75,75" fill={c[3]} />
+        <polygon points="60,90 60,60 75,75" fill={c[0]} />
+      </g>
+      <g transform="translate(320 150) rotate(12)">
+        <rect width="54" height="54" rx="10" fill="#fff" />
+        <circle cx="15" cy="15" r="5" fill="#0f172a" />
+        <circle cx="27" cy="27" r="5" fill="#0f172a" />
+        <circle cx="39" cy="39" r="5" fill="#0f172a" />
+      </g>
+    </svg>
+  );
+}

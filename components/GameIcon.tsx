@@ -31,6 +31,7 @@ import {
   VenetianMask,
   Gauge,
   Phone,
+  Dice5,
   type LucideIcon,
 } from "lucide-react";
 import type { GameId, PlayContext } from "@/lib/games";
@@ -67,6 +68,7 @@ const GAME_ICONS: Record<GameId, { icon: LucideIcon; gradient: string }> = {
   rompecabezas: { icon: Puzzle, gradient: "from-violet-500 to-purple-600" },
   onda: { icon: Gauge, gradient: "from-sky-500 to-orange-500" },
   telefono: { icon: Phone, gradient: "from-lime-400 to-emerald-600" },
+  ludo: { icon: Dice5, gradient: "from-red-500 to-blue-600" },
 };
 
 export const CONTEXT_ICONS: Record<PlayContext, LucideIcon> = {
