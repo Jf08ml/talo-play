@@ -51,6 +51,8 @@ import { TaloMark } from "@/components/TaloLogo";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { PRIMARY_BUTTON } from "@/components/ui";
 import { Eye, Maximize, Minimize, Shuffle, Smartphone, Volume2, VolumeX, X } from "lucide-react";
+import { useQuality } from "@/hooks/useQuality";
+import QualityButton from "@/components/QualityButton";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -95,6 +97,7 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
   const [presenceLoaded, setPresenceLoaded] = useState(false);
   const [hud, setHud] = useState<Partial<Record<Seat, LiveCar>>>({});
   const [camera, toggleCamera] = useCameraMode();
+  const [quality, toggleQuality] = useQuality("carreras.calidad");
   const [sound, toggleSound] = useSoundSetting();
 
   const canvas3dRef = useRef<HTMLCanvasElement>(null);
@@ -186,9 +189,9 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
   const laps = meta?.laps ?? 5;
   const is3d = game === "carreras3d";
   useEffect(() => {
-    if (!trackId || !hasState || !canvas3dRef.current) return;
+    if (!trackId || !hasState || !canvas3dRef.current || (is3d && !quality)) return;
     const track = getTrack(trackId, trackSeed);
-    const scene = is3d ? new RaceScene(canvas3dRef.current, track) : null;
+    const scene = is3d ? new RaceScene(canvas3dRef.current, track, { quality: quality ?? "alta" }) : null;
     const audio = audioRef.current;
     const cues = new RaceCues(audio);
     let engine: Engine | null = null;
@@ -259,6 +262,7 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
           if (engine.reported.has(seat) || car.progress < laps * track.length) continue;
           engine.reported.add(seat);
           audio?.finish(engine.reported.size === 1);
+          scene?.confetti(seat);
           reportFinish(roomId, s.gameNo, seat, now - s.startedAt).catch(console.error);
         }
       }
@@ -330,7 +334,7 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
       scene?.dispose();
       audio?.silence();
     };
-  }, [trackId, trackSeed, hasState, laps, roomId, is3d]);
+  }, [trackId, trackSeed, hasState, laps, roomId, is3d, quality]);
 
   const now = useServerNow(state?.status === "racing", 100);
   const [fullscreen, setFullscreen] = useState(false);
@@ -388,6 +392,7 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
               <button onClick={toggleSound} className={chip} aria-label={sound ? "Silenciar" : "Activar sonido"} title={sound ? "Silenciar" : "Activar sonido"}>
                 {sound ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
               </button>
+              {is3d && <QualityButton quality={quality} onToggle={toggleQuality} className="pointer-events-auto !rounded-xl !bg-slate-950/70 !px-3 !text-sm" />}
               {is3d && (
                 <button onClick={toggleCamera} className={chip}>
                   <Eye className="h-4 w-4" /> {camera === "detras" ? "Detrás" : "Cabina"}

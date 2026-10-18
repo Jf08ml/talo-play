@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { mulberry32 } from "./random";
+import { Bloom, aimShadow, glowColor, type Quality } from "./postfx";
 import type { StartLights } from "./carrerasAudio";
 import {
   BRIDGE_CLEARANCE,
@@ -564,7 +565,10 @@ function labelSprite(text: string, color: string): THREE.Sprite {
 
 const WHEEL_R = 4.2;
 const TAIL_OFF = new THREE.Color(0x7f1d1d);
-const TAIL_ON = new THREE.Color(0xff2d2d);
+// Over 1: under bloom (high quality) the brake lights glow; without it, they're just bright red.
+const TAIL_ON = glowColor(0xff2d2d, 2.4);
+/** Tire marks left on the asphalt (oldest reused). */
+const SKID_MARKS = 700;
 
 interface CarParts {
   /** Placed at the car and turned to its heading. */
@@ -915,7 +919,19 @@ export class RaceScene {
   private smoke = new Particles(500, false, -6);
   private sparks = new Particles(300, true, 160);
   private flames = new Particles(260, true, -20);
+  /** Specks rushing past at high speed. */
+  private wind = new Particles(260, false, 0);
+  private confettiP = new Particles(500, false, 70);
+  private skids: THREE.InstancedMesh;
+  private skidNext = 0;
+  private skidMatrix = new THREE.Matrix4();
+  private sun: THREE.DirectionalLight;
+  private sunDir: THREE.Vector3;
+  private bloom: Bloom | null = null;
+  private shadows: boolean;
   private smokeColor: THREE.Color;
+  private windColor = new THREE.Color(0xf1f5f9);
+  private confettiColors = [0xef4444, 0xfacc15, 0x22c55e, 0x3b82f6, 0xa855f7, 0xf97316].map((c) => new THREE.Color(c));
   private sparkColors = [new THREE.Color(0xfde047), new THREE.Color(0xfb923c), new THREE.Color(0xfffbeb)];
   private flameColors = [new THREE.Color(0xfb923c), new THREE.Color(0xfde047), new THREE.Color(0x60a5fa)];
   private lights: THREE.MeshBasicMaterial[] = [];
@@ -933,9 +949,11 @@ export class RaceScene {
   constructor(
     private canvas: HTMLCanvasElement,
     track: Track,
-    opts: { maxDpr?: number } = {}
+    opts: { maxDpr?: number; quality?: Quality } = {}
   ) {
-    this.maxDpr = opts.maxDpr ?? 2;
+    const high = (opts.quality ?? "alta") === "alta";
+    this.shadows = high;
+    this.maxDpr = opts.maxDpr ?? (high ? 1.75 : 1.25);
     this.look = LOOKS[track.def.theme] ?? LOOKS.campo;
     this.worldW = track.worldW;
     this.worldH = track.worldH;
@@ -946,15 +964,50 @@ export class RaceScene {
     const far = Math.max(1, Math.min(1.4, track.worldW / 1800));
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
     this.renderer.setClearColor(L.horizon);
+    if (high) {
+      this.renderer.shadowMap.enabled = true;
+      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    }
     this.scene.fog = new THREE.Fog(L.horizon, L.fogNear * far, L.fogFar * far);
     this.scene.add(new THREE.HemisphereLight(L.hemi[0], L.hemi[1], L.hemi[2]));
     const sun = new THREE.DirectionalLight(L.sun[0], L.sun[1]);
     sun.position.set(L.sunDir[0] * 1000, L.sunDir[1] * 1000, L.sunDir[2] * 1000);
-    this.scene.add(sun);
+    this.scene.add(sun, sun.target);
+    this.sun = sun;
+    this.sunDir = new THREE.Vector3(...L.sunDir).normalize();
+    if (high) {
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(2048, 2048);
+      sun.shadow.bias = -0.0008;
+      sun.shadow.normalBias = 1.5;
+    }
     this.glow = glowTexture();
     this.smokeColor = new THREE.Color(L.smoke);
-    this.scene.add(this.smoke.points, this.sparks.points, this.flames.points);
+    this.scene.add(this.smoke.points, this.sparks.points, this.flames.points, this.wind.points, this.confettiP.points);
+    const skidGeo = new THREE.PlaneGeometry(2.6, 5.5);
+    skidGeo.rotateX(-Math.PI / 2);
+    this.skids = new THREE.InstancedMesh(
+      skidGeo,
+      new THREE.MeshBasicMaterial({ color: 0x0a0a0a, transparent: true, opacity: 0.32, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
+      SKID_MARKS
+    );
+    const hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+    for (let i = 0; i < SKID_MARKS; i++) this.skids.setMatrixAt(i, hidden);
+    this.skids.frustumCulled = false;
+    this.skids.renderOrder = 1;
+    this.scene.add(this.skids);
     this.build(track);
+    if (high) {
+      // Lit things cast and take shadows (the road is unlit: cars keep their soft blob on it).
+      this.scene.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh || !m.material || Array.isArray(m.material)) return;
+        if ((m.material as THREE.Material).type === "MeshBasicMaterial") return;
+        m.castShadow = true;
+        m.receiveShadow = true;
+      });
+      this.bloom = new Bloom(this.renderer, this.scene, new THREE.PerspectiveCamera(), { strength: 0.6, radius: 0.5, threshold: 1.05 });
+    }
   }
 
   private build(track: Track) {
@@ -1449,6 +1502,7 @@ export class RaceScene {
     for (const [key, info] of Object.entries(cars)) {
       if (this.cars.has(key)) continue;
       const parts = carMesh(info.color, this.look.night, this.glow);
+      if (this.shadows) parts.body.traverse((o) => ((o as THREE.Mesh).castShadow = (o as THREE.Mesh).isMesh));
       const label = info.label ? labelSprite(info.label, info.color) : null;
       if (label) parts.group.add(label);
       this.scene.add(parts.group);
@@ -1491,6 +1545,31 @@ export class RaceScene {
     car.bump = pose.bump ?? 0;
   }
 
+  /** Crossing the finish line: confetti over the car. */
+  confetti(key: string) {
+    const car = this.cars.get(key);
+    if (!car) return;
+    const p = car.group.position;
+    for (let i = 0; i < 160; i++) {
+      const a = this.rand() * Math.PI * 2;
+      const sp = 20 + this.rand() * 60;
+      this.confettiP.spawn(
+        p.x + (this.rand() - 0.5) * 30,
+        car.ground + 30 + this.rand() * 20,
+        p.z + (this.rand() - 0.5) * 30,
+        Math.cos(a) * sp + car.forward * Math.cos(car.heading) * 0.6,
+        60 + this.rand() * 80,
+        Math.sin(a) * sp + car.forward * Math.sin(car.heading) * 0.6,
+        this.confettiColors[i % this.confettiColors.length],
+        2 + this.rand() * 1.5,
+        2.2 + this.rand(),
+        1,
+        0,
+        car.ground
+      );
+    }
+  }
+
   /** A hit (wall or another car): a burst of sparks and a camera shake. */
   impact(key: string, strength: number) {
     const car = this.cars.get(key);
@@ -1522,8 +1601,9 @@ export class RaceScene {
 
   setStartLights(state: StartLights) {
     this.lights.forEach((mat, i) => {
-      if (state === "go") mat.color.set(0x22e36b);
-      else mat.color.set(i < state ? 0xff2020 : 0x1e1b1b);
+      if (state === "go") mat.color.set(0x22e36b).multiplyScalar(2.2);
+      else if (i < state) mat.color.set(0xff2020).multiplyScalar(2.2);
+      else mat.color.set(0x1e1b1b);
     });
   }
 
@@ -1598,6 +1678,18 @@ export class RaceScene {
       const slip = Math.abs(car.lateral);
       if (slip > 55 && Math.abs(car.forward) > 60 && lift < 1) {
         car.smokeAcc += dt * Math.min(40, (slip - 40) * 0.35);
+        // Rubber left on the road behind the rear wheels.
+        const rot = Math.PI / 2 - car.heading;
+        for (const side of [1, -1]) {
+          this.skidMatrix.compose(
+            new THREE.Vector3(p.x - fx * 11 - fz * side * 8, car.ground + ROAD_Y + 0.3, p.z - fz * 11 + fx * side * 8),
+            new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rot),
+            new THREE.Vector3(1, 1, Math.max(1, (Math.abs(car.forward) * dt) / 5.5) * 1.3)
+          );
+          this.skids.setMatrixAt(this.skidNext, this.skidMatrix);
+          this.skidNext = (this.skidNext + 1) % SKID_MARKS;
+        }
+        this.skids.instanceMatrix.needsUpdate = true;
         while (car.smokeAcc >= 1) {
           car.smokeAcc -= 1;
           for (const side of [1, -1]) {
@@ -1664,11 +1756,37 @@ export class RaceScene {
       } else {
         car.flameAcc = 0;
       }
+      // At speed, specks rush past (more with a boost).
+      const fast = car.forward / MAX_SPEED;
+      if (fast > 0.7 && lift < 30) {
+        const n = Math.min(6, dt * (fast > 1.05 ? 140 : 50) * (fast - 0.6));
+        const count = Math.floor(n) + (this.rand() < n - Math.floor(n) ? 1 : 0);
+        for (let i = 0; i < count; i++) {
+          const ahead = 70 + this.rand() * 150;
+          const side = (this.rand() - 0.5) * 120;
+          this.wind.spawn(
+            p.x + fx * ahead - fz * side,
+            car.ground + 4 + this.rand() * 50,
+            p.z + fz * ahead + fx * side,
+            0,
+            0,
+            0,
+            this.windColor,
+            2.6 + this.rand() * 1.6,
+            0.45,
+            fast > 1.05 ? 0.85 : 0.55,
+            0,
+            car.ground
+          );
+        }
+      }
       car.shake = Math.max(0, car.shake - dt);
     }
     this.smoke.update(dt);
     this.sparks.update(dt);
     this.flames.update(dt);
+    this.wind.update(dt);
+    this.confettiP.update(dt);
     if (this.arrows) this.arrows.offset.y -= dt * 2.2;
 
     if (this.clouds) this.clouds.rotation.y += dt * 0.004;
@@ -1716,12 +1834,22 @@ export class RaceScene {
       this.smoke.setScale(scale);
       this.sparks.setScale(scale);
       this.flames.setScale(scale);
+      this.wind.setScale(scale);
+      this.confettiP.setScale(scale);
+      // Shadows around the car this view follows.
+      const followed = this.cars.get(view.key);
+      if (this.shadows && followed) {
+        const fp = followed.group.position;
+        aimShadow(this.sun, fp.x, followed.ground, fp.z, 320, this.sunDir);
+      }
       const own = this.cars.get(view.key);
       // Your own name tag would float in front of the camera.
       if (own?.label) own.label.visible = false;
       this.renderer.setViewport(x, ch - yTop - vh, vw, vh);
       this.renderer.setScissor(x, ch - yTop - vh, vw, vh);
-      this.renderer.render(this.scene, rig.camera);
+      // Bloom only works on a full-canvas view: split screens draw plain.
+      if (this.bloom && n === 1) this.bloom.render(rig.camera, dt);
+      else this.renderer.render(this.scene, rig.camera);
       if (own?.label) own.label.visible = true;
     });
   }
@@ -1796,6 +1924,7 @@ export class RaceScene {
 
   dispose() {
     disposeTree(this.scene);
+    this.bloom?.dispose();
     this.glow.dispose();
     this.renderer.dispose();
   }

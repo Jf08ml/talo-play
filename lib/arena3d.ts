@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { mulberry32 } from "./random";
+import { Bloom, aimShadow, glowColor, type Quality } from "./postfx";
 import type { TeamId } from "./teams";
 import {
   ARENA_RADIUS,
@@ -322,9 +323,15 @@ interface Knight {
   /** Seconds since it fell (for the fall animation), -1 standing. */
   fallen: number;
   hp: number;
+  /** Armor that flashes white for a moment when hit. */
+  flashMats: THREE.MeshPhongMaterial[];
+  flashT: number;
+  /** Last act seen (a dodge kicks up dust once). */
+  lastAct: string;
+  dustAcc: number;
 }
 
-function knightMesh(team: TeamId, glow: THREE.Texture): Omit<Knight, "tag" | "tagKey" | "label" | "pose" | "walk" | "fallen" | "hp"> {
+function knightMesh(team: TeamId, glow: THREE.Texture): Omit<Knight, "tag" | "tagKey" | "label" | "pose" | "walk" | "fallen" | "hp" | "flashT" | "lastAct" | "dustAcc"> {
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
@@ -416,6 +423,7 @@ function knightMesh(team: TeamId, glow: THREE.Texture): Omit<Knight, "tag" | "ta
     weaponKind: null,
     shield: null,
     shadow,
+    flashMats: [armor, darkArmor],
   };
 }
 
@@ -737,7 +745,14 @@ export class ArenaScene {
   private arrows = new Map<string, THREE.Group>();
   private sparks = new Particles(300, true, 9);
   private dust = new Particles(240, false, -0.5);
+  /** Embers rising from the torches. */
+  private embers = new Particles(160, true, -1.2);
   private flames: THREE.Sprite[] = [];
+  private torchLights: THREE.PointLight[] = [];
+  private motes: THREE.Points | null = null;
+  private sun: THREE.DirectionalLight | null = null;
+  private bloom: Bloom | null = null;
+  private shadows = false;
   private crowd: THREE.InstancedMesh | null = null;
   private crowdBase: THREE.Matrix4[] = [];
   private cheerT = 0;
@@ -758,17 +773,39 @@ export class ArenaScene {
 
   constructor(
     private canvas: HTMLCanvasElement,
-    opts: { maxDpr?: number } = {}
+    opts: { maxDpr?: number; quality?: Quality } = {}
   ) {
-    this.maxDpr = opts.maxDpr ?? 2;
+    const high = (opts.quality ?? "alta") === "alta";
+    this.shadows = high;
+    this.maxDpr = opts.maxDpr ?? (high ? 1.75 : 1.25);
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
     this.renderer.autoClear = false;
+    if (high) {
+      this.renderer.shadowMap.enabled = true;
+      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    }
     this.renderer.setClearColor(0xf2c48d);
     this.scene.fog = new THREE.Fog(0xf2c48d, 60, 170);
     this.glow = glowTexture();
     this.camera.rotation.order = "YXZ";
     this.build();
-    this.scene.add(this.sparks.points, this.dust.points);
+    this.scene.add(this.sparks.points, this.dust.points, this.embers.points);
+    // Specks of dust hanging in the sunlight.
+    {
+      const n = high ? 160 : 80;
+      const rand = mulberry32(5);
+      const pos = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) {
+        const a = rand() * Math.PI * 2;
+        const r = Math.sqrt(rand()) * ARENA_RADIUS;
+        pos.set([Math.cos(a) * r, 0.5 + rand() * 5, Math.sin(a) * r], i * 3);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      this.motes = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xfff1d6, size: 0.05, transparent: true, opacity: 0.55, depthWrite: false }));
+      this.scene.add(this.motes);
+    }
+    if (high) this.bloom = new Bloom(this.renderer, this.scene, this.camera, { strength: 0.55, radius: 0.5, threshold: 1.0 });
 
     // The hands have their own light, so they read well wherever you stand.
     this.handScene.add(new THREE.HemisphereLight(0xfff4e0, 0x6b4a2a, 1.6));
@@ -792,7 +829,15 @@ export class ArenaScene {
     s.add(new THREE.HemisphereLight(0xfff1d6, 0x8a6a3a, 1.5));
     const sun = new THREE.DirectionalLight(0xffe2b0, 1.6);
     sun.position.set(-40, 60, 25);
-    s.add(sun);
+    s.add(sun, sun.target);
+    this.sun = sun;
+    if (this.shadows) {
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(2048, 2048);
+      sun.shadow.bias = -0.0005;
+      sun.shadow.normalBias = 0.02;
+      aimShadow(sun, 0, 0, 0, ARENA_RADIUS + 4, new THREE.Vector3(-40, 60, 25).normalize());
+    }
 
     // Sky.
     const skyGeo = new THREE.SphereGeometry(300, 32, 16);
@@ -815,6 +860,7 @@ export class ArenaScene {
     sand.repeat.set(10, 10);
     const floor = new THREE.Mesh(new THREE.CircleGeometry(ARENA_RADIUS + 0.5, 64), new THREE.MeshLambertMaterial({ map: sand }));
     floor.rotation.x = -Math.PI / 2;
+    floor.receiveShadow = this.shadows;
     s.add(floor);
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(2.6, 2.85, 48),
@@ -836,6 +882,7 @@ export class ArenaScene {
       new THREE.MeshLambertMaterial({ map: wallTex, side: THREE.BackSide })
     );
     wall.position.y = 1.6;
+    wall.receiveShadow = this.shadows;
     s.add(wall);
     const rim = new THREE.Mesh(new THREE.TorusGeometry(ARENA_RADIUS + 0.45, 0.25, 6, 64), lambert(0x8d8270));
     rim.rotation.x = Math.PI / 2;
@@ -859,6 +906,10 @@ export class ArenaScene {
       cap.position.y = 4.75;
       p.add(shaft, base, cap);
       p.position.set(x, 0, z);
+      p.traverse((o) => {
+        (o as THREE.Mesh).castShadow = this.shadows;
+        (o as THREE.Mesh).receiveShadow = this.shadows;
+      });
       s.add(p);
     }
 
@@ -879,6 +930,14 @@ export class ArenaScene {
       );
       flame.position.set(x * 0.975, 2.9, z * 0.975);
       flame.scale.setScalar(0.7);
+      // Under bloom the flames glow.
+      if (this.shadows) (flame.material as THREE.SpriteMaterial).color = glowColor(0xffa23a, 2.2);
+      if (this.shadows && i % 3 === 0) {
+        const light = new THREE.PointLight(0xff9a3a, 4, 9, 2);
+        light.position.set(x * 0.94, 2.9, z * 0.94);
+        this.torchLights.push(light);
+        s.add(light);
+      }
       s.add(flame);
       this.flames.push(flame);
     }
@@ -963,6 +1022,7 @@ export class ArenaScene {
         g.add(banner, trim);
       }
       g.position.set(side * (ARENA_RADIUS + 0.35), 0, 0);
+      g.traverse((o) => ((o as THREE.Mesh).castShadow = this.shadows));
       s.add(g);
     }
   }
@@ -988,8 +1048,13 @@ export class ArenaScene {
       tag.scale.set(1.3, 0.41, 1);
       tag.position.y = 2.35;
       parts.root.add(tag);
+      if (this.shadows) {
+        parts.root.traverse((o) => ((o as THREE.Mesh).castShadow = (o as THREE.Mesh).isMesh && o !== tag));
+        // Real shadows replace the soft blob under the feet.
+        parts.shadow.visible = false;
+      }
       this.scene.add(parts.root, parts.shadow);
-      this.knights.set(id, { ...parts, tag, tagKey: "", label: f.label, pose: null, walk: Math.random() * 6, fallen: -1, hp: 100 });
+      this.knights.set(id, { ...parts, tag, tagKey: "", label: f.label, pose: null, walk: Math.random() * 6, fallen: -1, hp: 100, flashT: 0, lastAct: "", dustAcc: 0 });
     }
   }
 
@@ -1115,6 +1180,12 @@ export class ArenaScene {
     }
   }
 
+  /** A knight that just took a clean hit flashes white. */
+  hitFlash(id: string) {
+    const k = this.knights.get(id);
+    if (k) k.flashT = 0.15;
+  }
+
   /** Shakes the camera (you got hit, or landed a heavy blow). */
   jolt(amount: number) {
     this.shake = Math.max(this.shake, amount);
@@ -1130,8 +1201,24 @@ export class ArenaScene {
     for (const [, k] of this.knights) {
       const p = k.pose;
       k.root.visible = !!p;
-      k.shadow.visible = !!p;
+      k.shadow.visible = !!p && !this.shadows;
       if (!p) continue;
+      // Hit flash fading out.
+      if (k.flashT > 0) {
+        k.flashT = Math.max(0, k.flashT - dt);
+        for (const m of k.flashMats) m.emissive.setScalar(k.flashT * 4);
+      }
+      // Sand kicked up: running, and a burst on each dodge.
+      if (p.alive && p.y < 0.05) {
+        if (p.act === "dodge" && k.lastAct !== "dodge") this.burst(p.x, 0.1, p.z, "dust");
+        k.dustAcc += dt * Math.max(0, p.speed - 3.5) * 2.2;
+        while (k.dustAcc > 1) {
+          k.dustAcc -= 1;
+          const a = this.rand() * Math.PI * 2;
+          this.dust.spawn(p.x + Math.cos(a) * 0.25, 0.08, p.z + Math.sin(a) * 0.25, Math.cos(a) * 0.6, 0.35, Math.sin(a) * 0.6, new THREE.Color(0xe7cc9a), 0.35, 0.6, 0.35);
+        }
+      }
+      k.lastAct = p.act;
       k.root.position.set(p.x, p.y, p.z);
       k.root.rotation.y = p.yaw;
       k.shadow.position.set(p.x, 0.02, p.z);
@@ -1165,7 +1252,27 @@ export class ArenaScene {
       spin.rotation.y += dt * 1.4;
       spin.position.y = itemHeight(it.kind) + Math.sin(this.time * 2.5) * 0.06;
     }
-    for (const f of this.flames) f.scale.setScalar(0.6 + Math.sin(this.time * 13 + f.position.x) * 0.06 + this.rand() * 0.08);
+    for (const f of this.flames) {
+      f.scale.setScalar(0.6 + Math.sin(this.time * 13 + f.position.x) * 0.06 + this.rand() * 0.08);
+      // Now and then an ember floats up from a torch.
+      if (this.rand() < dt * 2.5) {
+        this.embers.spawn(f.position.x, f.position.y + 0.1, f.position.z, (this.rand() - 0.5) * 0.3, 0.6 + this.rand() * 0.6, (this.rand() - 0.5) * 0.3, new THREE.Color(0xffb347), 0.05, 1.5 + this.rand(), 1);
+      }
+    }
+    for (const [i, l] of this.torchLights.entries()) l.intensity = 3.5 + Math.sin(this.time * 11 + i * 2) * 0.6 + this.rand() * 0.8;
+    if (this.motes) {
+      const pos = this.motes.geometry.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < pos.count; i++) {
+        let x = pos.getX(i) + Math.sin(this.time * 0.4 + i) * 0.12 * dt + 0.08 * dt;
+        let y = pos.getY(i) + Math.cos(this.time * 0.3 + i * 1.7) * 0.05 * dt;
+        const z = pos.getZ(i) + Math.cos(this.time * 0.5 + i * 0.6) * 0.12 * dt;
+        if (Math.hypot(x, z) > ARENA_RADIUS) x = -x * 0.95;
+        if (y > 6) y = 0.5;
+        if (y < 0.3) y = 5.5;
+        pos.setXYZ(i, x, y, z);
+      }
+      pos.needsUpdate = true;
+    }
     if (this.crowd && this.cheerT > 0) {
       this.cheerT -= dt;
       const m = new THREE.Matrix4();
@@ -1179,6 +1286,7 @@ export class ArenaScene {
     }
     this.sparks.update(dt);
     this.dust.update(dt);
+    this.embers.update(dt);
     this.shake = Math.max(0, this.shake - dt * 2.5);
   }
 
@@ -1316,10 +1424,15 @@ export class ArenaScene {
     const scale = (ch * dpr) / (2 * Math.tan((cam.fov * Math.PI) / 360));
     this.sparks.setScale(scale);
     this.dust.setScale(scale);
+    this.embers.setScale(scale);
 
     this.renderer.setViewport(0, 0, cw, ch);
-    this.renderer.clear();
-    this.renderer.render(this.scene, cam);
+    if (this.bloom) {
+      this.bloom.render(cam, dt);
+    } else {
+      this.renderer.clear();
+      this.renderer.render(this.scene, cam);
+    }
     if (firstPerson && p && k) {
       this.updateHands(p, k.team, dt);
       cam.updateMatrixWorld();
@@ -1333,6 +1446,7 @@ export class ArenaScene {
   dispose() {
     disposeTree(this.scene);
     disposeTree(this.handScene);
+    this.bloom?.dispose();
     this.glow.dispose();
     this.renderer.dispose();
   }

@@ -28,6 +28,8 @@ import { TaloMark } from "@/components/TaloLogo";
 import Controller, { useWakeLock } from "./Controller";
 import { Standings, driverName, useCameraMode, useSoundSetting } from "./shared";
 import { Eye, Maximize, RotateCw, Volume2, VolumeX } from "lucide-react";
+import { useQuality } from "@/hooks/useQuality";
+import QualityButton from "@/components/QualityButton";
 
 const STEP = 1 / 120;
 /** How often this phone publishes its car. */
@@ -84,6 +86,7 @@ export default function PhoneRace({
   const cameraRef = useRef<CameraMode>(camera);
   const [hud, setHud] = useState<Hud | null>(null);
   const [sound, toggleSound] = useSoundSetting();
+  const [quality, toggleQuality] = useQuality("carreras.calidad");
   const audioRef = useRef<RaceAudio | null>(null);
   const now = useServerNow(true, 100);
 
@@ -132,9 +135,9 @@ export default function PhoneRace({
   const racersKey = state.racers;
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !quality) return;
     const track = getTrack(trackId, trackSeed);
-    const scene = new RaceScene(canvas, track, { maxDpr: 1.5 });
+    const scene = new RaceScene(canvas, track, { quality });
     const audio = audioRef.current;
     const cues = new RaceCues(audio);
     let frame = 0;
@@ -198,6 +201,7 @@ export default function PhoneRace({
       if (own && s.status === "racing" && moving && reportedGame !== s.gameNo && own.progress >= laps * track.length) {
         reportedGame = s.gameNo;
         audio?.finish(Object.keys(s.results).length === 0);
+        scene.confetti(seat!);
         reportFinish(roomId, s.gameNo, seat!, now - s.startedAt).catch(console.error);
       }
       if (own && poseSender.current && t - lastPose >= POSE_MS) {
@@ -312,7 +316,7 @@ export default function PhoneRace({
       scene.dispose();
       audio?.silence();
     };
-  }, [trackId, trackSeed, laps, roomId, myId, racersKey]);
+  }, [trackId, trackSeed, laps, roomId, myId, racersKey, quality]);
 
   const left = Math.ceil((state.startedAt - now) / 1000);
   const counting = state.status === "racing" && now > 0 && left > 0;
@@ -353,6 +357,7 @@ export default function PhoneRace({
             >
               {sound ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </button>
+            <QualityButton quality={quality} onToggle={toggleQuality} />
             <button
               onClick={toggleCamera}
               className="flex items-center gap-1 rounded-xl bg-slate-950/60 px-2.5 py-2 text-xs text-white backdrop-blur"

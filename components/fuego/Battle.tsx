@@ -64,7 +64,9 @@ import {
   type WeaponId,
 } from "@/lib/fuegoSim";
 import { MAPS, type PickupKind } from "@/lib/fuegoMaps";
-import { FuegoScene, type Quality } from "@/lib/fuego3d";
+import { FuegoScene } from "@/lib/fuego3d";
+import { useQuality } from "@/hooks/useQuality";
+import QualityButton from "@/components/QualityButton";
 import { FuegoAudio } from "@/lib/fuegoAudio";
 import { serverNow } from "@/lib/serverTime";
 import type { PresenceMap } from "@/lib/presence";
@@ -73,7 +75,7 @@ import { useWakeLock } from "@/components/carreras/Controller";
 import { TaloMark } from "@/components/TaloLogo";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { MOUSE_LOOK, TOUCH_LOOK, TouchControls, newControls, useDesktopControls, useFinePointer, type ControlState } from "./Controls";
-import { ListOrdered, Maximize, MousePointerClick, RotateCw, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { ListOrdered, Maximize, MousePointerClick, RotateCw, Volume2, VolumeX } from "lucide-react";
 
 const STEP = 1 / 60;
 const POSE_MS = 50;
@@ -193,7 +195,7 @@ export default function Battle({
   const [hit, setHit] = useState<{ n: number; head: boolean; kill: boolean }>({ n: 0, head: false, kill: false });
   const [hurtDirs, setHurtDirs] = useState<{ a: number; id: number; shield: boolean }[]>([]);
   const [shieldBroke, setShieldBroke] = useState(0);
-  const [quality, setQuality] = useState<Quality | null>(null);
+  const [quality, toggleQuality] = useQuality(QUALITY_KEY);
   const [toast, setToast] = useState<{ text: string; id: number } | null>(null);
   const [aimToggle, setAimToggle] = useState(false);
   const aimToggleRef = useRef(false);
@@ -204,28 +206,6 @@ export default function Battle({
   const locked = useDesktopControls(controlsRef, canvasRef, fine, canFight);
 
   useWakeLock();
-  // Quality: remembered, else high with a mouse (computers), low on touch (phones).
-  useEffect(() => {
-    let saved: string | null = null;
-    try {
-      saved = localStorage.getItem(QUALITY_KEY);
-    } catch {
-      // Not remembered.
-    }
-    const initial: Quality = saved === "alta" || saved === "baja" ? saved : window.matchMedia("(pointer: fine)").matches ? "alta" : "baja";
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the device after mounting.
-    setQuality(initial);
-  }, []);
-  const toggleQuality = () =>
-    setQuality((q) => {
-      const next: Quality = q === "alta" ? "baja" : "alta";
-      try {
-        localStorage.setItem(QUALITY_KEY, next);
-      } catch {
-        // Not remembered.
-      }
-      return next;
-    });
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
@@ -1130,14 +1110,7 @@ export default function Battle({
             <button onClick={() => setSound((v) => (v === "on" ? "off" : "on"))} aria-label={sound === "on" ? "Silenciar" : "Activar sonido"} className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur">
               {sound === "on" ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </button>
-            <button
-              onClick={toggleQuality}
-              aria-label="Calidad gráfica"
-              title="Calidad gráfica: alta tiene brillos y sombras; baja va más fluido en teléfonos viejos"
-              className="flex items-center gap-1 rounded-xl bg-slate-950/60 px-2 py-2 text-xs text-white backdrop-blur"
-            >
-              <Sparkles className="h-4 w-4" /> {quality === "alta" ? "Alta" : "Baja"}
-            </button>
+            <QualityButton quality={quality} onToggle={toggleQuality} />
             <button onClick={() => setBoard((v) => !v)} aria-label="Tabla" className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur">
               <ListOrdered className="h-4 w-4" />
             </button>

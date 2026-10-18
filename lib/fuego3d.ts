@@ -22,7 +22,8 @@ import { EYE, topAt, worldOf, type ProjectileKind, type WeaponId } from "./fuego
  * reused, so nothing makes three.js recompile shaders mid-game.
  */
 
-export type Quality = "alta" | "baja";
+export type { Quality } from "./postfx";
+import type { Quality } from "./postfx";
 
 export interface SoldierDraw {
   x: number;

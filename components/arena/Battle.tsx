@@ -64,6 +64,8 @@ import { serverNow } from "@/lib/serverTime";
 import type { PresenceMap } from "@/lib/presence";
 import type { TeamId } from "@/lib/teams";
 import { useWakeLock } from "@/components/carreras/Controller";
+import { useQuality } from "@/hooks/useQuality";
+import QualityButton from "@/components/QualityButton";
 import { TaloMark } from "@/components/TaloLogo";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { MOUSE_LOOK, TOUCH_LOOK, TouchControls, newControls, useDesktopControls, useFinePointer, type ControlState } from "./Controls";
@@ -174,6 +176,7 @@ export default function Battle({
   const [camera, toggleCamera] = useStored<ArenaCamera>(CAMERA_KEY, "primera", "tercera");
   const cameraRef = useRef(camera);
   const [sound, toggleSound] = useStored<"on" | "off">(SOUND_KEY, "on", "off");
+  const [quality, toggleQuality] = useQuality("arena.calidad");
   const audioRef = useRef<ArenaAudio | null>(null);
   const [hud, setHud] = useState<Hud | null>(null);
   const [hurt, setHurt] = useState(false);
@@ -216,8 +219,8 @@ export default function Battle({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const scene = new ArenaScene(canvas, { maxDpr: 1.5 });
+    if (!canvas || !quality) return;
+    const scene = new ArenaScene(canvas, { quality });
     const audio = audioRef.current;
     let poses: Record<string, ArenaPose> = {};
     let arrowsIn: Record<string, ArenaArrow> = {};
@@ -363,6 +366,7 @@ export default function Battle({
           for (const h of hits) {
             const t = views.find((v) => v.id === h.target)!;
             scene.burst(t.x, t.y + 1.3, t.z, h.blocked ? "block" : "hit");
+            if (!h.blocked) scene.hitFlash(h.target);
             const [v2, p2] = where(t.x, t.z);
             if (h.blocked) audio?.clang(v2, p2);
             else audio?.thud(v2, p2);
@@ -470,6 +474,7 @@ export default function Battle({
         if (h.from !== myId && !bots.has(h.from)) {
           const v = viewOf(s, id);
           scene.burst(v.x, v.y + 1.3, v.z, h.b ? "block" : "hit");
+          if (!h.b) scene.hitFlash(id);
           const [vol, pan] = where(v.x, v.z);
           if (h.b) audio?.clang(vol, pan);
           else audio?.thud(vol, pan);
@@ -588,6 +593,7 @@ export default function Battle({
         if (res.strike) {
           const v = views.find((o) => o.id === res.strike!.target)!;
           scene.burst(v.x, Math.max(v.y + 0.8, y), v.z, res.strike.blocked ? "block" : "hit");
+          if (!res.strike.blocked) scene.hitFlash(v.id);
           if (res.strike.blocked) audio?.clang(vol, pan);
           else audio?.thud(vol, pan);
           const shooter = ar.owner === myId ? me : bots.get(ar.owner)?.f;
@@ -818,7 +824,7 @@ export default function Battle({
       for (const a of myArrows) a.down();
       scene.dispose();
     };
-  }, [roomId, myId, gameNo, fine]);
+  }, [roomId, myId, gameNo, fine, quality]);
 
   const now = clock || serverNow();
   const counting = state.status === "fighting" && now < state.startedAt;
@@ -881,6 +887,7 @@ export default function Battle({
             <button onClick={toggleSound} aria-label={sound === "on" ? "Silenciar" : "Activar sonido"} className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur">
               {sound === "on" ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </button>
+            <QualityButton quality={quality} onToggle={toggleQuality} />
             <button onClick={toggleCamera} className="flex items-center gap-1 rounded-xl bg-slate-950/60 px-2.5 py-2 text-xs text-white backdrop-blur">
               <Eye className="h-4 w-4" /> {camera === "primera" ? "1ª persona" : "3ª persona"}
             </button>
