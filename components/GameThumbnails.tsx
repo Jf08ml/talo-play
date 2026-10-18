@@ -1256,3 +1256,43 @@ export function TrucoThumbnail() {
     </svg>
   );
 }
+
+export function FuegoThumbnail() {
+  // A visor helmet behind a crosshair, a tracer and a shield bar.
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <linearGradient id="fuego-bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#0c4a6e" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </linearGradient>
+        <linearGradient id="fuego-visor" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#fde68a" />
+          <stop offset="100%" stopColor="#d97706" />
+        </linearGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#fuego-bg)" />
+      <rect x="0" y="170" width="400" height="70" fill="#1e293b" />
+      <rect x="60" y="120" width="70" height="50" fill="#334155" />
+      <rect x="270" y="100" width="90" height="70" fill="#334155" />
+      <g transform="translate(200 128)">
+        <ellipse cx="0" cy="0" rx="44" ry="50" fill="#1f7fd6" />
+        <path d="M-34 -6 Q0 -26 34 -6 Q30 18 0 22 Q-30 18 -34 -6 Z" fill="url(#fuego-visor)" />
+        <rect x="-50" y="44" width="100" height="40" rx="12" fill="#1f7fd6" />
+      </g>
+      <line x1="40" y1="215" x2="190" y2="128" stroke="#fde047" strokeWidth="3" strokeLinecap="round" opacity="0.85" />
+      <g stroke="#f8fafc" strokeWidth="3" fill="none" opacity="0.9">
+        <circle cx="200" cy="120" r="26" />
+        <line x1="200" y1="84" x2="200" y2="102" />
+        <line x1="200" y1="138" x2="200" y2="156" />
+        <line x1="164" y1="120" x2="182" y2="120" />
+        <line x1="218" y1="120" x2="236" y2="120" />
+      </g>
+      <g transform="translate(130 20)">
+        {Array.from({ length: 10 }, (_, i) => (
+          <rect key={i} x={i * 14} y="0" width="11" height="8" rx="2" transform="skewX(-20)" fill={i < 7 ? "#67e8f9" : "#334155"} />
+        ))}
+      </g>
+    </svg>
+  );
+}

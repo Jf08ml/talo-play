@@ -6,7 +6,7 @@
  * Every room stores its game in `rooms/{id}/meta/game`; room codes are
  * global, so one code is enough to find any game's room (`lib/roomLookup.ts`).
  */
-export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena" | "yonunca" | "onda" | "telefono" | "ludo" | "lobo" | "ajedrez" | "chinchon" | "truco";
+export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena" | "yonunca" | "onda" | "telefono" | "ludo" | "lobo" | "ajedrez" | "chinchon" | "truco" | "fuego";
 
 /** Who you're playing with: the first question the home page asks. */
 export type PlayContext = "pareja" | "amigos" | "grupo" | "solo";
@@ -530,10 +530,25 @@ export const GAMES: Record<GameId, GameInfo> = {
       "Gana la mano quien gana dos de las tres bazas. La app cuenta el envido y anota los porotos hasta 15 o 30.",
     ],
   },
+  fuego: {
+    id: "fuego",
+    title: "Fuego cruzado",
+    path: "fuego-cruzado",
+    tagline: "Shooter en primera persona con escudo que se recarga, armas por el mapa y tres mapas, de un búnker chico a un valle enorme. Todos contra todos o por equipos.",
+    minPlayers: 1,
+    maxPlayers: 8,
+    duration: "5–10 min",
+    contexts: ["amigos", "grupo", "pareja", "solo"],
+    howTo: [
+      "Elegí mapa y modo: todos contra todos o rojos contra azules. Los bots completan los lugares libres.",
+      "Arrancás con fusil, pistola y granadas. Buscá la escopeta, el francotirador o el lanzacohetes por el mapa; llevás dos armas a la vez.",
+      "El escudo se recarga si no te pegan; la vida, con botiquines. Gana quien llega primero a las bajas pedidas.",
+    ],
+  },
 };
 
 /** Home page order: quickest to start first. */
-export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "yonunca", "onda", "telefono", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "lobo", "arena", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "ajedrez", "generala", "chinchon", "truco", "ludo", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
+export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "yonunca", "onda", "telefono", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "lobo", "arena", "fuego", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "ajedrez", "generala", "chinchon", "truco", "ludo", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
 
 export function roomPath(game: GameId, roomId: string): string {
   return `/${GAMES[game].path}/${roomId}`;
