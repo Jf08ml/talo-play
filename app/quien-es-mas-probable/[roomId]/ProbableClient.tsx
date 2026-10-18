@@ -32,6 +32,9 @@ import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
+import { BackToRoomButton, RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
+import { watchRoomMeta } from "@/lib/roomSettings";
+import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 import { Crown } from "lucide-react";
 
@@ -48,6 +51,7 @@ export default function ProbableClient({ roomId }: { roomId: string }) {
   const router = useRouter();
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
+  const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
   const [state, setState] = useState<ProbableState | null>(null);
 
@@ -62,9 +66,11 @@ export default function ProbableClient({ roomId }: { roomId: string }) {
     let cancelled = false;
     let unsub: (() => void) | undefined;
 
-    getProbableMeta(roomId)
-      .then((meta) => {
+    const unsubMeta = watchRoomMeta<NonNullable<Awaited<ReturnType<typeof getProbableMeta>>>>(
+      roomId,
+      (meta) => {
         if (cancelled) return;
+        setRoomMeta(meta);
         if (!meta) return setStatus("not-found");
         if (meta.game !== "probable") return router.replace(`/sala/${roomId}`);
         const m = normalizeMeta(meta);
@@ -73,16 +79,18 @@ export default function ProbableClient({ roomId }: { roomId: string }) {
         if (m.customPrompts?.length) decks.push("✏️ Propias");
         const total = Math.min(m.questions, pool.length);
         setConfig({ hostId: meta.hostId ?? "", pool, total, summary: `${total} preguntas · ${decks.join(", ")}` });
-        unsub = subscribeProbable(roomId, setState);
+        unsub ??= subscribeProbable(roomId, setState);
         setStatus("ready");
-      })
-      .catch((err) => {
+      },
+      (err) => {
         console.error(err);
         if (!cancelled) setStatus("error");
-      });
+      }
+    );
 
     return () => {
       cancelled = true;
+      unsubMeta();
       unsub?.();
     };
   }, [configured, roomId, identity.clientId, identity.name, router]);
@@ -137,6 +145,7 @@ export default function ProbableClient({ roomId }: { roomId: string }) {
               presence={presence}
               myId={myId}
               summary={config.summary}
+              settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
               onStart={() => startProbable(roomId, connected.length)}
             >
               {connected.length < MIN_PLAYERS && (
@@ -179,6 +188,9 @@ export default function ProbableClient({ roomId }: { roomId: string }) {
                   pool={config.pool}
                   onAgain={() => playAgain(roomId, state.gameNo)}
                 />
+              )}
+              {state.status === "finished" && (
+                <BackToRoomButton roomId={roomId} stateKey="probable/state" hostId={config.hostId} presence={presence} myId={myId} />
               )}
             </div>
             <Scoreboard state={state} presence={presence} myId={myId} />

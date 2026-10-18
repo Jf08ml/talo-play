@@ -7,11 +7,12 @@ import { shareInvite } from "@/lib/share";
 import { trackEvent } from "@/lib/analytics";
 import { TaloMark } from "./TaloLogo";
 import GameIcon from "./GameIcon";
+import { RulesButton } from "./HowToPlay";
 import { Check, Share2 } from "lucide-react";
 
 /**
  * Top bar shared by every game's room: back to Talo, which game, room code
- * and an always-visible "Invitar". `badges` go after the code (e.g. mode);
+ * and an always-visible "Invitar" and "Reglas". `badges` go after the code (e.g. mode);
  * `right` is the game's own status area (progress, players…).
  */
 export default function RoomHeader({
@@ -56,6 +57,7 @@ export default function RoomHeader({
           {copied ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
           {copied ? "¡Link copiado!" : "Invitar"}
         </button>
+        <RulesButton game={game} where="partida" />
       </div>
 
       {right && (

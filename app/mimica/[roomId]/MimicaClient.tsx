@@ -33,6 +33,9 @@ import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
+import { BackToRoomButton, RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
+import { watchRoomMeta } from "@/lib/roomSettings";
+import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { Shuffle } from "lucide-react";
 
@@ -46,6 +49,7 @@ export default function MimicaClient({ roomId }: { roomId: string }) {
   const router = useRouter();
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
+  const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
   const [state, setState] = useState<MimicaState | null>(null);
 
@@ -60,22 +64,26 @@ export default function MimicaClient({ roomId }: { roomId: string }) {
     let cancelled = false;
     let unsub: (() => void) | undefined;
 
-    getMimicaMeta(roomId)
-      .then((meta) => {
+    const unsubMeta = watchRoomMeta<NonNullable<Awaited<ReturnType<typeof getMimicaMeta>>>>(
+      roomId,
+      (meta) => {
         if (cancelled) return;
+        setRoomMeta(meta);
         if (!meta) return setStatus("not-found");
         if (meta.game !== "mimica") return router.replace(`/sala/${roomId}`);
         setConfig({ ...normalizeMeta(meta), hostId: meta.hostId ?? "" });
-        unsub = subscribeMimica(roomId, setState);
+        unsub ??= subscribeMimica(roomId, setState);
         setStatus("ready");
-      })
-      .catch((err) => {
+      },
+      (err) => {
         console.error(err);
         if (!cancelled) setStatus("error");
-      });
+      }
+    );
 
     return () => {
       cancelled = true;
+      unsubMeta();
       unsub?.();
     };
   }, [configured, roomId, identity.clientId, identity.name, router]);
@@ -133,6 +141,7 @@ export default function MimicaClient({ roomId }: { roomId: string }) {
               presence={presence}
               myId={myId}
               summary={`${config.turns} turnos por equipo · ${config.seconds} s cada uno`}
+              settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
               onStart={() => startMimica(roomId, connected)}
             >
               <TeamSetup roomId={roomId} state={state} myId={myId} connected={connected} />
@@ -162,6 +171,9 @@ export default function MimicaClient({ roomId }: { roomId: string }) {
                 canAgain={canStart(state, connected)}
                 onAgain={() => playAgain(roomId, state.gameNo, connected)}
               />
+            )}
+            {state.status === "finished" && (
+              <BackToRoomButton roomId={roomId} stateKey="mimica/state" hostId={config.hostId} presence={presence} myId={myId} />
             )}
           </div>
         )}

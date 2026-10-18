@@ -31,6 +31,9 @@ import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
+import { BackToRoomButton, RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
+import { watchRoomMeta } from "@/lib/roomSettings";
+import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 
 type Status = "loading" | "not-found" | "ready" | "error";
@@ -40,6 +43,7 @@ export default function MemotestClient({ roomId }: { roomId: string }) {
   const router = useRouter();
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
+  const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<MemoConfig | null>(null);
   const [hostId, setHostId] = useState("");
   const [state, setState] = useState<MemoState | null>(null);
@@ -55,23 +59,27 @@ export default function MemotestClient({ roomId }: { roomId: string }) {
     let cancelled = false;
     let unsub: (() => void) | undefined;
 
-    getMemoMeta(roomId)
-      .then((meta) => {
+    const unsubMeta = watchRoomMeta<NonNullable<Awaited<ReturnType<typeof getMemoMeta>>>>(
+      roomId,
+      (meta) => {
         if (cancelled) return;
+        setRoomMeta(meta);
         if (!meta) return setStatus("not-found");
         if (meta.game !== "memotest") return router.replace(`/sala/${roomId}`);
         setConfig(normalizeMeta(meta));
         setHostId(meta.hostId ?? "");
-        unsub = subscribeMemo(roomId, setState);
+        unsub ??= subscribeMemo(roomId, setState);
         setStatus("ready");
-      })
-      .catch((err) => {
+      },
+      (err) => {
         console.error(err);
         if (!cancelled) setStatus("error");
-      });
+      }
+    );
 
     return () => {
       cancelled = true;
+      unsubMeta();
       unsub?.();
     };
   }, [configured, roomId, identity.clientId, identity.name, router]);
@@ -167,6 +175,7 @@ export default function MemotestClient({ roomId }: { roomId: string }) {
               presence={presence}
               myId={identity.clientId}
               summary={memoSummary(config)}
+              settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
               onStart={() => startMemo(roomId)}
             />
           </div>
@@ -212,6 +221,12 @@ export default function MemotestClient({ roomId }: { roomId: string }) {
             </div>
 
             <Scoreboard state={state} isColab={isColab} myClientId={identity.clientId} presence={presence} />
+          </div>
+        )}
+
+        {status === "ready" && state?.status === "finished" && (
+          <div className="flex justify-center px-4 pb-6">
+            <BackToRoomButton roomId={roomId} stateKey="memo" hostId={hostId} presence={presence} myId={identity.clientId} />
           </div>
         )}
       </main>

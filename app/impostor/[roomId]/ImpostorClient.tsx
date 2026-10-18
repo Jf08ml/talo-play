@@ -40,6 +40,9 @@ import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
+import { BackToRoomButton, RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
+import { watchRoomMeta } from "@/lib/roomSettings";
+import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, TEXT_INPUT } from "@/components/ui";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -51,6 +54,7 @@ export default function ImpostorClient({ roomId }: { roomId: string }) {
   const router = useRouter();
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
+  const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
   const [state, setState] = useState<ImpostorState | null>(null);
 
@@ -65,22 +69,26 @@ export default function ImpostorClient({ roomId }: { roomId: string }) {
     let cancelled = false;
     let unsub: (() => void) | undefined;
 
-    getImpostorMeta(roomId)
-      .then((meta) => {
+    const unsubMeta = watchRoomMeta<NonNullable<Awaited<ReturnType<typeof getImpostorMeta>>>>(
+      roomId,
+      (meta) => {
         if (cancelled) return;
+        setRoomMeta(meta);
         if (!meta) return setStatus("not-found");
         if (meta.game !== "impostor") return router.replace(`/sala/${roomId}`);
         setConfig({ ...normalizeMeta(meta), hostId: meta.hostId ?? "" });
-        unsub = subscribeImpostor(roomId, setState);
+        unsub ??= subscribeImpostor(roomId, setState);
         setStatus("ready");
-      })
-      .catch((err) => {
+      },
+      (err) => {
         console.error(err);
         if (!cancelled) setStatus("error");
-      });
+      }
+    );
 
     return () => {
       cancelled = true;
+      unsubMeta();
       unsub?.();
     };
   }, [configured, roomId, identity.clientId, identity.name, router]);
@@ -154,6 +162,7 @@ export default function ImpostorClient({ roomId }: { roomId: string }) {
               presence={presence}
               myId={myId}
               summary={`${config.clueMode === "app" ? `${config.clueRounds} ${config.clueRounds === 1 ? "vuelta" : "vueltas"} de pistas en la app` : "Pistas en voz alta"} · ${categoriesLabel}`}
+              settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
               onStart={() => startImpostor(roomId, connected)}
             >
               {connected.length < MIN_PLAYERS && (
@@ -219,6 +228,9 @@ export default function ImpostorClient({ roomId }: { roomId: string }) {
                   canNext={connected.length >= MIN_PLAYERS}
                   onNext={() => nextRound(roomId, state.roundNo, connected)}
                 />
+              )}
+              {state.status === "result" && (
+                <BackToRoomButton roomId={roomId} stateKey="impostor/state" hostId={config.hostId} presence={presence} myId={myId} />
               )}
               {state.status === "result" && appClues && state.clues.length > 0 && <ClueList state={state} myId={myId} />}
             </div>

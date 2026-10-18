@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { isFirebaseConfigured } from "@/lib/firebase";
@@ -40,6 +40,9 @@ import PhoneRace from "@/components/carreras/PhoneRace";
 import TrackPreview from "@/components/carreras/TrackPreview";
 import { CarDot, Standings, driverName, useRaceCloser } from "@/components/carreras/shared";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
+import { RoomSettingsEditor } from "@/components/RoomSettings";
+import { watchRoomMeta } from "@/lib/roomSettings";
+import { carrerasSettings } from "./settings";
 import { MonitorPlay, Shuffle, Smartphone } from "lucide-react";
 
 type Status = "loading" | "not-found" | "ready" | "error";
@@ -53,6 +56,7 @@ export default function RoomClient({ game, roomId }: { game: CarrerasGame; roomI
   const [meta, setMeta] = useState<CarrerasMeta | null>(null);
   const [state, setState] = useState<CarrerasState | null>(null);
   const [live, setLive] = useState<CarrerasLive | null>(null);
+  const settings = useMemo(() => carrerasSettings(game), [game]);
 
   const myId = identity.clientId;
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;
@@ -64,24 +68,29 @@ export default function RoomClient({ game, roomId }: { game: CarrerasGame; roomI
     let cancelled = false;
     const unsubs: (() => void)[] = [];
 
-    getCarrerasMeta(roomId)
-      .then((raw) => {
+    // Followed live: the host can change track, laps or mode while waiting.
+    const unsubMeta = watchRoomMeta<NonNullable<Awaited<ReturnType<typeof getCarrerasMeta>>>>(
+      roomId,
+      (raw) => {
         if (cancelled) return;
         if (!raw) return setStatus("not-found");
         if (raw.game !== game) return router.replace(`/sala/${roomId}`);
-        const m = normalizeMeta(raw);
-        setMeta(m);
-        unsubs.push(subscribeCarreras(roomId, setState));
-        if (m.mode === "pantalla") unsubs.push(subscribeLive(roomId, setLive));
+        setMeta(normalizeMeta(raw));
+        if (unsubs.length === 0) {
+          // Live places only come from a big screen; following them always is harmless.
+          unsubs.push(subscribeCarreras(roomId, setState), subscribeLive(roomId, setLive));
+        }
         setStatus("ready");
-      })
-      .catch((err) => {
+      },
+      (err) => {
         console.error(err);
         if (!cancelled) setStatus("error");
-      });
+      }
+    );
 
     return () => {
       cancelled = true;
+      unsubMeta();
       unsubs.forEach((u) => u());
     };
   }, [configured, game, roomId, identity.clientId, identity.name, router]);
@@ -134,6 +143,7 @@ export default function RoomClient({ game, roomId }: { game: CarrerasGame; roomI
               summary={`Pista ${trackLabel(meta.track)} · ${meta.laps} vueltas · ${
                 meta.mode === "pantalla" ? "en pantalla grande" : "cada uno en su teléfono"
               }`}
+              settings={<RoomSettingsEditor settings={settings} roomId={roomId} meta={meta} />}
               onStart={() => startRace(roomId)}
             >
               <ModeHint roomId={roomId} meta={meta} />

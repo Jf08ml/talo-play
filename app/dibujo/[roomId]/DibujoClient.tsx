@@ -44,6 +44,9 @@ import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
+import { BackToRoomButton, RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
+import { watchRoomMeta } from "@/lib/roomSettings";
+import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 
 type Status = "loading" | "not-found" | "ready" | "error";
@@ -57,6 +60,7 @@ export default function DibujoClient({ roomId }: { roomId: string }) {
   const router = useRouter();
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
+  const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<{ rounds: number; drawSeconds: number; pool: string[] } | null>(null);
   const [hostId, setHostId] = useState("");
   const [state, setState] = useState<DibujoState | null>(null);
@@ -75,9 +79,11 @@ export default function DibujoClient({ roomId }: { roomId: string }) {
     let cancelled = false;
     let unsub: (() => void) | undefined;
 
-    getDibujoMeta(roomId)
-      .then((meta) => {
+    const unsubMeta = watchRoomMeta<NonNullable<Awaited<ReturnType<typeof getDibujoMeta>>>>(
+      roomId,
+      (meta) => {
         if (cancelled) return;
+        setRoomMeta(meta);
         if (!meta) return setStatus("not-found");
         if (meta.game !== "dibujo") return router.replace(`/sala/${roomId}`);
         setHostId(meta.hostId ?? "");
@@ -86,16 +92,18 @@ export default function DibujoClient({ roomId }: { roomId: string }) {
           drawSeconds: meta.drawSeconds ?? 80,
           pool: wordPool({ customWords: meta.customWords, useDefaultWords: meta.useDefaultWords ?? true }),
         });
-        unsub = subscribeDibujoState(roomId, setState);
+        unsub ??= subscribeDibujoState(roomId, setState);
         setStatus("ready");
-      })
-      .catch((err) => {
+      },
+      (err) => {
         console.error(err);
         if (!cancelled) setStatus("error");
-      });
+      }
+    );
 
     return () => {
       cancelled = true;
+      unsubMeta();
       unsub?.();
     };
   }, [configured, roomId, identity.clientId, identity.name, router]);
@@ -177,6 +185,7 @@ export default function DibujoClient({ roomId }: { roomId: string }) {
               presence={presence}
               myId={myId}
               summary={`Cada uno dibuja ${config.rounds} ${config.rounds === 1 ? "vez" : "veces"} · ${config.drawSeconds} s por dibujo`}
+              settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
               onStart={() => startDibujo(roomId)}
             />
           </div>
@@ -186,7 +195,10 @@ export default function DibujoClient({ roomId }: { roomId: string }) {
           <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 p-4 lg:flex-row lg:items-start">
             <div className="flex min-w-0 flex-1 flex-col gap-3">
               {state.status === "finished" ? (
-                <FinishedView state={state} myId={myId} onRestart={() => restartDibujo(roomId)} />
+                <>
+                  <FinishedView state={state} myId={myId} onRestart={() => restartDibujo(roomId)} />
+                  <BackToRoomButton roomId={roomId} stateKey="dibujo/state" hostId={hostId} presence={presence} myId={myId} />
+                </>
               ) : (
                 <>
                   <TurnBar

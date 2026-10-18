@@ -6,6 +6,7 @@ import { cropSquare } from "./images";
 import { makeSeed, mulberry32 } from "./random";
 import { serverNow } from "./serverTime";
 import { transactState } from "./transact";
+import { saveRoomSettings } from "./roomSettings";
 
 /**
  * Rompecabezas deslizante, race mode. Everyone gets the same scramble
@@ -168,15 +169,26 @@ function mutate(roomId: string, fn: (state: DeslizState) => DeslizState | null) 
   return transactState(`${base(roomId)}/state`, normalizeState, fn);
 }
 
+async function uploadImage(roomId: string, file: File): Promise<string> {
+  const blob = await cropSquare(file, IMAGE_PX, 0.9);
+  const imgRef = storageRef(getStorageInstance(), `rooms/${roomId}/image.jpg`);
+  await uploadBytes(imgRef, blob, { contentType: "image/jpeg" });
+  return getDownloadURL(imgRef);
+}
+
+/** New settings from the waiting room; `file` replaces the image (null keeps it). */
+export async function updateDeslizSettings(roomId: string, params: { file: File | null; size: number; showNumbers: boolean }) {
+  const meta: Record<string, unknown> = { size: params.size, showNumbers: params.showNumbers };
+  if (params.file) meta.imageUrl = await uploadImage(roomId, params.file);
+  return saveRoomSettings(roomId, "desliz/state", meta);
+}
+
 export async function createDeslizRoom(
   params: { file: File; size: number; showNumbers: boolean },
   hostId: string
 ): Promise<string> {
   const roomId = generateRoomCode();
-  const blob = await cropSquare(params.file, IMAGE_PX, 0.9);
-  const imgRef = storageRef(getStorageInstance(), `rooms/${roomId}/image.jpg`);
-  await uploadBytes(imgRef, blob, { contentType: "image/jpeg" });
-  const imageUrl = await getDownloadURL(imgRef);
+  const imageUrl = await uploadImage(roomId, params.file);
 
   const meta: DeslizMeta = {
     game: "deslizante",

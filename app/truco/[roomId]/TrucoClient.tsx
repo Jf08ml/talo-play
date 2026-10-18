@@ -49,6 +49,9 @@ import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import Naipe from "@/components/Naipe";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
+import { BackToRoomButton, RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
+import { watchRoomMeta } from "@/lib/roomSettings";
+import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 
 type Status = "loading" | "not-found" | "ready" | "error";
@@ -61,6 +64,7 @@ export default function TrucoClient({ roomId }: { roomId: string }) {
   const router = useRouter();
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
+  const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [state, setState] = useState<TrucoState | null>(null);
   const [hostId, setHostId] = useState("");
 
@@ -75,22 +79,26 @@ export default function TrucoClient({ roomId }: { roomId: string }) {
     let cancelled = false;
     let unsub: (() => void) | undefined;
 
-    getTrucoMeta(roomId)
-      .then((meta) => {
+    const unsubMeta = watchRoomMeta<NonNullable<Awaited<ReturnType<typeof getTrucoMeta>>>>(
+      roomId,
+      (meta) => {
         if (cancelled) return;
+        setRoomMeta(meta);
         if (!meta) return setStatus("not-found");
         if (meta.game !== "truco") return router.replace(`/sala/${roomId}`);
         setHostId(meta.hostId ?? "");
-        unsub = subscribeTruco(roomId, setState);
+        unsub ??= subscribeTruco(roomId, setState);
         setStatus("ready");
-      })
-      .catch((err) => {
+      },
+      (err) => {
         console.error(err);
         if (!cancelled) setStatus("error");
-      });
+      }
+    );
 
     return () => {
       cancelled = true;
+      unsubMeta();
       unsub?.();
     };
   }, [configured, roomId, identity.clientId, identity.name, router]);
@@ -132,6 +140,7 @@ export default function TrucoClient({ roomId }: { roomId: string }) {
               presence={presence}
               myId={myId}
               summary={`A ${state.target} puntos · sin flor`}
+              settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
               onStart={() => startTruco(roomId)}
             >
               <SeatPicker roomId={roomId} state={state} myId={myId} isAway={isAway} />
@@ -141,6 +150,12 @@ export default function TrucoClient({ roomId }: { roomId: string }) {
 
         {status === "ready" && state && state.status !== "waiting" && (
           <Game roomId={roomId} state={state} myId={myId} isAway={isAway} presence={presence} />
+        )}
+
+        {status === "ready" && state?.status === "finished" && (
+          <div className="flex justify-center px-4 pb-6">
+            <BackToRoomButton roomId={roomId} stateKey="truco/state" hostId={hostId} presence={presence} myId={myId} />
+          </div>
         )}
       </main>
     </div>

@@ -36,6 +36,9 @@ import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import DrawingCanvas, { BACKGROUND } from "@/components/dibujo/DrawingCanvas";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
+import { RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
+import { watchRoomMeta } from "@/lib/roomSettings";
+import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_INPUT } from "@/components/ui";
 
 type Status = "loading" | "not-found" | "ready" | "error";
@@ -49,6 +52,7 @@ export default function TelefonoClient({ roomId }: { roomId: string }) {
   const router = useRouter();
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
+  const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<{ hostId: string; drawSeconds: number } | null>(null);
   const [state, setState] = useState<TelefonoState | null>(null);
 
@@ -63,22 +67,26 @@ export default function TelefonoClient({ roomId }: { roomId: string }) {
     let cancelled = false;
     let unsub: (() => void) | undefined;
 
-    getTelefonoMeta(roomId)
-      .then((meta) => {
+    const unsubMeta = watchRoomMeta<NonNullable<Awaited<ReturnType<typeof getTelefonoMeta>>>>(
+      roomId,
+      (meta) => {
         if (cancelled) return;
+        setRoomMeta(meta);
         if (!meta) return setStatus("not-found");
         if (meta.game !== "telefono") return router.replace(`/sala/${roomId}`);
         setConfig({ hostId: meta.hostId ?? "", drawSeconds: meta.drawSeconds ?? 90 });
-        unsub = subscribeTelefono(roomId, setState);
+        unsub ??= subscribeTelefono(roomId, setState);
         setStatus("ready");
-      })
-      .catch((err) => {
+      },
+      (err) => {
         console.error(err);
         if (!cancelled) setStatus("error");
-      });
+      }
+    );
 
     return () => {
       cancelled = true;
+      unsubMeta();
       unsub?.();
     };
   }, [configured, roomId, identity.clientId, identity.name, router]);
@@ -138,6 +146,7 @@ export default function TelefonoClient({ roomId }: { roomId: string }) {
               presence={presence}
               myId={myId}
               summary={`${config.drawSeconds} s para dibujar · ${45} s para escribir`}
+              settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
               onStart={() => startTelefono(roomId, connected)}
             >
               {connected.length < MIN_PLAYERS && (

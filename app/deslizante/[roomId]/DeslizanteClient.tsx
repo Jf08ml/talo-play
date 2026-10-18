@@ -32,6 +32,9 @@ import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
+import { RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
+import { watchRoomMeta } from "@/lib/roomSettings";
+import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 
 type Status = "loading" | "not-found" | "ready" | "error";
@@ -42,6 +45,7 @@ export default function DeslizanteClient({ roomId }: { roomId: string }) {
   const router = useRouter();
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
+  const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
   const [state, setState] = useState<DeslizState | null>(null);
   const [boards, setBoards] = useState<Record<string, Record<string, PlayerBoard>>>({});
@@ -58,9 +62,11 @@ export default function DeslizanteClient({ roomId }: { roomId: string }) {
     let cancelled = false;
     let unsub: (() => void) | undefined;
 
-    getDeslizMeta(roomId)
-      .then((meta) => {
+    const unsubMeta = watchRoomMeta<NonNullable<Awaited<ReturnType<typeof getDeslizMeta>>>>(
+      roomId,
+      (meta) => {
         if (cancelled) return;
+        setRoomMeta(meta);
         if (!meta) return setStatus("not-found");
         if (meta.game !== "deslizante") return router.replace(`/sala/${roomId}`);
         setConfig({
@@ -69,19 +75,21 @@ export default function DeslizanteClient({ roomId }: { roomId: string }) {
           showNumbers: meta.showNumbers ?? true,
           hostId: meta.hostId ?? "",
         });
-        unsub = subscribeDesliz(roomId, (data) => {
+        unsub ??= subscribeDesliz(roomId, (data) => {
           setState(data.state);
           setBoards(data.boards);
         });
         setStatus("ready");
-      })
-      .catch((err) => {
+      },
+      (err) => {
         console.error(err);
         if (!cancelled) setStatus("error");
-      });
+      }
+    );
 
     return () => {
       cancelled = true;
+      unsubMeta();
       unsub?.();
     };
   }, [configured, roomId, identity.clientId, identity.name, router]);
@@ -172,6 +180,7 @@ export default function DeslizanteClient({ roomId }: { roomId: string }) {
               presence={presence}
               myId={myId}
               summary={`${config.size}×${config.size} · todos con la misma mezcla`}
+              settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
               onStart={() => startRace(roomId)}
             >
               <div className="mx-auto w-full max-w-[220px]">

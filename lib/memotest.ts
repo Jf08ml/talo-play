@@ -5,6 +5,7 @@ import { generateRoomCode } from "./ids";
 import { makeSeed, seededShuffle } from "./random";
 import { serverNow } from "./serverTime";
 import { transactState } from "./transact";
+import { saveRoomSettings } from "./roomSettings";
 import { cropSquare } from "./images";
 import { EMOJI_THEMES, type TextPair } from "./memotestDecks";
 
@@ -190,26 +191,29 @@ export type CreateMemoParams =
   | { kind: "fotos"; files: File[]; rules: MemoRules }
   | { kind: "texto"; textPairs: TextPair[]; rules: MemoRules };
 
-export async function createMemotestRoom(params: CreateMemoParams, hostId: string): Promise<string> {
-  const roomId = generateRoomCode();
-  const meta: MemoMeta = {
-    game: "memotest",
-    hostId,
-    kind: params.kind,
-    pairs: 0,
-    rules: params.rules,
-    createdAt: serverTimestamp(),
-  };
+type DeckFields = Pick<MemoMeta, "kind" | "pairs" | "rules" | "theme" | "images" | "textPairs">;
 
+/**
+ * The deck part of a room's meta (photos are uploaded to the room's Storage
+ * folder). Unused fields are null so an edit clears the previous deck's.
+ * `keepImages`: an edit of a photo room that keeps its photos.
+ */
+async function deckFields(roomId: string, params: CreateMemoParams, keepImages?: string[]): Promise<DeckFields> {
+  const meta = { kind: params.kind, pairs: 0, rules: params.rules, theme: null, images: null, textPairs: null } as unknown as DeckFields;
   if (params.kind === "emoji") {
     meta.theme = params.theme;
     meta.pairs = params.pairs;
+  } else if (params.kind === "fotos" && keepImages && params.files.length === 0) {
+    meta.images = keepImages;
+    meta.pairs = keepImages.length;
   } else if (params.kind === "fotos") {
     const storage = getStorageInstance();
+    // A new name per upload, so clients don't show a cached photo from before.
+    const tag = Date.now().toString(36);
     meta.images = await Promise.all(
       params.files.map(async (file, i) => {
         const blob = await cropSquare(file, 320);
-        const fileRef = storageRef(storage, `rooms/${roomId}/card-${i}.jpg`);
+        const fileRef = storageRef(storage, `rooms/${roomId}/card-${tag}-${i}.jpg`);
         await uploadBytes(fileRef, blob, { contentType: "image/jpeg" });
         return getDownloadURL(fileRef);
       })
@@ -222,13 +226,27 @@ export async function createMemotestRoom(params: CreateMemoParams, hostId: strin
     }));
     meta.pairs = meta.textPairs.length;
   }
+  return meta;
+}
 
+export async function createMemotestRoom(params: CreateMemoParams, hostId: string): Promise<string> {
+  const roomId = generateRoomCode();
+  const deck = await deckFields(roomId, params);
+  // RTDB drops nulls anyway; leave them out of a fresh meta.
+  const meta = Object.fromEntries(
+    Object.entries({ game: "memotest", hostId, ...deck, createdAt: serverTimestamp() }).filter(([, v]) => v !== null)
+  );
   const state: Partial<MemoState> = { status: "waiting", seed: makeSeed(), turn: 0 };
   await update(ref(getDb()), {
     [`rooms/${roomId}/meta`]: meta,
     [`rooms/${roomId}/memo`]: state,
   });
   return roomId;
+}
+
+/** New settings from the waiting room (`keepImages`: the photos it already has). */
+export async function updateMemotestSettings(roomId: string, params: CreateMemoParams, keepImages?: string[]) {
+  return saveRoomSettings(roomId, "memo", { ...(await deckFields(roomId, params, keepImages)) });
 }
 
 export async function getMemoMeta(roomId: string): Promise<Partial<MemoMeta> | null> {
@@ -271,7 +289,8 @@ export function startMemo(roomId: string) {
   return mutate(roomId, (s) => {
     if (s.status !== "waiting" || s.order.length === 0) return null;
     const now = serverNow();
-    return { ...s, status: "playing", turn: 0, moves: 0, startedAt: now, turnStartedAt: now };
+    // Back from a finished game (`backToWaiting`), the board starts over too.
+    return { ...s, status: "playing", turn: 0, moves: 0, flipped: [], matched: {}, finishedAt: 0, startedAt: now, turnStartedAt: now };
   });
 }
 

@@ -167,7 +167,7 @@ export function Standings({
           </button>
         )}
         <button onClick={() => backToWaiting(roomId, state.gameNo)} className={SECONDARY_BUTTON}>
-          Cambiar pilotos
+          Cambiar pilotos, pista o vueltas
         </button>
       </div>
     </div>

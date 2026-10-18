@@ -1367,7 +1367,7 @@ function Results({ roomId, meta, state, myId, presence }: { roomId: string; meta
           Revancha
         </button>
         <button onClick={() => backToWaiting(roomId, state.gameNo)} className={SECONDARY_BUTTON}>
-          Volver a la sala
+          Volver a la sala (cambiar configuración)
         </button>
       </div>
     </div>

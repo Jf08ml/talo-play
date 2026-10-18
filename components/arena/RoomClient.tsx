@@ -24,7 +24,10 @@ import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
+import { RoomSettingsEditor } from "@/components/RoomSettings";
+import { watchRoomMeta } from "@/lib/roomSettings";
 import Battle from "./Battle";
+import { SETTINGS } from "./settings";
 import { Bot, Eye, Shuffle, Smartphone } from "lucide-react";
 
 type Status = "loading" | "not-found" | "ready" | "error";
@@ -51,22 +54,26 @@ export default function RoomClient({ roomId }: { roomId: string }) {
   useEffect(() => {
     if (!configured || !identity.clientId || !identity.name) return;
     let cancelled = false;
-    let unsub: (() => void) | null = null;
-    getArenaMeta(roomId)
-      .then((raw) => {
+    let unsub: (() => void) | undefined;
+    // Followed live: the host can change the settings while waiting.
+    const unsubMeta = watchRoomMeta<NonNullable<Awaited<ReturnType<typeof getArenaMeta>>>>(
+      roomId,
+      (raw) => {
         if (cancelled) return;
         if (!raw) return setStatus("not-found");
         if (raw.game !== "arena") return router.replace(`/sala/${roomId}`);
         setMeta(normalizeMeta(raw));
-        unsub = subscribeArena(roomId, setState);
+        unsub ??= subscribeArena(roomId, setState);
         setStatus("ready");
-      })
-      .catch((err) => {
+      },
+      (err) => {
         console.error(err);
         if (!cancelled) setStatus("error");
-      });
+      }
+    );
     return () => {
       cancelled = true;
+      unsubMeta();
       unsub?.();
     };
   }, [configured, roomId, identity.clientId, identity.name, router]);
@@ -107,6 +114,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
               presence={presence}
               myId={myId}
               summary={settingsSummary(meta)}
+              settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={meta} />}
               onStart={() => startMatch(roomId, meta, connected)}
             >
               <div className="flex gap-2.5 rounded-xl bg-amber-500/10 p-3 text-sm text-amber-100 ring-1 ring-amber-400/20">

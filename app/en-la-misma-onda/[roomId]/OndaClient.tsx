@@ -34,6 +34,9 @@ import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import Dial from "@/components/onda/Dial";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
+import { RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
+import { watchRoomMeta } from "@/lib/roomSettings";
+import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_INPUT } from "@/components/ui";
 
 type Status = "loading" | "not-found" | "ready" | "error";
@@ -43,6 +46,7 @@ export default function OndaClient({ roomId }: { roomId: string }) {
   const router = useRouter();
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
+  const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<{ hostId: string; rounds: number } | null>(null);
   const [state, setState] = useState<OndaState | null>(null);
 
@@ -57,22 +61,26 @@ export default function OndaClient({ roomId }: { roomId: string }) {
     let cancelled = false;
     let unsub: (() => void) | undefined;
 
-    getOndaMeta(roomId)
-      .then((meta) => {
+    const unsubMeta = watchRoomMeta<NonNullable<Awaited<ReturnType<typeof getOndaMeta>>>>(
+      roomId,
+      (meta) => {
         if (cancelled) return;
+        setRoomMeta(meta);
         if (!meta) return setStatus("not-found");
         if (meta.game !== "onda") return router.replace(`/sala/${roomId}`);
         setConfig({ hostId: meta.hostId ?? "", rounds: meta.rounds ?? 2 });
-        unsub = subscribeOnda(roomId, setState);
+        unsub ??= subscribeOnda(roomId, setState);
         setStatus("ready");
-      })
-      .catch((err) => {
+      },
+      (err) => {
         console.error(err);
         if (!cancelled) setStatus("error");
-      });
+      }
+    );
 
     return () => {
       cancelled = true;
+      unsubMeta();
       unsub?.();
     };
   }, [configured, roomId, identity.clientId, identity.name, router]);
@@ -125,6 +133,7 @@ export default function OndaClient({ roomId }: { roomId: string }) {
               presence={presence}
               myId={myId}
               summary={`${config.rounds} ${config.rounds === 1 ? "vuelta" : "vueltas"}: cada uno da la pista ${config.rounds === 1 ? "una vez" : `${config.rounds} veces`}`}
+              settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
               onStart={() => startOnda(roomId, connected)}
             >
               {connected.length < MIN_PLAYERS && (

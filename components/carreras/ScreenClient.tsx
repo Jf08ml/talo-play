@@ -43,6 +43,7 @@ import { drawMinimap, drawTopView, type DrawCar } from "@/lib/carrerasDraw";
 import { subscribePresence, type PresenceMap } from "@/lib/presence";
 import { serverNow } from "@/lib/serverTime";
 import { roomPath } from "@/lib/games";
+import { watchRoomMeta } from "@/lib/roomSettings";
 import { useServerNow } from "@/hooks/useServerNow";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import TrackPreview from "@/components/carreras/TrackPreview";
@@ -120,14 +121,17 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
     let cancelled = false;
     const unsubs: (() => void)[] = [];
 
-    getCarrerasMeta(roomId)
-      .then((raw) => {
+    // Followed live: the host can change track, laps or mode from a phone while waiting.
+    const unsubMeta = watchRoomMeta<NonNullable<Awaited<ReturnType<typeof getCarrerasMeta>>>>(
+      roomId,
+      (raw) => {
         if (cancelled) return;
         if (!raw) return setStatus("not-found");
         if (raw.game !== game) return router.replace(`/sala/${roomId}`);
         const m = normalizeMeta(raw);
         if (m.mode !== "pantalla") return router.replace(roomPath(game, roomId));
         setMeta(m);
+        if (unsubs.length > 0) return;
         unsubs.push(
           subscribeCarreras(roomId, setState),
           subscribePresence(roomId, (p) => {
@@ -139,14 +143,16 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
           })
         );
         setStatus("ready");
-      })
-      .catch((err) => {
+      },
+      (err) => {
         console.error(err);
         if (!cancelled) setStatus("error");
-      });
+      }
+    );
 
     return () => {
       cancelled = true;
+      unsubMeta();
       unsubs.forEach((u) => u());
     };
   }, [configured, game, roomId, router]);

@@ -1296,3 +1296,170 @@ export function FuegoThumbnail() {
     </svg>
   );
 }
+
+export function OteloThumbnail() {
+  // A corner of the green board, a disc flipping in mid-air.
+  const discs: [number, number, string][] = [
+    [2, 2, "#f8fafc"], [3, 2, "#111827"], [2, 3, "#111827"], [3, 3, "#f8fafc"],
+    [4, 3, "#111827"], [4, 2, "#111827"], [1, 3, "#f8fafc"], [3, 4, "#111827"],
+  ];
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <rect width="400" height="240" fill="#0b0a14" />
+      <g transform="translate(70 -30) rotate(-8 130 150)">
+        <rect width="270" height="270" fill="#064e3b" />
+        {Array.from({ length: 36 }, (_, i) => (
+          <rect key={i} x={(i % 6) * 45 + 2} y={Math.floor(i / 6) * 45 + 2} width="41" height="41" fill="#047857" />
+        ))}
+        {discs.map(([c, r, fill], i) => (
+          <circle key={i} cx={c * 45 + 22.5} cy={r * 45 + 22.5} r="17" fill={fill} stroke="#00000055" strokeWidth="2" />
+        ))}
+      </g>
+      <g transform="translate(320 70)">
+        <ellipse cx="0" cy="0" rx="9" ry="26" fill="#f8fafc" />
+        <path d="M0 -26 A9 26 0 0 1 0 26 Z" fill="#111827" />
+      </g>
+    </svg>
+  );
+}
+
+export function BackgammonThumbnail() {
+  // Wooden board with points, stacked checkers and two dice.
+  const points = Array.from({ length: 6 }, (_, i) => i);
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <rect width="400" height="240" fill="#2a1708" />
+      <rect x="30" y="16" width="340" height="208" rx="10" fill="#5b3a1e" stroke="#1c0f04" strokeWidth="6" />
+      <rect x="194" y="16" width="12" height="208" fill="#3b240f" />
+      {[0, 1].map((half) =>
+        points.map((i) => {
+          const x = 40 + half * 166 + i * 25.5;
+          return (
+            <g key={`${half}${i}`}>
+              <polygon points={`${x},22 ${x + 24},22 ${x + 12},110`} fill={(i + half) % 2 ? "#e7d3a7" : "#9a3412"} />
+              <polygon points={`${x},218 ${x + 24},218 ${x + 12},130`} fill={(i + half) % 2 ? "#9a3412" : "#e7d3a7"} />
+            </g>
+          );
+        })
+      )}
+      {[0, 1, 2, 3, 4].map((k) => (
+        <circle key={`w${k}`} cx="52" cy={206 - k * 22} r="11" fill="#f5efe0" stroke="#b8a77e" strokeWidth="2" />
+      ))}
+      {[0, 1, 2].map((k) => (
+        <circle key={`b${k}`} cx="333" cy={34 + k * 22} r="11" fill="#1f2937" stroke="#64748b" strokeWidth="2" />
+      ))}
+      {[0, 1, 2].map((k) => (
+        <circle key={`b2${k}`} cx="129" cy={34 + k * 22} r="11" fill="#1f2937" stroke="#64748b" strokeWidth="2" />
+      ))}
+      <g transform="translate(236 100) rotate(-12)">
+        <rect width="34" height="34" rx="7" fill="#fff" />
+        <circle cx="10" cy="10" r="3.5" fill="#0f172a" />
+        <circle cx="24" cy="24" r="3.5" fill="#0f172a" />
+      </g>
+      <g transform="translate(282 108) rotate(10)">
+        <rect width="34" height="34" rx="7" fill="#fff" />
+        <circle cx="10" cy="10" r="3.5" fill="#0f172a" />
+        <circle cx="17" cy="17" r="3.5" fill="#0f172a" />
+        <circle cx="24" cy="24" r="3.5" fill="#0f172a" />
+        <circle cx="24" cy="10" r="3.5" fill="#0f172a" />
+        <circle cx="10" cy="24" r="3.5" fill="#0f172a" />
+      </g>
+    </svg>
+  );
+}
+
+export function OcaThumbnail() {
+  // A spiral of squares winding to the garden, with a goose.
+  const cells: [number, number][] = [];
+  let [top, bottom, left, right] = [0, 4, 0, 6];
+  while (cells.length < 35) {
+    for (let c = left; c <= right && cells.length < 35; c++) cells.push([bottom, c]);
+    bottom--;
+    for (let r = bottom; r >= top && cells.length < 35; r--) cells.push([r, right]);
+    right--;
+    for (let c = right; c >= left && cells.length < 35; c--) cells.push([top, c]);
+    top++;
+    for (let r = top; r <= bottom && cells.length < 35; r++) cells.push([r, left]);
+    left++;
+  }
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <rect width="400" height="240" fill="#052e16" />
+      <g transform="translate(60 12)">
+        {cells.map(([r, c], i) => (
+          <rect
+            key={i}
+            x={c * 40}
+            y={r * 43}
+            width="38"
+            height="41"
+            rx="5"
+            fill={i === 34 ? "#f9a8d4" : i % 4 === 1 ? "#fde68a" : i % 2 ? "#ecfccb" : "#d1fae5"}
+          />
+        ))}
+        <circle cx="20" cy="194" r="10" fill="#ef4444" stroke="#fff" strokeWidth="3" />
+        <circle cx="62" cy="194" r="10" fill="#3b82f6" stroke="#fff" strokeWidth="3" />
+      </g>
+      <g transform="translate(176 66)">
+        <ellipse cx="22" cy="40" rx="26" ry="17" fill="#f8fafc" stroke="#0f172a" strokeWidth="2" />
+        <path d="M34 34 Q44 6 34 -6" stroke="#f8fafc" strokeWidth="9" fill="none" strokeLinecap="round" />
+        <circle cx="34" cy="-8" r="9" fill="#f8fafc" stroke="#0f172a" strokeWidth="2" />
+        <path d="M41 -10 L54 -6 L41 -3 Z" fill="#f59e0b" />
+        <circle cx="36" cy="-10" r="1.8" fill="#0f172a" />
+      </g>
+    </svg>
+  );
+}
+
+export function DominoThumbnail() {
+  // A line of tiles on green felt, a double standing across.
+  const PIP: Record<number, [number, number][]> = {
+    1: [[1, 1]],
+    2: [[0, 0], [2, 2]],
+    3: [[0, 0], [1, 1], [2, 2]],
+    4: [[0, 0], [2, 0], [0, 2], [2, 2]],
+    5: [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]],
+    6: [[0, 0], [2, 0], [0, 1], [2, 1], [0, 2], [2, 2]],
+  };
+  const half = (n: number, x: number, y: number) =>
+    (PIP[n] ?? []).map(([c, r], i) => <circle key={`${x}${y}${i}`} cx={x + 9 + c * 11} cy={y + 9 + r * 11} r="3.6" fill="#0f172a" />);
+  const tiles: [number, number][] = [[2, 5], [5, 6], [6, 6], [6, 3], [3, 1]];
+  let x = 22;
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="domino-bg" cx="50%" cy="45%" r="75%">
+          <stop offset="0%" stopColor="#166534" />
+          <stop offset="100%" stopColor="#052e16" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#domino-bg)" />
+      {tiles.map(([a, b], i) => {
+        const double = a === b;
+        const w = double ? 40 : 80;
+        const h = double ? 80 : 40;
+        const tx = x;
+        const ty = double ? 80 : 100;
+        x += w + 4;
+        return (
+          <g key={i}>
+            <rect x={tx} y={ty} width={w} height={h} rx="7" fill="#fdfaf2" stroke="#94a3b8" strokeWidth="2" />
+            {double ? (
+              <>
+                <line x1={tx + 4} y1={ty + 40} x2={tx + 36} y2={ty + 40} stroke="#94a3b8" strokeWidth="2" />
+                {half(a, tx + 1, ty + 1)}
+                {half(b, tx + 1, ty + 41)}
+              </>
+            ) : (
+              <>
+                <line x1={tx + 40} y1={ty + 4} x2={tx + 40} y2={ty + 36} stroke="#94a3b8" strokeWidth="2" />
+                {half(a, tx + 1, ty + 1)}
+                {half(b, tx + 41, ty + 1)}
+              </>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}

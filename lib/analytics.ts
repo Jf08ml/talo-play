@@ -9,12 +9,16 @@ import type { GameId } from "./games";
  * - `join_room`: someone reached a room's waiting screen (`host` = it's the creator).
  * - `start_game`: "Empezar partida" was tapped.
  * - `share`: an invite was sent (`method`: whatsapp / nativo / copiar / header).
+ * - `edit_room`: the host saved new settings from the waiting room.
+ * - `open_rules`: someone opened a game's full instructions (`where`: lobby / sala / partida).
  */
 type Events = {
   create_room: { game: GameId; mode?: string };
   join_room: { game: GameId; host: boolean };
   start_game: { game: GameId; players: number };
   share: { game: GameId; method: "whatsapp" | "nativo" | "copiar" | "header" };
+  edit_room: { game: GameId };
+  open_rules: { game: GameId; where: "lobby" | "sala" | "partida" };
 };
 
 export function trackEvent<E extends keyof Events>(name: E, params: Events[E]): void {

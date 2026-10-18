@@ -1070,7 +1070,7 @@ function Results({
           Revancha
         </button>
         <button onClick={() => backToWaiting(roomId, state.gameNo)} className={SECONDARY_BUTTON}>
-          Cambiar equipos
+          Cambiar equipos o configuración
         </button>
       </div>
     </div>

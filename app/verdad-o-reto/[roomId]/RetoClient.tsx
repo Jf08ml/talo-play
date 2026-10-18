@@ -26,6 +26,9 @@ import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
+import { RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
+import { watchRoomMeta } from "@/lib/roomSettings";
+import { SETTINGS } from "../settings";
 import { CARD, SECONDARY_BUTTON } from "@/components/ui";
 
 type Status = "loading" | "not-found" | "ready" | "error";
@@ -35,6 +38,7 @@ export default function RetoClient({ roomId }: { roomId: string }) {
   const router = useRouter();
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
+  const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<{ hostId: string; levels: RetoLevel[] } | null>(null);
   const [state, setState] = useState<RetoState | null>(null);
 
@@ -49,22 +53,26 @@ export default function RetoClient({ roomId }: { roomId: string }) {
     let cancelled = false;
     let unsub: (() => void) | undefined;
 
-    getRetoMeta(roomId)
-      .then((meta) => {
+    const unsubMeta = watchRoomMeta<NonNullable<Awaited<ReturnType<typeof getRetoMeta>>>>(
+      roomId,
+      (meta) => {
         if (cancelled) return;
+        setRoomMeta(meta);
         if (!meta) return setStatus("not-found");
         if (meta.game !== "reto") return router.replace(`/sala/${roomId}`);
         setConfig({ ...normalizeMeta(meta), hostId: meta.hostId ?? "" });
-        unsub = subscribeReto(roomId, setState);
+        unsub ??= subscribeReto(roomId, setState);
         setStatus("ready");
-      })
-      .catch((err) => {
+      },
+      (err) => {
         console.error(err);
         if (!cancelled) setStatus("error");
-      });
+      }
+    );
 
     return () => {
       cancelled = true;
+      unsubMeta();
       unsub?.();
     };
   }, [configured, roomId, identity.clientId, identity.name, router]);
@@ -115,6 +123,7 @@ export default function RetoClient({ roomId }: { roomId: string }) {
               presence={presence}
               myId={myId}
               summary={levelsLabel}
+              settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
               onStart={() => startReto(roomId, connected)}
             >
               {connected.length < MIN_PLAYERS && (

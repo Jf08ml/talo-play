@@ -301,7 +301,17 @@ export function joinDibujo(roomId: string, clientId: string, player: DibujoPlaye
 export function startDibujo(roomId: string) {
   return mutate(roomId, (s) =>
     s.status === "waiting" && s.order.length > 0
-      ? { ...s, status: "choosing", turnNo: 0, drawer: drawerForTurn(s.order, 0), phaseStartedAt: serverNow(), word: "", guessed: {} }
+      ? {
+          ...s,
+          status: "choosing",
+          turnNo: 0,
+          drawer: drawerForTurn(s.order, 0),
+          phaseStartedAt: serverNow(),
+          word: "",
+          guessed: {},
+          // Back from a finished game (`backToWaiting`), scores start over.
+          scores: Object.fromEntries(s.order.map((id) => [id, 0])),
+        }
       : null
   );
 }

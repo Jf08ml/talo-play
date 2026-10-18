@@ -30,6 +30,9 @@ import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
+import { BackToRoomButton, RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
+import { watchRoomMeta } from "@/lib/roomSettings";
+import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 
 type Status = "loading" | "not-found" | "ready" | "error";
@@ -39,6 +42,7 @@ export default function CajasClient({ roomId }: { roomId: string }) {
   const router = useRouter();
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
+  const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<{ hostId: string; size: number } | null>(null);
   const [state, setState] = useState<CajasState | null>(null);
 
@@ -53,22 +57,26 @@ export default function CajasClient({ roomId }: { roomId: string }) {
     let cancelled = false;
     let unsub: (() => void) | undefined;
 
-    getCajasMeta(roomId)
-      .then((meta) => {
+    const unsubMeta = watchRoomMeta<NonNullable<Awaited<ReturnType<typeof getCajasMeta>>>>(
+      roomId,
+      (meta) => {
         if (cancelled) return;
+        setRoomMeta(meta);
         if (!meta) return setStatus("not-found");
         if (meta.game !== "cajas") return router.replace(`/sala/${roomId}`);
         setConfig({ ...normalizeMeta(meta), hostId: meta.hostId ?? "" });
-        unsub = subscribeCajas(roomId, setState);
+        unsub ??= subscribeCajas(roomId, setState);
         setStatus("ready");
-      })
-      .catch((err) => {
+      },
+      (err) => {
         console.error(err);
         if (!cancelled) setStatus("error");
-      });
+      }
+    );
 
     return () => {
       cancelled = true;
+      unsubMeta();
       unsub?.();
     };
   }, [configured, roomId, identity.clientId, identity.name, router]);
@@ -111,6 +119,7 @@ export default function CajasClient({ roomId }: { roomId: string }) {
               presence={presence}
               myId={myId}
               summary={`Tablero de ${config.size} × ${config.size} · hasta ${MAX_PLAYERS} jugadores`}
+              settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
               onStart={() => startCajas(roomId, connected, config.size)}
             >
               {connected.length > MAX_PLAYERS && (
@@ -132,6 +141,9 @@ export default function CajasClient({ roomId }: { roomId: string }) {
                 canAgain={connected.length >= MIN_PLAYERS}
                 onAgain={() => playAgain(roomId, state.gameNo, connected, config.size)}
               />
+            )}
+            {state.status === "finished" && (
+              <BackToRoomButton roomId={roomId} stateKey="cajas/state" hostId={config.hostId} presence={presence} myId={myId} />
             )}
             <Board roomId={roomId} state={state} myId={myId} size={config.size} />
             <Watching state={state} presence={presence} myId={myId} />

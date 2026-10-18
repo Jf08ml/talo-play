@@ -40,6 +40,9 @@ import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
+import { BackToRoomButton, RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
+import { watchRoomMeta } from "@/lib/roomSettings";
+import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 
 type Status = "loading" | "not-found" | "ready" | "error";
@@ -52,6 +55,7 @@ export default function TuttiClient({ roomId }: { roomId: string }) {
   const router = useRouter();
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
+  const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
   const [hostId, setHostId] = useState("");
   const [state, setState] = useState<TuttiState | null>(null);
@@ -74,9 +78,11 @@ export default function TuttiClient({ roomId }: { roomId: string }) {
     let cancelled = false;
     let unsub: (() => void) | undefined;
 
-    getTuttiMeta(roomId)
-      .then((meta) => {
+    const unsubMeta = watchRoomMeta<NonNullable<Awaited<ReturnType<typeof getTuttiMeta>>>>(
+      roomId,
+      (meta) => {
         if (cancelled) return;
+        setRoomMeta(meta);
         if (!meta) return setStatus("not-found");
         if (meta.game !== "tutti") return router.replace(`/sala/${roomId}`);
         setHostId(meta.hostId ?? "");
@@ -86,20 +92,22 @@ export default function TuttiClient({ roomId }: { roomId: string }) {
           roundSeconds: meta.roundSeconds ?? 0,
           letters: meta.letters ?? EASY_LETTERS,
         });
-        unsub = subscribeTutti(roomId, (data) => {
+        unsub ??= subscribeTutti(roomId, (data) => {
           setState(data.state);
           setAnswers(data.answers);
           setVotes(data.votes);
         });
         setStatus("ready");
-      })
-      .catch((err) => {
+      },
+      (err) => {
         console.error(err);
         if (!cancelled) setStatus("error");
-      });
+      }
+    );
 
     return () => {
       cancelled = true;
+      unsubMeta();
       unsub?.();
     };
   }, [configured, roomId, identity.clientId, identity.name, router]);
@@ -203,6 +211,7 @@ export default function TuttiClient({ roomId }: { roomId: string }) {
               summary={`${config.rounds} rondas · ${config.categories.length} categorías${
                 config.roundSeconds ? ` · ${config.roundSeconds} s por ronda` : ""
               }`}
+              settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
               onStart={() => startTutti(roomId)}
             >
               <p className="text-center text-xs text-slate-500">{config.categories.join(" · ")}</p>
@@ -243,7 +252,10 @@ export default function TuttiClient({ roomId }: { roomId: string }) {
               )}
 
               {state.status === "finished" && (
-                <FinishedView state={state} results={results} myId={myId} onRestart={() => restartTutti(roomId)} />
+                <>
+                  <FinishedView state={state} results={results} myId={myId} onRestart={() => restartTutti(roomId)} />
+                  <BackToRoomButton roomId={roomId} stateKey="tutti/state" hostId={hostId} presence={presence} myId={myId} />
+                </>
               )}
             </div>
 

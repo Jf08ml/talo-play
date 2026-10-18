@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { cleanupOldRooms } from "@/lib/roomCleanup";
 import Link from "next/link";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { GAMES, playersLabel, type GameId } from "@/lib/games";
@@ -11,6 +12,7 @@ import { TaloMark } from "./TaloLogo";
 import GameIcon from "./GameIcon";
 import { ChevronLeft, Clock, Users } from "lucide-react";
 import { CARD } from "./ui";
+import { RulesButton } from "./HowToPlay";
 
 /**
  * Common page to set up a game: what it is (from the catalog), the player's
@@ -20,6 +22,13 @@ import { CARD } from "./ui";
 export default function GameLobby({ game, children }: { game: GameId; children: ReactNode }) {
   const identity = useClientIdentity();
   const info = GAMES[game];
+
+  // Housekeeping: delete a few rooms nobody used in days (see lib/roomCleanup.ts).
+  useEffect(() => {
+    if (!isFirebaseConfigured()) return;
+    const t = setTimeout(cleanupOldRooms, 3000);
+    return () => clearTimeout(t);
+  }, []);
 
   if (!isFirebaseConfigured()) return <FirebaseSetupNotice />;
 
@@ -60,6 +69,12 @@ export default function GameLobby({ game, children }: { game: GameId; children: 
                   <li key={step}>{step}</li>
                 ))}
               </ol>
+              <RulesButton
+                game={game}
+                where="lobby"
+                label="Ver las reglas completas"
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-violet-400/40 py-2 text-sm font-medium text-violet-200 transition hover:bg-violet-500/10"
+              />
               <p className="mt-4 text-sm text-slate-500">
                 Creás la sala, mandás el link por WhatsApp y los demás entran con un toque.
               </p>

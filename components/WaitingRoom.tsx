@@ -8,6 +8,7 @@ import { Crown } from "lucide-react";
 import InviteCard from "./InviteCard";
 import GameIcon from "./GameIcon";
 import { CARD, PRIMARY_BUTTON } from "./ui";
+import { GuideBody } from "./HowToPlay";
 
 export interface WaitingPlayer {
   id: string;
@@ -48,6 +49,7 @@ export default function WaitingRoom({
   presence,
   myId,
   summary,
+  settings,
   onStart,
   children,
 }: {
@@ -59,6 +61,11 @@ export default function WaitingRoom({
   myId: string;
   /** The room's settings in a line ("5 rondas · 8 categorías"). */
   summary?: string;
+  /**
+   * The settings editor (`RoomSettingsEditor`), shown to whoever may start;
+   * the rest see the summary, which updates when it's saved.
+   */
+  settings?: ReactNode;
   onStart: () => void;
   /** Game-specific setup shown above the players (e.g. team picking). */
   children?: ReactNode;
@@ -87,7 +94,12 @@ export default function WaitingRoom({
           {info.title}
         </p>
         {summary && <p className="mt-1 text-sm text-slate-400">{summary}</p>}
+        {settings && !canStart && (
+          <p className="mt-1 text-xs text-slate-500">El anfitrión puede cambiar la configuración antes de empezar.</p>
+        )}
       </div>
+
+      {settings && canStart && settings}
 
       {children}
 
@@ -123,7 +135,7 @@ export default function WaitingRoom({
           </p>
         )}
         {canStart && (
-          <button onClick={start}className={`w-full max-w-xs ${PRIMARY_BUTTON}`}>
+          <button onClick={start} className={`w-full max-w-xs ${PRIMARY_BUTTON}`}>
             Empezar partida
           </button>
         )}
@@ -135,11 +147,9 @@ export default function WaitingRoom({
         <summary className="cursor-pointer list-none font-medium text-slate-200">
           <span className="mr-1 inline-block transition group-open:rotate-90">▸</span> Cómo se juega
         </summary>
-        <ol className="mt-2 list-decimal space-y-1 pl-5 text-slate-400">
-          {info.howTo.map((step) => (
-            <li key={step}>{step}</li>
-          ))}
-        </ol>
+        <div className="mt-3">
+          <GuideBody game={game} />
+        </div>
       </details>
     </div>
   );

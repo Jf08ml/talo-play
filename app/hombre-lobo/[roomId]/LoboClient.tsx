@@ -35,6 +35,9 @@ import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
+import { RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
+import { watchRoomMeta } from "@/lib/roomSettings";
+import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -45,6 +48,7 @@ export default function LoboClient({ roomId }: { roomId: string }) {
   const router = useRouter();
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
+  const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<{ hostId: string; daySeconds: number } | null>(null);
   const [state, setState] = useState<LoboState | null>(null);
 
@@ -59,22 +63,26 @@ export default function LoboClient({ roomId }: { roomId: string }) {
     let cancelled = false;
     let unsub: (() => void) | undefined;
 
-    getLoboMeta(roomId)
-      .then((meta) => {
+    const unsubMeta = watchRoomMeta<NonNullable<Awaited<ReturnType<typeof getLoboMeta>>>>(
+      roomId,
+      (meta) => {
         if (cancelled) return;
+        setRoomMeta(meta);
         if (!meta) return setStatus("not-found");
         if (meta.game !== "lobo") return router.replace(`/sala/${roomId}`);
         setConfig({ hostId: meta.hostId ?? "", daySeconds: meta.daySeconds ?? 180 });
-        unsub = subscribeLobo(roomId, setState);
+        unsub ??= subscribeLobo(roomId, setState);
         setStatus("ready");
-      })
-      .catch((err) => {
+      },
+      (err) => {
         console.error(err);
         if (!cancelled) setStatus("error");
-      });
+      }
+    );
 
     return () => {
       cancelled = true;
+      unsubMeta();
       unsub?.();
     };
   }, [configured, roomId, identity.clientId, identity.name, router]);
@@ -144,6 +152,7 @@ export default function LoboClient({ roomId }: { roomId: string }) {
               summary={`Día de ${Math.round(config.daySeconds / 60)} min · ${
                 connected.length >= MIN_PLAYERS ? `${wolvesFor(connected.length)} ${wolvesFor(connected.length) === 1 ? "lobo" : "lobos"}, vidente y médico` : "lobos, vidente y médico"
               }`}
+              settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
               onStart={() => startLobo(roomId, connected)}
             >
               {connected.length < MIN_PLAYERS && (

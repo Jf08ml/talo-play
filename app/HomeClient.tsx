@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { cleanupOldRooms } from "@/lib/roomCleanup";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { CONTEXTS, GAME_ORDER, GAMES, type GameId, type PlayContext } from "@/lib/games";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
@@ -44,6 +45,10 @@ import {
   ChinchonThumbnail,
   TrucoThumbnail,
   FuegoThumbnail,
+  OteloThumbnail,
+  BackgammonThumbnail,
+  OcaThumbnail,
+  DominoThumbnail,
 } from "@/components/GameThumbnails";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 
@@ -82,11 +87,22 @@ const THUMBNAILS: Record<GameId, ReactNode> = {
   chinchon: <ChinchonThumbnail />,
   truco: <TrucoThumbnail />,
   fuego: <FuegoThumbnail />,
+  otelo: <OteloThumbnail />,
+  backgammon: <BackgammonThumbnail />,
+  oca: <OcaThumbnail />,
+  domino: <DominoThumbnail />,
 };
 
 export default function HomeClient() {
   const identity = useClientIdentity();
   const [context, setContext] = useState<PlayContext | null>(null);
+
+  // Housekeeping: delete a few rooms nobody used in days (see lib/roomCleanup.ts).
+  useEffect(() => {
+    if (!isFirebaseConfigured()) return;
+    const t = setTimeout(cleanupOldRooms, 3000);
+    return () => clearTimeout(t);
+  }, []);
 
   if (!isFirebaseConfigured()) return <FirebaseSetupNotice />;
 

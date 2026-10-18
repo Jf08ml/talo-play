@@ -37,6 +37,10 @@ import {
   Spade,
   Club,
   Crosshair,
+  Contrast,
+  Triangle,
+  Bird,
+  Rows2,
   type LucideIcon,
 } from "lucide-react";
 import type { GameId, PlayContext } from "@/lib/games";
@@ -79,6 +83,10 @@ const GAME_ICONS: Record<GameId, { icon: LucideIcon; gradient: string }> = {
   chinchon: { icon: Spade, gradient: "from-emerald-600 to-yellow-600" },
   truco: { icon: Club, gradient: "from-sky-600 to-amber-600" },
   fuego: { icon: Crosshair, gradient: "from-cyan-500 to-slate-700" },
+  otelo: { icon: Contrast, gradient: "from-emerald-500 to-slate-800" },
+  backgammon: { icon: Triangle, gradient: "from-amber-600 to-red-800" },
+  oca: { icon: Bird, gradient: "from-lime-400 to-amber-500" },
+  domino: { icon: Rows2, gradient: "from-slate-400 to-emerald-700" },
 };
 
 export const CONTEXT_ICONS: Record<PlayContext, LucideIcon> = {

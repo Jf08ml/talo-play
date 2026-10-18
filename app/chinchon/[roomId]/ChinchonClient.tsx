@@ -31,6 +31,9 @@ import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import Naipe from "@/components/Naipe";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
+import { RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
+import { watchRoomMeta } from "@/lib/roomSettings";
+import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 
 type Status = "loading" | "not-found" | "ready" | "error";
@@ -40,6 +43,7 @@ export default function ChinchonClient({ roomId }: { roomId: string }) {
   const router = useRouter();
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
+  const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<{ hostId: string; limit: number } | null>(null);
   const [state, setState] = useState<ChinchonState | null>(null);
 
@@ -54,22 +58,26 @@ export default function ChinchonClient({ roomId }: { roomId: string }) {
     let cancelled = false;
     let unsub: (() => void) | undefined;
 
-    getChinchonMeta(roomId)
-      .then((meta) => {
+    const unsubMeta = watchRoomMeta<NonNullable<Awaited<ReturnType<typeof getChinchonMeta>>>>(
+      roomId,
+      (meta) => {
         if (cancelled) return;
+        setRoomMeta(meta);
         if (!meta) return setStatus("not-found");
         if (meta.game !== "chinchon") return router.replace(`/sala/${roomId}`);
         setConfig({ hostId: meta.hostId ?? "", limit: meta.limit ?? 100 });
-        unsub = subscribeChinchon(roomId, setState);
+        unsub ??= subscribeChinchon(roomId, setState);
         setStatus("ready");
-      })
-      .catch((err) => {
+      },
+      (err) => {
         console.error(err);
         if (!cancelled) setStatus("error");
-      });
+      }
+    );
 
     return () => {
       cancelled = true;
+      unsubMeta();
       unsub?.();
     };
   }, [configured, roomId, identity.clientId, identity.name, router]);
@@ -112,6 +120,7 @@ export default function ChinchonClient({ roomId }: { roomId: string }) {
               presence={presence}
               myId={myId}
               summary={`A ${config.limit} puntos · de ${MIN_PLAYERS} a ${MAX_PLAYERS} jugadores`}
+              settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
               onStart={() => startChinchon(roomId, connected)}
             >
               {connected.length < MIN_PLAYERS && (

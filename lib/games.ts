@@ -6,7 +6,7 @@
  * Every room stores its game in `rooms/{id}/meta/game`; room codes are
  * global, so one code is enough to find any game's room (`lib/roomLookup.ts`).
  */
-export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena" | "yonunca" | "onda" | "telefono" | "ludo" | "lobo" | "ajedrez" | "chinchon" | "truco" | "fuego";
+export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena" | "yonunca" | "onda" | "telefono" | "ludo" | "lobo" | "ajedrez" | "chinchon" | "truco" | "fuego" | "otelo" | "backgammon" | "oca" | "domino";
 
 /** Who you're playing with: the first question the home page asks. */
 export type PlayContext = "pareja" | "amigos" | "grupo" | "solo";
@@ -457,17 +457,77 @@ export const GAMES: Record<GameId, GameInfo> = {
   },
   ludo: {
     id: "ludo",
-    title: "Ludo",
-    path: "ludo",
-    tagline: "El clásico de dados y fichas para 2 a 4: sacá con un 6, comete las fichas de los demás y llevá las cuatro a casa.",
+    title: "Parchís",
+    path: "parchis",
+    tagline: "El parchís de siempre para 2 a 4: salí con un 5, armá barreras, comé para contar 20 y llevá tus cuatro fichas a la meta. También hay Ludo clásico.",
     minPlayers: 2,
     maxPlayers: 4,
-    duration: "20–30 min",
+    duration: "20–40 min",
     contexts: ["pareja", "amigos"],
     howTo: [
-      "Tirá el dado en tu turno: con un 6 sacás una ficha de tu base (y volvés a tirar).",
-      "Mové una ficha lo que marca el dado. Si caés donde hay una rival, vuelve a su base (salvo en las casillas con estrella).",
-      "Gana el primero que lleva sus cuatro fichas a la meta, con el número justo.",
+      "Tirá el dado en tu turno: con un 5 sacás una ficha de casa; con un 6 volvés a tirar.",
+      "Si caés sola sobre una rival fuera de los seguros, te la comés y contás 20. Dos fichas tuyas juntas forman una barrera que nadie puede pasar.",
+      "Gana el primero que lleva sus cuatro fichas a la meta, con el número justo. Llegar a la meta cuenta 10.",
+    ],
+  },
+  otelo: {
+    id: "otelo",
+    title: "Otelo",
+    path: "otelo",
+    tagline: "El reversi de siempre, uno contra uno: encerrá las fichas del rival para darlas vuelta. Gana quien termina con más de su color.",
+    minPlayers: 2,
+    maxPlayers: 2,
+    duration: "10–15 min",
+    contexts: ["pareja", "amigos"],
+    howTo: [
+      "Juegan negras contra blancas, por turnos; empiezan las negras.",
+      "Poné una ficha de modo que encierre en línea (recta o diagonal) fichas del rival: esas se dan vuelta y pasan a ser tuyas.",
+      "Si no tenés jugada, pasás. Cuando nadie puede jugar, gana quien tiene más fichas en el tablero.",
+    ],
+  },
+  backgammon: {
+    id: "backgammon",
+    title: "Backgammon",
+    path: "backgammon",
+    tagline: "El clásico de dados y estrategia, uno contra uno: llevá tus 15 fichas a casa y sacalas antes que el rival. Con cubo de doblaje y partido a puntos.",
+    minPlayers: 2,
+    maxPlayers: 2,
+    duration: "10–30 min",
+    contexts: ["pareja", "amigos"],
+    howTo: [
+      "Tirá los dos dados y mové una ficha por cada dado (los dobles valen cuatro movimientos). No podés caer donde el rival tiene dos o más.",
+      "Si caés sobre una ficha sola del rival, va a la barra y tiene que volver a entrar antes de mover otra.",
+      "Cuando tenés todas en tu casa, empezás a sacarlas. Gana quien saca las 15 primero; el cubo dobla lo que vale la partida.",
+    ],
+  },
+  oca: {
+    id: "oca",
+    title: "Juego de la Oca",
+    path: "juego-de-la-oca",
+    tagline: "De oca a oca y tiro porque me toca: el clásico tablero de 63 casillas con puentes, posada, pozo, laberinto, cárcel y la calavera. De 2 a 6.",
+    minPlayers: 2,
+    maxPlayers: 6,
+    duration: "15–25 min",
+    contexts: ["amigos", "pareja", "grupo"],
+    howTo: [
+      "En tu turno tirá los dados: la ficha avanza sola.",
+      "Las casillas especiales mandan: la oca te lleva a la siguiente oca y volvés a tirar; la posada y la cárcel te hacen perder turnos; la calavera te manda al principio.",
+      "Gana quien llega primero al jardín de la Oca (la 63), con el número justo: lo que sobra, rebota.",
+    ],
+  },
+  domino: {
+    id: "domino",
+    title: "Dominó",
+    path: "domino",
+    tagline: "Dominó doble seis de 2 a 4, en parejas o cada uno por su cuenta. Juntá las fichas por sus números, dominá y sumá los puntos del rival.",
+    minPlayers: 2,
+    maxPlayers: 4,
+    duration: "20–40 min",
+    contexts: ["pareja", "amigos"],
+    howTo: [
+      "Cada uno recibe 7 fichas. Por turnos, poné una ficha que coincida con una de las dos puntas de la mesa.",
+      "Si no tenés ficha que entre, robás del pozo (de a 2 o 3) o pasás (de a 4, en parejas: los de enfrente son compañeros).",
+      "Gana la mano quien se queda sin fichas, o quien tiene menos puntos si se tranca. Suma los puntos que les quedan a los rivales.",
     ],
   },
   lobo: {
@@ -548,7 +608,7 @@ export const GAMES: Record<GameId, GameInfo> = {
 };
 
 /** Home page order: quickest to start first. */
-export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "yonunca", "onda", "telefono", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "lobo", "arena", "fuego", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "ajedrez", "generala", "chinchon", "truco", "ludo", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
+export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "yonunca", "onda", "telefono", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "lobo", "arena", "fuego", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "ajedrez", "generala", "chinchon", "truco", "ludo", "domino", "backgammon", "otelo", "oca", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
 
 export function roomPath(game: GameId, roomId: string): string {
   return `/${GAMES[game].path}/${roomId}`;
