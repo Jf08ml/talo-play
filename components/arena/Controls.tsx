@@ -216,21 +216,34 @@ export function TouchControls({
     lookIds.current.delete(e.pointerId);
   };
 
-  /** A button held with a finger (its own pointer, so looking keeps working). */
-  const hold = (key: "attack" | "block" | "jump" | "dodge") => ({
-    onPointerDown: (e: ReactPointerEvent) => {
-      e.stopPropagation();
-      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-      controlsRef.current[key] = true;
-    },
-    onPointerUp: (e: ReactPointerEvent) => {
-      e.stopPropagation();
-      controlsRef.current[key] = false;
-    },
-    onPointerCancel: () => {
-      controlsRef.current[key] = false;
-    },
-  });
+  /**
+   * Buttons held with a finger (each its own pointer, so looking keeps
+   * working). The button says which control it holds in `data-hold`; with
+   * `data-look`, dragging that same finger also turns the camera, so you can
+   * keep swinging or blocking while you aim.
+   */
+  type HoldKey = "attack" | "block" | "jump" | "dodge";
+  const holdKey = (e: ReactPointerEvent<HTMLButtonElement>) => e.currentTarget.dataset.hold as HoldKey;
+  const holdDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    controlsRef.current[holdKey(e)] = true;
+    if (e.currentTarget.dataset.look) lookIds.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  };
+  const holdMove = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    const last = lookIds.current.get(e.pointerId);
+    if (!last) return;
+    controlsRef.current.lookX += e.clientX - last.x;
+    controlsRef.current.lookY += e.clientY - last.y;
+    lookIds.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  };
+  const holdUp = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    controlsRef.current[holdKey(e)] = false;
+    lookIds.current.delete(e.pointerId);
+  };
+  const held = { onPointerDown: holdDown, onPointerMove: holdMove, onPointerUp: holdUp, onPointerCancel: holdUp };
 
   return (
     <div
@@ -257,14 +270,17 @@ export function TouchControls({
 
       <div className="absolute bottom-5 right-5 grid grid-cols-3 items-end gap-3">
         <button
-          {...hold("dodge")}
+          {...held}
+          data-hold="dodge"
           aria-label="Esquivar"
           className="flex h-14 w-14 items-center justify-center self-center rounded-full bg-emerald-500/35 text-white ring-2 ring-emerald-300/60 active:bg-emerald-500/70"
         >
           <Wind className="h-6 w-6" />
         </button>
         <button
-          {...hold("block")}
+          {...held}
+          data-hold="block"
+          data-look="1"
           aria-label="Bloquear"
           disabled={bow}
           className="flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/35 text-white ring-2 ring-sky-300/60 active:bg-sky-500/70 disabled:opacity-30"
@@ -272,14 +288,17 @@ export function TouchControls({
           <Shield className="h-7 w-7" />
         </button>
         <button
-          {...hold("attack")}
+          {...held}
+          data-hold="attack"
+          data-look="1"
           aria-label="Atacar"
           className="flex h-24 w-24 items-center justify-center rounded-full bg-rose-500/40 text-white ring-2 ring-rose-300/70 active:bg-rose-500/75"
         >
           <Swords className="h-10 w-10" />
         </button>
         <button
-          {...hold("jump")}
+          {...held}
+          data-hold="jump"
           aria-label="Saltar"
           className="flex h-14 w-14 items-center justify-center justify-self-center rounded-full bg-white/20 text-white ring-2 ring-white/40 active:bg-white/40"
         >
