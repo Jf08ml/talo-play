@@ -146,42 +146,71 @@ export interface Ray {
   dz: number;
 }
 
-/** Distance along the ray to an axis-aligned box, or Infinity. */
-function rayAabb(r: Ray, minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number, maxT: number): [number, number] {
+/** Entry and exit distances of a ray through an axis-aligned box (Infinity if it misses), and the entry face's axis (0 x, 1 y, 2 z). */
+function rayAabb(r: Ray, minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number, maxT: number): [number, number, number] {
   let t0 = 0;
   let t1 = maxT;
-  const axis = (o: number, d: number, lo: number, hi: number) => {
+  let face = 1;
+  const axis = (o: number, d: number, lo: number, hi: number, k: number) => {
     if (Math.abs(d) < 1e-9) return o >= lo && o <= hi;
     let a = (lo - o) / d;
     let b2 = (hi - o) / d;
     if (a > b2) [a, b2] = [b2, a];
-    t0 = Math.max(t0, a);
+    if (a > t0) {
+      t0 = a;
+      face = k;
+    }
     t1 = Math.min(t1, b2);
     return t0 <= t1;
   };
-  if (!axis(r.ox, r.dx, minX, maxX) || !axis(r.oy, r.dy, minY, maxY) || !axis(r.oz, r.dz, minZ, maxZ)) return [Infinity, Infinity];
-  return [t0, t1];
+  if (!axis(r.ox, r.dx, minX, maxX, 0) || !axis(r.oy, r.dy, minY, maxY, 1) || !axis(r.oz, r.dz, minZ, maxZ, 2)) return [Infinity, Infinity, 1];
+  return [t0, t1, face];
 }
 
-/** Distance to the first solid thing (floor, boxes, ramps, walls) along a ray, up to maxT. */
-export function rayWorld(w: World, r: Ray, maxT: number): number {
+/** The first solid thing along a ray, up to maxT: its distance and the normal of the surface hit. */
+export function rayWorldHit(w: World, r: Ray, maxT: number): { t: number; n: [number, number, number] } {
   let best = maxT;
-  if (r.dy < 0) best = Math.min(best, -r.oy / r.dy);
+  let n: [number, number, number] = [0, 1, 0];
+  const faceNormal = (face: number): [number, number, number] =>
+    face === 0 ? [-Math.sign(r.dx), 0, 0] : face === 1 ? [0, -Math.sign(r.dy), 0] : [0, 0, -Math.sign(r.dz)];
+  if (r.dy < 0 && -r.oy / r.dy < best) {
+    best = -r.oy / r.dy;
+    n = [0, 1, 0];
+  }
   for (const bx of w.boxes) {
-    const [t] = rayAabb(r, bx.x - bx.w / 2, bx.y, bx.z - bx.d / 2, bx.x + bx.w / 2, bx.y + bx.h, bx.z + bx.d / 2, best);
-    if (t < best) best = t;
+    const [t, , face] = rayAabb(r, bx.x - bx.w / 2, bx.y, bx.z - bx.d / 2, bx.x + bx.w / 2, bx.y + bx.h, bx.z + bx.d / 2, best);
+    if (t < best) {
+      best = t;
+      n = faceNormal(face);
+    }
   }
   for (const rp of w.ramps) {
-    const [t0, t1] = rayAabb(r, rp.x - rp.w / 2, rp.y, rp.z - rp.d / 2, rp.x + rp.w / 2, rp.y + rp.h, rp.z + rp.d / 2, best);
+    const [t0, t1, face] = rayAabb(r, rp.x - rp.w / 2, rp.y, rp.z - rp.d / 2, rp.x + rp.w / 2, rp.y + rp.h, rp.z + rp.d / 2, best);
     if (t0 === Infinity) continue;
     // Below the slope = inside the ramp. Height minus surface is linear along the ray.
     const f = (t: number) => r.oy + r.dy * t - rampHeight(rp, r.ox + r.dx * t, r.oz + r.dz * t);
     const f0 = f(t0);
     const f1 = f(t1);
-    if (f0 <= 1e-6) best = Math.min(best, t0);
-    else if (f1 < 0) best = Math.min(best, t0 + (t1 - t0) * (f0 / (f0 - f1)));
+    if (f0 <= 1e-6 && t0 < best) {
+      best = t0;
+      n = faceNormal(face);
+    } else if (f0 > 1e-6 && f1 < 0) {
+      const t = t0 + (t1 - t0) * (f0 / (f0 - f1));
+      if (t < best) {
+        best = t;
+        const sx = rp.up === "x+" ? -rp.h / rp.w : rp.up === "x-" ? rp.h / rp.w : 0;
+        const sz = rp.up === "z+" ? -rp.h / rp.d : rp.up === "z-" ? rp.h / rp.d : 0;
+        const len = Math.hypot(sx, 1, sz);
+        n = [sx / len, 1 / len, sz / len];
+      }
+    }
   }
-  return Math.max(0, best);
+  return { t: Math.max(0, best), n };
+}
+
+/** Distance to the first solid thing (floor, boxes, ramps, walls) along a ray, up to maxT. */
+export function rayWorld(w: World, r: Ray, maxT: number): number {
+  return rayWorldHit(w, r, maxT).t;
 }
 
 /** Nothing solid between two points. */
@@ -602,9 +631,10 @@ export function castBullet(
   weapon: WeaponId,
   targets: Target[],
   assist = 0
-): { hit: ShotHit | null; end: [number, number, number]; dist: number } {
+): { hit: ShotHit | null; end: [number, number, number]; dist: number; normal: [number, number, number] | null } {
   const def = WEAPONS[weapon];
-  const wallT = rayWorld(w, r, def.range);
+  const wall = rayWorldHit(w, r, def.range);
+  const wallT = wall.t;
   let best: { t: number; head: boolean; id: string } | null = null;
   for (const t of targets) {
     const h = rayTarget(r, t, wallT);
@@ -632,9 +662,10 @@ export function castBullet(
   }
   const t = best ? best.t : wallT;
   const end: [number, number, number] = [r.ox + r.dx * t, r.oy + r.dy * t, r.oz + r.dz * t];
-  if (!best) return { hit: null, end, dist: t };
+  // The surface it hit (null when it flew out of range).
+  if (!best) return { hit: null, end, dist: t, normal: wallT < def.range - 1e-3 ? wall.n : null };
   const fall = t <= def.falloff ? 1 : Math.max(def.minFactor, 1 - ((1 - def.minFactor) * (t - def.falloff)) / Math.max(1, def.range - def.falloff));
-  return { hit: { target: best.id, head: best.head, damage: def.damage * fall * (best.head ? def.head : 1) }, end, dist: t };
+  return { hit: { target: best.id, head: best.head, damage: def.damage * fall * (best.head ? def.head : 1) }, end, dist: t, normal: null };
 }
 
 /** A shot's direction: the view direction turned by the spread offsets. */

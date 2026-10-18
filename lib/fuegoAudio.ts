@@ -168,6 +168,22 @@ export class FuegoAudio {
     }
   }
 
+  /** A bullet flying past your head. */
+  whizz(pan = 0) {
+    if (!this.live) return;
+    const t = this.ctx!.currentTime;
+    this.hiss("bandpass", 5000, 1200, 0.16, 0.22, pan, 0.4);
+    this.tone(2600, t, 0.12, "sine", 0.03, 900, pan);
+  }
+
+  /** Your shield just broke: a glassy crack. */
+  shieldBreak() {
+    if (!this.live) return;
+    const t = this.ctx!.currentTime;
+    this.hiss("highpass", 6000, 2500, 0.35, 0.4, 0, 0.02);
+    for (const f of [1900, 2500, 3300]) this.tone(f, t, 0.3, "triangle", 0.05, f * 0.6);
+  }
+
   /** Your shield is gone: the alarm, a beep. */
   shieldAlarm() {
     if (!this.live) return;

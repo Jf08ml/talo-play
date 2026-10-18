@@ -54,6 +54,7 @@ import {
   navGraph,
   newMind,
   pickSpawn,
+  rayWorldHit,
   spreadDir,
   worldOf,
   type ArsenalEvent,
@@ -63,7 +64,7 @@ import {
   type WeaponId,
 } from "@/lib/fuegoSim";
 import { MAPS, type PickupKind } from "@/lib/fuegoMaps";
-import { FuegoScene } from "@/lib/fuego3d";
+import { FuegoScene, type Quality } from "@/lib/fuego3d";
 import { FuegoAudio } from "@/lib/fuegoAudio";
 import { serverNow } from "@/lib/serverTime";
 import type { PresenceMap } from "@/lib/presence";
@@ -72,7 +73,7 @@ import { useWakeLock } from "@/components/carreras/Controller";
 import { TaloMark } from "@/components/TaloLogo";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { MOUSE_LOOK, TOUCH_LOOK, TouchControls, newControls, useDesktopControls, useFinePointer, type ControlState } from "./Controls";
-import { ListOrdered, Maximize, MousePointerClick, RotateCw, Volume2, VolumeX } from "lucide-react";
+import { ListOrdered, Maximize, MousePointerClick, RotateCw, Sparkles, Volume2, VolumeX } from "lucide-react";
 
 const STEP = 1 / 60;
 const POSE_MS = 50;
@@ -132,11 +133,16 @@ interface Hud {
   reloading: boolean;
   radar: { x: number; y: number; ally: boolean }[];
   watching: string;
+  /** Through the scope: distance to what the crosshair is on, and magnification. */
+  range: number;
+  zoomX: number;
+  onTarget: boolean;
   /** Tab held (desktop scoreboard). */
   board: boolean;
 }
 
 const SOUND_KEY = "fuego.sound";
+const QUALITY_KEY = "fuego.calidad";
 
 function formatClock(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000));
@@ -185,7 +191,9 @@ export default function Battle({
   const [hud, setHud] = useState<Hud | null>(null);
   const [clock, setClock] = useState(0);
   const [hit, setHit] = useState<{ n: number; head: boolean; kill: boolean }>({ n: 0, head: false, kill: false });
-  const [hurtDirs, setHurtDirs] = useState<{ a: number; id: number }[]>([]);
+  const [hurtDirs, setHurtDirs] = useState<{ a: number; id: number; shield: boolean }[]>([]);
+  const [shieldBroke, setShieldBroke] = useState(0);
+  const [quality, setQuality] = useState<Quality | null>(null);
   const [toast, setToast] = useState<{ text: string; id: number } | null>(null);
   const [aimToggle, setAimToggle] = useState(false);
   const aimToggleRef = useRef(false);
@@ -196,6 +204,28 @@ export default function Battle({
   const locked = useDesktopControls(controlsRef, canvasRef, fine, canFight);
 
   useWakeLock();
+  // Quality: remembered, else high with a mouse (computers), low on touch (phones).
+  useEffect(() => {
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(QUALITY_KEY);
+    } catch {
+      // Not remembered.
+    }
+    const initial: Quality = saved === "alta" || saved === "baja" ? saved : window.matchMedia("(pointer: fine)").matches ? "alta" : "baja";
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once from the device after mounting.
+    setQuality(initial);
+  }, []);
+  const toggleQuality = () =>
+    setQuality((q) => {
+      const next: Quality = q === "alta" ? "baja" : "alta";
+      try {
+        localStorage.setItem(QUALITY_KEY, next);
+      } catch {
+        // Not remembered.
+      }
+      return next;
+    });
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
@@ -227,8 +257,8 @@ export default function Battle({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const scene = new FuegoScene(canvas, mapId, { maxDpr: 1.5 });
+    if (!canvas || !quality) return;
+    const scene = new FuegoScene(canvas, mapId, { quality });
     const world = worldOf(mapId);
     const graph = navGraph(mapId);
     const map = MAPS[mapId];
@@ -264,6 +294,8 @@ export default function Battle({
     let shieldWas = MAX_SHIELD;
     let alarmAt = 0;
     let kills: number[] = [];
+    let whizzAt = 0;
+    let land = 0;
     let hurtId = 0;
     let toastId = 0;
     const ghosts = new Map<string, Ghost>();
@@ -376,8 +408,10 @@ export default function Battle({
               if (hitKind === "escudo") scene.shieldHit(res.hit.target);
             }
             const from = mine ? muzzleOfMe(sol, dx, dy, dz) : scene.muzzle(id) ?? [sol.x, eyeY - 0.2, sol.z];
-            scene.shot(mine ? null : id, from, res.end[0], res.end[1], res.end[2], ev.weapon, res.hit ? hitKind : "nada");
+            scene.shot(mine ? null : id, from, res.end[0], res.end[1], res.end[2], ev.weapon, res.hit ? hitKind : "nada", res.normal);
+            if (!mine && !res.hit) nearMiss(from, res.end);
           }
+          if (mine) scene.ejectShell(ev.weapon);
           out.end = first ?? out.end;
           audio?.shot(ev.weapon, vol, pan);
           if (mine) {
@@ -422,6 +456,22 @@ export default function Battle({
         else if (mine && ev.type === "switch") audio?.switchWeapon();
       }
       return out;
+    };
+
+    /** A shot that flew close past my head: a whizz. */
+    const nearMiss = (from: [number, number, number], end: [number, number, number]) => {
+      if (!me || myDead) return;
+      const ax = from[0], ay = from[1], az = from[2];
+      const bx = end[0] - ax, by = end[1] - ay, bz = end[2] - az;
+      const len2 = bx * bx + by * by + bz * bz;
+      if (len2 < 1) return;
+      const ex = me.x - ax, ey = me.y + EYE - ay, ez = me.z - az;
+      const t = Math.max(0, Math.min(1, (ex * bx + ey * by + ez * bz) / len2));
+      const d = Math.hypot(ex - bx * t, ey - by * t, ez - bz * t);
+      if (d < 1.8 && d > 0.3 && performance.now() - whizzAt > 250) {
+        whizzAt = performance.now();
+        audio?.whizz(where(ax + bx * t, az + bz * t)[1]);
+      }
     };
 
     const muzzleOfMe = (sol: Soldier, dx: number, dy: number, dz: number): [number, number, number] => {
@@ -518,10 +568,13 @@ export default function Battle({
 
       // Look around (touch looks slower over an enemy: a little aim help).
       let sens = fine ? MOUSE_LOOK : TOUCH_LOOK;
+      const prevYaw = look.yaw;
+      const prevPitch = look.pitch;
       const aiming = s.status === "playing" && !myDead && (fine ? c.aim : aimToggleRef.current);
       const zoomFov = aiming ? WEAPONS[arms.weapon].zoom : 78;
-      sens *= zoomFov / 78;
-      if (!fine && me && !myDead) {
+      // Zoomed in, the view turns slower; on touch only a little slower, or the scope can't be aimed.
+      sens *= fine ? zoomFov / 78 : Math.sqrt(zoomFov / 78);
+      if (!fine && me && !myDead && !aiming) {
         const ens = enemiesOf(s, myId);
         const [dx, dy, dz] = spreadDir(look.yaw, look.pitch, [0, 0, 0]);
         const over = ens.some((e) => {
@@ -545,8 +598,9 @@ export default function Battle({
         seenHits.set(id, h.n);
         if (id === myId && me) {
           const a = Math.atan2(-(h.x - me.x), -(h.z - me.z)) - look.yaw;
-          setHurtDirs((list) => [...list.slice(-3), { a, id: hurtId++ }]);
-          audio?.hurt(shieldOf(s, myId, now) > 1);
+          const onShield = shieldOf(s, myId, now) > 1;
+          setHurtDirs((list) => [...list.slice(-3), { a, id: hurtId++, shield: onShield }]);
+          audio?.hurt(onShield);
           scene.jolt(0.25);
         }
       }
@@ -587,6 +641,7 @@ export default function Battle({
             me.step({ mx: c.mx, mz: c.mz, yaw: look.yaw, pitch: look.pitch, jump: c.jump, aiming }, world, STEP, solids(myId));
             if (wasAir && me.landed > 0) {
               scene.jolt(Math.min(0.5, me.landed / 25));
+              land = Math.min(1, me.landed / 12);
               me.landed = 0;
             }
             const evs = arms.step({ fire: c.fire, aim: aiming, reload: c.reload, swap: c.swap, grenade: c.grenade, melee: c.melee }, STEP);
@@ -753,7 +808,16 @@ export default function Battle({
           const weapon = WEAPON_IDS[p.w] ?? "rifle";
           if (weapon !== "lanzacohetes") {
             const from = scene.muzzle(id) ?? [g.x, g.y + EYE - 0.2, g.z];
-            scene.shot(id, from, p.sx, p.sy, p.sz, weapon, "nada");
+            // Where it landed: a wall (hole and dust) or a soldier (no normal).
+            const dx = p.sx - from[0], dy = p.sy - from[1], dz = p.sz - from[2];
+            const len = Math.hypot(dx, dy, dz);
+            let normal: [number, number, number] | null = null;
+            if (len > 0.5) {
+              const hitW = rayWorldHit(world, { ox: from[0], oy: from[1], oz: from[2], dx: dx / len, dy: dy / len, dz: dz / len }, len + 0.3);
+              if (Math.abs(hitW.t - len) < 0.35) normal = hitW.n;
+            }
+            scene.shot(id, from, p.sx, p.sy, p.sz, weapon, normal ? "nada" : null, normal);
+            nearMiss(from, [p.sx, p.sy, p.sz]);
             const [vol, pan] = where(g.x, g.z);
             audio?.shot(weapon, vol, pan);
           }
@@ -772,6 +836,10 @@ export default function Battle({
       // My shield: alarm when empty, a sound when it starts filling.
       if (me && !myDead) {
         const sh = shieldOf(s, myId, now);
+        if (sh < 1 && shieldWas >= 1) {
+          audio?.shieldBreak();
+          setShieldBroke((n) => n + 1);
+        }
         if (sh < 1 && performance.now() - alarmAt > 600) {
           alarmAt = performance.now();
           audio?.shieldAlarm();
@@ -848,10 +916,26 @@ export default function Battle({
         }
       }
       const zoomed = aiming && arms.weapon === "francotirador";
+      land = Math.max(0, land - dt * 4);
+      const mySide = s.roster[myId];
+      const myColor = mySide === "red" || mySide === "blue" ? teamInfo(mySide).color : (s.players[myId]?.color ?? "#64748b");
       scene.render(
         eye,
         me && !myDead
-          ? { weapon: arms.weapon, sinceShot, reload: arms.reloading > 0 ? 1 - arms.reloading / WEAPONS[arms.weapon].reload : 0, switching: arms.switching, melee: meleeT / 0.35, aiming, speed: me.speed, hidden: zoomed }
+          ? {
+              weapon: arms.weapon,
+              sinceShot,
+              reload: arms.reloading > 0 ? 1 - arms.reloading / WEAPONS[arms.weapon].reload : 0,
+              switching: arms.switching,
+              melee: meleeT / 0.35,
+              aiming,
+              speed: me.speed,
+              lookDX: look.yaw - prevYaw,
+              lookDY: look.pitch - prevPitch,
+              land,
+              color: myColor,
+              hidden: zoomed,
+            }
           : null,
         dt
       );
@@ -879,6 +963,12 @@ export default function Battle({
           }
         }
         const other = arms.slots.length > 1 ? arms.slots[1 - arms.current].id : null;
+        const scopeInfo = () => {
+          if (!me || myDead || !aiming) return { range: 0, zoomX: 1, onTarget: false };
+          const [dx, dy, dz] = spreadDir(look.yaw, look.pitch, [0, 0, 0]);
+          const res = castBullet(world, { ox: me.x, oy: me.y + EYE, oz: me.z, dx, dy, dz }, arms.weapon, enemiesOf(s, myId));
+          return { range: Math.round(res.dist), zoomX: Math.round((78 / WEAPONS[arms.weapon].zoom) * 10) / 10, onTarget: !!res.hit };
+        };
         const next: Hud = {
           hp: s.hp[myId] ?? 0,
           shield: Math.round(shieldOf(s, myId, now)),
@@ -895,6 +985,7 @@ export default function Battle({
           reloading: arms.reloading > 0,
           radar,
           watching,
+          ...scopeInfo(),
           board: c.board,
         };
         const hk = JSON.stringify(next);
@@ -907,8 +998,12 @@ export default function Battle({
     };
 
     frame = requestAnimationFrame(tick);
+    // Development only: hand yourself a weapon from the console, for testing (`__fuego.give("francotirador")`).
+    const devWindow = window as unknown as { __fuego?: { give: (w: WeaponId) => void } };
+    if (process.env.NODE_ENV !== "production") devWindow.__fuego = { give: (w) => arms.take(w) };
     return () => {
       cancelAnimationFrame(frame);
+      delete devWindow.__fuego;
       unsubPoses();
       unsubProj();
       unsubBooms();
@@ -917,7 +1012,7 @@ export default function Battle({
       for (const pr of myProj) pr.down();
       scene.dispose();
     };
-  }, [roomId, myId, gameNo, mapId, fine]);
+  }, [roomId, myId, gameNo, mapId, fine, quality]);
 
   // Messages fade.
   useEffect(() => {
@@ -950,24 +1045,38 @@ export default function Battle({
     <div className="fixed inset-0 z-40 select-none overflow-hidden bg-slate-900" style={{ touchAction: "none" }}>
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 
-      {/* Sniper scope. */}
-      {hud?.zoomed && (
-        <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(circle at center, transparent 0 32vmin, rgba(0,0,0,0.92) 32.5vmin)" }}>
-          <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-black/70" />
-          <div className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-black/70" />
-        </div>
-      )}
+      {hud?.zoomed && <Scope range={hud.range} zoomX={hud.zoomX} onTarget={hud.onTarget} />}
 
-      {/* Damage: red edges and arrows toward who's shooting. */}
-      {hurtDirs.length > 0 && <div className="pointer-events-none absolute inset-0" style={{ boxShadow: "inset 0 0 110px 25px rgba(220,38,38,0.45)" }} />}
+      {/* Low health: a slow red pulse at the edges. */}
+      {inRoster && hud?.alive && hud.hp <= 35 && !hud.zoomed && (
+        <div className="pointer-events-none absolute inset-0 animate-pulse" style={{ boxShadow: "inset 0 0 140px 40px rgba(185,28,28,0.5)" }} />
+      )}
+      {/* Damage: edges (cyan on the shield, red on health) and arrows toward who's shooting. */}
+      {hurtDirs.length > 0 && (
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ boxShadow: hurtDirs[hurtDirs.length - 1].shield ? "inset 0 0 90px 18px rgba(34,211,238,0.4)" : "inset 0 0 110px 25px rgba(220,38,38,0.5)" }}
+        />
+      )}
       {hurtDirs.map((h) => (
         <div key={h.id} className="pointer-events-none absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2" style={{ transform: `translate(-50%, -50%) rotate(${-h.a}rad)` }}>
-          <div className="absolute left-1/2 top-0 h-0 w-0 -translate-x-1/2 border-x-[14px] border-b-[22px] border-x-transparent border-b-red-500/80" />
+          <div className={`absolute left-1/2 top-0 h-0 w-0 -translate-x-1/2 border-x-[14px] border-b-[22px] border-x-transparent ${h.shield ? "border-b-cyan-300/80" : "border-b-red-500/85"}`} />
         </div>
       ))}
+      {/* The shield just broke. */}
+      {shieldBroke > 0 && (
+        <div key={shieldBroke} className="pointer-events-none absolute inset-0 animate-[ping_0.5s_ease-out_1] opacity-0" style={{ boxShadow: "inset 0 0 160px 50px rgba(103,232,249,0.6)" }} />
+      )}
 
       {inRoster && hud?.alive && state.status === "playing" && !fine && (
-        <TouchControls controlsRef={controlsRef} canPick={!!hud.near} pickLabel={hud.near} aiming={aimToggle} onAim={() => setAimToggle((v) => !v)} />
+        <TouchControls
+          controlsRef={controlsRef}
+          canPick={!!hud.near}
+          pickLabel={hud.near}
+          aiming={aimToggle}
+          onAim={() => setAimToggle((v) => !v)}
+          fireOnRelease={hud.zoomed}
+        />
       )}
 
       {/* Crosshair and hit marker. */}
@@ -1020,6 +1129,14 @@ export default function Battle({
           <div className="flex gap-1.5">
             <button onClick={() => setSound((v) => (v === "on" ? "off" : "on"))} aria-label={sound === "on" ? "Silenciar" : "Activar sonido"} className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur">
               {sound === "on" ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            </button>
+            <button
+              onClick={toggleQuality}
+              aria-label="Calidad gráfica"
+              title="Calidad gráfica: alta tiene brillos y sombras; baja va más fluido en teléfonos viejos"
+              className="flex items-center gap-1 rounded-xl bg-slate-950/60 px-2 py-2 text-xs text-white backdrop-blur"
+            >
+              <Sparkles className="h-4 w-4" /> {quality === "alta" ? "Alta" : "Baja"}
             </button>
             <button onClick={() => setBoard((v) => !v)} aria-label="Tabla" className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur">
               <ListOrdered className="h-4 w-4" />
@@ -1077,6 +1194,10 @@ export default function Battle({
               {WEAPONS[hud.weapon].label}
               {hud.reloading && <span className="ml-1 text-amber-300">recargando…</span>}
             </p>
+            {!hud.reloading && hud.mag === 0 && hud.reserve === 0 && <p className="text-xs font-bold text-red-400">Sin munición: cambiá de arma</p>}
+            {!hud.reloading && hud.reserve > 0 && hud.mag <= Math.max(1, Math.floor(WEAPONS[hud.weapon].mag / 4)) && (
+              <p className="animate-pulse text-xs font-bold text-amber-300">{fine ? "R: recargá" : "Recargá"}</p>
+            )}
             <p className="text-[11px] text-slate-400">
               {hud.other ? `${WEAPONS[hud.other].label} · ` : ""}💣 {hud.grenades}
             </p>
@@ -1141,6 +1262,28 @@ export default function Battle({
           <Results roomId={roomId} meta={meta} state={state} myId={myId} presence={presence} />
         </div>
       )}
+    </div>
+  );
+}
+
+/** Sniper scope: dark around the lens, mil-dot reticle, range to what's under the crosshair. */
+function Scope({ range, zoomX, onTarget }: { range: number; zoomX: number; onTarget: boolean }) {
+  const color = onTarget ? "#ef4444" : "#0f172a";
+  return (
+    <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(circle at center, rgba(96,165,250,0.06) 0 31vmin, rgba(0,0,0,0.6) 32vmin, rgba(0,0,0,0.96) 33vmin)" }}>
+      <div className="absolute left-1/2 top-1/2 h-[64vmin] w-[64vmin] -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[inset_0_0_40px_10px_rgba(0,0,0,0.65)]" />
+      <div className="absolute left-1/2 top-1/2 h-[64vmin] w-[2px] -translate-x-1/2 -translate-y-1/2" style={{ background: `linear-gradient(${color} 0 44%, transparent 44% 56%, ${color} 56%)` }} />
+      <div className="absolute left-1/2 top-1/2 h-[2px] w-[64vmin] -translate-x-1/2 -translate-y-1/2" style={{ background: `linear-gradient(90deg, ${color} 0 44%, transparent 44% 56%, ${color} 56%)` }} />
+      {[-3, -2, -1, 1, 2, 3].map((k) => (
+        <span key={`h${k}`} className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ backgroundColor: color, marginLeft: `${k * 4}vmin` }} />
+      ))}
+      {[1, 2, 3].map((k) => (
+        <span key={`v${k}`} className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ backgroundColor: color, marginTop: `${k * 4}vmin` }} />
+      ))}
+      <span className="absolute left-1/2 top-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ backgroundColor: onTarget ? "#ef4444" : "#e11d48" }} />
+      <p className="absolute left-1/2 top-1/2 ml-[18vmin] mt-[3vmin] font-mono text-sm font-bold text-emerald-300 drop-shadow">
+        {range} m · x{zoomX}
+      </p>
     </div>
   );
 }

@@ -155,7 +155,9 @@ type HoldKey = "fire" | "jump" | "reload" | "swap" | "grenade" | "melee";
 /**
  * Touch: a joystick wherever the left thumb lands, drag on the right to
  * look, and buttons. The fire button also turns the camera when you drag the
- * finger that holds it, so you can keep shooting while you aim.
+ * finger that holds it, so you can keep shooting while you aim. With
+ * `fireOnRelease` (the sniper's scope), holding it only aims: the shot goes
+ * when you lift the finger.
  */
 export function TouchControls({
   controlsRef,
@@ -163,13 +165,19 @@ export function TouchControls({
   pickLabel,
   aiming,
   onAim,
+  fireOnRelease,
 }: {
   controlsRef: RefObject<ControlState>;
   canPick: boolean;
   pickLabel: string;
   aiming: boolean;
   onAim: () => void;
+  fireOnRelease: boolean;
 }) {
+  const releaseRef = useRef(fireOnRelease);
+  useEffect(() => {
+    releaseRef.current = fireOnRelease;
+  }, [fireOnRelease]);
   const [stick, setStick] = useState<{ x: number; y: number; dx: number; dy: number } | null>(null);
   const stickId = useRef<number | null>(null);
   const lookIds = useRef(new Map<number, { x: number; y: number }>());
@@ -220,7 +228,8 @@ export function TouchControls({
   const holdDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    controlsRef.current[e.currentTarget.dataset.hold as HoldKey] = true;
+    const key = e.currentTarget.dataset.hold as HoldKey;
+    if (!(key === "fire" && releaseRef.current)) controlsRef.current[key] = true;
     if (e.currentTarget.dataset.look) lookIds.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
   };
   const holdMove = (e: ReactPointerEvent<HTMLButtonElement>) => {
@@ -233,7 +242,15 @@ export function TouchControls({
   };
   const holdUp = (e: ReactPointerEvent<HTMLButtonElement>) => {
     e.stopPropagation();
-    controlsRef.current[e.currentTarget.dataset.hold as HoldKey] = false;
+    const key = e.currentTarget.dataset.hold as HoldKey;
+    const c = controlsRef.current;
+    if (key === "fire" && releaseRef.current && e.type === "pointerup") {
+      // Scoped: lifting the finger is the trigger (a short press, so the loop sees it).
+      c.fire = true;
+      setTimeout(() => (c.fire = false), 70);
+    } else {
+      c[key] = false;
+    }
     lookIds.current.delete(e.pointerId);
   };
   const held = { onPointerDown: holdDown, onPointerMove: holdMove, onPointerUp: holdUp, onPointerCancel: holdUp };
@@ -284,10 +301,13 @@ export function TouchControls({
             {...held}
             data-hold="fire"
             data-look="1"
-            aria-label="Disparar"
-            className="flex h-24 w-24 items-center justify-center rounded-full bg-rose-500/40 text-white ring-2 ring-rose-300/70 active:bg-rose-500/75"
+            aria-label={fireOnRelease ? "Apuntar y soltar para disparar" : "Disparar"}
+            className={`relative flex h-24 w-24 items-center justify-center rounded-full text-white ring-2 ${
+              fireOnRelease ? "bg-sky-500/40 ring-sky-300/70 active:bg-sky-500/70" : "bg-rose-500/40 ring-rose-300/70 active:bg-rose-500/75"
+            }`}
           >
             <Crosshair className="h-10 w-10" />
+            {fireOnRelease && <span className="absolute -top-6 whitespace-nowrap rounded bg-slate-950/70 px-1.5 text-[10px]">soltá para disparar</span>}
           </button>
         </div>
         <div className="flex flex-col items-center gap-2.5">
