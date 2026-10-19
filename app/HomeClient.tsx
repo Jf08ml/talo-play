@@ -49,6 +49,7 @@ import {
   BackgammonThumbnail,
   OcaThumbnail,
   DominoThumbnail,
+  PasteleriaThumbnail,
 } from "@/components/GameThumbnails";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 
@@ -91,6 +92,7 @@ const THUMBNAILS: Record<GameId, ReactNode> = {
   backgammon: <BackgammonThumbnail />,
   oca: <OcaThumbnail />,
   domino: <DominoThumbnail />,
+  pasteleria: <PasteleriaThumbnail />,
 };
 
 export default function HomeClient() {

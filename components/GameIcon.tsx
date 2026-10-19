@@ -41,6 +41,7 @@ import {
   Triangle,
   Bird,
   Rows2,
+  CakeSlice,
   type LucideIcon,
 } from "lucide-react";
 import type { GameId, PlayContext } from "@/lib/games";
@@ -87,6 +88,7 @@ const GAME_ICONS: Record<GameId, { icon: LucideIcon; gradient: string }> = {
   backgammon: { icon: Triangle, gradient: "from-amber-600 to-red-800" },
   oca: { icon: Bird, gradient: "from-lime-400 to-amber-500" },
   domino: { icon: Rows2, gradient: "from-slate-400 to-emerald-700" },
+  pasteleria: { icon: CakeSlice, gradient: "from-pink-400 to-violet-500" },
 };
 
 export const CONTEXT_ICONS: Record<PlayContext, LucideIcon> = {

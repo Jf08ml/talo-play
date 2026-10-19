@@ -6,7 +6,7 @@
  * Every room stores its game in `rooms/{id}/meta/game`; room codes are
  * global, so one code is enough to find any game's room (`lib/roomLookup.ts`).
  */
-export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena" | "yonunca" | "onda" | "telefono" | "ludo" | "lobo" | "ajedrez" | "chinchon" | "truco" | "fuego" | "otelo" | "backgammon" | "oca" | "domino";
+export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena" | "yonunca" | "onda" | "telefono" | "ludo" | "lobo" | "ajedrez" | "chinchon" | "truco" | "fuego" | "otelo" | "backgammon" | "oca" | "domino" | "pasteleria";
 
 /** Who you're playing with: the first question the home page asks. */
 export type PlayContext = "pareja" | "amigos" | "grupo" | "solo";
@@ -530,6 +530,21 @@ export const GAMES: Record<GameId, GameInfo> = {
       "Gana la mano quien se queda sin fichas, o quien tiene menos puntos si se tranca. Suma los puntos que les quedan a los rivales.",
     ],
   },
+  pasteleria: {
+    id: "pasteleria",
+    title: "Pastelería",
+    path: "pasteleria",
+    tagline: "Armá en 3D las tortas que te piden los clientes: forma, bizcocho, pisos, relleno, cobertura y decoración. Tres niveles, de aprendiz a maestro.",
+    minPlayers: 1,
+    maxPlayers: 1,
+    duration: "10–15 min",
+    contexts: ["solo"],
+    howTo: [
+      "Mirá el pedido del cliente: cómo tiene que ser la torta.",
+      "Elegí forma, bizcocho, pisos, relleno, cobertura y decoración: la torta se arma en 3D mientras elegís.",
+      "Entregala: si es igual a lo pedido sumás puntos (y más si vas en racha). Superá los tres niveles.",
+    ],
+  },
   lobo: {
     id: "lobo",
     title: "Hombre lobo",
@@ -608,7 +623,7 @@ export const GAMES: Record<GameId, GameInfo> = {
 };
 
 /** Home page order: quickest to start first. */
-export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "yonunca", "onda", "telefono", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "lobo", "arena", "fuego", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "ajedrez", "generala", "chinchon", "truco", "ludo", "domino", "backgammon", "otelo", "oca", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
+export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "yonunca", "onda", "telefono", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "lobo", "arena", "fuego", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "ajedrez", "generala", "pasteleria", "chinchon", "truco", "ludo", "domino", "backgammon", "otelo", "oca", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
 
 export function roomPath(game: GameId, roomId: string): string {
   return `/${GAMES[game].path}/${roomId}`;

@@ -1463,3 +1463,49 @@ export function DominoThumbnail() {
     </svg>
   );
 }
+
+export function PasteleriaThumbnail() {
+  // A two-layer pastel cake with dripping icing and cherries on a stand.
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <linearGradient id="pasteleria-bg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#fbcfe8" />
+          <stop offset="55%" stopColor="#e9d5ff" />
+          <stop offset="100%" stopColor="#fff1dc" />
+        </linearGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#pasteleria-bg)" />
+      <rect x="0" y="196" width="400" height="44" fill="#b9ecd9" />
+      <rect x="0" y="190" width="400" height="10" rx="5" fill="#fff7ec" />
+      <ellipse cx="200" cy="186" rx="96" ry="14" fill="#ede9fe" stroke="#c4b5fd" strokeWidth="3" />
+      <rect x="140" y="138" width="120" height="44" fill="#8a5a3c" />
+      <ellipse cx="200" cy="182" rx="60" ry="10" fill="#6d4630" />
+      <rect x="137" y="128" width="126" height="12" rx="6" fill="#e8436b" />
+      <rect x="140" y="88" width="120" height="42" fill="#8a5a3c" />
+      <path
+        d="M134 86 L266 86 L266 96 Q260 116 252 96 Q244 122 236 96 Q228 110 220 96 Q212 124 204 96 Q196 112 188 96 Q180 120 172 96 Q164 108 156 96 Q148 118 140 96 Q136 104 134 96 Z"
+        fill="#f9a8d4"
+      />
+      <ellipse cx="200" cy="86" rx="66" ry="12" fill="#f9a8d4" />
+      <ellipse cx="180" cy="82" rx="22" ry="4" fill="#ffffff88" />
+      {[160, 190, 220, 248].map((x, i) => (
+        <g key={x}>
+          <path d={`M${x} ${74 - (i % 2) * 2} q5 -12 12 -14`} stroke="#4d7c0f" strokeWidth="2.5" fill="none" />
+          <circle cx={x} cy={78 - (i % 2) * 2} r="8" fill="#dc2626" />
+          <circle cx={x - 2.5} cy={75 - (i % 2) * 2} r="2.4" fill="#fecaca" />
+        </g>
+      ))}
+      {(
+        [
+          [60, 60, "#facc15"],
+          [330, 50, "#a78bfa"],
+          [300, 120, "#60a5fa"],
+          [90, 140, "#34d399"],
+        ] as [number, number, string][]
+      ).map(([x, y, c], i) => (
+        <rect key={i} x={x} y={y} width="12" height="5" rx="2.5" fill={c} transform={`rotate(${i * 35} ${x} ${y})`} />
+      ))}
+    </svg>
+  );
+}
