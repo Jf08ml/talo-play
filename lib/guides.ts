@@ -697,38 +697,51 @@ export const GUIDES: Record<GameId, Guide> = {
     ],
   },
   pasteleria: {
-    goal: "Preparar cada torta exactamente como la pidió el cliente y pasar los tres niveles.",
+    goal: "Preparar cada torta exactamente como la pidió el cliente, antes de que se acabe el tiempo: solo, para pasar los cuatro niveles; en el duelo, para hacer más puntos que los demás.",
     sections: [
       {
         title: "El pedido",
         text: [
-          "Arriba (o a la derecha en la compu) está el pedido: quién lo pide, un dibujo de la torta y la lista de lo que quiere: forma, bizcocho, pisos, relleno, cobertura y decoración. Queda a la vista mientras cocinás.",
+          "Arriba (o a la derecha en la compu) está el pedido: quién lo pide, un dibujo de la torta y la lista de lo que quiere: forma, bizcocho, pisos, relleno, cobertura y decoración.",
+          "En los niveles altos el pedido viene sin dibujo, solo la lista. En Chef estrella, además, se esconde a los 8 segundos: memorizalo. Podés volver a mirarlo un momento, pero cada vistazo le resta 20 puntos a esa torta.",
         ],
       },
       {
         title: "Armar la torta",
         text: [
           "Elegí cada paso en las pestañas de abajo: la torta en 3D cambia con cada elección. Arrastrala para girarla y ver los pisos.",
-          "El relleno va entre los pisos, así que solo aparece con 2 pisos o más. En el último nivel se piden dos decoraciones.",
+          "El relleno va entre los pisos, así que solo aparece con 2 pisos o más. En los dos últimos niveles se piden dos decoraciones.",
           "En la compu: los números eligen una opción, las flechas cambian de paso, Enter entrega y Esc pausa.",
         ],
       },
       {
         title: "Entregar",
         text: [
-          "Cuando está todo, tocá «Entregar la torta». Si es igual al pedido sumás 100 puntos, más un extra por racha de tortas perfectas y, con reloj, por los segundos que te sobran.",
-          "Si algo no coincide, la app te dice qué. Podés arreglarla una vez (vale 40) o pasar al siguiente pedido.",
+          "Cuando está todo, tocá «Entregar la torta». Si es igual al pedido sumás 100 puntos, más un extra por racha de tortas perfectas y por los segundos que te sobran del reloj.",
+          "Si algo no coincide, la app te dice qué. Hasta el nivel Maestro podés arreglarla una vez (vale 40) o pasar al siguiente pedido; en Chef estrella no hay segunda oportunidad. Si se acaba el tiempo, el pedido se pierde.",
         ],
       },
       {
-        title: "Niveles",
+        title: "Niveles (solo)",
         text: [
-          "Aprendiz: tortas de un piso. Pastelero: dos pisos, rellenos y forma cuadrada. Maestro: hasta tres pisos, dos decoraciones y 75 segundos por pedido.",
-          "Para pasar de nivel hace falta armar bien al menos la mitad de los pedidos. Tres estrellas si salen todas perfectas de una.",
+          "Aprendiz: un piso, redonda o cuadrada, 60 segundos por torta. Pastelero: hasta dos pisos con relleno, 50 segundos. Maestro: dos o tres pisos, dos decoraciones y el pedido sin dibujo, 45 segundos. Chef estrella: el pedido se esconde, 40 segundos y sin arreglos.",
+          "Para pasar de nivel hace falta armar bien al menos 3 de 5 pedidos (4 de 6 en los últimos). Tres estrellas si salen todas perfectas de una.",
+        ],
+      },
+      {
+        title: "Duelo con amigos",
+        text: [
+          "Desde el inicio, «Duelo con amigos» crea una sala: elegís la dificultad (la de uno de los niveles) y cuánto dura el turno (2, 3 o 5 minutos), y mandás el link.",
+          "Todos reciben los mismos pedidos en el mismo orden y arrancan juntos después de una cuenta regresiva. No hay reloj por torta: el reloj es el del turno. Cada torta bien suma como en el juego solo; cada torta mal resta 25 y pasás al pedido siguiente igual.",
+          "Arriba ves los puntos de todos y la torta que cada uno tiene en la mesada. Cuando suena la campana gana quien sumó más.",
         ],
       },
     ],
-    tips: ["Antes de entregar, girá la torta y compará con el dibujo del pedido.", "La música, el volumen y la calidad gráfica se cambian en la pausa."],
+    tips: [
+      "Antes de entregar, girá la torta y compará con el pedido.",
+      "En el duelo, apurarse con una torta mal cuesta más que tardar unos segundos en revisarla.",
+      "La música, el volumen y la calidad gráfica se cambian en la pausa.",
+    ],
   },
   domino: {
     goal: "Quedarte sin fichas antes que los demás y sumar los puntos que les quedan.",

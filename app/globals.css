@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* A phone on its side: wide but short. Game screens switch to side-by-side columns. */
+@custom-variant landscape (@media (orientation: landscape) and (max-height: 540px));
+/* Short screens (small phones upright, or on their side): tighter controls. */
+@custom-variant short (@media (max-height: 700px));
+
 :root {
   --background: #07060d;
   --foreground: #e6e4f7;

@@ -7,7 +7,11 @@ import { mulberry32 } from "./random";
  * the order generator, the validation and the scoring, plus `reduce`, the
  * whole game as a state machine the page drives (and tests can run).
  *
+ * The duel (`lib/bakeryDuel.ts`) builds cakes with the same pieces.
+ *
  * Levels unlock options gradually (`LEVELS`); adding one is adding an entry.
+ * Every level has a clock; the later ones also hide the picture, hide the
+ * whole order after a few seconds (`memorize`) or allow no second try.
  */
 
 // ---- Options ---------------------------------------------------------------
@@ -98,6 +102,12 @@ export interface Level {
   decorationCount: number;
   /** Seconds per order; 0 = no clock. */
   seconds: number;
+  /** Seconds the order stays visible before it hides (0 = always visible). */
+  memorize: number;
+  /** The order card shows the cake drawn (otherwise only the list). */
+  picture: boolean;
+  /** A wrong cake can be fixed once. */
+  retry: boolean;
 }
 
 const ALL_FLAVORS: Flavor[] = ["vainilla", "chocolate", "fresa"];
@@ -105,21 +115,24 @@ const ALL_FLAVORS: Flavor[] = ["vainilla", "chocolate", "fresa"];
 export const LEVELS: Level[] = [
   {
     name: "Aprendiz",
-    hint: "Tortas de un piso, sin apuro.",
-    orders: 4,
-    shapes: ["redonda"],
-    sponges: ["vainilla", "chocolate"],
+    hint: "Un piso, dos formas y un minuto por torta.",
+    orders: 5,
+    shapes: ["redonda", "cuadrada"],
+    sponges: ALL_FLAVORS,
     layers: [1],
     fillings: [],
-    frostings: ["rosa", "celeste", "crema"],
-    decorations: ["chispas", "cerezas", "velas"],
+    frostings: ["rosa", "celeste", "chocolate", "crema"],
+    decorations: ["chispas", "cerezas", "estrellas", "velas"],
     decorationCount: 1,
-    seconds: 0,
+    seconds: 60,
+    memorize: 0,
+    picture: true,
+    retry: true,
   },
   {
     name: "Pastelero",
-    hint: "Dos pisos con relleno, más sabores y formas.",
-    orders: 4,
+    hint: "Hasta dos pisos con relleno y menos tiempo.",
+    orders: 5,
     shapes: ["redonda", "cuadrada"],
     sponges: ALL_FLAVORS,
     layers: [1, 2],
@@ -127,12 +140,15 @@ export const LEVELS: Level[] = [
     frostings: ["rosa", "celeste", "lavanda", "chocolate", "crema"],
     decorations: ["chispas", "cerezas", "estrellas", "flores", "velas"],
     decorationCount: 1,
-    seconds: 0,
+    seconds: 50,
+    memorize: 0,
+    picture: true,
+    retry: true,
   },
   {
     name: "Maestro",
-    hint: "Hasta tres pisos, dos decoraciones y reloj.",
-    orders: 4,
+    hint: "Hasta tres pisos, dos decoraciones y el pedido sin dibujo.",
+    orders: 6,
     shapes: ["redonda", "cuadrada"],
     sponges: ALL_FLAVORS,
     layers: [2, 3],
@@ -140,7 +156,26 @@ export const LEVELS: Level[] = [
     frostings: ["rosa", "celeste", "lavanda", "chocolate", "crema"],
     decorations: ["chispas", "cerezas", "estrellas", "flores", "velas"],
     decorationCount: 2,
-    seconds: 75,
+    seconds: 45,
+    memorize: 0,
+    picture: false,
+    retry: true,
+  },
+  {
+    name: "Chef estrella",
+    hint: "Memorizá el pedido: se esconde a los 8 segundos. Sin segunda oportunidad.",
+    orders: 6,
+    shapes: ["redonda", "cuadrada"],
+    sponges: ALL_FLAVORS,
+    layers: [1, 2, 3],
+    fillings: ALL_FLAVORS,
+    frostings: ["rosa", "celeste", "lavanda", "chocolate", "crema"],
+    decorations: ["chispas", "cerezas", "estrellas", "flores", "velas"],
+    decorationCount: 2,
+    seconds: 40,
+    memorize: 8,
+    picture: false,
+    retry: false,
   },
 ];
 
@@ -274,16 +309,23 @@ export const POINTS = {
   perSecond: 2,
   /** Right on the second try. */
   fixed: 40,
+  /** Per look back at a hidden order. */
+  peek: 20,
+  /** A right order never pays less than this. */
+  min: 10,
 };
 
-export function orderPoints(attempt: number, streak: number, secondsLeft: number): number {
-  if (attempt > 1) return POINTS.fixed;
+/** Seconds a look back at a hidden order lasts. */
+export const PEEK_SECONDS = 3;
+
+export function orderPoints(attempt: number, streak: number, secondsLeft: number, peeks = 0): number {
   const bonus = Math.min(POINTS.maxStreakBonus, Math.max(0, streak - 1) * POINTS.streakBonus);
-  return POINTS.perfect + bonus + Math.max(0, Math.ceil(secondsLeft)) * POINTS.perSecond;
+  const base = attempt > 1 ? POINTS.fixed : POINTS.perfect + bonus + Math.max(0, Math.ceil(secondsLeft)) * POINTS.perSecond;
+  return Math.max(POINTS.min, base - peeks * POINTS.peek);
 }
 
 /** Right orders (on either try) needed to pass a level. */
-export const toPass = (level: Level) => Math.ceil(level.orders / 2);
+export const toPass = (level: Level) => Math.ceil(level.orders * 0.6);
 
 /** 1–3 stars for a finished level, 0 if it wasn't passed. */
 export function levelStars(level: Level, firstTry: number, right: number): number {
@@ -323,6 +365,11 @@ export interface GameState {
   attempt: number;
   /** Seconds left on this order's clock (levels with `seconds`). */
   timeLeft: number;
+  /** Seconds spent on this order, and until when its card shows (levels with `memorize`). */
+  elapsed: number;
+  showUntil: number;
+  /** Looks back at the hidden order. */
+  peeks: number;
   score: number;
   streak: number;
   bestStreak: number;
@@ -344,6 +391,9 @@ export function initialGame(seed: number): GameState {
     cake: EMPTY_CAKE,
     attempt: 1,
     timeLeft: 0,
+    elapsed: 0,
+    showUntil: 0,
+    peeks: 0,
     score: 0,
     streak: 0,
     bestStreak: 0,
@@ -362,6 +412,43 @@ export function freshCake(level: Level): Cake {
   };
 }
 
+/** Whether the order card shows right now (levels with `memorize` hide it). */
+export const orderVisible = (level: Level, elapsed: number, showUntil: number) => !level.memorize || elapsed < showUntil;
+
+/** A building step, shared by the solo game and the duel. */
+export type BuildAction =
+  | { type: "set"; field: "shape" | "sponge" | "filling" | "frosting"; value: string }
+  | { type: "layers"; value: number }
+  | { type: "decoration"; value: Decoration };
+
+/** The cake after a building step, or null if the level doesn't allow it. */
+export function applyBuild(cake: Cake, lv: Level, a: BuildAction): Cake | null {
+  switch (a.type) {
+    case "set": {
+      const allowed: Record<string, readonly string[]> = {
+        shape: lv.shapes,
+        sponge: lv.sponges,
+        filling: cake.layers > 1 ? lv.fillings : [],
+        frosting: lv.frostings,
+      };
+      return allowed[a.field].includes(a.value) ? { ...cake, [a.field]: a.value } : null;
+    }
+    case "layers":
+      if (a.value < 1 || a.value > Math.max(...lv.layers)) return null;
+      return { ...cake, layers: a.value, filling: a.value > 1 ? cake.filling : null };
+    case "decoration": {
+      if (!lv.decorations.includes(a.value)) return null;
+      const has = cake.decorations.includes(a.value);
+      // Full: the new one replaces the oldest.
+      if (!has && cake.decorations.length >= lv.decorationCount) return { ...cake, decorations: [...cake.decorations.slice(1), a.value] };
+      return { ...cake, decorations: has ? cake.decorations.filter((d) => d !== a.value) : [...cake.decorations, a.value] };
+    }
+  }
+}
+
+/** Clock and memory for a new order. */
+const orderClock = (lv: Level) => ({ timeLeft: lv.seconds, elapsed: 0, showUntil: lv.memorize, peeks: 0 });
+
 function startLevel(s: GameState, level: number): GameState {
   const lv = LEVELS[level];
   return {
@@ -372,7 +459,7 @@ function startLevel(s: GameState, level: number): GameState {
     orderNo: 0,
     cake: freshCake(lv),
     attempt: 1,
-    timeLeft: lv.seconds,
+    ...orderClock(lv),
     stats: NO_STATS,
     result: null,
   };
@@ -380,10 +467,9 @@ function startLevel(s: GameState, level: number): GameState {
 
 export type Action =
   | { type: "start"; seed: number }
-  | { type: "set"; field: "shape" | "sponge" | "filling" | "frosting"; value: string }
-  | { type: "layers"; value: number }
-  | { type: "decoration"; value: Decoration }
+  | BuildAction
   | { type: "reset" }
+  | { type: "peek" }
   | { type: "deliver" }
   | { type: "tick"; seconds: number }
   | { type: "retry" }
@@ -397,10 +483,10 @@ function judge(s: GameState, timeout: boolean): GameState {
   const order = s.tickets[s.orderNo].order;
   const wrong = mismatches(s.cake, order);
   const right = !timeout && wrong.length === 0;
-  const canRetry = !right && !timeout && s.attempt === 1;
+  const canRetry = !right && !timeout && s.attempt === 1 && lv.retry;
   if (right) {
     const streak = s.attempt === 1 ? s.streak + 1 : 0;
-    const points = orderPoints(s.attempt, streak, lv.seconds ? s.timeLeft : 0);
+    const points = orderPoints(s.attempt, streak, lv.seconds ? s.timeLeft : 0, s.peeks);
     return {
       ...s,
       phase: "result",
@@ -431,41 +517,25 @@ export function reduce(s: GameState, a: Action): GameState {
   switch (a.type) {
     case "start":
       return s.phase === "menu" ? startLevel({ ...s, seed: a.seed, score: 0, streak: 0, bestStreak: 0, history: [] }, 0) : s;
-    case "set": {
-      if (!building) return s;
-      const allowed: Record<string, readonly string[]> = {
-        shape: lv.shapes,
-        sponge: lv.sponges,
-        filling: s.cake.layers > 1 ? lv.fillings : [],
-        frosting: lv.frostings,
-      };
-      if (!allowed[a.field].includes(a.value)) return s;
-      return { ...s, cake: { ...s.cake, [a.field]: a.value } };
-    }
-    case "layers": {
-      if (!building || a.value < 1 || a.value > Math.max(...lv.layers)) return s;
-      return { ...s, cake: { ...s.cake, layers: a.value, filling: a.value > 1 ? s.cake.filling : null } };
-    }
+    case "set":
+    case "layers":
     case "decoration": {
-      if (!building || !lv.decorations.includes(a.value)) return s;
-      const has = s.cake.decorations.includes(a.value);
-      if (!has && s.cake.decorations.length >= lv.decorationCount) {
-        // Full: the new one replaces the oldest.
-        return { ...s, cake: { ...s.cake, decorations: [...s.cake.decorations.slice(1), a.value] } };
-      }
-      return {
-        ...s,
-        cake: { ...s.cake, decorations: has ? s.cake.decorations.filter((d) => d !== a.value) : [...s.cake.decorations, a.value] },
-      };
+      const cake = building ? applyBuild(s.cake, lv, a) : null;
+      return cake ? { ...s, cake } : s;
     }
+    case "peek":
+      // A look back at a hidden order: it shows for a moment and pays less.
+      return building && !orderVisible(lv, s.elapsed, s.showUntil) ? { ...s, peeks: s.peeks + 1, showUntil: s.elapsed + PEEK_SECONDS } : s;
     case "reset":
       return building ? { ...s, cake: freshCake(lv) } : s;
     case "deliver":
       return building && missingStep(s.cake) === null ? judge(s, false) : s;
     case "tick": {
-      if (!building || !lv.seconds) return s;
+      if (!building) return s;
+      const elapsed = s.elapsed + a.seconds;
+      if (!lv.seconds) return { ...s, elapsed };
       const timeLeft = Math.max(0, s.timeLeft - a.seconds);
-      return timeLeft > 0 ? { ...s, timeLeft } : judge({ ...s, timeLeft: 0 }, true);
+      return timeLeft > 0 ? { ...s, timeLeft, elapsed } : judge({ ...s, timeLeft: 0, elapsed }, true);
     }
     case "retry":
       // Fix the same cake (it stays as delivered).
@@ -475,7 +545,7 @@ export function reduce(s: GameState, a: Action): GameState {
       // Skipping the retry counts the order as failed.
       const stats = s.result.canRetry ? { ...s.stats, failed: s.stats.failed + 1 } : s.stats;
       if (s.orderNo + 1 < s.tickets.length) {
-        return { ...s, stats, phase: "playing", orderNo: s.orderNo + 1, cake: freshCake(lv), attempt: 1, timeLeft: lv.seconds, result: null };
+        return { ...s, stats, phase: "playing", orderNo: s.orderNo + 1, cake: freshCake(lv), attempt: 1, ...orderClock(lv), result: null };
       }
       const stars = levelStars(lv, stats.firstTry, stats.right);
       return { ...s, stats, phase: "levelDone", result: null, history: [...s.history, { ...stats, level: s.level, stars }] };
