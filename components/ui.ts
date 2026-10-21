@@ -5,10 +5,10 @@ export const CARD =
   "rounded-2xl border border-violet-500/15 bg-slate-900/60 p-5 shadow-[0_0_25px_rgba(139,92,246,0.08)] backdrop-blur";
 
 export const PRIMARY_BUTTON =
-  "rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 py-2.5 font-medium text-white shadow-[0_0_20px_rgba(217,70,239,0.35)] transition hover:from-violet-500 hover:to-fuchsia-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none";
+  "rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 py-2.5 font-semibold text-white shadow-[0_0_20px_rgba(217,70,239,0.35)] transition hover:from-violet-500 hover:to-fuchsia-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:active:scale-100";
 
 export const SECONDARY_BUTTON =
-  "rounded-lg border border-cyan-400/60 py-2.5 font-medium text-cyan-300 transition hover:bg-cyan-500/10 hover:shadow-[0_0_15px_rgba(34,211,238,0.25)] disabled:cursor-not-allowed disabled:opacity-50";
+  "rounded-xl border border-cyan-400/60 py-2.5 font-medium text-cyan-300 transition hover:bg-cyan-500/10 hover:shadow-[0_0_15px_rgba(34,211,238,0.25)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
 
 export const TEXT_INPUT =
   "rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none placeholder:text-slate-500 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30";
@@ -17,7 +17,7 @@ export const SECTION_LABEL = "mb-1.5 text-xs font-medium uppercase tracking-wide
 
 /** One option of a row of selectable chips (difficulty, size, etc). */
 export function chipClass(selected: boolean): string {
-  return `rounded-lg border px-2 py-1.5 text-xs font-medium transition ${
+  return `rounded-lg border px-2 py-1.5 text-xs font-medium transition active:scale-[0.97] ${
     selected
       ? "border-cyan-400/60 bg-cyan-500/10 text-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.3)]"
       : "border-slate-700 text-slate-400 hover:bg-slate-800/60"

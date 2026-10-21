@@ -1,10 +1,16 @@
 import Link from "next/link";
 import { MAX_IDLE_DAYS } from "@/lib/roomCleanup";
+import { TaloMark } from "./TaloLogo";
 
 // Full-area placeholders shown inside a room's <main> while it isn't playable.
 
 export function RoomLoading({ text }: { text: string }) {
-  return <div className="flex h-full items-center justify-center text-slate-400">{text}</div>;
+  return (
+    <div className="flex h-full min-h-[50vh] flex-col items-center justify-center gap-4 text-slate-400">
+      <TaloMark className="h-10 w-10 animate-pulse" />
+      <p className="text-sm">{text}</p>
+    </div>
+  );
 }
 
 export function RoomNotFound() {

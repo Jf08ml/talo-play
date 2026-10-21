@@ -150,11 +150,28 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
   /* Two soft neon blobs anchored to the viewport, behind everything —
      atmosphere for the cyberpunk theme without needing an image asset. */
   background-image:
     radial-gradient(ellipse 60% 50% at 15% 0%, rgba(168, 85, 247, 0.16), transparent 60%),
     radial-gradient(ellipse 60% 50% at 100% 100%, rgba(34, 211, 238, 0.12), transparent 60%);
   background-attachment: fixed;
+}
+
+/* A clear ring for keyboard users only; taps and clicks don't show it. */
+:focus-visible {
+  outline: 2px solid rgba(34, 211, 238, 0.8);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -138,14 +138,9 @@ export default function YoNuncaClient({ roomId }: { roomId: string }) {
               myId={myId}
               summary={config.summary}
               settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
+              minToStart={MIN_PLAYERS}
               onStart={() => startYoNunca(roomId, connected.length)}
-            >
-              {connected.length < MIN_PLAYERS && (
-                <p className="text-center text-sm text-amber-300/90">
-                  Hacen falta al menos {MIN_PLAYERS} jugadores para empezar.
-                </p>
-              )}
-            </WaitingRoom>
+            />
           </div>
         )}
 

@@ -163,14 +163,9 @@ export default function ImpostorClient({ roomId }: { roomId: string }) {
               myId={myId}
               summary={`${config.clueMode === "app" ? `${config.clueRounds} ${config.clueRounds === 1 ? "vuelta" : "vueltas"} de pistas en la app` : "Pistas en voz alta"} · ${categoriesLabel}`}
               settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
+              minToStart={MIN_PLAYERS}
               onStart={() => startImpostor(roomId, connected)}
-            >
-              {connected.length < MIN_PLAYERS && (
-                <p className="text-center text-sm text-amber-300/90">
-                  Hacen falta al menos {MIN_PLAYERS} jugadores para empezar.
-                </p>
-              )}
-            </WaitingRoom>
+            />
           </div>
         )}
 

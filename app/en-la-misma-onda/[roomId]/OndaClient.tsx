@@ -134,12 +134,9 @@ export default function OndaClient({ roomId }: { roomId: string }) {
               myId={myId}
               summary={`${config.rounds} ${config.rounds === 1 ? "vuelta" : "vueltas"}: cada uno da la pista ${config.rounds === 1 ? "una vez" : `${config.rounds} veces`}`}
               settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
+              minToStart={MIN_PLAYERS}
               onStart={() => startOnda(roomId, connected)}
-            >
-              {connected.length < MIN_PLAYERS && (
-                <p className="text-center text-sm text-amber-300/90">Hacen falta al menos {MIN_PLAYERS} jugadores.</p>
-              )}
-            </WaitingRoom>
+            />
           </div>
         )}
 

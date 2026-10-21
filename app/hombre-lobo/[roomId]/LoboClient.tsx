@@ -153,14 +153,9 @@ export default function LoboClient({ roomId }: { roomId: string }) {
                 connected.length >= MIN_PLAYERS ? `${wolvesFor(connected.length)} ${wolvesFor(connected.length) === 1 ? "lobo" : "lobos"}, vidente y médico` : "lobos, vidente y médico"
               }`}
               settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
+              minToStart={MIN_PLAYERS}
               onStart={() => startLobo(roomId, connected)}
-            >
-              {connected.length < MIN_PLAYERS && (
-                <p className="text-center text-sm text-amber-300/90">
-                  Hacen falta al menos {MIN_PLAYERS} jugadores (hay {connected.length}).
-                </p>
-              )}
-            </WaitingRoom>
+            />
           </div>
         )}
 

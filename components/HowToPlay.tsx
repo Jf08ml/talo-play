@@ -104,11 +104,14 @@ export function RulesButton({
   where,
   className,
   label = "Reglas",
+  compact = false,
 }: {
   game: GameId;
   where: "lobby" | "sala" | "partida";
   className?: string;
   label?: string;
+  /** Icon only on phones (the room header). */
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -121,11 +124,12 @@ export function RulesButton({
         }}
         className={
           className ??
-          "flex items-center gap-1.5 rounded-md bg-violet-500/15 px-2.5 py-1 text-xs font-semibold text-violet-200 ring-1 ring-violet-400/30 transition hover:bg-violet-500/25"
+          "flex h-7 items-center gap-1.5 rounded-md bg-violet-500/15 px-2 text-xs font-semibold text-violet-200 ring-1 ring-violet-400/30 transition hover:bg-violet-500/25 active:scale-95 sm:px-2.5"
         }
+        aria-label={label}
       >
         <BookOpen className="h-3.5 w-3.5" />
-        {label}
+        <span className={compact ? "hidden sm:inline" : ""}>{label}</span>
       </button>
       {open && <RulesDialog game={game} onClose={() => setOpen(false)} />}
     </>

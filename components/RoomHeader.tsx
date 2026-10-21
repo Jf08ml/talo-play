@@ -37,7 +37,7 @@ export default function RoomHeader({
   };
 
   return (
-    <header className="flex flex-col gap-2.5 border-b border-violet-500/15 bg-slate-900/80 px-4 py-3 shadow-[0_1px_20px_rgba(139,92,246,0.08)] backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+    <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-violet-500/15 bg-slate-900/80 px-3 py-2.5 shadow-[0_1px_20px_rgba(139,92,246,0.08)] backdrop-blur sm:px-4 sm:py-3">
       <div className="flex flex-wrap items-center gap-2">
         <Link href="/" aria-label="Volver a Talo" className="flex items-center gap-1.5 hover:opacity-80">
           <TaloMark className="h-6 w-6" />
@@ -52,17 +52,17 @@ export default function RoomHeader({
         {badges}
         <button
           onClick={invite}
-          className="flex items-center gap-1.5 rounded-md bg-cyan-500/15 px-2.5 py-1 text-xs font-semibold text-cyan-200 ring-1 ring-cyan-400/30 transition hover:bg-cyan-500/25"
+          aria-label="Invitar"
+          className="flex h-7 items-center gap-1.5 rounded-md bg-cyan-500/15 px-2 text-xs font-semibold text-cyan-200 ring-1 ring-cyan-400/30 transition hover:bg-cyan-500/25 active:scale-95 sm:px-2.5"
         >
           {copied ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
-          {copied ? "¡Link copiado!" : "Invitar"}
+          {/* On a phone the label only shows as feedback, so the bar fits one line. */}
+          <span className={copied ? "" : "hidden sm:inline"}>{copied ? "¡Link copiado!" : "Invitar"}</span>
         </button>
-        <RulesButton game={game} where="partida" />
+        <RulesButton game={game} where="partida" compact />
       </div>
 
-      {right && (
-        <div className="flex items-center justify-between gap-4 sm:justify-end">{right}</div>
-      )}
+      {right && <div className="ml-auto flex items-center justify-end gap-4">{right}</div>}
     </header>
   );
 }

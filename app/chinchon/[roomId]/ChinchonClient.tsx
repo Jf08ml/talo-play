@@ -121,11 +121,9 @@ export default function ChinchonClient({ roomId }: { roomId: string }) {
               myId={myId}
               summary={`A ${config.limit} puntos · de ${MIN_PLAYERS} a ${MAX_PLAYERS} jugadores`}
               settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
+              minToStart={MIN_PLAYERS}
               onStart={() => startChinchon(roomId, connected)}
             >
-              {connected.length < MIN_PLAYERS && (
-                <p className="text-center text-sm text-amber-300/90">Hacen falta al menos {MIN_PLAYERS} jugadores.</p>
-              )}
               {connected.length > MAX_PLAYERS && (
                 <p className="text-center text-sm text-slate-400">Juegan los primeros {MAX_PLAYERS}; el resto mira.</p>
               )}

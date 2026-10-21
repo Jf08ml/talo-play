@@ -147,12 +147,9 @@ export default function TelefonoClient({ roomId }: { roomId: string }) {
               myId={myId}
               summary={`${config.drawSeconds} s para dibujar · ${45} s para escribir`}
               settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
+              minToStart={MIN_PLAYERS}
               onStart={() => startTelefono(roomId, connected)}
-            >
-              {connected.length < MIN_PLAYERS && (
-                <p className="text-center text-sm text-amber-300/90">Hacen falta al menos {MIN_PLAYERS} jugadores.</p>
-              )}
-            </WaitingRoom>
+            />
           </div>
         )}
 
