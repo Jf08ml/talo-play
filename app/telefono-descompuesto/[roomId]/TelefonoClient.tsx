@@ -464,7 +464,7 @@ function Album({ roomId, state, myId }: { roomId: string; state: TelefonoState; 
         <p className="text-xs uppercase tracking-wide text-slate-500">
           Álbum {state.albumChain + 1} de {state.order.length}
         </p>
-        <p className="font-display text-2xl font-semibold text-slate-100">La cadena de {nameOf(state, owner, myId)}</p>
+        <p className="font-display text-2xl font-semibold text-slate-100">{owner === myId ? "Tu cadena" : `La cadena de ${nameOf(state, owner, myId)}`}</p>
       </div>
 
       {Array.from({ length: state.albumStep + 1 }, (_, k) => {

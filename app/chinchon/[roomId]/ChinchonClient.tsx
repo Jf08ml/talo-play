@@ -37,6 +37,7 @@ import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -172,6 +173,7 @@ function Table({
   const playing = inPlay(state).includes(myId);
   const myTurn = state.turn === myId;
   useTurnAlert(myTurn);
+  useSoundOn(state.moveNo, "place");
   const hand = splitCards(state.hands[myId] ?? "");
   const top = topDiscard(state);
   const canDraw = myTurn && state.phase === "draw";
@@ -316,9 +318,9 @@ function HandEnd({ roomId, state, myId }: { roomId: string; state: ChinchonState
     <div className={`${CARD} animate-celebration-in flex flex-col gap-4`}>
       <div className="text-center">
         {chinchon ? (
-          <p className="font-display text-2xl font-bold text-amber-300">🎉 ¡CHINCHÓN de {nameOf(state, cutter, myId)}!</p>
+          <p className="font-display text-2xl font-bold text-amber-300">🎉 ¡CHINCHÓN{cutter === myId ? "!" : ` de ${nameOf(state, cutter, myId)}!`}</p>
         ) : (
-          <p className="font-display text-xl font-semibold text-slate-100">✂️ Cortó {nameOf(state, cutter, myId)}</p>
+          <p className="font-display text-xl font-semibold text-slate-100">✂️ {cutter === myId ? "Cortaste vos" : `Cortó ${nameOf(state, cutter, myId)}`}</p>
         )}
         {finished && (
           <p className="mt-1 text-lg text-emerald-300">

@@ -35,6 +35,7 @@ import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -188,6 +189,7 @@ function DiceTray({
   const player = currentPlayer(state);
   const myTurn = player === myId;
   useTurnAlert(myTurn);
+  useSoundOn(state.rolls ? `${state.turnNo}-${state.rolls}` : null, "dice");
   const values = state.dice ? diceValues(state.dice) : Array<number>(DICE).fill(0);
   const canHold = myTurn && state.rolls > 0 && state.rolls < MAX_ROLLS;
   const canRoll = myTurn && state.rolls < MAX_ROLLS;

@@ -42,6 +42,7 @@ import { SETTINGS } from "../settings";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -242,6 +243,8 @@ function Game({
   const mySeat = seatOf(state, myId);
   const myTurn = state.status === "playing" && mySeat === state.turn;
   useTurnAlert(myTurn);
+  useSoundOn(state.phase === "roll" ? null : `${state.moveNo}-${state.die}`, "dice");
+  useSoundOn(state.moveNo, "place");
   const moves = myTurn ? currentMoves(state) : [];
   const active = activeSeats(state);
   const turnPlayer = state.seats[state.turn];

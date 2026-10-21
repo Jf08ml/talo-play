@@ -54,6 +54,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -266,6 +267,9 @@ function Game({
   const iAnswer = playing && pending && answering === myTeam;
   const myTurn = playing && state.status === "playing" && state.turn === mySeat && !pending;
   useTurnAlert(myTurn);
+  useSoundOn(state.moveNo, "place");
+  // A song (truco, envido…) waiting for an answer.
+  useSoundOn(`${state.trucoAsk.level}${state.envidoAsk.chain}` || null, "turn", !!(state.trucoAsk.by || state.envidoAsk.by));
   const hand = playing ? inHand(state, mySeat!) : [];
   const myEnvido = playing ? envidoOf(splitCards(state.hands[mySeat!])) : 0;
   const mv = state.moveNo;

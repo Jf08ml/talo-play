@@ -47,6 +47,7 @@ import { SETTINGS } from "../settings";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -291,6 +292,7 @@ function Game({
   const mySeat = seatOf(state, myId);
   const myTurn = state.status === "playing" && state.phase === "play" && mySeat === state.turn;
   useTurnAlert(myTurn);
+  useSoundOn(state.moveNo, "place");
   const canPlay = myTurn ? playable(state, state.turn) : [];
   const [selected, setSelected] = useState<string | null>(null);
   const seats = activeSeats(state);
@@ -391,15 +393,14 @@ function Game({
         ) : (
           <p className="text-sm text-emerald-100/70">
             {state.phase === "play" &&
-              (state.mustOpen
-                ? `Sale ${nameOf(state, state.opener, myId)} con el ${state.mustOpen[0]}-${state.mustOpen[1]}.`
-                : `Sale ${nameOf(state, state.opener, myId)}.`)}
+              `${state.seats[state.opener] === myId ? "Salís vos" : `Sale ${nameOf(state, state.opener, myId)}`}${
+                state.mustOpen ? ` con el ${state.mustOpen[0]}-${state.mustOpen[1]}` : ""
+              }.`}
           </p>
         )}
         {state.phase === "play" && state.status === "playing" && (
           <p className="text-xs text-emerald-100/70">
-            {lastText(state, myId)}
-            {seats.length < 4 && ` · Pozo: ${splitTiles(state.stock).length}`}
+            {[lastText(state, myId), seats.length < 4 && `Pozo: ${splitTiles(state.stock).length}`].filter(Boolean).join(" · ")}
           </p>
         )}
         {state.phase === "handover" && <HandOver roomId={roomId} state={state} myId={myId} />}

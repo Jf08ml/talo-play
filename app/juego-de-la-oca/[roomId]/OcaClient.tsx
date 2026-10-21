@@ -36,6 +36,7 @@ import { SETTINGS } from "../settings";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -199,6 +200,7 @@ function Game({
   const turnId = state.order[state.turn];
   const myTurn = state.status === "playing" && turnId === myId;
   useTurnAlert(myTurn);
+  useSoundOn(state.moveNo, "dice");
   const playing = state.order.includes(myId);
   const last = state.last;
   const dice = last.dice ? last.dice.split(",").map(Number) : Array<number>(state.dice).fill(0);
