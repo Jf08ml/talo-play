@@ -50,6 +50,7 @@ import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { Flag, Undo2 } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -509,6 +510,8 @@ function TurnPanel({ roomId, state, myId }: { roomId: string; state: BgState; my
   const mySeat = seatOf(state, myId);
   const myTurn = mySeat === state.turn;
   useTurnAlert(myTurn);
+  useSoundOn(state.rolled || null, "dice");
+  useSoundOn(state.moveNo, "place");
   const turnName = seatName(state, state.seats[state.turn], myId);
   const rolled = parseDice(state.rolled);
   const steps = currentSteps(state);
@@ -528,7 +531,7 @@ function TurnPanel({ roomId, state, myId }: { roomId: string; state: BgState; my
 
       {state.opening && state.phase === "move" && (
         <p className="text-xs text-slate-400">
-          Primera tirada: blancas {rolled[0]}, negras {rolled[1]}. Arranca {turnName} con {rolled[0]}-{rolled[1]}.
+          Primera tirada: blancas {rolled[0]}, negras {rolled[1]}. {myTurn ? "Arrancás vos" : `Arranca ${turnName}`} con {rolled[0]}-{rolled[1]}.
         </p>
       )}
       {state.blocked && state.phase === "roll" && (

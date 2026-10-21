@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
 import { GAMES, type GameId } from "@/lib/games";
 import { shareInvite } from "@/lib/share";
@@ -8,7 +8,27 @@ import { trackEvent } from "@/lib/analytics";
 import { TaloMark } from "./TaloLogo";
 import GameIcon from "./GameIcon";
 import { RulesButton } from "./HowToPlay";
-import { Check, Share2 } from "lucide-react";
+import { Check, Share2, Volume2, VolumeX } from "lucide-react";
+import { installUnlock, isMuted, setMuted, subscribeMuted } from "@/lib/sfx";
+
+// Games with their own audio and sound switch (lib/*Audio.ts).
+const OWN_AUDIO = new Set<GameId>(["fuego", "arena", "carreras", "carreras3d", "pasteleria"]);
+
+/** Turns the shared game sounds (lib/sfx.ts) on and off, for every game. */
+function SoundButton() {
+  const muted = useSyncExternalStore(subscribeMuted, isMuted, () => false);
+  useEffect(installUnlock, []);
+  return (
+    <button
+      onClick={() => setMuted(!muted)}
+      aria-label={muted ? "Activar sonido" : "Silenciar"}
+      aria-pressed={!muted}
+      className="flex h-7 items-center rounded-md bg-slate-800 px-2 text-slate-300 ring-1 ring-slate-600/60 transition hover:bg-slate-700 active:scale-95"
+    >
+      {muted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+    </button>
+  );
+}
 
 /**
  * Top bar shared by every game's room: back to Talo, which game, room code
@@ -60,6 +80,7 @@ export default function RoomHeader({
           <span className={copied ? "" : "hidden sm:inline"}>{copied ? "¡Link copiado!" : "Invitar"}</span>
         </button>
         <RulesButton game={game} where="partida" compact />
+        {!OWN_AUDIO.has(game) && <SoundButton />}
       </div>
 
       {right && <div className="ml-auto flex items-center justify-end gap-4">{right}</div>}

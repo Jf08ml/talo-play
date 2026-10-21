@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import { Crown, Trophy } from "lucide-react";
+import { playSound } from "@/lib/sfx";
 
 // The end-of-game screen shared by the games: who won (ties too), a podium
 // for the top three, the rest in a list, and confetti when you won.
@@ -20,6 +21,7 @@ export function Confetti({ pieces = 140 }: { pieces?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
+    playSound("win");
     const canvas = ref.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -155,6 +157,12 @@ export default function GameResults({
       : `Con ${best} ${unit}`
     : undefined;
 
+  const celebrating = celebrate ?? iWon;
+  // The confetti brings its own fanfare; otherwise a soft closing jingle.
+  useEffect(() => {
+    if (!celebrating) playSound("end");
+  }, [celebrating]);
+
   const podium = ranking.length >= 2 ? ranking.slice(0, 3) : [];
   const rest = ranking.slice(podium.length);
 
@@ -164,7 +172,7 @@ export default function GameResults({
         iWon ? "border-amber-300/30 shadow-[0_0_50px_rgba(251,191,36,0.18)]" : "border-violet-500/20 shadow-[0_0_40px_rgba(139,92,246,0.12)]"
       }`}
     >
-      {(celebrate ?? iWon) && <Confetti />}
+      {celebrating && <Confetti />}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 -top-24 mx-auto h-48 w-72 rounded-full bg-gradient-to-r from-violet-600/25 via-fuchsia-500/25 to-amber-400/20 blur-3xl"

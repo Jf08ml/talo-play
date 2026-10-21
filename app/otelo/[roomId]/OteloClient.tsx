@@ -38,6 +38,7 @@ import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { Flag } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -215,6 +216,7 @@ function BoardView({ roomId, state, myId }: { roomId: string; state: OteloState;
   const mySeat = seatOf(state, myId);
   const myTurn = state.status === "playing" && mySeat === state.turn;
   useTurnAlert(myTurn);
+  useSoundOn(state.moveNo, "place");
   const legal = new Set(myTurn ? legalSquares(state.cells, state.turn) : []);
   const flipped = new Set(state.flipped ? state.flipped.split(",").map(Number) : []);
   const preview = new Set(myTurn && hover !== null && legal.has(hover) ? flipsFor(state.cells, state.turn, hover) : []);

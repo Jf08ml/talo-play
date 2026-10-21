@@ -36,6 +36,7 @@ import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -219,6 +220,8 @@ const PAD = 14;
 function Board({ roomId, state, myId, size }: { roomId: string; state: CajasState; myId: string; size: number }) {
   const myTurn = state.status === "playing" && state.order[state.turn] === myId;
   useTurnAlert(myTurn);
+  useSoundOn(state.lastLine, "place");
+  useSoundOn(state.boxes.split("").filter((c) => c !== ".").length, "good");
   const drawn = drawnLines(state.lines);
   const span = size * CELL + PAD * 2;
   const myColor = PLAYER_COLORS[state.turn];

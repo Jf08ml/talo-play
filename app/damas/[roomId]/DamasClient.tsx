@@ -39,6 +39,7 @@ import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { ArrowLeftRight, Crown, Flag, Handshake } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -286,6 +287,8 @@ function BoardView({ roomId, state, myId }: { roomId: string; state: DamasState;
   const mySeat = seatOf(state, myId);
   const myTurn = state.status === "playing" && mySeat === state.turn;
   useTurnAlert(myTurn);
+  useSoundOn(state.moveNo, "place");
+  useSoundOn(state.cells.split("").filter((c) => c !== ".").length, "capture");
   const moves = myTurn ? legalMoves(state.cells, state.turn, state.chain) : [];
   const movable = new Set(moves.map((m) => m.from));
   const mustCapture = moves.some((m) => m.captured >= 0);

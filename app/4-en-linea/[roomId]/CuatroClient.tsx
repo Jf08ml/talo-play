@@ -36,6 +36,7 @@ import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { ArrowLeftRight } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -89,6 +90,7 @@ export default function CuatroClient({ roomId }: { roomId: string }) {
   const mySeat = state ? seatOf(state, myId) : null;
   const myTurn = state?.status === "playing" && mySeat === state.turn;
   useTurnAlert(myTurn);
+  useSoundOn(state?.lastMove, "place");
   const moves = state ? movesMade(state.cells) : 0;
 
   const drop = (col: number) => {

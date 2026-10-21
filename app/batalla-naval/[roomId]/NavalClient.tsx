@@ -44,6 +44,7 @@ import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { RotateCw, Shuffle } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -482,6 +483,9 @@ function Battle({ roomId, state, myId }: { roomId: string; state: NavalState; my
   const mySeat = seatOf(state, myId);
   const over = state.status === "finished";
   useTurnAlert(state.status === "playing" && !!mySeat && state.turn === mySeat);
+  const shot = state.lastShot;
+  const hit = !!shot.by && state.fleets[otherSeat(shot.by)][shot.idx] !== ".";
+  useSoundOn(shot.by ? `${shot.by}${shot.idx}` : null, hit ? "capture" : "place");
 
   if (!mySeat) {
     return (

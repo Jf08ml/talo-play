@@ -38,6 +38,7 @@ import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { ArrowLeftRight } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -250,6 +251,8 @@ function Game({
   const playing = state.status === "playing";
   const myTurn = playing && !!mySeat && colorOfSeat(mySeat) === state.turn;
   useTurnAlert(myTurn);
+  useSoundOn(state.moveNo, "place");
+  useSoundOn(state.cells.split("").filter((c) => c !== ".").length, "capture");
   const [selected, setSelected] = useState<number | null>(null);
   const [promoAsk, setPromoAsk] = useState<{ from: number; to: number } | null>(null);
   const [confirmResign, setConfirmResign] = useState(false);
