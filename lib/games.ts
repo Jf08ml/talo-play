@@ -6,7 +6,7 @@
  * Every room stores its game in `rooms/{id}/meta/game`; room codes are
  * global, so one code is enough to find any game's room (`lib/roomLookup.ts`).
  */
-export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena" | "yonunca" | "onda" | "telefono" | "ludo" | "lobo" | "ajedrez" | "chinchon" | "truco" | "fuego" | "otelo" | "backgammon" | "oca" | "domino" | "pasteleria";
+export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena" | "yonunca" | "onda" | "telefono" | "ludo" | "lobo" | "ajedrez" | "chinchon" | "truco" | "fuego" | "otelo" | "backgammon" | "oca" | "domino" | "pasteleria" | "vibora";
 
 /** Who you're playing with: the first question the home page asks. */
 export type PlayContext = "pareja" | "amigos" | "grupo" | "solo";
@@ -350,6 +350,21 @@ export const GAMES: Record<GameId, GameInfo> = {
       "Cada palabra es de quien la marca primero. Gana quien encuentra más.",
     ],
   },
+  vibora: {
+    id: "vibora",
+    title: "Viborita",
+    path: "viborita",
+    tagline: "Comé bolitas, crecé y cortales la cola a los demás para quedarte con sus puntos. En línea con gente de todos lados o en una sala con amigos.",
+    minPlayers: 1,
+    maxPlayers: 10,
+    duration: "Sin límite",
+    contexts: ["solo", "pareja", "amigos", "grupo"],
+    howTo: [
+      "Guiá tu víbora con el dedo o el mouse y comé bolitas para crecer.",
+      "Si tu cabeza cruza el cuerpo de otra víbora, se lo cortás ahí y te comés esa parte.",
+      "En línea no hay tiempo: llegá al primer puesto del ranking. Con amigos, gana la más larga cuando se acaba el tiempo.",
+    ],
+  },
   carreras: {
     id: "carreras",
     title: "Carreras",
@@ -623,7 +638,7 @@ export const GAMES: Record<GameId, GameInfo> = {
 };
 
 /** Home page order: quickest to start first. */
-export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "yonunca", "onda", "telefono", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "lobo", "arena", "fuego", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "ajedrez", "generala", "pasteleria", "chinchon", "truco", "ludo", "domino", "backgammon", "otelo", "oca", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
+export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "yonunca", "onda", "telefono", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "lobo", "vibora", "arena", "fuego", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "ajedrez", "generala", "pasteleria", "chinchon", "truco", "ludo", "domino", "backgammon", "otelo", "oca", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
 
 /** The home's shelves: every game in exactly one, in the order listed. */
 export type GameCategory = "previa" | "palabras" | "mesa" | "cartas" | "accion" | "puzzles";
@@ -631,7 +646,7 @@ export type GameCategory = "previa" | "palabras" | "mesa" | "cartas" | "accion" 
 export const CATEGORIES: { id: GameCategory; label: string; hint: string; games: GameId[] }[] = [
   { id: "previa", label: "Para la previa", hint: "Risas, secretos y votaciones en grupo", games: ["impostor", "probable", "yonunca", "onda", "telefono", "reto", "conoces", "verdades", "mimica", "lobo"] },
   { id: "palabras", label: "Preguntas y palabras", hint: "Para los que saben de todo", games: ["trivia", "emojis", "palabra", "sopa", "ahorcado", "tutti", "dibujo", "codigo"] },
-  { id: "accion", label: "Acción y 3D", hint: "Carreras, combates y más", games: ["fuego", "arena", "carreras3d", "carreras", "pasteleria"] },
+  { id: "accion", label: "Acción y 3D", hint: "Carreras, combates y más", games: ["vibora", "fuego", "arena", "carreras3d", "carreras", "pasteleria"] },
   { id: "mesa", label: "Juegos de mesa", hint: "Los clásicos de siempre, uno contra uno o en familia", games: ["cuatro", "cajas", "naval", "damas", "ajedrez", "ludo", "backgammon", "otelo", "oca"] },
   { id: "cartas", label: "Cartas y dados", hint: "Para jugar de sobremesa", games: ["truco", "chinchon", "generala", "domino"] },
   { id: "puzzles", label: "Puzzles y memoria", hint: "Tranquilos, en equipo o a contrarreloj", games: ["memotest", "rompecabezas", "deslizante"] },

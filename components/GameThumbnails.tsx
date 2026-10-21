@@ -910,6 +910,65 @@ export function SopaThumbnail() {
   );
 }
 
+export function ViboraThumbnail() {
+  // A green snake crossing a pink one's tail, with the cut-off bits flying away.
+  const pellets = [
+    [52, 40, "#facc15"],
+    [340, 46, "#22d3ee"],
+    [300, 200, "#f472b6"],
+    [80, 196, "#a3e635"],
+    [210, 28, "#fb923c"],
+    [360, 140, "#c084fc"],
+  ] as const;
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="vibora-bg" cx="50%" cy="45%" r="90%">
+          <stop offset="0%" stopColor="#1a2e05" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+        <filter id="vibora-glow" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="3" />
+        </filter>
+      </defs>
+      <rect width="400" height="240" fill="url(#vibora-bg)" />
+      {pellets.map(([x, y, c], i) => (
+        <g key={i}>
+          <circle cx={x} cy={y} r="8" fill={c} opacity="0.5" filter="url(#vibora-glow)" />
+          <circle cx={x} cy={y} r="4" fill={c} />
+        </g>
+      ))}
+      {/* The pink one, cut: front part and the loose bits. */}
+      <path d="M330 100 C 290 70, 250 80, 230 110" fill="none" stroke="#000" strokeOpacity="0.4" strokeWidth="26" strokeLinecap="round" />
+      <path d="M330 100 C 290 70, 250 80, 230 110" fill="none" stroke="#ec4899" strokeWidth="22" strokeLinecap="round" />
+      <path d="M330 100 C 290 70, 250 80, 230 110" fill="none" stroke="#f9a8d4" strokeWidth="12" strokeLinecap="round" strokeDasharray="10 14" />
+      <circle cx="334" cy="103" r="14" fill="#ec4899" />
+      <circle cx="340" cy="96" r="5" fill="#fff" />
+      <circle cx="342" cy="96" r="2.5" fill="#0b0a14" />
+      <circle cx="342" cy="110" r="5" fill="#fff" />
+      <circle cx="344" cy="110" r="2.5" fill="#0b0a14" />
+      {[
+        [196, 150],
+        [180, 172],
+        [168, 196],
+        [150, 160],
+        [214, 182],
+      ].map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r={7 - i * 0.6} fill="#ec4899" opacity={0.9 - i * 0.12} />
+      ))}
+      {/* The green one, crossing through. */}
+      <path d="M40 150 C 90 110, 150 150, 200 125 S 240 60, 250 40" fill="none" stroke="#000" strokeOpacity="0.4" strokeWidth="30" strokeLinecap="round" />
+      <path d="M40 150 C 90 110, 150 150, 200 125 S 240 60, 250 40" fill="none" stroke="#84cc16" strokeWidth="26" strokeLinecap="round" />
+      <path d="M40 150 C 90 110, 150 150, 200 125 S 240 60, 250 40" fill="none" stroke="#d9f99d" strokeWidth="14" strokeLinecap="round" strokeDasharray="12 16" opacity="0.8" />
+      <circle cx="252" cy="36" r="17" fill="#84cc16" />
+      <circle cx="244" cy="28" r="6" fill="#fff" />
+      <circle cx="245" cy="25" r="3" fill="#0b0a14" />
+      <circle cx="262" cy="34" r="6" fill="#fff" />
+      <circle cx="264" cy="31" r="3" fill="#0b0a14" />
+    </svg>
+  );
+}
+
 export function CarrerasThumbnail() {
   // Two cars on a curve, seen from above, with the start line.
   return (

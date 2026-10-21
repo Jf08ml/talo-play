@@ -376,6 +376,52 @@ export const GUIDES: Record<GameId, Guide> = {
       { title: "Puntos", text: ["Cada palabra es de quien la marca primero. Cuando se encuentran todas, gana quien tiene más."] },
     ],
   },
+  vibora: {
+    goal: "Ser la víbora más larga del mapa.",
+    sections: [
+      {
+        title: "En línea o con amigos",
+        text: [
+          "«Jugar en línea» te mete en un mapa abierto con gente de todos lados. No hay tiempo: entrás y salís cuando quieras, y el ranking de arriba muestra quién es más grande ahora. Los más grandes del día quedan en «Récords de hoy».",
+          "«Solo con amigos» arma una sala privada: elegís la duración y si querés bots que completen el mapa. Cuando se acaba el tiempo, gana la víbora más larga.",
+        ],
+      },
+      {
+        title: "Moverse",
+        text: [
+          "Tu víbora avanza sola. En el teléfono, apoyá el dedo en cualquier parte y arrastralo hacia donde querés ir; en la compu, apuntá con el mouse (o usá las flechas).",
+          "Mantené el botón del rayo, el click o la barra espaciadora para acelerar. Acelerar gasta puntos: usalo para escapar o para cerrarle el paso a alguien.",
+        ],
+      },
+      { title: "Crecer", text: ["Cada bolita que comés te da puntos y te alarga. Las más grandes y brillantes valen más."] },
+      {
+        title: "Cortar colas",
+        text: [
+          "Si tu cabeza choca el cuerpo de otra víbora, se lo cortás justo ahí: ella se queda con la parte de adelante y vos te comés los puntos de lo que cortaste.",
+          "La cabeza y el cuello no se pueden cortar, y una víbora recién cortada o recién aparecida tiene unos segundos de protección (se ve titilando).",
+          "A vos también te pueden cortar: cuanto más larga es tu cola, más fácil es que alguien se la cruce.",
+        ],
+      },
+      {
+        title: "Perder (en línea)",
+        text: [
+          "En línea la cabeza y el cuello son duros: si tu cabeza choca contra la cabeza o el cuello de otra víbora, perdés (si chocan de frente, pierde la más chica). Tocar el borde del mapa también te elimina.",
+          "Cuando una víbora pierde, su cuerpo queda en el piso como restos brillantes que cualquiera puede comer. Al cortar una cola en línea, te comés la mitad al instante y la otra mitad cae como restos: ¡apurate antes de que te los roben!",
+          "Después de perder ves hasta dónde llegaste y podés volver a empezar al toque.",
+        ],
+      },
+      {
+        title: "Con amigos",
+        text: ["En la sala con amigos nadie pierde: el borde quema y te saca puntos mientras lo tocás, y al cortar te comés toda la cola. Cuando se acaba el tiempo, gana la más larga."],
+      },
+    ],
+    tips: [
+      "Cortar cerca de la cabeza se lleva casi toda la víbora.",
+      "En línea, una víbora grande puede cruzarte su cabeza por delante: ¡no le pegues de frente!",
+      "Si tu víbora es muy larga, enroscala para proteger la cola.",
+      "Acelerá para cruzarte justo delante de otra víbora y cortarla antes de que se escape.",
+    ],
+  },
   carreras: {
     goal: "Completar las vueltas antes que los demás pilotos.",
     sections: [
