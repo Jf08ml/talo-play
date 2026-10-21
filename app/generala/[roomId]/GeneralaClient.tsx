@@ -33,6 +33,7 @@ import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
+import { useTurnAlert } from "@/hooks/useTurnAlert";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -185,6 +186,7 @@ function DiceTray({
 }) {
   const player = currentPlayer(state);
   const myTurn = player === myId;
+  useTurnAlert(myTurn);
   const values = state.dice ? diceValues(state.dice) : Array<number>(DICE).fill(0);
   const canHold = myTurn && state.rolls > 0 && state.rolls < MAX_ROLLS;
   const canRoll = myTurn && state.rolls < MAX_ROLLS;

@@ -40,6 +40,7 @@ import { BackToRoomButton, RoomSettingsEditor, type RawMeta } from "@/components
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
+import { useTurnAlert } from "@/hooks/useTurnAlert";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -239,6 +240,7 @@ function Game({
 }) {
   const mySeat = seatOf(state, myId);
   const myTurn = state.status === "playing" && mySeat === state.turn;
+  useTurnAlert(myTurn);
   const moves = myTurn ? currentMoves(state) : [];
   const active = activeSeats(state);
   const turnPlayer = state.seats[state.turn];

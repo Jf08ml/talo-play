@@ -11,7 +11,7 @@ export default function GameCard({ game, thumbnail }: { game: GameInfo; thumbnai
   return (
     <Link
       href={`/${game.path}`}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-violet-500/15 bg-slate-900/60 shadow-[0_0_25px_rgba(139,92,246,0.08)] backdrop-blur transition hover:-translate-y-0.5 hover:border-violet-400/40 hover:shadow-[0_0_35px_rgba(139,92,246,0.2)]"
+      className="group flex w-full flex-col overflow-hidden rounded-2xl border border-violet-500/15 bg-slate-900/60 shadow-[0_0_25px_rgba(139,92,246,0.08)] backdrop-blur transition hover:-translate-y-0.5 hover:border-violet-400/40 hover:shadow-[0_0_35px_rgba(139,92,246,0.2)]"
     >
       <div className="aspect-[2/1] w-full overflow-hidden">{thumbnail}</div>
       <div className="flex flex-1 flex-col gap-1.5 p-4">

@@ -35,6 +35,7 @@ import { RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
+import { useTurnAlert } from "@/hooks/useTurnAlert";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -169,6 +170,7 @@ function Table({
   const [selected, setSelected] = useState<string | null>(null);
   const playing = inPlay(state).includes(myId);
   const myTurn = state.turn === myId;
+  useTurnAlert(myTurn);
   const hand = splitCards(state.hands[myId] ?? "");
   const top = topDiscard(state);
   const canDraw = myTurn && state.phase === "draw";

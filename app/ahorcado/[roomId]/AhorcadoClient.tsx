@@ -34,6 +34,7 @@ import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_INPUT } from "@/components/ui";
 import { Eye, EyeOff } from "lucide-react";
+import { useTurnAlert } from "@/hooks/useTurnAlert";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -274,6 +275,7 @@ function GuessPanel({
   const guesser = currentGuesser(state);
   const ended = state.status === "roundEnd";
   const myTurn = !ended && guesser === myId;
+  useTurnAlert(myTurn);
   const m = misses(state);
   const knowsWord = !state.fromApp && setter === myId;
   const canSee = (ch: string) => ch === " " || state.tried.includes(ch) || ended || knowsWord;

@@ -37,6 +37,7 @@ import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { ArrowLeftRight, Crown, Flag, Handshake } from "lucide-react";
+import { useTurnAlert } from "@/hooks/useTurnAlert";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -283,6 +284,7 @@ function BoardView({ roomId, state, myId }: { roomId: string; state: DamasState;
   const [selected, setSelected] = useState<number | null>(null);
   const mySeat = seatOf(state, myId);
   const myTurn = state.status === "playing" && mySeat === state.turn;
+  useTurnAlert(myTurn);
   const moves = myTurn ? legalMoves(state.cells, state.turn, state.chain) : [];
   const movable = new Set(moves.map((m) => m.from));
   const mustCapture = moves.some((m) => m.captured >= 0);

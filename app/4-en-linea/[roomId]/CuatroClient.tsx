@@ -34,6 +34,7 @@ import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { ArrowLeftRight } from "lucide-react";
+import { useTurnAlert } from "@/hooks/useTurnAlert";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -86,6 +87,7 @@ export default function CuatroClient({ roomId }: { roomId: string }) {
 
   const mySeat = state ? seatOf(state, myId) : null;
   const myTurn = state?.status === "playing" && mySeat === state.turn;
+  useTurnAlert(myTurn);
   const moves = state ? movesMade(state.cells) : 0;
 
   const drop = (col: number) => {

@@ -30,6 +30,7 @@ import { RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, SECONDARY_BUTTON } from "@/components/ui";
+import { useTurnAlert } from "@/hooks/useTurnAlert";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -174,6 +175,7 @@ function TurnPanel({
 }) {
   const current = state.current;
   const myTurn = current === myId;
+  useTurnAlert(myTurn);
   const name = state.players[current]?.name ?? "?";
   const color = state.players[current]?.color;
   const card =

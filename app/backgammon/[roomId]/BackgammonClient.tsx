@@ -48,6 +48,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { Flag, Undo2 } from "lucide-react";
+import { useTurnAlert } from "@/hooks/useTurnAlert";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -506,6 +507,7 @@ function DiceRow({ state }: { state: BgState }) {
 function TurnPanel({ roomId, state, myId }: { roomId: string; state: BgState; myId: string }) {
   const mySeat = seatOf(state, myId);
   const myTurn = mySeat === state.turn;
+  useTurnAlert(myTurn);
   const turnName = seatName(state, state.seats[state.turn], myId);
   const rolled = parseDice(state.rolled);
   const steps = currentSteps(state);

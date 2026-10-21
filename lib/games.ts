@@ -625,6 +625,18 @@ export const GAMES: Record<GameId, GameInfo> = {
 /** Home page order: quickest to start first. */
 export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "yonunca", "onda", "telefono", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "lobo", "arena", "fuego", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "cajas", "naval", "damas", "ajedrez", "generala", "pasteleria", "chinchon", "truco", "ludo", "domino", "backgammon", "otelo", "oca", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
 
+/** The home's shelves: every game in exactly one, in the order listed. */
+export type GameCategory = "previa" | "palabras" | "mesa" | "cartas" | "accion" | "puzzles";
+
+export const CATEGORIES: { id: GameCategory; label: string; hint: string; games: GameId[] }[] = [
+  { id: "previa", label: "Para la previa", hint: "Risas, secretos y votaciones en grupo", games: ["impostor", "probable", "yonunca", "onda", "telefono", "reto", "conoces", "verdades", "mimica", "lobo"] },
+  { id: "palabras", label: "Preguntas y palabras", hint: "Para los que saben de todo", games: ["trivia", "emojis", "palabra", "sopa", "ahorcado", "tutti", "dibujo", "codigo"] },
+  { id: "accion", label: "Acción y 3D", hint: "Carreras, combates y más", games: ["fuego", "arena", "carreras3d", "carreras", "pasteleria"] },
+  { id: "mesa", label: "Juegos de mesa", hint: "Los clásicos de siempre, uno contra uno o en familia", games: ["cuatro", "cajas", "naval", "damas", "ajedrez", "ludo", "backgammon", "otelo", "oca"] },
+  { id: "cartas", label: "Cartas y dados", hint: "Para jugar de sobremesa", games: ["truco", "chinchon", "generala", "domino"] },
+  { id: "puzzles", label: "Puzzles y memoria", hint: "Tranquilos, en equipo o a contrarreloj", games: ["memotest", "rompecabezas", "deslizante"] },
+];
+
 export function roomPath(game: GameId, roomId: string): string {
   return `/${GAMES[game].path}/${roomId}`;
 }

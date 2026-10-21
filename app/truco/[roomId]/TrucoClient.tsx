@@ -53,6 +53,7 @@ import { BackToRoomButton, RoomSettingsEditor, type RawMeta } from "@/components
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
+import { useTurnAlert } from "@/hooks/useTurnAlert";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -264,6 +265,7 @@ function Game({
   const answering = answeringTeam(state);
   const iAnswer = playing && pending && answering === myTeam;
   const myTurn = playing && state.status === "playing" && state.turn === mySeat && !pending;
+  useTurnAlert(myTurn);
   const hand = playing ? inHand(state, mySeat!) : [];
   const myEnvido = playing ? envidoOf(splitCards(state.hands[mySeat!])) : 0;
   const mv = state.moveNo;

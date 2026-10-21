@@ -34,6 +34,7 @@ import { RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
+import { useTurnAlert } from "@/hooks/useTurnAlert";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -196,6 +197,7 @@ function Game({
   const shown = useWalk(state);
   const turnId = state.order[state.turn];
   const myTurn = state.status === "playing" && turnId === myId;
+  useTurnAlert(myTurn);
   const playing = state.order.includes(myId);
   const last = state.last;
   const dice = last.dice ? last.dice.split(",").map(Number) : Array<number>(state.dice).fill(0);

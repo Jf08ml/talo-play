@@ -36,6 +36,7 @@ import TwoSeatPicker, { Spectators, seatName } from "@/components/TwoSeatPicker"
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { Flag } from "lucide-react";
+import { useTurnAlert } from "@/hooks/useTurnAlert";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -212,6 +213,7 @@ function BoardView({ roomId, state, myId }: { roomId: string; state: OteloState;
   const [hover, setHover] = useState<number | null>(null);
   const mySeat = seatOf(state, myId);
   const myTurn = state.status === "playing" && mySeat === state.turn;
+  useTurnAlert(myTurn);
   const legal = new Set(myTurn ? legalSquares(state.cells, state.turn) : []);
   const flipped = new Set(state.flipped ? state.flipped.split(",").map(Number) : []);
   const preview = new Set(myTurn && hover !== null && legal.has(hover) ? flipsFor(state.cells, state.turn, hover) : []);

@@ -3,7 +3,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { cleanupOldRooms } from "@/lib/roomCleanup";
 import { isFirebaseConfigured } from "@/lib/firebase";
-import { CONTEXTS, GAME_ORDER, GAMES, type GameId, type PlayContext } from "@/lib/games";
+import { CATEGORIES, CONTEXTS, GAME_ORDER, GAMES, type GameId, type PlayContext } from "@/lib/games";
+import { normalizeText } from "@/lib/text";
+import { Search, X } from "lucide-react";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import GameCard from "@/components/GameCard";
 import JoinRoomForm from "@/components/JoinRoomForm";
@@ -98,6 +100,7 @@ const THUMBNAILS: Record<GameId, ReactNode> = {
 export default function HomeClient() {
   const identity = useClientIdentity();
   const [context, setContext] = useState<PlayContext | null>(null);
+  const [query, setQuery] = useState("");
 
   // Housekeeping: delete a few rooms nobody used in days (see lib/roomCleanup.ts).
   useEffect(() => {
@@ -108,7 +111,11 @@ export default function HomeClient() {
 
   if (!isFirebaseConfigured()) return <FirebaseSetupNotice />;
 
-  const games = GAME_ORDER.map((id) => GAMES[id]).filter((g) => !context || g.contexts.includes(context));
+  const q = normalizeText(query);
+  const fits = (id: GameId) =>
+    (!context || GAMES[id].contexts.includes(context)) &&
+    (!q || normalizeText(`${GAMES[id].title} ${GAMES[id].tagline}`).includes(q));
+  const searchResults = GAME_ORDER.filter(fits);
   const selected = CONTEXTS.find((c) => c.id === context);
 
   return (
@@ -156,21 +163,74 @@ export default function HomeClient() {
             })}
           </div>
 
-          <div className="mt-8 flex items-baseline justify-between gap-3">
-            <h3 className="text-sm font-medium uppercase tracking-wide text-slate-500">
-              {selected ? `Para jugar ${selected.label.toLowerCase()}` : "Todos los juegos"}
-            </h3>
-            {selected && (
-              <button onClick={() => setContext(null)} className="text-sm text-violet-400 hover:text-violet-300">
-                Ver todos
+          <div className="mx-auto mt-6 flex max-w-2xl items-center gap-2 rounded-2xl border border-slate-700/80 bg-slate-900/50 px-3 focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-500/30">
+            <Search className="h-4 w-4 shrink-0 text-slate-500" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`Buscar entre ${GAME_ORDER.length} juegos…`}
+              aria-label="Buscar juegos"
+              className="min-w-0 flex-1 bg-transparent py-2.5 text-slate-100 outline-none placeholder:text-slate-500"
+            />
+            {query && (
+              <button onClick={() => setQuery("")} aria-label="Borrar búsqueda" className="text-slate-500 hover:text-slate-300">
+                <X className="h-4 w-4" />
               </button>
             )}
           </div>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {games.map((g) => (
-              <GameCard key={g.id} game={g} thumbnail={THUMBNAILS[g.id]} />
-            ))}
-          </div>
+
+          {(selected || q) && (
+            <div className="mt-8 flex items-baseline justify-between gap-3">
+              <h3 className="text-sm font-medium uppercase tracking-wide text-slate-500">
+                {q
+                  ? `${searchResults.length} ${searchResults.length === 1 ? "juego" : "juegos"}${selected ? ` ${selected.label.toLowerCase()}` : ""}`
+                  : `Para jugar ${selected!.label.toLowerCase()}`}
+              </h3>
+              <button
+                onClick={() => {
+                  setContext(null);
+                  setQuery("");
+                }}
+                className="text-sm text-violet-400 hover:text-violet-300"
+              >
+                Ver todos
+              </button>
+            </div>
+          )}
+
+          {q ? (
+            searchResults.length ? (
+              <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {searchResults.map((id) => (
+                  <GameCard key={id} game={GAMES[id]} thumbnail={THUMBNAILS[id]} />
+                ))}
+              </div>
+            ) : (
+              <p className="mt-6 text-center text-slate-400">No encontramos juegos con «{query.trim()}».</p>
+            )
+          ) : (
+            CATEGORIES.map((cat) => {
+              const ids = cat.games.filter(fits);
+              if (!ids.length) return null;
+              return (
+                <div key={cat.id} className="mt-9">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h3 className="font-display text-lg font-semibold text-slate-100 sm:text-xl">{cat.label}</h3>
+                    <span className="text-xs text-slate-500">{ids.length} {ids.length === 1 ? "juego" : "juegos"}</span>
+                  </div>
+                  <p className="text-sm text-slate-500">{cat.hint}</p>
+                  {/* A swipeable shelf on phones; a grid from tablets up. */}
+                  <div className="-mx-4 mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto scroll-px-4 px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3 [&::-webkit-scrollbar]:hidden">
+                    {ids.map((id) => (
+                      <div key={id} className="flex w-[78%] shrink-0 snap-start sm:w-auto">
+                        <GameCard game={GAMES[id]} thumbnail={THUMBNAILS[id]} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </section>
       </div>
     </div>

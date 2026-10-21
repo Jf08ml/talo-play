@@ -34,6 +34,7 @@ import { BackToRoomButton, RoomSettingsEditor, type RawMeta } from "@/components
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
+import { useTurnAlert } from "@/hooks/useTurnAlert";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -216,6 +217,7 @@ const PAD = 14;
 
 function Board({ roomId, state, myId, size }: { roomId: string; state: CajasState; myId: string; size: number }) {
   const myTurn = state.status === "playing" && state.order[state.turn] === myId;
+  useTurnAlert(myTurn);
   const drawn = drawnLines(state.lines);
   const span = size * CELL + PAD * 2;
   const myColor = PLAYER_COLORS[state.turn];

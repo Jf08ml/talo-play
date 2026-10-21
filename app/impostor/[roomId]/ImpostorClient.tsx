@@ -45,6 +45,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, TEXT_INPUT } from "@/components/ui";
 import { Eye, EyeOff } from "lucide-react";
+import { useTurnAlert } from "@/hooks/useTurnAlert";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = Pick<ImpostorMeta, "categories" | "clueMode" | "clueRounds" | "impostorHint"> & { hostId: string };
@@ -322,6 +323,7 @@ function CluesPanel({
   const clueNo = state.clues.length;
   const speaker = speakerFor(state, clueNo);
   const myTurn = speaker === myId;
+  useTurnAlert(myTurn);
   // The impostor doesn't know the word, so their clue is never checked against it.
   const problem = text.trim() && !isImpostor ? clueProblem(text, word) : null;
 

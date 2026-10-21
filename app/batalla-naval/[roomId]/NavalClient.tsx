@@ -43,6 +43,7 @@ import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { RotateCw, Shuffle } from "lucide-react";
+import { useTurnAlert } from "@/hooks/useTurnAlert";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -480,6 +481,7 @@ function seatMapCell(state: NavalState, seat: Seat, idx: number, showShips: bool
 function Battle({ roomId, state, myId }: { roomId: string; state: NavalState; myId: string }) {
   const mySeat = seatOf(state, myId);
   const over = state.status === "finished";
+  useTurnAlert(state.status === "playing" && !!mySeat && state.turn === mySeat);
 
   if (!mySeat) {
     return (

@@ -45,6 +45,7 @@ import { BackToRoomButton, RoomSettingsEditor, type RawMeta } from "@/components
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
+import { useTurnAlert } from "@/hooks/useTurnAlert";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -288,6 +289,7 @@ function Game({
 }) {
   const mySeat = seatOf(state, myId);
   const myTurn = state.status === "playing" && state.phase === "play" && mySeat === state.turn;
+  useTurnAlert(myTurn);
   const canPlay = myTurn ? playable(state, state.turn) : [];
   const [selected, setSelected] = useState<string | null>(null);
   const seats = activeSeats(state);

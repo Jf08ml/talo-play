@@ -36,6 +36,7 @@ import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { ArrowLeftRight } from "lucide-react";
+import { useTurnAlert } from "@/hooks/useTurnAlert";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -247,6 +248,7 @@ function Game({
   const flipped = mySeat === "b";
   const playing = state.status === "playing";
   const myTurn = playing && !!mySeat && colorOfSeat(mySeat) === state.turn;
+  useTurnAlert(myTurn);
   const [selected, setSelected] = useState<number | null>(null);
   const [promoAsk, setPromoAsk] = useState<{ from: number; to: number } | null>(null);
   const [confirmResign, setConfirmResign] = useState(false);
