@@ -36,6 +36,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
+import { Confetti } from "@/components/Results";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -321,6 +322,7 @@ function HandEnd({ roomId, state, myId }: { roomId: string; state: ChinchonState
         )}
         {finished && (
           <p className="mt-1 text-lg text-emerald-300">
+            {state.winner === myId && <Confetti />}
             🏆 {state.winner === myId ? "¡Ganaste la partida!" : `Ganó ${nameOf(state, state.winner, myId)}`}
           </p>
         )}

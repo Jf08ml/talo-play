@@ -38,6 +38,7 @@ import { RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_INPUT } from "@/components/ui";
+import GameResults, { rankFrom } from "@/components/Results";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -326,20 +327,16 @@ function TurnPanel({
 }
 
 function FinalPanel({ state, myId, onAgain }: { state: OndaState; myId: string; onAgain: () => void }) {
-  const rows = Object.keys(state.scores).sort((a, b) => (state.scores[b] ?? 0) - (state.scores[a] ?? 0));
-  const best = rows[0];
   return (
-    <div className="animate-celebration-in flex flex-col items-center gap-4 rounded-2xl border border-violet-500/25 bg-slate-900 p-6 text-center">
-      <p className="font-display text-2xl font-semibold text-slate-100">🏁 ¡Terminó!</p>
-      {best && (
-        <p className="text-slate-300">
-          🏆 {best === myId ? "Ganaste vos" : `Ganó ${nameOf(state, best, myId)}`} con {state.scores[best]} puntos.
-        </p>
-      )}
-      <button onClick={onAgain} className={`w-full max-w-xs ${SECONDARY_BUTTON}`}>
-        Jugar de nuevo
-      </button>
-    </div>
+    <GameResults
+      ranking={rankFrom(state.players, state.scores)}
+      myId={myId}
+      actions={
+        <button onClick={onAgain} className={`w-full ${PRIMARY_BUTTON}`}>
+          Jugar de nuevo
+        </button>
+      }
+    />
   );
 }
 

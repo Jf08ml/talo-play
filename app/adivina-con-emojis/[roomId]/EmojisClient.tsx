@@ -35,6 +35,7 @@ import { BackToRoomButton, RoomSettingsEditor, type RawMeta } from "@/components
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, TEXT_INPUT } from "@/components/ui";
+import GameResults, { rankFrom } from "@/components/Results";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = { questionCount: number; seconds: number; categories: EmojiCategory[]; hostId: string };
@@ -331,38 +332,15 @@ function Scoreboard({ state, presence, myId }: { state: EmojisState; presence: P
 }
 
 function FinishedView({ state, myId, onRestart }: { state: EmojisState; myId: string; onRestart: () => void }) {
-  const order = ranked(state);
-  const best = state.scores[order[0]] ?? 0;
-  const winners = order.filter((id) => (state.scores[id] ?? 0) === best);
-  const names = winners.map((id) => (id === myId ? "vos" : (state.players[id]?.name ?? "?")));
-  const iWon = winners.includes(myId) && best > 0;
-  const medals = ["🥇", "🥈", "🥉"];
   return (
-    <div
-      className={`animate-celebration-in flex flex-col items-center gap-4 rounded-2xl border bg-slate-900 p-6 text-center ${
-        iWon ? "border-emerald-500/25 shadow-[0_0_40px_rgba(52,211,153,0.2)]" : "border-violet-500/20"
-      }`}
-    >
-      <p className="font-display text-2xl font-semibold text-slate-100">{iWon ? "🎉 ¡Ganaste!" : "🏁 ¡Terminó!"}</p>
-      {best > 0 && (
-        <p className="text-slate-400">
-          {winners.length > 1 ? `Empate entre ${names.join(" y ")}` : `Ganó ${names[0]}`} con {best} puntos.
-        </p>
-      )}
-      <ol className="flex w-full max-w-xs flex-col gap-1 text-sm">
-        {order.slice(0, 5).map((id, i) => (
-          <li key={id} className="flex items-center gap-2">
-            <span className="w-6">{medals[i] ?? `${i + 1}.`}</span>
-            <span className="flex-1 truncate text-left" style={{ color: state.players[id]?.color }}>
-              {id === myId ? "Vos" : (state.players[id]?.name ?? "?")}
-            </span>
-            <span className="font-mono text-slate-200">{state.scores[id] ?? 0}</span>
-          </li>
-        ))}
-      </ol>
-      <button onClick={onRestart} className={`w-full max-w-xs ${PRIMARY_BUTTON}`}>
-        Jugar de nuevo
-      </button>
-    </div>
+    <GameResults
+      ranking={rankFrom(state.players, state.scores, ranked(state))}
+      myId={myId}
+      actions={
+        <button onClick={onRestart} className={`w-full ${PRIMARY_BUTTON}`}>
+          Jugar de nuevo
+        </button>
+      }
+    />
   );
 }

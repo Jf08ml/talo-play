@@ -37,6 +37,7 @@ import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { Flag } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
+import { Confetti } from "@/components/Results";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -301,6 +302,7 @@ function ResultBanner({ roomId, state, myId }: { roomId: string; state: OteloSta
         iWon ? "border-emerald-500/25 shadow-[0_0_40px_rgba(52,211,153,0.2)]" : "border-violet-500/20"
       }`}
     >
+      {iWon && <Confetti />}
       <p className="font-display text-xl font-semibold text-slate-100">{title}</p>
       <p className="text-xs text-slate-500">{reason}</p>
       <button

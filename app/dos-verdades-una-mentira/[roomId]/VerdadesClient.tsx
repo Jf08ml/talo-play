@@ -33,6 +33,7 @@ import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_INPUT } from "@/components/ui";
+import GameResults, { rankFrom } from "@/components/Results";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -402,19 +403,19 @@ function VotingPanel({
 }
 
 function FinalPanel({ state, myId, onAgain }: { state: VerdadesState; myId: string; onAgain: () => void }) {
-  const ranking = Object.keys(state.scores).sort((a, b) => (state.scores[b] ?? 0) - (state.scores[a] ?? 0));
-  const tie = ranking.length > 1 && state.scores[ranking[0]] === state.scores[ranking[1]];
-  const winner = tie ? "" : ranking[0];
   return (
-    <div className="animate-celebration-in flex flex-col items-center gap-3 rounded-2xl border border-indigo-500/25 bg-slate-900 p-6 text-center shadow-[0_0_40px_rgba(129,140,248,0.15)]">
-      <p className="font-display text-2xl font-semibold text-slate-100">
-        {winner ? (winner === myId ? "🎉 ¡Ganaste!" : `🏆 ¡Ganó ${nameOf(state, winner, myId)}!`) : "🏁 ¡Terminó!"}
-      </p>
-      <p className="text-sm text-slate-400">¿Otra vuelta? Cada uno escribe tres frases nuevas.</p>
-      <button onClick={onAgain} className={`w-full max-w-xs ${PRIMARY_BUTTON}`}>
-        Jugar de nuevo
-      </button>
-    </div>
+    <GameResults
+      ranking={rankFrom(state.players, state.scores)}
+      myId={myId}
+      actions={
+        <>
+          <p className="text-sm text-slate-400">¿Otra vuelta? Cada uno escribe tres frases nuevas.</p>
+          <button onClick={onAgain} className={`w-full ${PRIMARY_BUTTON}`}>
+            Jugar de nuevo
+          </button>
+        </>
+      }
+    />
   );
 }
 

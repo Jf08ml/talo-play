@@ -46,6 +46,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
+import { Confetti } from "@/components/Results";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -518,6 +519,7 @@ function HandOver({ roomId, state, myId }: { roomId: string; state: DominoState;
       {state.status === "finished" ? (
         <>
           <p className="text-sm text-slate-300">
+            {iWon && <Confetti />}
             {iWon ? (pairs ? "¡Ganaron el partido!" : "¡Ganaste el partido!") : `Ganó el partido: ${who}`}
           </p>
           <button onClick={() => rematch(roomId, state.gameNo)} className={`w-full ${mySeat ? PRIMARY_BUTTON : SECONDARY_BUTTON}`}>

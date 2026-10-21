@@ -47,6 +47,7 @@ import CakeStage, { type CakeFx } from "@/components/bakery/CakeStage";
 import CakeArt from "@/components/bakery/CakeArt";
 import { CakeBuilder, OrderCard, useBuilderStep, usePrefersReducedMotion } from "@/components/bakery/Builder";
 import { SETTINGS } from "@/components/bakery/settings";
+import { Confetti } from "@/components/Results";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = { hostId: string; level: number; minutes: number };
@@ -380,6 +381,7 @@ function DuelPlay({
             {state.status === "finished" ? (
               <>
                 <p className="font-display text-2xl font-black text-pink-500">
+                  {state.winner === myId && <Confetti />}
                   {state.winner === myId ? "¡Ganaste el duelo! 🏆" : state.winner ? `¡Ganó ${nameOf(state.winner)}! 🏆` : "¡Empate! 🤝"}
                 </p>
                 <ol className="flex w-full flex-col gap-1 text-left text-sm">

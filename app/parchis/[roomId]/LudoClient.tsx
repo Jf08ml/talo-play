@@ -41,6 +41,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
+import { Confetti } from "@/components/Results";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -256,6 +257,7 @@ function Game({
         {state.status === "finished" ? (
           <div className="animate-celebration-in flex flex-col items-center gap-3 rounded-2xl border border-emerald-500/25 bg-slate-900 p-4 text-center">
             <p className="font-display text-xl font-semibold text-slate-100">
+              {state.winner === mySeat && <Confetti />}
               {state.winner === mySeat ? "🎉 ¡Ganaste!" : `🏆 Ganó ${playerName(state, state.seats[state.winner as Seat], myId)}`}
             </p>
             <button onClick={() => rematch(roomId, state.gameNo)} className={`w-full ${mySeat ? PRIMARY_BUTTON : SECONDARY_BUTTON}`}>

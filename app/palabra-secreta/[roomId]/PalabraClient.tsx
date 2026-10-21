@@ -36,6 +36,7 @@ import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 import { Delete } from "lucide-react";
+import { Confetti } from "@/components/Results";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -382,6 +383,7 @@ function TopBar({
         }`}
       >
         <p className="font-display text-xl font-semibold text-slate-100">
+          {state.winner === myId && <Confetti />}
           {!state.winner
             ? "😵 ¡Nadie la adivinó!"
             : state.winner === myId

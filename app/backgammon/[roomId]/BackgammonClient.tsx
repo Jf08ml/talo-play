@@ -49,6 +49,7 @@ import { SETTINGS } from "../settings";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { Flag, Undo2 } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
+import { Confetti } from "@/components/Results";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -623,6 +624,7 @@ function MatchOver({ roomId, state, myId }: { roomId: string; state: BgState; my
   return (
     <div className="animate-celebration-in flex flex-col items-center gap-2 rounded-2xl border border-emerald-500/25 bg-slate-900 p-4 text-center shadow-[0_0_40px_rgba(52,211,153,0.2)]">
       <p className="font-display text-xl font-semibold text-slate-100">
+        {winner === mySeat && <Confetti />}
         {winner === mySeat ? "🎉 ¡Ganaste el partido!" : `🏆 ¡${name} ganó el partido!`}
       </p>
       {KIND_TEXT[state.result.kind] && <p className="text-xs text-slate-400">{KIND_TEXT[state.result.kind]}</p>}

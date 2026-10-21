@@ -37,6 +37,7 @@ import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { ArrowLeftRight } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
+import { Confetti } from "@/components/Results";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -470,6 +471,7 @@ function ResultBox({ roomId, state, myId }: { roomId: string; state: AjedrezStat
       : `🏆 Ganaron las ${SEAT_LABEL[winner].toLowerCase()} (${playerName(state, state.seats[winner], myId)})`;
   return (
     <div className="animate-celebration-in flex flex-col items-center gap-2 rounded-2xl border border-emerald-500/25 bg-slate-900 p-4 text-center">
+      {!!winner && winner === mySeat && <Confetti />}
       <p className="font-display text-xl font-semibold text-slate-100">{title}</p>
       {reason && <p className="text-sm text-slate-400">{winner ? reason[0].toUpperCase() + reason.slice(1) : reason}</p>}
       <button onClick={() => rematch(roomId, state.gameNo)} className={`w-full ${mySeat ? PRIMARY_BUTTON : SECONDARY_BUTTON}`}>

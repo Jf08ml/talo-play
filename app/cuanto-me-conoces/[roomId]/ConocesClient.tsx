@@ -37,6 +37,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 import { Check, Lock } from "lucide-react";
+import GameResults, { rankFrom } from "@/components/Results";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -367,9 +368,6 @@ function FinalPanel({
   canAgain: boolean;
   onAgain: () => void;
 }) {
-  const ranking = Object.keys(state.scores).sort((a, b) => (state.scores[b] ?? 0) - (state.scores[a] ?? 0));
-  const tie = ranking.length > 1 && state.scores[ranking[0]] === state.scores[ranking[1]];
-  const winner = tie ? "" : ranking[0];
   // For each protagonist, who guessed them right the most.
   const bestFriends = state.order
     .map((p) => {
@@ -387,10 +385,19 @@ function FinalPanel({
     .filter((x) => x.best);
 
   return (
-    <div className="animate-celebration-in flex flex-col gap-4 rounded-2xl border border-rose-500/25 bg-slate-900 p-6 text-center shadow-[0_0_40px_rgba(244,63,94,0.15)]">
-      <p className="font-display text-2xl font-semibold text-slate-100">
-        {winner ? (winner === myId ? "🎉 ¡Ganaste!" : `🏆 ¡Ganó ${nameOf(state, winner, myId)}!`) : "🏁 ¡Terminó!"}
-      </p>
+    <GameResults
+      ranking={rankFrom(state.players, state.scores)}
+      myId={myId}
+      actions={
+        canAgain ? (
+          <button onClick={onAgain} className={`w-full ${PRIMARY_BUTTON}`}>
+            Jugar de nuevo
+          </button>
+        ) : (
+          <p className="text-xs text-amber-300/90">Hace falta al menos otra persona conectada para jugar de nuevo.</p>
+        )
+      }
+    >
       {bestFriends.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Quién conoce mejor a quién</p>
@@ -410,14 +417,7 @@ function FinalPanel({
           </ul>
         </div>
       )}
-      {canAgain ? (
-        <button onClick={onAgain} className={`w-full max-w-xs self-center ${PRIMARY_BUTTON}`}>
-          Jugar de nuevo
-        </button>
-      ) : (
-        <p className="text-xs text-amber-300/90">Hace falta al menos otra persona conectada para jugar de nuevo.</p>
-      )}
-    </div>
+    </GameResults>
   );
 }
 

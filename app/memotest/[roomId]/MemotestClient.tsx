@@ -35,6 +35,7 @@ import { BackToRoomButton, RoomSettingsEditor, type RawMeta } from "@/components
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
+import { Confetti } from "@/components/Results";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -356,6 +357,7 @@ function TurnBanner({
             : "border-violet-500/20"
         }`}
       >
+        {celebrate && <Confetti />}
         <p className="font-display text-xl font-semibold text-slate-100">{title}</p>
         <p className="text-sm text-slate-400">{detail}</p>
         <button onClick={() => restartMemo(roomId)} className={`w-full max-w-xs ${PRIMARY_BUTTON}`}>

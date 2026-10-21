@@ -44,6 +44,7 @@ import { BackToRoomButton, RoomSettingsEditor, type RawMeta } from "@/components
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
+import GameResults, { rankFrom } from "@/components/Results";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = Pick<TuttiMeta, "categories" | "rounds" | "roundSeconds" | "letters">;
@@ -498,28 +499,16 @@ function FinishedView({
   myId: string;
   onRestart: () => void;
 }) {
-  const t = totals(state, results);
-  const best = Math.max(0, ...Object.values(t));
-  const winners = state.order.filter((id) => t[id] === best);
-  const names = winners.map((id) => (id === myId ? "vos" : state.players[id]?.name ?? "?"));
-  const iWon = winners.includes(myId);
-
   return (
-    <div
-      className={`animate-celebration-in flex flex-col items-center gap-3 rounded-2xl border bg-slate-900 p-6 text-center ${
-        iWon ? "border-emerald-500/25 shadow-[0_0_40px_rgba(52,211,153,0.2)]" : "border-violet-500/20"
-      }`}
-    >
-      <p className="font-display text-2xl font-semibold text-slate-100">
-        {iWon ? "🎉 ¡Ganaste!" : "🏁 ¡Terminó la partida!"}
-      </p>
-      <p className="text-slate-400">
-        {winners.length > 1 ? `Empate entre ${names.join(" y ")}` : `Ganó ${names[0]}`} con {best} puntos.
-      </p>
-      <button onClick={onRestart} className={`w-full max-w-xs ${PRIMARY_BUTTON}`}>
-        Jugar de nuevo
-      </button>
-    </div>
+    <GameResults
+      ranking={rankFrom(state.players, totals(state, results), state.order)}
+      myId={myId}
+      actions={
+        <button onClick={onRestart} className={`w-full ${PRIMARY_BUTTON}`}>
+          Jugar de nuevo
+        </button>
+      }
+    />
   );
 }
 

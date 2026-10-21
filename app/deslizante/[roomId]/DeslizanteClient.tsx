@@ -36,6 +36,7 @@ import { RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
+import { Confetti } from "@/components/Results";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = { size: number; imageUrl: string; showNumbers: boolean; hostId: string };
@@ -297,6 +298,7 @@ function TopBar({
         }`}
       >
         <p className="font-display text-xl font-semibold text-slate-100">
+          {state.winner === myId && <Confetti />}
           {state.winner === myId ? "🎉 ¡Ganaste!" : `🏁 ¡${name} lo armó primero!`}
         </p>
         <p className="text-sm text-slate-400">
