@@ -37,6 +37,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 import { Confetti } from "@/components/Results";
+import { playSound } from "@/lib/sfx";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = { size: number; imageUrl: string; showNumbers: boolean; hostId: string };
@@ -123,6 +124,7 @@ export default function DeslizanteClient({ roomId }: { roomId: string }) {
     if (!canMove) return;
     const { tiles, moved } = slide(myBoard.tiles, size, pos);
     if (!moved) return;
+    playSound("flip");
     const board = { tiles, moves: myBoard.moves + moved };
     setLocal({ gk, board });
     saveBoard(roomId, gk, myId, board).catch(console.error);

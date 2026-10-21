@@ -69,7 +69,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     id: "memotest",
     title: "Memotest",
     path: "memotest",
-    tagline: "Dá vuelta las cartas y encontrá los pares: con emojis, fotos propias o pares de palabras.",
+    tagline: "Da vuelta las cartas y encontrá los pares: con emojis, fotos propias o pares de palabras.",
     minPlayers: 1,
     maxPlayers: 6,
     duration: "5 min",

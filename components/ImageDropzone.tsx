@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState, type DragEvent } from "react";
+import { ImagePlus, RefreshCw } from "lucide-react";
 
 export default function ImageDropzone({
   file,
@@ -31,7 +32,16 @@ export default function ImageDropzone({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={previewUrl ? "Cambiar la imagen" : "Elegir una imagen"}
       onClick={() => inputRef.current?.click()}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          inputRef.current?.click();
+        }
+      }}
       onDragOver={(e) => {
         e.preventDefault();
         setDragOver(true);
@@ -59,15 +69,20 @@ export default function ImageDropzone({
           className="max-h-full max-w-full rounded-lg object-contain"
         />
       ) : (
-        <>
-          <p className="text-sm font-medium text-slate-300">
-            Arrastrá una imagen acá, o hacé clic para elegirla
+        <div className="flex flex-col items-center gap-2 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/30">
+            <ImagePlus className="h-6 w-6" />
+          </span>
+          <p className="text-sm font-semibold text-slate-200">Elegí una foto</p>
+          <p className="text-xs text-slate-500">
+            Tocá para buscarla en la galería<span className="hidden sm:inline"> o arrastrala acá</span>
           </p>
-          <p className="mt-1 text-xs text-slate-500">JPG, PNG o WEBP</p>
-        </>
+        </div>
       )}
       {file && (
-        <p className="mt-2 truncate text-xs text-slate-500">{file.name}</p>
+        <p className="mt-2 flex max-w-full items-center gap-1.5 truncate text-xs text-slate-500">
+          <RefreshCw className="h-3 w-3 shrink-0" /> Tocá para cambiarla
+        </p>
       )}
     </div>
   );

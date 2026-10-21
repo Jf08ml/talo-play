@@ -6,6 +6,7 @@ import type Konva from "konva";
 import type { PuzzleLayout } from "@/lib/puzzleGeometry";
 import type { PieceBitmap } from "@/lib/piecesRender";
 import { holdPiece, releasePiece, updatePiece, type PieceState } from "@/lib/puzzleRoom";
+import { playSound } from "@/lib/sfx";
 import type { TeamId } from "@/lib/teams";
 import type { PresenceMap } from "@/lib/presence";
 import { useElementSize } from "@/hooks/useElementSize";
@@ -347,6 +348,7 @@ export default function PuzzleStage({
         y = piece.correctY;
         placed = true;
         node.position({ x: x - bleed, y: y - bleed });
+        playSound("place");
       }
 
       const finalState: PieceState = { x, y, placed, holder: null };

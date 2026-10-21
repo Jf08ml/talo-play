@@ -36,6 +36,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { Confetti } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -48,6 +49,8 @@ export default function MemotestClient({ roomId }: { roomId: string }) {
   const [config, setConfig] = useState<MemoConfig | null>(null);
   const [hostId, setHostId] = useState("");
   const [state, setState] = useState<MemoState | null>(null);
+  useSoundOn(state?.flipped.length || null, "flip");
+  useSoundOn(state ? Object.keys(state.matched).length : null, "good");
 
   const me = identity.clientId && identity.name
     ? { clientId: identity.clientId, name: identity.name, color: identity.color }
@@ -388,7 +391,7 @@ function TurnBanner({
   return (
     <div className="flex flex-wrap items-center justify-center gap-3 text-center">
       <p className="font-display text-lg font-semibold" style={{ color: current?.color }}>
-        {isMe ? "¡Te toca! Dá vuelta dos cartas." : `Le toca a ${current?.name ?? "?"}`}
+        {isMe ? "¡Te toca! Da vuelta dos cartas." : `Le toca a ${current?.name ?? "?"}`}
       </p>
       {secondsLeft !== null && (
         <span
