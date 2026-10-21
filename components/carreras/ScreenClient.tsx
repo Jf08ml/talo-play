@@ -537,12 +537,12 @@ function JoinCard({
         <p className="text-xl">Entrá desde tu teléfono</p>
       </div>
       <div>
-        <p className="font-mono text-2xl text-slate-300">
+        <p className="break-all font-mono text-sm text-slate-300 sm:text-2xl">
           {host}
           {roomPath(meta.game, "")}
           <span className="text-cyan-200">{roomId}</span>
         </p>
-        <p className="mt-2 font-mono text-8xl font-bold tracking-[0.2em] text-cyan-200 drop-shadow-[0_0_20px_rgba(34,211,238,0.4)]">
+        <p className="mt-2 font-mono text-5xl font-bold tracking-[0.15em] sm:text-8xl sm:tracking-[0.2em] text-cyan-200 drop-shadow-[0_0_20px_rgba(34,211,238,0.4)]">
           {roomId}
         </p>
         <p className="mt-1 text-sm text-slate-500">o en la página de Talo: «¿Te invitaron?» y este código</p>
