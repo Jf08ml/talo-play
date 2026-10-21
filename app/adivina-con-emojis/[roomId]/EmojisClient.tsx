@@ -36,6 +36,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, TEXT_INPUT } from "@/components/ui";
 import GameResults, { rankFrom } from "@/components/Results";
+import { useCountdownTicks, useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = { questionCount: number; seconds: number; categories: EmojiCategory[]; hostId: string };
@@ -50,6 +51,7 @@ export default function EmojisClient({ roomId }: { roomId: string }) {
   const [state, setState] = useState<EmojisState | null>(null);
 
   const myId = identity.clientId;
+  useSoundOn(state ? Object.keys(state.solved).length : null, state?.solved[myId] ? "good" : "flip");
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;
   const presence = useRoomPresence(roomId, status === "ready" ? me : null);
 
@@ -207,6 +209,12 @@ function PuzzleView({
   const revealing = state.status === "reveal";
   const mine = state.solved[myId];
   const countdown = state.status === "question" && (now === 0 || now < state.phaseStartedAt);
+  // Ticks for the 3-2-1 and the last seconds, until I solve it.
+  useCountdownTicks(
+    now === 0 || revealing || (mine && !countdown)
+      ? null
+      : Math.ceil(((countdown ? state.phaseStartedAt : state.phaseStartedAt + seconds * 1000) - now) / 1000)
+  );
 
   if (countdown) {
     return (

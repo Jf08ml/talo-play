@@ -36,6 +36,7 @@ import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_INPUT } from "@/components
 import { Eye, EyeOff } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import GameResults, { rankFrom } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -48,6 +49,7 @@ export default function AhorcadoClient({ roomId }: { roomId: string }) {
   const [hostId, setHostId] = useState("");
 
   const myId = identity.clientId;
+  useSoundOn(state?.last.text ? `${state.turnNo}${state.last.text}` : null, state?.last.ok ? "good" : "bad");
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;
   const presence = useRoomPresence(roomId, status === "ready" ? me : null);
   // Presence starts empty: only trust "X isn't here" once I see myself in it.

@@ -35,6 +35,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 import GameResults, { rankFrom } from "@/components/Results";
+import { useCountdownTicks, useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = { questionCount: number; seconds: number; categories: TriviaCategory[]; hostId: string };
@@ -56,6 +57,8 @@ export default function TriviaClient({ roomId }: { roomId: string }) {
   const [state, setState] = useState<TriviaState | null>(null);
 
   const myId = identity.clientId;
+  // The reveal: right or wrong for me.
+  useSoundOn(state?.status === "reveal" ? state.qNo : null, state?.answers[myId]?.choice === 0 ? "good" : "bad");
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;
   const presence = useRoomPresence(roomId, status === "ready" ? me : null);
 
@@ -215,6 +218,12 @@ function QuestionView({
   const revealing = state.status === "reveal";
   const mine = state.answers[myId];
   const countdown = state.status === "question" && (now === 0 || now < state.phaseStartedAt);
+  // Ticks for the 3-2-1 and the last seconds, until I answer.
+  useCountdownTicks(
+    now === 0 || revealing || (mine && !countdown)
+      ? null
+      : Math.ceil(((countdown ? state.phaseStartedAt : state.phaseStartedAt + seconds * 1000) - now) / 1000)
+  );
 
   if (countdown) {
     return (

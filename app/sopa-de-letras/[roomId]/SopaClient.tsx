@@ -35,6 +35,7 @@ import { BackToRoomButton, RoomSettingsEditor, type RawMeta } from "@/components
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = { hostId: string; theme: SopaTheme; level: SopaLevel };
@@ -49,6 +50,7 @@ export default function SopaClient({ roomId }: { roomId: string }) {
   const [state, setState] = useState<SopaState | null>(null);
 
   const myId = identity.clientId;
+  useSoundOn(state ? Object.keys(state.found).length : null, "good");
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;
   const presence = useRoomPresence(roomId, status === "ready" ? me : null);
 

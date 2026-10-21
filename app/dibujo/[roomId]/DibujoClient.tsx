@@ -49,6 +49,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 import GameResults, { rankFrom } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -69,6 +70,8 @@ export default function DibujoClient({ roomId }: { roomId: string }) {
   const [chat, setChat] = useState<ChatMessage[]>([]);
 
   const myId = identity.clientId;
+  useSoundOn(state ? Object.keys(state.guessed).length : null, "good");
+  useSoundOn(state?.status, "flip", state?.status !== "finished");
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;
   const presence = useRoomPresence(roomId, status === "ready" ? me : null);
   // Presence starts empty: only trust "X isn't here" once I see myself in it.
@@ -265,7 +268,8 @@ function TurnBar({
   const elapsed = now ? 1 - (deadline - now) / (drawSeconds * 1000) : 0;
 
   let center: string;
-  if (state.status === "choosing") center = state.drawer === myId ? "Elegí qué dibujar" : `${drawerName} está eligiendo…`;
+  // While choosing, the canvas already says who's picking: the bar just keeps it short.
+  if (state.status === "choosing") center = "Eligiendo…";
   else if (iKnow) center = state.word;
   else center = wordHint(state.word, state.seed, state.turnNo, elapsed);
 
@@ -276,8 +280,12 @@ function TurnBar({
         <div className="truncate text-sm text-slate-300">✏️ {drawerName}</div>
       </div>
       <p
-        className={`min-w-0 flex-1 truncate text-center font-display text-xl font-semibold sm:text-2xl ${
-          iKnow && state.status !== "choosing" ? "text-emerald-300" : "tracking-widest text-slate-100"
+        className={`min-w-0 flex-1 truncate text-center font-display ${
+          state.status === "choosing"
+            ? "text-base font-medium text-slate-400"
+            : iKnow
+              ? "text-xl font-semibold text-emerald-300 sm:text-2xl"
+              : "text-xl font-semibold tracking-widest text-slate-100 sm:text-2xl"
         }`}
       >
         {center}

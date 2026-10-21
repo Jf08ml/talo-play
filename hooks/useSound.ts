@@ -16,3 +16,11 @@ export function useSoundOn(key: unknown, name: SoundName, when = true) {
     if (when && key !== null && key !== undefined) playSound(name);
   }, [key, name, when]);
 }
+
+/**
+ * A tick each second of a countdown's last `from` seconds (`secondsLeft`
+ * rounded up; `null` = no clock running, e.g. after answering).
+ */
+export function useCountdownTicks(secondsLeft: number | null, from = 5) {
+  useSoundOn(secondsLeft !== null && secondsLeft > 0 && secondsLeft <= from ? secondsLeft : null, "tick");
+}

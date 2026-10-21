@@ -45,6 +45,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import GameResults, { rankFrom } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = Pick<TuttiMeta, "categories" | "rounds" | "roundSeconds" | "letters">;
@@ -70,6 +71,7 @@ export default function TuttiClient({ roomId }: { roomId: string }) {
   });
 
   const myId = identity.clientId;
+  useSoundOn(state?.status, "flip", state?.status !== "finished");
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;
   const presence = useRoomPresence(roomId, status === "ready" ? me : null);
 

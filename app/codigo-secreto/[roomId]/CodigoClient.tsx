@@ -36,6 +36,7 @@ import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -50,6 +51,7 @@ export default function CodigoClient({ roomId }: { roomId: string }) {
   const [hostId, setHostId] = useState("");
 
   const myId = identity.clientId;
+  useSoundOn(state ? Object.keys(state.revealed).length : null, "flip");
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;
   const presence = useRoomPresence(roomId, status === "ready" ? me : null);
 

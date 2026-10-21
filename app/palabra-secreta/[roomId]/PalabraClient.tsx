@@ -37,6 +37,7 @@ import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 import { Delete } from "lucide-react";
 import { Confetti } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -64,6 +65,7 @@ export default function PalabraClient({ roomId }: { roomId: string }) {
   const [shake, setShake] = useState(0);
 
   const myId = identity.clientId;
+  useSoundOn(state ? Object.keys(state.results).length : null, "flip");
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;
   const presence = useRoomPresence(roomId, status === "ready" ? me : null);
 
