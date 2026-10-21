@@ -38,6 +38,7 @@ import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 import { Check, Lock } from "lucide-react";
 import GameResults, { rankFrom } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -49,6 +50,7 @@ export default function ConocesClient({ roomId }: { roomId: string }) {
   const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<{ hostId: string; rounds: number } | null>(null);
   const [state, setState] = useState<ConocesState | null>(null);
+  useSoundOn(state?.status, "flip", state?.status !== "finished");
 
   const myId = identity.clientId;
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;

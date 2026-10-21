@@ -39,6 +39,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_INPUT } from "@/components/ui";
 import GameResults, { rankFrom } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -50,6 +51,7 @@ export default function OndaClient({ roomId }: { roomId: string }) {
   const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<{ hostId: string; rounds: number } | null>(null);
   const [state, setState] = useState<OndaState | null>(null);
+  useSoundOn(state?.status, "flip", state?.status !== "finished");
 
   const myId = identity.clientId;
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;

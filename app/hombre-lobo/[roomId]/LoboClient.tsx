@@ -40,6 +40,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { Eye, EyeOff } from "lucide-react";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -51,6 +52,9 @@ export default function LoboClient({ roomId }: { roomId: string }) {
   const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<{ hostId: string; daySeconds: number } | null>(null);
   const [state, setState] = useState<LoboState | null>(null);
+  useSoundOn(state?.status, "flip", state?.status !== "finished");
+  // Whether my role card is face up: secrets in the village list follow it.
+  const [roleShown, setRoleShown] = useState(false);
 
   const myId = identity.clientId;
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;
@@ -162,7 +166,9 @@ export default function LoboClient({ roomId }: { roomId: string }) {
         {status === "ready" && state && config && state.status !== "waiting" && (
           <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 p-4 lg:flex-row lg:items-start">
             <div className="flex min-w-0 flex-col gap-4 lg:flex-1">
-              {myRole && state.status !== "finished" && <RoleCard role={myRole} dead={dead} />}
+              {myRole && state.status !== "finished" && (
+                <RoleCard role={myRole} dead={dead} shown={roleShown} onToggle={() => setRoleShown((v) => !v)} />
+              )}
               {!inGame && state.status !== "finished" && (
                 <p className={`${CARD} !p-3 text-center text-sm text-slate-400`}>
                   La partida ya empezó: mirás en silencio y jugás la próxima. 🤫
@@ -178,7 +184,7 @@ export default function LoboClient({ roomId }: { roomId: string }) {
               {state.status === "dusk" && <DuskPanel roomId={roomId} state={state} myId={myId} />}
               {state.status === "finished" && <FinalPanel roomId={roomId} state={state} myId={myId} />}
             </div>
-            <Villagers state={state} presence={presence} myId={myId} omniscient={omniscient} />
+            <Villagers state={state} presence={presence} myId={myId} omniscient={omniscient} secretsShown={roleShown} />
           </div>
         )}
       </main>
@@ -190,12 +196,11 @@ function nameOf(state: LoboState, id: string, myId: string): string {
   return id === myId ? "Vos" : (state.players[id]?.name ?? "?");
 }
 
-function RoleCard({ role, dead }: { role: Role; dead: boolean }) {
-  const [shown, setShown] = useState(false);
+function RoleCard({ role, dead, shown, onToggle }: { role: Role; dead: boolean; shown: boolean; onToggle: () => void }) {
   const info = ROLES[role];
   return (
     <button
-      onClick={() => setShown((v) => !v)}
+      onClick={onToggle}
       className={`flex items-center gap-3 rounded-2xl border p-3 text-left transition ${
         info.team === "lobos" && shown ? "border-red-500/50 bg-red-950/40" : "border-slate-700 bg-slate-900/70"
       }`}
@@ -453,13 +458,16 @@ function Villagers({
   presence,
   myId,
   omniscient,
+  secretsShown,
 }: {
   state: LoboState;
   presence: PresenceMap;
   myId: string;
   omniscient: boolean;
+  /** My role card is face up; otherwise what only I know stays hidden from onlookers. */
+  secretsShown: boolean;
 }) {
-  const myRole = state.roles[myId];
+  const myRole = secretsShown ? state.roles[myId] : undefined;
   const ids = Object.keys(state.roles).sort((a, b) => Number(!!state.alive[b]) - Number(!!state.alive[a]));
   const seerSeen = myRole === "vidente" ? Object.values(state.seerLog) : [];
   return (
@@ -471,7 +479,7 @@ function Villagers({
           // What I know: everything if omniscient; fellow wolves if I'm one; what the seer saw.
           const known =
             omniscient ||
-            id === myId ||
+            (id === myId && secretsShown) ||
             (myRole === "lobo" && role === "lobo") ||
             (seerSeen.includes(id) && role === "lobo") ||
             !state.alive[id];

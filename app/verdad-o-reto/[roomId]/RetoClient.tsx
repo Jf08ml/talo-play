@@ -31,6 +31,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, SECONDARY_BUTTON } from "@/components/ui";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -42,6 +43,7 @@ export default function RetoClient({ roomId }: { roomId: string }) {
   const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<{ hostId: string; levels: RetoLevel[] } | null>(null);
   const [state, setState] = useState<RetoState | null>(null);
+  useSoundOn(state?.status, "flip");
 
   const myId = identity.clientId;
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;

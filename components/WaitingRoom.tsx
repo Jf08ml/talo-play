@@ -51,6 +51,7 @@ export default function WaitingRoom({
   summary,
   settings,
   minToStart = 0,
+  blocked,
   onStart,
   children,
 }: {
@@ -69,6 +70,8 @@ export default function WaitingRoom({
   settings?: ReactNode;
   /** Connected players the game needs to start at all (below it, "Empezar" is off). */
   minToStart?: number;
+  /** Why the game can't start yet (e.g. teams not set): shown instead and "Empezar" is off. */
+  blocked?: string;
   onStart: () => void;
   /** Game-specific setup shown above the players (e.g. team picking). */
   children?: ReactNode;
@@ -99,9 +102,10 @@ export default function WaitingRoom({
   return (
     <div className={`${CARD} flex flex-col gap-5`}>
       <div className="text-center">
-        <p className="flex items-center justify-center gap-2.5 font-display text-2xl font-semibold text-slate-100">
+        {/* Long titles drop below the icon instead of squeezing beside it. */}
+        <p className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1.5 font-display text-2xl font-semibold text-slate-100">
           <GameIcon game={game} />
-          {info.title}
+          <span className="text-balance">{info.title}</span>
         </p>
         {summary && <p className="mt-1 text-sm text-slate-400">{summary}</p>}
         {settings && !canStart && (
@@ -162,6 +166,8 @@ export default function WaitingRoom({
           <p className="text-sm font-medium text-amber-300/90">
             {missing === 1 ? "Falta 1 jugador" : `Faltan ${missing} jugadores`} para empezar: ¡mandá el link!
           </p>
+        ) : blocked ? (
+          <p className="text-sm font-medium text-amber-300/90">{blocked}</p>
         ) : (
           <p className="text-sm text-slate-300">{message}</p>
         )}
@@ -171,7 +177,7 @@ export default function WaitingRoom({
           </p>
         )}
         {canStart && (
-          <button onClick={start} disabled={missing > 0} className={`flex w-full max-w-xs items-center justify-center gap-2 ${PRIMARY_BUTTON}`}>
+          <button onClick={start} disabled={missing > 0 || !!blocked} className={`flex w-full max-w-xs items-center justify-center gap-2 ${PRIMARY_BUTTON}`}>
             <Play className="h-4 w-4 fill-current" />
             {missing > 0 ? `Esperando ${missing === 1 ? "1 jugador" : `${missing} jugadores`}` : "Empezar partida"}
           </button>

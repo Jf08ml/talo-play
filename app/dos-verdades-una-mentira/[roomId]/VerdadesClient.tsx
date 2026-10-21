@@ -34,6 +34,7 @@ import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_INPUT } from "@/components/ui";
 import GameResults, { rankFrom } from "@/components/Results";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -43,6 +44,7 @@ export default function VerdadesClient({ roomId }: { roomId: string }) {
   const configured = isFirebaseConfigured();
   const [status, setStatus] = useState<Status>("loading");
   const [state, setState] = useState<VerdadesState | null>(null);
+  useSoundOn(state?.status, "flip", state?.status !== "finished");
   const [hostId, setHostId] = useState("");
 
   const myId = identity.clientId;

@@ -38,6 +38,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { Shuffle } from "lucide-react";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = { hostId: string; seconds: number; turns: number };
@@ -52,6 +53,8 @@ export default function MimicaClient({ roomId }: { roomId: string }) {
   const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
   const [state, setState] = useState<MimicaState | null>(null);
+  useSoundOn(state?.status, "flip", state?.status !== "finished");
+  useSoundOn(state?.wordNo, "good");
 
   const myId = identity.clientId;
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;
@@ -142,6 +145,7 @@ export default function MimicaClient({ roomId }: { roomId: string }) {
               myId={myId}
               summary={`${config.turns} turnos por equipo · ${config.seconds} s cada uno`}
               settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={roomMeta} />}
+              blocked={canStart(state, connected) ? undefined : `Cada equipo necesita al menos ${MIN_PER_TEAM} jugadores conectados.`}
               onStart={() => startMimica(roomId, connected)}
             >
               <TeamSetup roomId={roomId} state={state} myId={myId} connected={connected} />
@@ -255,11 +259,6 @@ function TeamSetup({
       {unassigned.length > 0 && (
         <p className="text-center text-xs text-slate-500">
           Sin equipo: {unassigned.map((id) => (id === myId ? "vos" : state.players[id]?.name)).join(", ")}
-        </p>
-      )}
-      {!canStart(state, connected) && (
-        <p className="text-center text-sm text-amber-300/90">
-          Cada equipo necesita al menos {MIN_PER_TEAM} jugadores conectados.
         </p>
       )}
     </div>

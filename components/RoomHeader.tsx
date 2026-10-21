@@ -57,15 +57,15 @@ export default function RoomHeader({
   };
 
   return (
-    <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-violet-500/15 bg-slate-900/80 px-3 py-2.5 shadow-[0_1px_20px_rgba(139,92,246,0.08)] backdrop-blur sm:px-4 sm:py-3">
-      <div className="flex flex-wrap items-center gap-2">
+    <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-violet-500/15 bg-slate-900/80 px-3 py-2.5 shadow-[0_1px_20px_rgba(139,92,246,0.08)] backdrop-blur sm:px-4 sm:py-3">
+      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
         <Link href="/" aria-label="Volver a Talo" className="flex items-center gap-1.5 hover:opacity-80">
           <TaloMark className="h-6 w-6" />
         </Link>
         <span className="flex items-center gap-1.5 font-display text-sm font-semibold text-slate-200">
           <GameIcon game={game} size="sm" /> <span className="hidden sm:inline">{GAMES[game].title}</span>
         </span>
-        <span className="text-slate-700">·</span>
+        <span className="hidden text-slate-700 sm:inline">·</span>
         <span className="rounded-md border border-violet-500/20 bg-slate-800 px-2 py-1 font-mono text-sm font-semibold text-violet-200">
           {roomId}
         </span>

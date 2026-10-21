@@ -40,6 +40,7 @@ import { RoomSettingsEditor, type RawMeta } from "@/components/RoomSettings";
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_INPUT } from "@/components/ui";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -55,6 +56,7 @@ export default function TelefonoClient({ roomId }: { roomId: string }) {
   const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<{ hostId: string; drawSeconds: number } | null>(null);
   const [state, setState] = useState<TelefonoState | null>(null);
+  useSoundOn(state?.status, "flip");
 
   const myId = identity.clientId;
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;

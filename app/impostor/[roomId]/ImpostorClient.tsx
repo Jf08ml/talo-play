@@ -46,6 +46,7 @@ import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, TEXT_INPUT } from "@/components/ui";
 import { Eye, EyeOff } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = Pick<ImpostorMeta, "categories" | "clueMode" | "clueRounds" | "impostorHint"> & { hostId: string };
@@ -58,6 +59,7 @@ export default function ImpostorClient({ roomId }: { roomId: string }) {
   const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
   const [state, setState] = useState<ImpostorState | null>(null);
+  useSoundOn(state?.status, "flip");
 
   const myId = identity.clientId;
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;

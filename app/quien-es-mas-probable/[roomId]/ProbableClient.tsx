@@ -37,6 +37,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 import { Crown } from "lucide-react";
+import { useSoundOn } from "@/hooks/useSound";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 interface Config {
@@ -54,6 +55,7 @@ export default function ProbableClient({ roomId }: { roomId: string }) {
   const [roomMeta, setRoomMeta] = useState<RawMeta | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
   const [state, setState] = useState<ProbableState | null>(null);
+  useSoundOn(state?.status, "flip", state?.status !== "finished");
 
   const myId = identity.clientId;
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;
