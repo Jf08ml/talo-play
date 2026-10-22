@@ -8,6 +8,7 @@ import { trackEvent } from "@/lib/analytics";
 import { TaloMark } from "./TaloLogo";
 import GameIcon from "./GameIcon";
 import { RulesButton } from "./HowToPlay";
+import VoiceButton from "./VoiceButton";
 import { Check, Share2, Volume2, VolumeX } from "lucide-react";
 import { installUnlock, isMuted, setMuted, subscribeMuted } from "@/lib/sfx";
 
@@ -33,18 +34,21 @@ function SoundButton() {
 /**
  * Top bar shared by every game's room: back to Talo, which game, room code
  * and an always-visible "Invitar" and "Reglas". `badges` go after the code (e.g. mode);
- * `right` is the game's own status area (progress, players…).
+ * `right` is the game's own status area (progress, players…). The room's voice
+ * chat (`VoiceButton`) is here too, unless `voice` is false (public worlds).
  */
 export default function RoomHeader({
   game,
   roomId,
   badges,
   right,
+  voice = true,
 }: {
   game: GameId;
   roomId: string;
   badges?: ReactNode;
   right?: ReactNode;
+  voice?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -57,7 +61,7 @@ export default function RoomHeader({
   };
 
   return (
-    <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-violet-500/15 bg-slate-900/80 px-3 py-2.5 shadow-[0_1px_20px_rgba(139,92,246,0.08)] backdrop-blur sm:px-4 sm:py-3">
+    <header className="relative z-30 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-violet-500/15 bg-slate-900/80 px-3 py-2.5 shadow-[0_1px_20px_rgba(139,92,246,0.08)] backdrop-blur sm:px-4 sm:py-3">
       <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
         <Link href="/" aria-label="Volver a Talo" className="flex items-center gap-1.5 hover:opacity-80">
           <TaloMark className="h-6 w-6" />
@@ -81,6 +85,7 @@ export default function RoomHeader({
         </button>
         <RulesButton game={game} where="partida" compact />
         {!OWN_AUDIO.has(game) && <SoundButton />}
+        {voice && <VoiceButton roomId={roomId} />}
       </div>
 
       {right && <div className="ml-auto flex items-center justify-end gap-4">{right}</div>}
