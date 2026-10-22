@@ -125,6 +125,7 @@ export default function EmojisClient({ roomId }: { roomId: string }) {
       <RoomHeader
         game="emojis"
         roomId={roomId}
+        chatLocked={phase === "question" && "El chat vuelve cuando se revele la respuesta."}
         right={status === "ready" && <PlayerBadges presence={presence} myClientId={myId} />}
       />
 

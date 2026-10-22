@@ -143,6 +143,10 @@ export default function ImpostorClient({ roomId }: { roomId: string }) {
       <RoomHeader
         game="impostor"
         roomId={roomId}
+        chatLocked={
+          (phase === "clues" || phase === "voting" || phase === "guess") &&
+          "El chat vuelve al terminar la ronda, así nadie le pasa la palabra al impostor."
+        }
         right={status === "ready" && <PlayerBadges presence={presence} myClientId={myId} />}
       />
 

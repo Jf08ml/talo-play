@@ -93,7 +93,7 @@ export default function ViboraClient({ roomId }: { roomId: string }) {
       <RoomHeader
         game="vibora"
         roomId={roomId}
-        voice={!meta?.online}
+        social={!meta?.online}
         right={status === "ready" && !playing && <PlayerBadges presence={presence} myClientId={myId} />}
       />
 

@@ -9,6 +9,7 @@ import { TaloMark } from "./TaloLogo";
 import GameIcon from "./GameIcon";
 import { RulesButton } from "./HowToPlay";
 import VoiceButton from "./VoiceButton";
+import ChatButton from "./ChatButton";
 import { Check, Share2, Volume2, VolumeX } from "lucide-react";
 import { installUnlock, isMuted, setMuted, subscribeMuted } from "@/lib/sfx";
 
@@ -34,21 +35,25 @@ function SoundButton() {
 /**
  * Top bar shared by every game's room: back to Talo, which game, room code
  * and an always-visible "Invitar" and "Reglas". `badges` go after the code (e.g. mode);
- * `right` is the game's own status area (progress, players…). The room's voice
- * chat (`VoiceButton`) is here too, unless `voice` is false (public worlds).
+ * `right` is the game's own status area (progress, players…). The room's text
+ * and voice chats (`ChatButton`, `VoiceButton`) are here too, unless `social`
+ * is false (public worlds); `chatLocked` (a reason) closes the text chat while
+ * typing would give an answer away.
  */
 export default function RoomHeader({
   game,
   roomId,
   badges,
   right,
-  voice = true,
+  social = true,
+  chatLocked,
 }: {
   game: GameId;
   roomId: string;
   badges?: ReactNode;
   right?: ReactNode;
-  voice?: boolean;
+  social?: boolean;
+  chatLocked?: string | false;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -85,7 +90,8 @@ export default function RoomHeader({
         </button>
         <RulesButton game={game} where="partida" compact />
         {!OWN_AUDIO.has(game) && <SoundButton />}
-        {voice && <VoiceButton roomId={roomId} />}
+        {social && <ChatButton roomId={roomId} locked={chatLocked} />}
+        {social && <VoiceButton roomId={roomId} />}
       </div>
 
       {right && <div className="ml-auto flex items-center justify-end gap-4">{right}</div>}

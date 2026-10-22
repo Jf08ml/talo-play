@@ -175,6 +175,7 @@ export default function PalabraClient({ roomId }: { roomId: string }) {
       <RoomHeader
         game="palabra"
         roomId={roomId}
+        chatLocked={racing && "El chat vuelve cuando termine la carrera, así nadie sopla la palabra."}
         right={status === "ready" && <PlayerBadges presence={presence} myClientId={myId} />}
       />
 

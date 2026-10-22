@@ -132,6 +132,13 @@ export default function LoboClient({ roomId }: { roomId: string }) {
       <RoomHeader
         game="lobo"
         roomId={roomId}
+        chatLocked={
+          phase === "night"
+            ? "De noche el pueblo duerme: el chat vuelve al amanecer."
+            : omniscient && state?.status !== "waiting" && state?.status !== "finished"
+              ? "Ves todos los roles, así que no podés escribir hasta que termine la partida."
+              : false
+        }
         right={status === "ready" && <PlayerBadges presence={presence} myClientId={myId} />}
       />
 

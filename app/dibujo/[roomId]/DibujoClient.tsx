@@ -167,6 +167,7 @@ export default function DibujoClient({ roomId }: { roomId: string }) {
       <RoomHeader
         game="dibujo"
         roomId={roomId}
+        chatLocked={phase === "drawing" && "El chat vuelve cuando termine el dibujo, así nadie sopla la palabra."}
         right={status === "ready" && <PlayerBadges presence={presence} myClientId={myId} />}
       />
 

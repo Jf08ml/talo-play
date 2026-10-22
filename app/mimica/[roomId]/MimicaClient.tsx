@@ -122,6 +122,7 @@ export default function MimicaClient({ roomId }: { roomId: string }) {
       <RoomHeader
         game="mimica"
         roomId={roomId}
+        chatLocked={acting && "El chat vuelve cuando termine el turno de mímica."}
         right={status === "ready" && <PlayerBadges presence={presence} myClientId={myId} />}
       />
 
