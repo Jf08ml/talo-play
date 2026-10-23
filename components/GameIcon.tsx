@@ -23,6 +23,7 @@ import {
   Lightbulb,
   UserSearch,
   Grid3x3,
+  Hash,
   Heart,
   NotebookPen,
   PartyPopper,
@@ -91,6 +92,7 @@ const GAME_ICONS: Record<GameId, { icon: LucideIcon; gradient: string }> = {
   domino: { icon: Rows2, gradient: "from-slate-400 to-emerald-700" },
   pasteleria: { icon: CakeSlice, gradient: "from-pink-400 to-violet-500" },
   vibora: { icon: Worm, gradient: "from-lime-400 to-emerald-600" },
+  triqui: { icon: Hash, gradient: "from-cyan-400 to-rose-500" },
 };
 
 export const CONTEXT_ICONS: Record<PlayContext, LucideIcon> = {

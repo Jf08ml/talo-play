@@ -1568,3 +1568,38 @@ export function PasteleriaThumbnail() {
     </svg>
   );
 }
+
+export function TriquiThumbnail() {
+  // A chalky # grid with X winning on the diagonal, the line being drawn.
+  const xs = [0, 4, 8];
+  const os = [2, 3];
+  const at = (i: number) => ({ x: 125 + (i % 3) * 50, y: 45 + Math.floor(i / 3) * 50 });
+  return (
+    <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" className="h-full w-full">
+      <defs>
+        <radialGradient id="triqui-bg" cx="30%" cy="20%" r="90%">
+          <stop offset="0%" stopColor="#083344" />
+          <stop offset="100%" stopColor="#0b0a14" />
+        </radialGradient>
+      </defs>
+      <rect width="400" height="240" fill="url(#triqui-bg)" />
+      <g stroke="#94a3b8" strokeWidth="5" strokeLinecap="round" opacity="0.7">
+        <line x1="175" y1="25" x2="175" y2="215" />
+        <line x1="225" y1="25" x2="225" y2="215" />
+        <line x1="105" y1="95" x2="295" y2="95" />
+        <line x1="105" y1="145" x2="295" y2="145" />
+      </g>
+      {xs.map((i) => {
+        const { x, y } = at(i);
+        return (
+          <path key={i} d={`M${x + 12} ${y + 12} L${x + 38} ${y + 38} M${x + 38} ${y + 12} L${x + 12} ${y + 38}`} stroke="#22d3ee" strokeWidth="8" strokeLinecap="round" />
+        );
+      })}
+      {os.map((i) => {
+        const { x, y } = at(i);
+        return <circle key={i} cx={x + 25} cy={y + 25} r="15" stroke="#fb7185" strokeWidth="8" fill="none" />;
+      })}
+      <line x1="140" y1="60" x2="260" y2="180" stroke="#fcd34d" strokeWidth="7" strokeLinecap="round" />
+    </svg>
+  );
+}

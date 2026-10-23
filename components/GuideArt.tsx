@@ -508,11 +508,44 @@ function Memotest() {
   );
 }
 
+function Triqui() {
+  // Infinite mode: X places its fourth mark and its oldest one goes away.
+  const cell = (i: number, x0: number) => ({ x: x0 + (i % 3) * 34, y: 22 + Math.floor(i / 3) * 34 });
+  const board = (x0: number, marks: [number, "x" | "o", number?][]) => (
+    <g>
+      {[1, 2].map((k) => (
+        <g key={k} stroke="#475569" strokeWidth="3" strokeLinecap="round">
+          <line x1={x0 + k * 34} y1={22} x2={x0 + k * 34} y2={124} />
+          <line x1={x0} y1={22 + k * 34} x2={x0 + 102} y2={22 + k * 34} />
+        </g>
+      ))}
+      {marks.map(([i, m, opacity = 1]) => {
+        const { x, y } = cell(i, x0);
+        return m === "x" ? (
+          <path key={i} d={`M${x + 9} ${y + 9} L${x + 25} ${y + 25} M${x + 25} ${y + 9} L${x + 9} ${y + 25}`} stroke="#22d3ee" strokeWidth="4" strokeLinecap="round" opacity={opacity} />
+        ) : (
+          <circle key={i} cx={x + 17} cy={y + 17} r="9" stroke="#fb7185" strokeWidth="4" fill="none" opacity={opacity} />
+        );
+      })}
+    </g>
+  );
+  return (
+    <Frame label="Modo infinito del triqui: la marca más vieja se borra">
+      {board(20, [[0, "x", 0.35], [4, "x"], [8, "o"], [2, "o"], [6, "o"], [5, "x"]])}
+      <Arrow d="M135 73 L 175 73" />
+      {board(190, [[4, "x"], [8, "o"], [2, "o"], [6, "o"], [5, "x"], [3, "x"]])}
+      <text x="71" y="140" textAnchor="middle" {...TXT}>la X más vieja titila…</text>
+      <text x="241" y="140" textAnchor="middle" {...TXT}>…y se borra al poner otra</text>
+    </Frame>
+  );
+}
+
 const ART: Record<ArtId, () => ReactNode> = {
   parchis: Parchis,
   ludo: Ludo,
   backgammon: Backgammon,
   otelo: Otelo,
+  triqui: Triqui,
   damas: Damas,
   ajedrez: Ajedrez,
   truco: Truco,

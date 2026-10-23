@@ -28,6 +28,7 @@ export type ArtId =
   | "sopa"
   | "deslizante"
   | "memotest"
+  | "triqui"
   | "ludo";
 
 export interface GuideSection {
@@ -687,8 +688,35 @@ export const GUIDES: Record<GameId, Guide> = {
     ],
     tips: ["Las esquinas nunca se pueden dar vuelta: son las casillas más valiosas.", "Evitá jugar en las casillas pegadas a una esquina vacía: le abrís la esquina al rival."],
   },
+  triqui: {
+    goal: "Hacer tres en línea con tu marca antes que el rival.",
+    sections: [
+      {
+        title: "Tu turno",
+        text: [
+          "Uno juega con X y el otro con O; empieza la X. En tu turno ponés tu marca en cualquier casilla libre.",
+          "Gana el primero que completa una fila, una columna o una diagonal con tres de las suyas.",
+        ],
+      },
+      { title: "Modo clásico", text: ["Si se llena el tablero y nadie hizo tres en línea, es empate."] },
+      {
+        title: "Modo infinito",
+        text: [
+          "Cada uno tiene como mucho tres marcas en el tablero: cuando ponés la cuarta, se borra tu marca más vieja. Así nunca se llena y no hay empates.",
+          "La marca que vas a perder con tu próxima jugada titila, para que la tengas en cuenta.",
+        ],
+        art: "triqui",
+      },
+      { title: "Revancha", text: ["En cada revancha se cambian X y O, así arranca uno y después el otro. La app lleva la cuenta de ganadas."] },
+    ],
+    tips: [
+      "Si empezás, el centro o una esquina son las mejores primeras jugadas.",
+      "Buscá armar dos amenazas a la vez: el rival solo puede tapar una.",
+      "En el infinito, fijate cuál marca te va a desaparecer antes de contar con ella para la línea.",
+    ],
+  },
   backgammon: {
-    goal: "Llevar tus 15 fichas a tu casa y sacarlas del tablero antes que el rival.",
+    goal:"Llevar tus 15 fichas a tu casa y sacarlas del tablero antes que el rival.",
     sections: [
       {
         title: "Hacia dónde se mueve",

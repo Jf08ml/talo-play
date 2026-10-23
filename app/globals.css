@@ -25,6 +25,17 @@
   --animate-splash: splash 0.45s ease-out;
   --animate-disc-flip: disc-flip 0.5s ease-in-out;
   --animate-pop-in: pop-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-mark-draw: mark-draw 0.3s ease-out both;
+}
+
+/* A pen stroke drawing itself (Triqui's X and O; paths use pathLength="1"). */
+@keyframes mark-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 /* A disc turning over to the other color (Otelo). */
