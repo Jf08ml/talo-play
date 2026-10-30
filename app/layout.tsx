@@ -1,24 +1,33 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Bricolage_Grotesque } from "next/font/google";
+import { Albert_Sans, Dela_Gothic_One, Geist_Mono, JetBrains_Mono } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { SITE_DESCRIPTION, SITE_URL } from "@/lib/seo";
 import { VoiceKeeper } from "@/components/VoiceButton";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Talo's type (talo-handoff/tokens.css): Albert Sans for text and UI, Dela
+// Gothic One (a single weight) for titles, the logo and big numbers, and
+// JetBrains Mono only for the room-code boxes. Geist Mono stays for the
+// games' own monospaced numbers.
+const ui = Albert_Sans({
+  variable: "--font-ui",
+  subsets: ["latin", "latin-ext"],
+});
+
+const display = Dela_Gothic_One({
+  variable: "--font-display",
+  weight: "400",
+  subsets: ["latin", "latin-ext"],
+});
+
+const code = JetBrains_Mono({
+  variable: "--font-code",
+  weight: "700",
   subsets: ["latin"],
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-// Display face with some character, used only for branding/headings —
-// everything else (forms, buttons, body copy) stays on Geist Sans.
-const display = Bricolage_Grotesque({
-  variable: "--font-display",
   subsets: ["latin"],
 });
 
@@ -57,14 +66,14 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#0b0c10",
+  themeColor: "#111111",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="es"
-      className={`${geistSans.variable} ${geistMono.variable} ${display.variable} h-full antialiased`}
+      className={`${ui.variable} ${display.variable} ${code.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         {children}

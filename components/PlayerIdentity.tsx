@@ -10,7 +10,7 @@ import NamePrompt from "./NamePrompt";
  * Shows "Jugando como …" with a way to change it. With `requireName` (lobby
  * pages, i.e. once you're about to play) it also asks for a name when there
  * is none; the home page leaves it off so a first visit isn't a form.
- * `compact` is the small chip for the site header (tap it to change).
+ * `compact` is the chip for the light site header (tap it to change).
  */
 export default function PlayerIdentity({
   identity,
@@ -37,16 +37,16 @@ export default function PlayerIdentity({
         <button
           onClick={() => setEditing(true)}
           title="Cambiar tu nombre"
-          className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] py-1 pl-1 pr-3 text-sm transition hover:border-white/20 hover:bg-white/[0.06]"
+          className="ml-2 flex min-h-11 items-center gap-2 rounded-xl bg-talo-ink/[0.08] py-1.5 pl-1.5 pr-3 text-[15px] text-talo-ink transition hover:bg-talo-ink/15"
         >
           <span
-            className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold text-white"
             style={{ backgroundColor: identity.color }}
           >
             {identity.name.slice(0, 1).toUpperCase()}
           </span>
-          <span className="max-w-[8rem] truncate font-medium text-slate-200">{identity.name}</span>
-          <Pencil className="h-3 w-3 text-slate-500" />
+          <span className="max-w-[8rem] truncate font-bold">{identity.name}</span>
+          <Pencil className="h-3.5 w-3.5 opacity-60" />
         </button>
       ) : (
         <div className="mx-auto flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] py-1 pl-1 pr-3 text-sm">

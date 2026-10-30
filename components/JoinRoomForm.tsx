@@ -7,39 +7,53 @@ import { ArrowRight } from "lucide-react";
 /**
  * "¿Te invitaron?": join any room by code. Goes through `/sala/{code}`, which
  * looks up the room's game and redirects, so it works for every game.
+ *
+ * The code is typed over six gray boxes: a monospaced font whose advance plus
+ * the letter spacing equals one box plus its gap, so each letter lands in its
+ * box. Codes have letters and digits (lib/ids.ts).
  */
-export default function JoinRoomForm() {
+export default function JoinRoomForm({ id = "join-code" }: { id?: string }) {
   const router = useRouter();
   const [code, setCode] = useState("");
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const trimmed = code.trim().toUpperCase();
-    if (!trimmed) return;
-    router.push(`/sala/${trimmed}`);
+    if (!code) return;
+    router.push(`/sala/${code}`);
   };
 
   return (
-    <form onSubmit={submit} className="w-full">
-      <label htmlFor="join-code" className="mb-2 block text-sm font-medium text-slate-300">
-        ¿Te invitaron? Entrá con el código
+    <form onSubmit={submit} className="flex flex-col gap-2.5 sm:gap-3">
+      <label htmlFor={id} className="text-[15px] font-bold text-talo-ink">
+        ¿Te invitaron? Escribí el código
       </label>
-      <div className="flex gap-2 rounded-xl border border-white/10 bg-slate-950/60 p-1.5 transition focus-within:border-violet-400/70 focus-within:ring-4 focus-within:ring-violet-500/15">
-        <input
-          id="join-code"
-          value={code}
-          onChange={(e) => setCode(e.target.value.toUpperCase())}
-          placeholder="ABC123"
-          maxLength={6}
-          autoComplete="off"
-          className="min-w-0 flex-1 bg-transparent px-2.5 font-mono text-lg uppercase tracking-[0.3em] text-slate-100 outline-none placeholder:text-slate-600"
-        />
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* Boxes 39.6/44 px wide with 6/8 px gaps; JetBrains Mono advances 0.6em. */}
+        <div className="relative h-[54px] w-[268px] shrink-0 overflow-hidden rounded-[10px] outline-offset-3 outline-talo-blue focus-within:outline-3 sm:h-[60px] sm:w-[304px]">
+          <div aria-hidden="true" className="absolute inset-0 flex gap-1.5 sm:gap-2">
+            {Array.from({ length: 6 }, (_, i) => (
+              <span key={i} className="h-full flex-1 rounded-[10px] bg-talo-surface" />
+            ))}
+          </div>
+          <input
+            id={id}
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 6))}
+            maxLength={6}
+            autoComplete="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            placeholder="······"
+            className="absolute inset-y-0 left-0 w-[calc(100%+40px)] bg-transparent pl-[12.3px] font-code text-[25px] tracking-[30.6px] text-talo-ink outline-none placeholder:text-[#C4C4C4] sm:pl-[13px] sm:text-[30px] sm:tracking-[34px]"
+          />
+        </div>
         <button
           type="submit"
-          disabled={!code.trim()}
-          className="flex items-center gap-1.5 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-slate-200 disabled:bg-white/10 disabled:text-slate-500"
+          aria-label="Entrar a la sala"
+          className="flex h-[54px] min-w-[54px] flex-1 items-center justify-center gap-2 rounded-xl bg-talo-ink px-5 text-lg font-bold text-white transition hover:bg-black sm:h-[60px] sm:flex-none sm:px-[26px]"
         >
-          Entrar <ArrowRight className="h-4 w-4" />
+          <span className="hidden sm:inline">Entrar</span>
+          <ArrowRight className="h-[22px] w-[22px] sm:hidden" strokeWidth={2.6} />
         </button>
       </div>
     </form>

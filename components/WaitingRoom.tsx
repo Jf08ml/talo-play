@@ -4,10 +4,11 @@ import { useEffect, type ReactNode } from "react";
 import { trackEvent } from "@/lib/analytics";
 import { GAMES, type GameId } from "@/lib/games";
 import type { PresenceMap } from "@/lib/presence";
-import { ChevronRight, Crown, Play, UserPlus } from "lucide-react";
+import { ChevronDown } from "lucide-react";
+import { categoryOf, gameColors } from "@/lib/talos";
 import InviteCard from "./InviteCard";
-import GameIcon from "./GameIcon";
-import { CARD, PRIMARY_BUTTON } from "./ui";
+import TaloTable from "./TaloTable";
+import { PRIMARY_BUTTON } from "./ui";
 import { GuideBody } from "./HowToPlay";
 
 export interface WaitingPlayer {
@@ -38,8 +39,9 @@ export function startPermission(
 }
 
 /**
- * The shared pre-game screen: which game, who's in (and who hosts), how to
- * play, how to invite, and who starts.
+ * The shared pre-game screen (talo-handoff Sala.dc.html): which game, who's
+ * at the table as talos (and who hosts), how to invite, how to play, and who
+ * starts.
  */
 export default function WaitingRoom({
   game,
@@ -99,101 +101,74 @@ export default function WaitingRoom({
 
   const invite = <InviteCard game={game} roomId={roomId} />;
 
+  const { color, ink } = gameColors(game);
+
   return (
-    <div className={`${CARD} flex flex-col gap-5`}>
-      <div className="text-center">
-        {/* Long titles drop below the icon instead of squeezing beside it. */}
-        <p className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1.5 font-display text-2xl font-semibold text-slate-100">
-          <GameIcon game={game} />
-          <span className="text-balance">{info.title}</span>
-        </p>
-        {summary && <p className="mt-1 text-sm text-slate-400">{summary}</p>}
-        {settings && !canStart && (
-          <p className="mt-1 text-xs text-slate-500">El anfitrión puede cambiar la configuración antes de empezar.</p>
-        )}
-      </div>
-
-      {settings && canStart && settings}
-
-      {children}
-
-      {inviteFirst && invite}
-
-      <div>
-        <p className="mb-2.5 flex items-center justify-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-          </span>
-          En la sala · {online.length}
-          {info.maxPlayers > info.minPlayers && <span className="normal-case text-slate-600">(hasta {info.maxPlayers})</span>}
-        </p>
-        <ul className="flex flex-wrap justify-center gap-2">
-          {online.map((p) => (
-            <li
-              key={p.id}
-              className={`animate-pop-in flex items-center gap-1.5 rounded-full py-1 pl-1 pr-3 text-sm text-slate-200 ring-1 ${
-                p.id === myId ? "bg-violet-500/10 ring-violet-400/40" : "bg-white/[0.04] ring-white/10"
-              }`}
-            >
-              <span
-                className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white"
-                style={{ backgroundColor: p.color }}
-              >
-                {p.name.slice(0, 1).toUpperCase()}
-              </span>
-              <span className="max-w-[9rem] truncate">{p.name}</span>
-              {p.id === myId && <span className="text-slate-500">(vos)</span>}
-              {p.id === hostId && <Crown className="h-4 w-4 text-amber-300" aria-label="Anfitrión" />}
-            </li>
-          ))}
-          {Array.from({ length: openSeats }, (_, i) => (
-            <li
-              key={`open-${i}`}
-              className="flex items-center gap-1.5 rounded-full border border-dashed border-white/10 py-1 pl-1 pr-3 text-sm text-slate-500"
-            >
-              <span className="flex h-7 w-7 animate-pulse items-center justify-center rounded-full border border-dashed border-slate-600">
-                <UserPlus className="h-3.5 w-3.5" />
-              </span>
-              Esperando…
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="flex flex-col items-center gap-2 text-center">
-        {missing > 0 ? (
-          <p className="text-sm font-medium text-amber-300/90">
-            {missing === 1 ? "Falta 1 jugador" : `Faltan ${missing} jugadores`} para empezar: ¡mandá el link!
-          </p>
-        ) : blocked ? (
-          <p className="text-sm font-medium text-amber-300/90">{blocked}</p>
-        ) : (
-          <p className="text-sm text-slate-300">{message}</p>
-        )}
-        {fewPlayers && (
-          <p className="text-xs text-amber-300/90">
-            Se juega mejor con {info.minPlayers} o más: ¡invitá a alguien!
-          </p>
-        )}
-        {canStart && (
-          <button onClick={start} disabled={missing > 0 || !!blocked} className={`flex w-full max-w-xs items-center justify-center gap-2 ${PRIMARY_BUTTON}`}>
-            <Play className="h-4 w-4 fill-current" />
-            {missing > 0 ? `Esperando ${missing === 1 ? "1 jugador" : `${missing} jugadores`}` : "Empezar partida"}
-          </button>
-        )}
-      </div>
-
-      {!inviteFirst && invite}
-
-      <details className="group rounded-xl border border-white/[0.07] bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
-        <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-slate-200">
-          <ChevronRight className="h-4 w-4 transition group-open:rotate-90" /> Cómo se juega
-        </summary>
-        <div className="mt-3">
-          <GuideBody game={game} />
+    <div className="overflow-hidden rounded-[28px] bg-[#1c1c1c] ring-1 ring-white/[0.08]">
+      {/* The table, in the shelf's color: who's in, as talos. */}
+      <section className="flex flex-col gap-4 px-5 pb-6 pt-5" style={{ background: color, color: ink }}>
+        <div className="flex flex-col leading-tight">
+          <span className="text-[13px] font-bold">{categoryOf(game).label}</span>
+          <span className="text-balance font-display text-2xl sm:text-[28px]">{info.title}</span>
         </div>
-      </details>
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-xl font-extrabold">En la mesa</h2>
+          <span className="text-[15px] font-bold">
+            {online.length} jugando
+            {info.maxPlayers > info.minPlayers && <span className="font-medium opacity-75"> · hasta {info.maxPlayers}</span>}
+          </span>
+        </div>
+        <TaloTable players={online} hostId={hostId} myId={myId} open={openSeats} tagInk={ink} />
+      </section>
+
+      <div className="flex flex-col gap-6 p-5">
+        {summary && <p className="text-[15px] font-medium text-white/80">{summary}</p>}
+        {settings && !canStart && (
+          <p className="-mt-4 text-sm text-white/50">El anfitrión puede cambiar la configuración antes de empezar.</p>
+        )}
+
+        {settings && canStart && settings}
+
+        {children}
+
+        {inviteFirst && invite}
+
+        <div className="flex flex-col items-center gap-2.5 text-center">
+          {canStart && (
+            <button
+              onClick={start}
+              disabled={missing > 0 || !!blocked}
+              className={`min-h-[62px] w-full font-display text-[22px] ${PRIMARY_BUTTON}`}
+            >
+              {missing > 0 ? `Esperando ${missing === 1 ? "1 jugador" : `${missing} jugadores`}` : "Empezar partida"}
+            </button>
+          )}
+          {missing > 0 ? (
+            <p className="text-sm font-bold text-talo-hero">
+              {missing === 1 ? "Falta 1 jugador" : `Faltan ${missing} jugadores`} para empezar: ¡mandá el link!
+            </p>
+          ) : blocked ? (
+            <p className="text-sm font-bold text-talo-hero">{blocked}</p>
+          ) : (
+            <p className="text-sm text-white/70">{message}</p>
+          )}
+          {fewPlayers && (
+            <p className="text-sm text-white/70">Se juega mejor con {info.minPlayers} o más: ¡invitá a alguien!</p>
+          )}
+        </div>
+
+        {!inviteFirst && invite}
+
+        <details className="group border-t border-white/10 pt-4 text-sm text-white/80">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 text-base font-bold text-white [&::-webkit-details-marker]:hidden">
+            Cómo se juega
+            <ChevronDown className="h-5 w-5 transition-transform group-open:rotate-180" strokeWidth={2.4} />
+          </summary>
+          <div className="mt-3">
+            <GuideBody game={game} />
+          </div>
+        </details>
+      </div>
     </div>
   );
 }

@@ -42,7 +42,8 @@ async function roomCodes(): Promise<string[]> {
   const res = await fetch(`${base}/rooms.json?shallow=true`);
   if (!res.ok) return [];
   const keys = Object.keys(((await res.json()) as Record<string, true> | null) ?? {});
-  return keys.filter((k) => k !== "_index");
+  // "_index", "_stats"… are ours, not rooms (codes never have "_").
+  return keys.filter((k) => !k.startsWith("_"));
 }
 
 /** Adds rooms from before the index, dated by when they were created. */

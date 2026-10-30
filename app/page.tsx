@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { ChevronDown } from "lucide-react";
 import HomeClient from "./HomeClient";
 import JsonLd from "@/components/JsonLd";
-import { TaloMark } from "@/components/TaloLogo";
+import { SiteFooter } from "@/components/SiteHeader";
 import { HOME_FAQ, SITE_DESCRIPTION, homeJsonLd } from "@/lib/seo";
 
 export const metadata: Metadata = {
@@ -12,57 +12,54 @@ export const metadata: Metadata = {
 };
 
 const STEPS = [
-  { title: "Elegí un juego", text: "Para dos, para la previa o para un rato solo. Cada juego te dice para cuántos es y cuánto dura." },
-  { title: "Mandá el link", text: "Creás la sala y compartís el link o el código por WhatsApp. Nadie tiene que registrarse." },
-  { title: "A jugar", text: "Los demás tocan el link, ponen su nombre y entran. Todo pasa en vivo, cada uno desde su celular." },
+  { color: "#FF5FA2", title: "Elegí un juego", text: "Para la previa, de mesa, de cartas o para jugar solo. Todos en español." },
+  { color: "#2D5BFF", title: "Mandá el link", text: "Por WhatsApp o pasando el código de la sala. Cada uno entra con su nombre." },
+  { color: "#00A863", title: "A jugar", text: "Todo se sincroniza en vivo: en la misma mesa o cada uno en su casa, por videollamada." },
 ];
+
+const H2 = "font-display text-[32px] leading-[1.05] tracking-[-0.01em] sm:text-[44px]";
 
 export default function Home() {
   return (
     <>
       <HomeClient />
       {/* Server-rendered so search engines and AI assistants can read it; also the FAQPage JSON-LD. */}
-      <div className="border-t border-white/[0.06] bg-slate-950/40">
-        <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6">
-          <h2 className="font-display text-2xl font-semibold tracking-tight text-white sm:text-3xl">Cómo funciona</h2>
-          <ol className="mt-8 grid gap-4 sm:grid-cols-3">
+      <div className="talo-light">
+        <section id="como" className="scroll-mt-4 bg-talo-surface">
+          <div className="mx-auto grid max-w-[1360px] gap-10 px-5 py-[72px] sm:grid-cols-[repeat(auto-fit,minmax(280px,1fr))] sm:gap-12 sm:px-10 sm:py-28">
+            <h2 className={H2}>En un minuto están jugando</h2>
             {STEPS.map((s, i) => (
-              <li key={s.title} className="rounded-2xl border border-white/[0.07] bg-slate-900/40 p-5">
-                <span className="font-mono text-sm text-violet-400">0{i + 1}</span>
-                <p className="mt-3 font-display text-lg font-semibold text-white">{s.title}</p>
-                <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{s.text}</p>
-              </li>
+              <div key={s.title} className="flex flex-col gap-3">
+                <span className="font-display text-[64px] leading-none" style={{ color: s.color }}>
+                  {i + 1}
+                </span>
+                <h3 className="text-2xl font-extrabold">{s.title}</h3>
+                <p className="text-lg text-talo-text-2">{s.text}</p>
+              </div>
             ))}
-          </ol>
+          </div>
         </section>
 
-        <section className="mx-auto grid w-full max-w-6xl gap-8 px-4 pb-20 sm:px-6 lg:grid-cols-[1fr_2fr] lg:gap-14">
-          <div>
-            <h2 className="font-display text-2xl font-semibold tracking-tight text-white sm:text-3xl">Preguntas frecuentes</h2>
-            <p className="mt-2 text-sm text-slate-400">Lo que más nos preguntan antes de la primera partida.</p>
-          </div>
-          <div className="divide-y divide-white/[0.07] border-y border-white/[0.07]">
+        <section
+          id="faq"
+          className="mx-auto grid max-w-[1360px] scroll-mt-4 items-start gap-8 px-5 py-[72px] sm:px-10 sm:py-28 lg:grid-cols-3 lg:gap-12"
+        >
+          <h2 className={H2}>Preguntas</h2>
+          <div className="min-w-0 border-t-2 border-talo-ink lg:col-span-2">
             {HOME_FAQ.map(({ q, a }) => (
-              <details key={q} className="group py-4">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-medium text-slate-100 marker:hidden">
+              <details key={q} className="group border-b border-talo-line">
+                <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 px-1 py-5 text-lg font-bold sm:py-[22px] sm:text-[21px] [&::-webkit-details-marker]:hidden">
                   {q}
-                  <ChevronDown className="h-4 w-4 shrink-0 text-slate-500 transition group-open:rotate-180" />
+                  <ChevronDown className="h-[22px] w-[22px] shrink-0 transition-transform duration-200 group-open:rotate-180" strokeWidth={2.4} />
                 </summary>
-                <p className="mt-2 pr-8 text-sm leading-relaxed text-slate-400">{a}</p>
+                <p className="max-w-[720px] px-1 pb-6 text-lg leading-normal text-talo-text-2">{a}</p>
               </details>
             ))}
           </div>
         </section>
-      </div>
 
-      <footer className="border-t border-white/[0.06]">
-        <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-slate-500 sm:flex-row sm:px-6">
-          <span className="flex items-center gap-2">
-            <TaloMark className="h-5 w-5" /> Talo · Juegos para jugar juntos
-          </span>
-          <span>Gratis, sin registrarse y desde el celular.</span>
-        </div>
-      </footer>
+        <SiteFooter />
+      </div>
       <JsonLd data={homeJsonLd()} />
     </>
   );

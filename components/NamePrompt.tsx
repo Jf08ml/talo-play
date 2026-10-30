@@ -2,8 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { GAMES, type GameId } from "@/lib/games";
-import { TaloMark } from "./TaloLogo";
-import GameIcon from "./GameIcon";
+import { categoryOf, gameColors } from "@/lib/talos";
+import { Talo } from "./Talo";
 
 export default function NamePrompt({
   onSubmit,
@@ -29,60 +29,68 @@ export default function NamePrompt({
     onSubmit(trimmed.slice(0, 24));
   };
 
+  const invite = invitedTo && gameColors(invitedTo);
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
       onClick={onCancel}
       onKeyDown={(e) => e.key === "Escape" && onCancel?.()}
     >
       <form
         onSubmit={submit}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-[0_32px_64px_-24px_rgba(0,0,0,0.9)]"
+        className="talo-light w-full max-w-sm overflow-hidden rounded-[28px]"
       >
-        {invitedTo && (
-          <div className="mb-4 flex items-center gap-3 rounded-xl bg-white/[0.03] p-3 ring-1 ring-white/10">
-            <TaloMark className="h-8 w-8 shrink-0" />
-            <p className="text-sm text-slate-300">
-              Te invitaron a jugar{" "}
-              <span className="inline-flex items-center gap-1 align-middle font-semibold text-slate-100">
-                <GameIcon game={invitedTo} size="sm" /> {GAMES[invitedTo].title}
-              </span>{" "}
-              en Talo
-            </p>
+        {invitedTo && invite && (
+          <div
+            className="relative flex h-32 flex-col justify-start overflow-hidden px-6 pt-5"
+            style={{ background: invite.color, color: invite.ink }}
+          >
+            <span className="text-[13px] font-bold">Te invitaron a jugar</span>
+            <span className="font-display text-2xl leading-tight">{GAMES[invitedTo].title}</span>
+            <span className="sr-only">en Talo, {categoryOf(invitedTo).label}</span>
+            <span aria-hidden="true" className="absolute -bottom-6 right-5 flex items-end gap-2">
+              <Talo w={58} h={58} color="#111111" radius="50%" look={[-1, -0.4]} blinkDelay="1.2s" />
+              <Talo w={44} h={74} color="#FFFFFF" radius="22px 22px 10px 10px" look={[-1, -0.6]} blinkDelay="3s" />
+            </span>
           </div>
         )}
-        <h2 className="font-display text-lg font-semibold text-slate-100">
-          ¿Cómo te llamás?
-        </h2>
-        <p className="mt-1 text-sm text-slate-400">
-          Así te van a ver los demás jugadores. No hace falta registrarse.
-        </p>
-        <input
-          autoFocus
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="Tu nombre"
-          maxLength={24}
-          className="mt-4 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-violet-400/70 focus:ring-4 focus:ring-violet-500/15"
-        />
-        <div className="mt-4 flex gap-2">
-          {onCancel && (
+        <div className="p-6">
+          <h2 className="font-display text-[28px] leading-tight">¿Cómo te llamás?</h2>
+          <p className="mt-1.5 text-[15px] text-talo-text-2">
+            Así te van a ver los demás jugadores. No hace falta registrarse.
+          </p>
+          <label htmlFor="player-name" className="sr-only">
+            Tu nombre
+          </label>
+          <input
+            id="player-name"
+            autoFocus
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="Tu nombre"
+            maxLength={24}
+            className="mt-5 h-14 w-full rounded-xl bg-talo-surface px-4 text-lg font-semibold text-talo-ink outline-none placeholder:font-medium placeholder:text-[#8a8a8a]"
+          />
+          <div className="mt-4 flex gap-2">
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="min-h-[54px] flex-1 rounded-[14px] border-2 border-talo-ink font-bold text-talo-ink transition hover:bg-talo-surface"
+              >
+                Cancelar
+              </button>
+            )}
             <button
-              type="button"
-              onClick={onCancel}
-              className="flex-1 rounded-lg border border-white/10 py-2 font-medium text-slate-300 transition hover:bg-white/[0.06]"
+              type="submit"
+              disabled={!value.trim()}
+              className="min-h-[54px] flex-1 rounded-[14px] bg-talo-ink text-[17px] font-bold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:bg-[#cfcfcf] disabled:text-[#6b6b6b]"
             >
-              Cancelar
+              {submitLabel}
             </button>
-          )}
-          <button
-            type="submit"
-            disabled={!value.trim()}
-            className="flex-1 rounded-lg bg-violet-600 py-2 font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {submitLabel}
-          </button>
+          </div>
         </div>
       </form>
     </div>
