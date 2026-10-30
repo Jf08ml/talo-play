@@ -1,26 +1,27 @@
 // Shared Tailwind class strings so every game's lobby and room look like part
-// of the same product.
+// of the same product: quiet surfaces with hairline borders, one accent
+// (violet) for the main action, no glows.
 
 export const CARD =
-  "rounded-2xl border border-violet-500/15 bg-slate-900/60 p-5 shadow-[0_0_25px_rgba(139,92,246,0.08)] backdrop-blur";
+  "rounded-2xl border border-white/[0.07] bg-slate-900/50 p-5 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset,0_8px_24px_-12px_rgba(0,0,0,0.6)]";
 
 export const PRIMARY_BUTTON =
-  "rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 py-2.5 font-semibold text-white shadow-[0_0_20px_rgba(217,70,239,0.35)] transition hover:from-violet-500 hover:to-fuchsia-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:active:scale-100";
+  "rounded-xl bg-violet-600 py-2.5 font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] transition hover:bg-violet-500 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-violet-600/50 disabled:text-white/60 disabled:active:scale-100";
 
 export const SECONDARY_BUTTON =
-  "rounded-xl border border-cyan-400/60 py-2.5 font-medium text-cyan-300 transition hover:bg-cyan-500/10 hover:shadow-[0_0_15px_rgba(34,211,238,0.25)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
+  "rounded-xl border border-white/10 bg-white/[0.03] py-2.5 font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/[0.06] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
 
 export const TEXT_INPUT =
-  "rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none placeholder:text-slate-500 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30";
+  "rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-violet-400/70 focus:ring-4 focus:ring-violet-500/15";
 
-export const SECTION_LABEL = "mb-1.5 text-xs font-medium uppercase tracking-wide text-slate-500";
+export const SECTION_LABEL = "mb-1.5 text-xs font-medium uppercase tracking-wider text-slate-500";
 
 /** One option of a row of selectable chips (difficulty, size, etc). */
 export function chipClass(selected: boolean): string {
   return `rounded-lg border px-2 py-1.5 text-xs font-medium transition active:scale-[0.97] ${
     selected
-      ? "border-cyan-400/60 bg-cyan-500/10 text-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.3)]"
-      : "border-slate-700 text-slate-400 hover:bg-slate-800/60"
+      ? "border-violet-400/60 bg-violet-500/10 text-violet-100"
+      : "border-white/10 text-slate-400 hover:border-white/20 hover:bg-white/[0.04] hover:text-slate-200"
   }`;
 }
 
@@ -28,7 +29,7 @@ export function chipClass(selected: boolean): string {
 export function segmentClass(selected: boolean): string {
   return `rounded-md py-1.5 text-sm font-medium transition ${
     selected
-      ? "bg-violet-600 text-white shadow-[0_0_15px_rgba(139,92,246,0.5)]"
+      ? "bg-slate-700/80 text-white shadow-[0_1px_2px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.08)]"
       : "text-slate-400 hover:text-slate-200"
   }`;
 }

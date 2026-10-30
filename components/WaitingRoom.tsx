@@ -133,12 +133,12 @@ export default function WaitingRoom({
             <li
               key={p.id}
               className={`animate-pop-in flex items-center gap-1.5 rounded-full py-1 pl-1 pr-3 text-sm text-slate-200 ring-1 ${
-                p.id === myId ? "bg-violet-500/10 ring-violet-400/40" : "bg-slate-800/80 ring-slate-700"
+                p.id === myId ? "bg-violet-500/10 ring-violet-400/40" : "bg-white/[0.04] ring-white/10"
               }`}
             >
               <span
                 className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white"
-                style={{ backgroundColor: p.color, boxShadow: `0 0 10px ${p.color}66` }}
+                style={{ backgroundColor: p.color }}
               >
                 {p.name.slice(0, 1).toUpperCase()}
               </span>
@@ -150,7 +150,7 @@ export default function WaitingRoom({
           {Array.from({ length: openSeats }, (_, i) => (
             <li
               key={`open-${i}`}
-              className="flex items-center gap-1.5 rounded-full border border-dashed border-slate-700 py-1 pl-1 pr-3 text-sm text-slate-500"
+              className="flex items-center gap-1.5 rounded-full border border-dashed border-white/10 py-1 pl-1 pr-3 text-sm text-slate-500"
             >
               <span className="flex h-7 w-7 animate-pulse items-center justify-center rounded-full border border-dashed border-slate-600">
                 <UserPlus className="h-3.5 w-3.5" />
@@ -186,7 +186,7 @@ export default function WaitingRoom({
 
       {!inviteFirst && invite}
 
-      <details className="group rounded-xl bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
+      <details className="group rounded-xl border border-white/[0.07] bg-slate-950/40 px-4 py-3 text-sm text-slate-300">
         <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-slate-200">
           <ChevronRight className="h-4 w-4 transition group-open:rotate-90" /> Cómo se juega
         </summary>

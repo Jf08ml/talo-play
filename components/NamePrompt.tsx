@@ -38,10 +38,10 @@ export default function NamePrompt({
       <form
         onSubmit={submit}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-2xl border border-violet-500/20 bg-slate-900 p-6 shadow-[0_0_40px_rgba(139,92,246,0.2)]"
+        className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900 p-6 shadow-[0_32px_64px_-24px_rgba(0,0,0,0.9)]"
       >
         {invitedTo && (
-          <div className="mb-4 flex items-center gap-3 rounded-xl bg-violet-500/10 p-3 ring-1 ring-violet-400/20">
+          <div className="mb-4 flex items-center gap-3 rounded-xl bg-white/[0.03] p-3 ring-1 ring-white/10">
             <TaloMark className="h-8 w-8 shrink-0" />
             <p className="text-sm text-slate-300">
               Te invitaron a jugar{" "}
@@ -64,14 +64,14 @@ export default function NamePrompt({
           onChange={(e) => setValue(e.target.value)}
           placeholder="Tu nombre"
           maxLength={24}
-          className="mt-4 w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none placeholder:text-slate-500 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30"
+          className="mt-4 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-violet-400/70 focus:ring-4 focus:ring-violet-500/15"
         />
         <div className="mt-4 flex gap-2">
           {onCancel && (
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 rounded-lg border border-slate-700 py-2 font-medium text-slate-300 transition hover:bg-slate-800"
+              className="flex-1 rounded-lg border border-white/10 py-2 font-medium text-slate-300 transition hover:bg-white/[0.06]"
             >
               Cancelar
             </button>
@@ -79,7 +79,7 @@ export default function NamePrompt({
           <button
             type="submit"
             disabled={!value.trim()}
-            className="flex-1 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 py-2 font-medium text-white shadow-[0_0_20px_rgba(217,70,239,0.35)] transition hover:from-violet-500 hover:to-fuchsia-500 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+            className="flex-1 rounded-lg bg-violet-600 py-2 font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitLabel}
           </button>

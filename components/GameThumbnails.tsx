@@ -1,7 +1,7 @@
 // Small inline SVG "cover art" pieces for the games hub — no external image
-// assets, drawn in the same violet/cyan/fuchsia neon palette as the rest of
-// the app so a game's card reads as part of the same family before you ever
-// open it.
+// assets, drawn on the same dark backdrop with a few saturated accents so the
+// cards read as one family before you ever open a game (mapped per game in
+// GameCover.tsx).
 
 export function PuzzleThumbnail() {
   return (
@@ -21,7 +21,7 @@ export function PuzzleThumbnail() {
       </defs>
       <rect width="400" height="240" fill="url(#puzzle-bg)" />
 
-      <g filter="url(#puzzle-glow)" opacity="0.95">
+      <g opacity="0.95">
         <g transform="translate(150 60) rotate(-8)">
           <rect width="90" height="90" rx="14" fill="#a855f7" />
           <circle cx="90" cy="45" r="16" fill="#a855f7" />
@@ -67,7 +67,7 @@ export function MemotestThumbnail() {
         </filter>
       </defs>
       <rect width="400" height="240" fill="url(#memo-bg)" />
-      <g filter="url(#memo-glow)">
+      <g>
         {cards.map((c, i) => (
           <g key={i} transform={`translate(${c.x} ${c.y}) rotate(${c.r} 32 38)`}>
             <rect
@@ -121,7 +121,7 @@ export function TuttiThumbnail() {
         </filter>
       </defs>
       <rect width="400" height="240" fill="url(#tutti-bg)" />
-      <g filter="url(#tutti-glow)">
+      <g>
         <rect x="58" y="70" width="96" height="96" rx="20" fill="url(#tutti-letter)" transform="rotate(-6 106 118)" />
       </g>
       <text
@@ -182,7 +182,7 @@ export function DibujoThumbnail() {
           <path d="M92 160 Q170 150 250 162" stroke="#22c55e" />
         </g>
       </g>
-      <g filter="url(#dibujo-glow)" transform="translate(296 70)">
+      <g transform="translate(296 70)">
         <rect width="78" height="30" rx="15" fill="#0f172a" stroke="#22d3ee" strokeWidth="2" />
         <text x="39" y="20" textAnchor="middle" fontSize="13" fill="#e2e8f0" fontFamily="system-ui, sans-serif">
           ¿casa?
@@ -474,7 +474,7 @@ export function NavalThumbnail() {
         )}
         {shots.map((s, i) =>
           s.hit ? (
-            <g key={i} filter="url(#naval-glow)">
+            <g key={i}>
               <rect x={s.x * 31} y={s.y * 29} width="28" height="26" rx="4" fill="#f43f5e" />
               <path
                 d={`M${s.x * 31 + 8} ${s.y * 29 + 7} l12 12 m0 -12 l-12 12`}
@@ -934,7 +934,7 @@ export function ViboraThumbnail() {
       <rect width="400" height="240" fill="url(#vibora-bg)" />
       {pellets.map(([x, y, c], i) => (
         <g key={i}>
-          <circle cx={x} cy={y} r="8" fill={c} opacity="0.5" filter="url(#vibora-glow)" />
+          <circle cx={x} cy={y} r="8" fill={c} opacity="0.5" />
           <circle cx={x} cy={y} r="4" fill={c} />
         </g>
       ))}
@@ -1232,9 +1232,9 @@ export function LoboThumbnail() {
         </filter>
       </defs>
       <rect width="400" height="240" fill="url(#lobo-bg)" />
-      <circle cx="285" cy="70" r="42" fill="#fef3c7" filter="url(#lobo-glow)" />
+      <circle cx="285" cy="70" r="42" fill="#fef3c7" />
       <path d="M0 240 V180 L30 160 L60 180 V150 H90 V180 L120 165 L150 185 V140 L175 120 L200 140 V190 L240 170 L270 190 V160 H300 V195 L340 175 L370 190 L400 170 V240 Z" fill="#0f0d1a" />
-      <g filter="url(#lobo-glow)">
+      <g>
         <ellipse cx="110" cy="105" rx="9" ry="5" fill="#ef4444" />
         <ellipse cx="140" cy="105" rx="9" ry="5" fill="#ef4444" />
       </g>

@@ -80,10 +80,10 @@ export function RulesDialog({ game, onClose }: { game: GameId; onClose: () => vo
       aria-label={`Cómo se juega ${GAMES[game].title}`}
     >
       <div
-        className="flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-violet-500/20 bg-slate-900 shadow-2xl sm:rounded-2xl"
+        className="flex max-h-[90dvh] w-full max-w-xl flex-col overflow-hidden rounded-t-2xl border border-white/10 bg-slate-900 shadow-2xl sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2.5 border-b border-slate-800 px-4 py-3">
+        <div className="flex items-center gap-2.5 border-b border-white/[0.07] px-4 py-3">
           <GameIcon game={game} size="sm" />
           <p className="flex-1 font-display font-semibold text-slate-100">Cómo se juega {GAMES[game].title}</p>
           <button onClick={onClose} aria-label="Cerrar" className="rounded-md p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-100">
@@ -124,7 +124,7 @@ export function RulesButton({
         }}
         className={
           className ??
-          "flex h-7 items-center gap-1.5 rounded-md bg-violet-500/15 px-2 text-xs font-semibold text-violet-200 ring-1 ring-violet-400/30 transition hover:bg-violet-500/25 active:scale-95 sm:px-2.5"
+          "flex h-7 items-center gap-1.5 rounded-md bg-white/[0.04] px-2 text-xs font-semibold text-slate-200 ring-1 ring-white/10 transition hover:bg-white/[0.08] active:scale-95 sm:px-2.5"
         }
         aria-label={label}
       >

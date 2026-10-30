@@ -111,14 +111,14 @@ export default function ChatButton({ roomId, locked }: { roomId: string; locked?
         aria-expanded={isOpen}
         className={`${PILL} relative ${
           locked
-            ? "bg-slate-800 text-slate-500 ring-slate-700"
-            : "bg-violet-500/15 text-violet-200 ring-violet-400/30 hover:bg-violet-500/25"
+            ? "bg-white/[0.02] text-slate-500 ring-white/[0.06]"
+            : "bg-white/[0.04] text-slate-200 ring-white/10 hover:bg-white/[0.08]"
         }`}
       >
         {locked ? <Lock className="h-3.5 w-3.5" /> : <MessageCircle className="h-3.5 w-3.5" />}
         <span className="hidden sm:inline">Chat</span>
         {!locked && !isOpen && unread > 0 && (
-          <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-fuchsia-500 px-1 text-[10px] font-bold text-white">
+          <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-violet-500 px-1 text-[10px] font-bold text-white">
             {unread > 9 ? "9+" : unread}
           </span>
         )}
@@ -133,7 +133,7 @@ export default function ChatButton({ roomId, locked }: { roomId: string; locked?
       {toast && !isOpen && !locked && (
         <button
           onClick={toggle}
-          className="fixed inset-x-3 top-14 z-50 flex items-start gap-2 rounded-xl border border-violet-500/25 bg-slate-900/95 px-3 py-2 text-left text-sm shadow-xl backdrop-blur sm:absolute sm:inset-x-auto sm:left-0 sm:top-full sm:mt-2 sm:w-72"
+          className="fixed inset-x-3 top-14 z-50 flex items-start gap-2 rounded-xl border border-white/10 bg-slate-900/95 px-3 py-2 text-left text-sm shadow-xl backdrop-blur sm:absolute sm:inset-x-auto sm:left-0 sm:top-full sm:mt-2 sm:w-72"
         >
           <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: toast.color }} />
           <span className="min-w-0">
@@ -146,7 +146,7 @@ export default function ChatButton({ roomId, locked }: { roomId: string; locked?
       )}
 
       {isOpen && (
-        <div className="fixed inset-x-3 top-14 z-50 flex max-h-[70dvh] flex-col rounded-xl border border-violet-500/20 bg-slate-900 shadow-xl sm:absolute sm:inset-x-auto sm:left-0 sm:top-full sm:mt-2 sm:w-80">
+        <div className="fixed inset-x-3 top-14 z-50 flex max-h-[70dvh] flex-col rounded-xl border border-white/10 bg-slate-900 shadow-xl sm:absolute sm:inset-x-auto sm:left-0 sm:top-full sm:mt-2 sm:w-80">
           <div className="flex items-center justify-between px-3 pb-1 pt-2">
             <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Chat de la sala</p>
             <button

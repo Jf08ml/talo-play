@@ -8,7 +8,8 @@ import { GAMES, playersLabel, type GameId } from "@/lib/games";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import FirebaseSetupNotice from "./FirebaseSetupNotice";
 import PlayerIdentity from "./PlayerIdentity";
-import { TaloMark } from "./TaloLogo";
+import SiteHeader from "./SiteHeader";
+import GameCover from "./GameCover";
 import GameIcon from "./GameIcon";
 import { ChevronLeft, Clock, Users } from "lucide-react";
 import { CARD } from "./ui";
@@ -33,55 +34,71 @@ export default function GameLobby({ game, children }: { game: GameId; children: 
   if (!isFirebaseConfigured()) return <FirebaseSetupNotice />;
 
   return (
-    <div className="flex flex-1 flex-col items-center px-4 py-8">
-      <div className="w-full max-w-3xl">
-        <Link href="/" className="mb-5 inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-violet-300">
-          <ChevronLeft className="h-4 w-4" /> <TaloMark className="h-5 w-5" /> Volver a Talo
+    <>
+      <SiteHeader right={<PlayerIdentity identity={identity} compact />} />
+
+      <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-6 sm:px-6">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1 text-sm text-slate-400 transition hover:text-white"
+        >
+          <ChevronLeft className="h-4 w-4" /> Todos los juegos
         </Link>
 
-        <div className="text-center">
-          <h1 className="flex items-center justify-center gap-3 font-display text-3xl font-bold tracking-tight text-slate-100 sm:text-4xl">
+        <section className="mt-5 grid grid-cols-1 items-center gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+          <div>
             <GameIcon game={game} size="lg" />
-            {info.title}
-          </h1>
-          <p className="mx-auto mt-2 max-w-xl text-slate-400">{info.tagline}</p>
-          <div className="mt-3 flex justify-center gap-2 text-xs text-slate-400">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-2.5 py-1">
-              <Users className="h-3.5 w-3.5" /> {playersLabel(info)} jugadores
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-800 px-2.5 py-1">
-              <Clock className="h-3.5 w-3.5" /> {info.duration}
-            </span>
+            <h1 className="mt-4 text-balance font-display text-4xl font-bold tracking-[-0.03em] text-white sm:text-5xl">
+              {info.title}
+            </h1>
+            <p className="mt-3 max-w-xl text-pretty text-lg leading-relaxed text-slate-400">{info.tagline}</p>
+            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-400">
+              <span className="inline-flex items-center gap-1.5">
+                <Users className="h-4 w-4 text-slate-500" /> {playersLabel(info)} jugadores
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Clock className="h-4 w-4 text-slate-500" /> {info.duration}
+              </span>
+            </div>
           </div>
-        </div>
-
-        <div className="mt-5">
-          <PlayerIdentity identity={identity} />
-        </div>
+          <div
+            aria-hidden="true"
+            className="hidden overflow-hidden rounded-2xl border border-white/10 shadow-[0_24px_48px_-24px_rgba(0,0,0,0.9)] sm:block"
+          >
+            <div className="aspect-[2/1]">
+              <GameCover game={game} />
+            </div>
+          </div>
+        </section>
 
         {identity.name && (
-          <div className="mt-6 grid gap-6 md:grid-cols-[1.4fr_1fr]">
+          <div className="mt-10 grid gap-6 md:grid-cols-[1.4fr_1fr]">
             {children}
             <div className={`${CARD} h-fit`}>
-              <h2 className="font-display text-lg font-semibold text-slate-100">Cómo se juega</h2>
-              <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-slate-400">
-                {info.howTo.map((step) => (
-                  <li key={step}>{step}</li>
+              <h2 className="font-display text-lg font-semibold text-white">Cómo se juega</h2>
+              <ol className="mt-4 flex flex-col gap-3 text-sm text-slate-400">
+                {info.howTo.map((step, i) => (
+                  <li key={step} className="flex gap-3">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/10 text-xs font-semibold text-slate-300">
+                      {i + 1}
+                    </span>
+                    <span className="pt-0.5 leading-relaxed">{step}</span>
+                  </li>
                 ))}
               </ol>
               <RulesButton
                 game={game}
                 where="lobby"
                 label="Ver las reglas completas"
-                className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-violet-400/40 py-2 text-sm font-medium text-violet-200 transition hover:bg-violet-500/10"
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] py-2.5 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/[0.06]"
               />
-              <p className="mt-4 text-sm text-slate-500">
+              <p className="mt-4 border-t border-white/[0.06] pt-4 text-sm text-slate-500">
                 Creás la sala, mandás el link por WhatsApp y los demás entran con un toque.
               </p>
             </div>
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }

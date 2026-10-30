@@ -1,7 +1,7 @@
 export default function FirebaseSetupNotice() {
   return (
     <div className="flex h-dvh items-center justify-center p-6">
-      <div className="max-w-lg rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6 text-slate-200 shadow-[0_0_30px_rgba(245,158,11,0.15)] backdrop-blur">
+      <div className="max-w-lg rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6 text-slate-200">
         <h1 className="font-display text-lg font-semibold text-amber-300">
           Falta configurar Firebase
         </h1>

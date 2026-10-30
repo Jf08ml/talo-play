@@ -23,9 +23,9 @@ export default function InviteCard({ game, roomId }: { game: GameId; roomId: str
   };
 
   return (
-    <div className="flex flex-col items-center gap-3 rounded-2xl border border-cyan-400/20 bg-slate-950/50 p-4 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-2xl border border-white/[0.07] bg-slate-950/50 p-5 text-center">
       <p className="text-sm text-slate-400">Invitá a los demás con este código o mandales el link</p>
-      <p className="font-mono text-4xl font-bold tracking-[0.25em] text-cyan-200 drop-shadow-[0_0_12px_rgba(34,211,238,0.35)]">
+      <p className="font-mono text-4xl font-bold tracking-[0.25em] text-white">
         {roomId}
       </p>
       <div className="grid w-full max-w-sm grid-cols-2 gap-2">
@@ -47,14 +47,14 @@ export default function InviteCard({ game, roomId }: { game: GameId; roomId: str
               trackEvent("share", { game, method: "nativo" });
               shareInvite(game, roomId);
             }}
-            className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-600 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800"
+            className="flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] py-2 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/[0.06]"
           >
             <Share2 className="h-4 w-4" /> Compartir
           </button>
         )}
         <button
           onClick={copy}
-          className={`flex items-center justify-center gap-1.5 rounded-lg border border-slate-600 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800 ${
+          className={`flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] py-2 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/[0.06] ${
             nativeShare ? "" : "col-span-2"
           }`}
         >

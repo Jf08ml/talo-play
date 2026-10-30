@@ -68,7 +68,7 @@ export default function VoiceButton({ roomId }: { roomId: string }) {
       )}
 
       {here && voice.status === "connecting" && (
-        <span className={`${PILL} bg-slate-800 text-slate-300 ring-slate-600/60`}>
+        <span className={`${PILL} bg-white/[0.04] text-slate-300 ring-white/10`}>
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> <span className="hidden sm:inline">Conectando…</span>
         </span>
       )}
@@ -93,7 +93,7 @@ export default function VoiceButton({ roomId }: { roomId: string }) {
             onClick={() => setOpen((o) => !o)}
             aria-label="Quién está en la voz"
             aria-expanded={open}
-            className={`${PILL} bg-slate-800 text-slate-300 ring-slate-600/60 hover:bg-slate-700`}
+            className={`${PILL} bg-white/[0.04] text-slate-300 ring-white/10 hover:bg-white/[0.08]`}
           >
             <Headphones className="h-3.5 w-3.5" /> {others}
           </button>

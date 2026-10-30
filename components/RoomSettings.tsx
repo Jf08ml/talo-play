@@ -147,7 +147,7 @@ export function SettingsTextArea({
         onChange={(e) => onChange(e.target.value)}
         rows={3}
         placeholder={placeholder}
-        className="w-full resize-y rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/30"
+        className="w-full resize-y rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-violet-400/70 focus:ring-4 focus:ring-violet-500/15"
       />
       {footer}
     </div>
@@ -384,7 +384,7 @@ export function RoomSettingsEditor<T>({
           setDraft(settings.fromMeta(meta ?? {}));
           setError(null);
         }}
-        className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-violet-400/40 bg-violet-500/5 px-3 py-2.5 text-sm font-medium text-violet-200 transition hover:bg-violet-500/10"
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 bg-white/[0.02] px-3 py-2.5 text-sm font-medium text-slate-200 transition hover:border-white/25 hover:bg-white/[0.05]"
       >
         <Settings2 className="h-4 w-4" />
         {savedAt ? "¡Guardado! Cambiar de nuevo" : "Cambiar la configuración de la sala"}
@@ -393,7 +393,7 @@ export function RoomSettingsEditor<T>({
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-violet-400/30 bg-slate-950/50 p-4">
+    <div className="flex flex-col gap-4 rounded-xl border border-white/10 bg-slate-950/50 p-4">
       <p className="flex items-center gap-2 font-display font-semibold text-slate-100">
         <Settings2 className="h-4 w-4 text-violet-300" /> Configuración de la sala
       </p>
@@ -404,7 +404,7 @@ export function RoomSettingsEditor<T>({
         <button
           type="button"
           onClick={() => setDraft(null)}
-          className="flex-1 rounded-lg border border-slate-700 py-2.5 text-sm text-slate-300 transition hover:text-slate-100"
+          className="flex-1 rounded-lg border border-white/10 py-2.5 text-sm text-slate-300 transition hover:bg-white/[0.05] hover:text-slate-100"
         >
           Cancelar
         </button>

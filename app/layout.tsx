@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Baloo_2 } from "next/font/google";
+import { Geist, Geist_Mono, Bricolage_Grotesque } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { SITE_DESCRIPTION, SITE_URL } from "@/lib/seo";
 import { VoiceKeeper } from "@/components/VoiceButton";
@@ -15,11 +15,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Rounded, friendly display face used only for branding/headings — everything
-// else (forms, buttons, body copy) stays on Geist Sans for readability.
-const balooTwo = Baloo_2({
+// Display face with some character, used only for branding/headings —
+// everything else (forms, buttons, body copy) stays on Geist Sans.
+const display = Bricolage_Grotesque({
   variable: "--font-display",
-  weight: ["600", "700", "800"],
   subsets: ["latin"],
 });
 
@@ -58,14 +57,14 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#07060d",
+  themeColor: "#0b0c10",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="es"
-      className={`${geistSans.variable} ${geistMono.variable} ${balooTwo.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${display.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         {children}
