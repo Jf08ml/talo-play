@@ -24,9 +24,9 @@ import { burst, stepParticles, type Particle } from "@/lib/ladrillazoDraw";
 import { serverNow } from "@/lib/serverTime";
 import type { PresenceMap } from "@/lib/presence";
 import { useServerNow } from "@/hooks/useServerNow";
-import { useCountdownTicks } from "@/hooks/useSound";
+import { ladriAudio, playEvents } from "@/lib/ladrillazoAudio";
 import { useWakeLock } from "@/components/carreras/Controller";
-import Field, { Countdown, newInput, useEventSounds, type FieldInput, type Frame } from "./Field";
+import Field, { Countdown, newInput, useCountdownBeeps, type FieldInput, type Frame } from "./Field";
 import { GoalPill, Lives, ProgressBar } from "./Hud";
 
 const BALL_SEND_MS = 100;
@@ -139,7 +139,7 @@ export default function SharedGame({
   const padSent = useRef(new Map<string, { x: number; at: number }>());
   const particles = useRef<Particle[]>([]);
   const input = useRef<FieldInput>(newInput());
-  const sound = useEventSounds();
+  const lastHit = useRef("");
   const [progress, setProgress] = useState(0);
   const lastHud = useRef(0);
   const absentSince = useRef(0);
@@ -159,10 +159,18 @@ export default function SharedGame({
       for (const [key, ch] of Object.entries(f.cells)) {
         const i = Number(key.slice(1));
         if (board.cells[i] !== undefined && board.cells[i] !== ch) {
+          // Someone else's ball broke it: the same sound as if it were mine.
           if (ch === "." || ch === "b") burst(particles.current, i, board.cells[i]);
+          if (board.cells[i] === "x") ladriAudio.bomb();
+          else if (board.cells[i] === "B") ladriAudio.hard();
+          else ladriAudio.brick(1 + Math.floor(Math.random() * 5));
           board.cells[i] = ch;
         }
       }
+      // A paddle hit seen in someone else's snapshot.
+      const hitBy = f.ball && !f.ball.st ? f.ball.lh + ":" + Math.sign(f.ball.vy) : "";
+      if (hitBy && lastHit.current && hitBy !== lastHit.current && f.ball?.o !== myId) ladriAudio.paddle(0);
+      lastHit.current = hitBy;
       board.left = board.count();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- getBoard follows g and the roster.
@@ -226,9 +234,8 @@ export default function SharedGame({
         burst(particles.current, i, ch, 8);
       }
       if (mine) sendCells(roomId, g, patch);
-      sound(ev.booms.length ? "capture" : "place");
     }
-    if (ev.paddle) sound("tick");
+    playEvents({ ...ev, lost: [] }, board.combo, 1);
   };
 
   const frame = (dt: number): Frame => {
@@ -282,7 +289,6 @@ export default function SharedGame({
         const conceder = duel ? (lost.side === 1 ? roster[0] : roster[1]) : r.owner;
         if (duel) scoreGoal(roomId, g, lost.side === 1 ? roster[1] : roster[0], r.k).catch(console.error);
         else loseLife(roomId, g, r.k).catch(console.error);
-        sound("bad");
         board.balls = [];
         board.serve(conceder, SERVE_DELAY);
         r.k++;
@@ -373,7 +379,24 @@ export default function SharedGame({
 
   const now = useServerNow(true, 250);
   const countdown = now && now < state.startedAt ? Math.ceil((state.startedAt - now) / 1000) : 0;
-  useCountdownTicks(countdown || null, 3);
+  useCountdownBeeps(countdown);
+
+  // Goals and lost lives, heard by everyone.
+  const goalsKey = roster.map((id) => state.goals[id] ?? 0).join(",");
+  const prevGoals = useRef(goalsKey);
+  useEffect(() => {
+    if (prevGoals.current === goalsKey) return;
+    const before = prevGoals.current.split(",").map(Number);
+    prevGoals.current = goalsKey;
+    const after = goalsKey.split(",").map(Number);
+    const scorer = roster.find((_, i) => after[i] > (before[i] ?? 0));
+    if (scorer) ladriAudio.goal(scorer === myId);
+  }, [goalsKey, roster, myId]);
+  const prevLives = useRef(state.lives);
+  useEffect(() => {
+    if (state.lives < prevLives.current) ladriAudio.lost();
+    prevLives.current = state.lives;
+  }, [state.lives]);
 
   const [bottom, top] = flip ? [roster[1], roster[0]] : [roster[0], roster[1]];
   return (

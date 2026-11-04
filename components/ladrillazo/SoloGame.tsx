@@ -9,7 +9,8 @@ import { makeSeed } from "@/lib/random";
 import { useWakeLock } from "@/components/carreras/Controller";
 import { Confetti } from "@/components/Results";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
-import Field, { newInput, useEventSounds, type FieldInput, type Frame } from "./Field";
+import Field, { MuteButton, newInput, type FieldInput, type Frame } from "./Field";
+import { ladriAudio, playEvents } from "@/lib/ladrillazoAudio";
 import { GoalPill, Lives, ProgressBar, Stars, formatTime } from "./Hud";
 import { readRecord, saveRecord, saveStars } from "./progress";
 
@@ -61,7 +62,6 @@ export default function SoloGame({ start, onExit }: { start: SoloStart; onExit: 
   const [result, setResult] = useState<{ stars: number; score: number; record: boolean } | null>(null);
   const [hint, setHint] = useState(true);
   const lastHud = useRef(0);
-  const sound = useEventSounds();
   useWakeLock();
 
   useEffect(() => {
@@ -87,14 +87,10 @@ export default function SoloGame({ start, onExit }: { start: SoloStart; onExit: 
   const onEvents = useCallback(
     (ev: Events) => {
       for (const { i, ch } of ev.broke) burst(particles.current, i, ch, ch === "o" ? 14 : 6);
-      if (ev.broke.some((b) => b.ch === "o")) sound("good");
-      else if (ev.booms.length) sound("capture");
-      else if (ev.broke.length) sound("place");
-      if (ev.paddle) sound("tick");
-      if (ev.power.length) sound("flip");
-      if (ev.lost.length && boardRef.current && !boardRef.current.balls.length) sound("bad");
+      const b = boardRef.current;
+      if (b) playEvents(ev, b.combo, b.balls.length);
     },
-    [sound]
+    []
   );
 
   const frame = (dt: number): Frame => {
@@ -120,7 +116,8 @@ export default function SoloGame({ start, onExit }: { start: SoloStart; onExit: 
           if (!won) saveRecord(score);
           setResult({ stars: 0, score, record });
         }
-        if (!won) sound("end");
+        if (won) ladriAudio.win();
+        else ladriAudio.lose();
       }
       const now = performance.now();
       if (now - lastHud.current > 120) {
@@ -187,6 +184,7 @@ export default function SoloGame({ start, onExit }: { start: SoloStart; onExit: 
           <span className="font-mono text-lg leading-none">{hud.score}</span>
           <Lives lives={hud.lives} />
         </div>
+        <MuteButton />
         <button
           onClick={() => setPhase((p) => (p === "playing" ? "paused" : p === "paused" ? "playing" : p))}
           className="rounded-lg p-1.5 text-white/70 hover:bg-white/10 hover:text-white"

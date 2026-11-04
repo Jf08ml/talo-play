@@ -25,9 +25,9 @@ import { mulberry32 } from "@/lib/random";
 import { serverNow } from "@/lib/serverTime";
 import type { PresenceMap } from "@/lib/presence";
 import { useServerNow } from "@/hooks/useServerNow";
-import { useCountdownTicks } from "@/hooks/useSound";
+import { ladriAudio, playEvents } from "@/lib/ladrillazoAudio";
 import { useWakeLock } from "@/components/carreras/Controller";
-import Field, { Countdown, newInput, useEventSounds, type FieldInput, type Frame } from "./Field";
+import Field, { Countdown, newInput, useCountdownBeeps, type FieldInput, type Frame } from "./Field";
 import MiniBoard from "./MiniBoard";
 import { GoalPill, Lives, ProgressBar, formatTime } from "./Hud";
 import { Overlay } from "./SoloGame";
@@ -104,7 +104,7 @@ export default function RaceGame({
   const runners = useRef(new Map<string, Runner>());
   const particles = useRef<Particle[]>([]);
   const input = useRef<FieldInput>(newInput());
-  const sound = useEventSounds();
+  const lastBeat = useRef(0);
   const [hud, setHud] = useState({ score: 0, lives, progress: 0, danger: 0, retries: 0 });
   const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
   const lastHud = useRef(0);
@@ -170,6 +170,7 @@ export default function RaceGame({
       while (r.drops < due && !b.over) {
         b.pushRows([attackRow(mulberry32(s.seed + 77 + r.drops))]);
         r.drops++;
+        if (!r.brain) ladriAudio.rowDrop();
       }
       // Rows sent by rivals, in order.
       const incoming = Object.entries(attacksRef.current[r.id] ?? {}).sort((a, b) => (a[0] < b[0] ? -1 : 1));
@@ -178,6 +179,7 @@ export default function RaceGame({
         r.applied = key;
         const rand = mulberry32(key.length * 131 + key.charCodeAt(key.length - 1));
         b.pushRows(Array.from({ length: Math.min(3, a.r) }, () => garbageRow(rand)));
+        if (!r.brain) ladriAudio.attackHit();
         if (!r.brain) setToast({ text: `¡${playerInfo(s, a.by).name} te mandó ${a.r === 1 ? "una fila" : `${a.r} filas`}!`, key: now });
       }
       // My combos go to someone still standing.
@@ -188,14 +190,17 @@ export default function RaceGame({
         if (!targets.length) continue;
         const victim = targets[Math.floor(Math.random() * targets.length)];
         sendAttack(roomId, g, victim, r.id, rows);
+        if (!r.brain) ladriAudio.attackSent();
         if (!r.brain) setToast({ text: `¡Combo de ${c}! Le mandaste ${rows === 1 ? "una fila" : `${rows} filas`} a ${playerInfo(s, victim).name}`, key: now });
       }
       if (b.over) {
         r.stopped = true;
+        if (!r.brain) ladriAudio.lose();
         reportOut(roomId, g, r.id).catch(console.error);
       }
     } else if (b.done) {
       r.stopped = true;
+      if (!r.brain) ladriAudio.win();
       reportFinish(roomId, g, r.id).catch(console.error);
     } else if (b.over) {
       // Out of balls in a race: the level starts over, the clock keeps going.
@@ -255,12 +260,16 @@ export default function RaceGame({
         const ev = stepRunner(r, dt, now);
         if (ev && r.id === myId) {
           for (const { i, ch } of ev.broke) burst(particles.current, i, ch, ch === "o" ? 14 : 6);
-          if (ev.broke.some((b) => b.ch === "o")) sound("good");
-          else if (ev.booms.length) sound("capture");
-          else if (ev.broke.length) sound("place");
-          if (ev.paddle) sound("tick");
-          if (ev.power.length) sound("flip");
-          if (ev.lost.length && !r.board.balls.length) sound("bad");
+          playEvents(ev, r.board.combo, r.board.balls.length);
+          // Bricks close to the line: a heartbeat, faster the closer.
+          if (attack && !r.stopped) {
+            const low = r.board.lowestRow();
+            const t = performance.now();
+            if (low >= DANGER_ROW - 4 && t - lastBeat.current > (low >= DANGER_ROW - 2 ? 650 : 1100)) {
+              lastBeat.current = t;
+              ladriAudio.danger();
+            }
+          }
         }
         publish(r, now);
       }
@@ -326,7 +335,7 @@ export default function RaceGame({
 
   const now = useServerNow(true, 250);
   const countdown = now && now < state.startedAt ? Math.ceil((state.startedAt - now) / 1000) : 0;
-  useCountdownTicks(countdown || null, 3);
+  useCountdownBeeps(countdown);
   const elapsed = now > state.startedAt ? (now - state.startedAt) / 1000 : 0;
   const graceLeft = state.firstAt ? Math.max(0, (state.firstAt + FINISH_GRACE_MS - now) / 1000) : null;
 

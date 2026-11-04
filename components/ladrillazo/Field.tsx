@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type MutableRefObject, type ReactNode } from "react";
 import { COLS } from "@/lib/ladrillazoSim";
 import { drawField, fitField, type FieldView, type Particle } from "@/lib/ladrillazoDraw";
-import { playSound, type SoundName } from "@/lib/sfx";
+import { installLadriAudio, ladriAudio } from "@/lib/ladrillazoAudio";
+import { isMuted, setMuted, subscribeMuted } from "@/lib/sfx";
+import { Volume2, VolumeX } from "lucide-react";
 
 /** What the player's hands say, read and reset by the game's tick. */
 export interface FieldInput {
@@ -52,6 +54,8 @@ export default function Field({
   const sizeRef = useRef(size);
   const flipRef = useRef(flip);
   const paddleRef = useRef(paddleX);
+
+  useEffect(installLadriAudio, []);
 
   useEffect(() => {
     frameRef.current = frame;
@@ -190,15 +194,30 @@ export default function Field({
   );
 }
 
-/** Sounds for a frame's events, at most one of each kind every few frames. */
-export function useEventSounds() {
-  const last = useRef<Record<string, number>>({});
-  return (name: SoundName) => {
-    const now = performance.now();
-    if (now - (last.current[name] ?? 0) < 60) return;
-    last.current[name] = now;
-    playSound(name);
-  };
+/** Sound on/off (shared with the rest of the site), for screens without the room header. */
+export function MuteButton() {
+  const muted = useSyncExternalStore(subscribeMuted, isMuted, () => false);
+  return (
+    <button
+      onClick={() => setMuted(!muted)}
+      className="rounded-lg p-1.5 text-white/70 hover:bg-white/10 hover:text-white"
+      aria-label={muted ? "Activar el sonido" : "Silenciar"}
+    >
+      {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+    </button>
+  );
+}
+
+/** Beeps for 3, 2, 1 and go. */
+export function useCountdownBeeps(seconds: number) {
+  const prev = useRef(seconds);
+  useEffect(() => {
+    if (prev.current === seconds) return;
+    const was = prev.current;
+    prev.current = seconds;
+    if (seconds > 0 && seconds <= 3) ladriAudio.countdown(seconds);
+    else if (seconds === 0 && was > 0) ladriAudio.countdown(0);
+  }, [seconds]);
 }
 
 /** A big number over the field while the countdown runs. */

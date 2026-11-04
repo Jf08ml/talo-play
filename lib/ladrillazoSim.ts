@@ -97,9 +97,15 @@ export interface Events {
   /** Bricks broken between two paddle hits, at each paddle hit (the attack's combos). */
   combos: number[];
   served: number;
+  /** Balls launched from a paddle. */
+  launched: number;
+  /** Hits on unbreakable walls (#). */
+  thud: number;
+  /** Where each paddle hit landed on it, −1 (left tip) … 1 (right tip). */
+  offs: number[];
 }
 
-const noEvents = (): Events => ({ broke: [], paddle: 0, wall: 0, lost: [], power: [], booms: [], combos: [], served: 0 });
+const noEvents = (): Events => ({ broke: [], paddle: 0, wall: 0, lost: [], power: [], booms: [], combos: [], served: 0, launched: 0, thud: 0, offs: [] });
 
 export interface BoardOptions {
   goal: Goal;
@@ -265,6 +271,7 @@ export class Board {
   private launch(b: Ball, p: Paddle) {
     const off = clamp(b.stuckOff / p.hw, -1, 1) * 0.5 + (Math.random() - 0.5) * 0.2;
     b.stuck = "";
+    this.ev.launched++;
     b.vx = b.speed * Math.sin(off);
     b.vy = -p.side * b.speed * Math.cos(off);
   }
@@ -324,6 +331,7 @@ export class Board {
     b.lastHit = p.id;
     this.paddleHits++;
     this.ev.paddle++;
+    this.ev.offs.push(off);
     this.ev.combos.push(this.combo);
     this.combo = 0;
   }
@@ -358,6 +366,7 @@ export class Board {
       const ch = this.cells[i];
       if (ch === "#") {
         this.ev.wall++;
+        this.ev.thud++;
         continue;
       }
       broke = true;
