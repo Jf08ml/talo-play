@@ -24,6 +24,7 @@ import {
   UserSearch,
   Grid3x3,
   Hash,
+  BrickWall,
   Heart,
   NotebookPen,
   PartyPopper,
@@ -94,6 +95,7 @@ const GAME_ICONS: Record<GameId, LucideIcon> = {
   pasteleria: CakeSlice,
   vibora: Worm,
   triqui: Hash,
+  ladrillazo: BrickWall,
 };
 
 export const CONTEXT_ICONS: Record<PlayContext, LucideIcon> = {

@@ -265,6 +265,19 @@ const SCENES: Record<GameId, ReactNode> = {
       ))}
     </>
   ),
+  ladrillazo: (
+    <>
+      {[Y, PINK, OR, W].map((c, i) => (
+        <rect key={i} x={6 + i * 28} y={8} width={24} height={13} rx={3} fill={c} />
+      ))}
+      {[W, null, Y, PINK].map((c, i) => (c ? <rect key={i} x={6 + i * 28} y={25} width={24} height={13} rx={3} fill={c} /> : null))}
+      {[[38, 44, 4], [48, 48, 3], [42, 53, 3]].map(([x, y, s], i) => (
+        <rect key={i} x={x} y={y} width={s} height={s} fill={OR} />
+      ))}
+      <circle cx={64} cy={62} r={6} fill={W} />
+      <T x={28} y={86} w={64} h={26} r={13} c={Y} look={[0.2, -1]} />
+    </>
+  ),
   fuego: (
     <>
       <path d={shape(30, 38, 56, 82, [28, 28, 8, 8])} fill={INK} />

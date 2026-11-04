@@ -29,6 +29,7 @@ export type ArtId =
   | "deslizante"
   | "memotest"
   | "triqui"
+  | "ladrillazo"
   | "ludo";
 
 export interface GuideSection {
@@ -421,6 +422,74 @@ export const GUIDES: Record<GameId, Guide> = {
       "En línea, una víbora grande puede cruzarte su cabeza por delante: ¡no le pegues de frente!",
       "Si tu víbora es muy larga, enroscala para proteger la cola.",
       "Acelerá para cruzarte justo delante de otra víbora y cortarla antes de que se escape.",
+    ],
+  },
+  ladrillazo: {
+    goal: "Romper ladrillos con la pelota sin dejarla caer: los objetivos rojos o todo el nivel, según cuál toque.",
+    sections: [
+      {
+        title: "La paleta",
+        text: [
+          "Abajo tenés una paleta. En el teléfono, apoyá el dedo en cualquier parte y arrastralo; en la compu, mové el mouse o usá las flechas. Para sacar, tocá la pantalla, hacé click o apretá la barra espaciadora.",
+          "Donde pega la pelota en la paleta decide para dónde sale: en el centro sale derecha para arriba y en las puntas sale abierta. Así se apunta.",
+        ],
+        art: "ladrillazo",
+      },
+      {
+        title: "Los ladrillos",
+        text: [
+          "Los de color se rompen de un golpe; los blancos con el centro gris son duros y necesitan dos. Los muros grises no se rompen nunca: hay que rodearlos o meter la pelota por los huecos.",
+          "Las bombas negras rompen todo lo que tienen alrededor (y otras bombas que toquen, en cadena). Los ladrillos blancos con dibujo sueltan un premio que cae: agarralo con la paleta. Azul: tres pelotas. Verde: paleta larga por un rato. Rosa: una vida más.",
+        ],
+      },
+      {
+        title: "El objetivo de cada nivel",
+        text: [
+          "Arriba de la cancha dice qué hay que hacer. En algunos niveles hay que romper todos los ladrillos; en otros alcanza con los objetivos rojos, que suelen estar escondidos detrás de muros, adentro de tubos o arriba de torres.",
+          "Si se te cae la pelota perdés una vida. Sin vidas, perdés el nivel.",
+        ],
+      },
+      {
+        title: "Solo",
+        text: [
+          "La campaña tiene niveles cada vez más difíciles: pasá uno para abrir el siguiente. Cada nivel da hasta tres estrellas: una por pasarlo, otra si perdiste una vida como mucho y otra si lo hiciste rápido.",
+          "En «Infinito» los niveles se inventan solos y nunca se terminan: cada uno que pasás te da una vida más y los puntos se acumulan hasta que te quedes sin vidas.",
+        ],
+      },
+      {
+        title: "Carrera",
+        text: [
+          "Todos juegan el mismo nivel, cada uno en su pantalla, y arriba ven los tableros de los demás en vivo. Gana el que lo termina primero. Si te quedás sin pelotas, el nivel vuelve a empezar desde cero, pero el reloj sigue.",
+          "Cuando alguien termina, el resto tiene 30 segundos más. Si nadie llega, gana el que avanzó más.",
+        ],
+      },
+      {
+        title: "Ataque",
+        text: [
+          "Cada uno en su tablero, y la pared de ladrillos baja sola cada tantos segundos (cada vez más rápido). Si un ladrillo llega a la línea roja, o te quedás sin pelotas, quedás afuera.",
+          "Romper muchos ladrillos entre dos toques de la paleta es un combo: con 4 le mandás una fila de ladrillos duros a otro jugador, con 8 dos filas y con 12 tres. Gana el último que queda en pie.",
+        ],
+      },
+      {
+        title: "Duelo",
+        text: [
+          "Dos jugadores en la misma cancha: uno abajo y otro arriba (cada uno se ve abajo en su pantalla), con ladrillos en el medio. Si la pelota pasa por detrás de tu rival, es gol tuyo. Gana el primero que llega a los goles elegidos.",
+          "Si en la sala estás solo, jugás contra la compu.",
+        ],
+      },
+      {
+        title: "En equipo",
+        text: ["Hasta cuatro en la misma cancha contra un nivel. La parte de abajo se divide: cada uno cuida su franja con su paleta. Las vidas son de todos: si se acaban, pierden juntos."],
+      },
+      {
+        title: "En línea",
+        text: ["«Jugar en línea» te mete en rondas cortas con gente de todos lados, una atrás de la otra: casi siempre carreras y, cada tanto, un ataque. Si llegás en medio de una ronda, mirás y entrás en la siguiente. Si hay poca gente, completan unos bots."],
+      },
+    ],
+    tips: [
+      "Para llegar a un objetivo escondido, buscá el hueco del muro y pegale a la pelota con la punta de la paleta para que salga en diagonal.",
+      "Una pelota que entra detrás de los ladrillos rebota sola un buen rato rompiendo todo: abrí un camino hacia arriba.",
+      "En el ataque, no rompas de a uno: esperá a tener la pelota arriba y dejá que haga combo.",
     ],
   },
   carreras: {

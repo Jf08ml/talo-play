@@ -540,12 +540,35 @@ function Triqui() {
   );
 }
 
+function Ladrillazo() {
+  // Where the ball hits the paddle decides where it goes.
+  const bricks = ["#FFD400", "#FF7A1A", "#FF5FA2", "#8A4DFF", "#2D5BFF", "#00B26B", "#FFD400", "#FF7A1A"];
+  return (
+    <Frame label="Según dónde pega la pelota en la paleta, sale para un lado o para el otro">
+      {bricks.map((c, i) => (
+        <rect key={i} x={36 + i * 31} y={14} width={27} height={12} rx={2} fill={c} />
+      ))}
+      <rect x={129} y={30} width={27} height={12} rx={2} fill="#FF3B30" />
+      <circle cx={142.5} cy={36} r={3.5} fill="none" stroke="#fff" strokeWidth={1.5} />
+      <rect x={100} y={112} width={120} height={10} rx={5} fill="#FFD400" />
+      <Arrow d="M110 108 L 62 64" color="#e2e8f0" />
+      <Arrow d="M160 108 L 160 56" color="#e2e8f0" />
+      <Arrow d="M210 108 L 258 64" color="#e2e8f0" />
+      <circle cx={160} cy={105} r={5} fill="#fff" />
+      <text x={60} y={140} textAnchor="middle" {...TXT}>punta: sale abierta</text>
+      <text x={160} y={140} textAnchor="middle" {...TXT}>centro: derecha</text>
+      <text x={262} y={140} textAnchor="middle" {...TXT}>punta: sale abierta</text>
+    </Frame>
+  );
+}
+
 const ART: Record<ArtId, () => ReactNode> = {
   parchis: Parchis,
   ludo: Ludo,
   backgammon: Backgammon,
   otelo: Otelo,
   triqui: Triqui,
+  ladrillazo: Ladrillazo,
   damas: Damas,
   ajedrez: Ajedrez,
   truco: Truco,
