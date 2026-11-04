@@ -11,6 +11,8 @@ import GameIcon from "./GameIcon";
 import { RulesButton } from "./HowToPlay";
 import VoiceButton from "./VoiceButton";
 import ChatButton from "./ChatButton";
+import { FriendsButton } from "./FriendInvite";
+import { setActivity } from "@/lib/account";
 import { Check, Share2, Volume2, VolumeX } from "lucide-react";
 import { installUnlock, isMuted, setMuted, subscribeMuted } from "@/lib/sfx";
 
@@ -60,6 +62,11 @@ export default function RoomHeader({
 
   // Every room has this header: entering one counts as playing its game (lib/playStats.ts).
   useEffect(() => countPlay(game, roomId), [game, roomId]);
+  // Friends with an account see "Jugando a …" and can join (lib/account.ts).
+  useEffect(() => {
+    setActivity(roomId, game);
+    return () => setActivity(null);
+  }, [game, roomId]);
 
   const invite = async () => {
     trackEvent("share", { game, method: "header" });
@@ -94,6 +101,7 @@ export default function RoomHeader({
         </button>
         <RulesButton game={game} where="partida" compact />
         {!OWN_AUDIO.has(game) && <SoundButton />}
+        {social && <FriendsButton game={game} roomId={roomId} />}
         {social && <ChatButton roomId={roomId} locked={chatLocked} />}
         {social && <VoiceButton roomId={roomId} />}
       </div>

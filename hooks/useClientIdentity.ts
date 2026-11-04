@@ -7,6 +7,7 @@ import { generateClientId, colorForClient } from "@/lib/ids";
 const CLIENT_ID_KEY = "salon.clientId";
 const NAME_KEY = "salon.playerName";
 const NAME_CHANGE_EVENT = "salon:name-changed";
+const ID_CHANGE_EVENT = "salon:id-changed";
 
 // Keys from when the puzzle was the only game; migrated on first read so
 // returning players keep their id (and therefore color) and name.
@@ -25,16 +26,17 @@ function readMigrated(key: string): string | null {
   return legacy;
 }
 
-function subscribeNever() {
-  return () => {};
+function subscribeIdChanges(onStoreChange: () => void) {
+  window.addEventListener(ID_CHANGE_EVENT, onStoreChange);
+  return () => window.removeEventListener(ID_CHANGE_EVENT, onStoreChange);
 }
 
-function subscribeNameChanges(onStoreChange: () => void) {
+export function subscribeNameChanges(onStoreChange: () => void) {
   window.addEventListener(NAME_CHANGE_EVENT, onStoreChange);
   return () => window.removeEventListener(NAME_CHANGE_EVENT, onStoreChange);
 }
 
-function readClientId(): string {
+export function readClientId(): string {
   let id = readMigrated(CLIENT_ID_KEY);
   if (!id) {
     id = generateClientId();
@@ -43,7 +45,7 @@ function readClientId(): string {
   return id;
 }
 
-function readName(): string | null {
+export function readName(): string | null {
   return readMigrated(NAME_KEY);
 }
 
@@ -59,7 +61,7 @@ export interface ClientIdentity {
 
 export function useClientIdentity(): ClientIdentity {
   const clientId = useSyncExternalStore(
-    subscribeNever,
+    subscribeIdChanges,
     readClientId,
     getClientIdServerSnapshot
   );
@@ -75,4 +77,20 @@ export function useClientIdentity(): ClientIdentity {
   }, []);
 
   return { clientId, color: clientId ? colorForClient(clientId) : "#999", name, setName };
+}
+
+/**
+ * Takes on an account's identity on this device (lib/account.ts): its client
+ * id (so the talo and color are the same everywhere) and its name. Never
+ * called inside a room, where the id is the player's seat.
+ */
+export function adoptIdentity(clientId: string, name: string | null) {
+  if (clientId && clientId !== localStorage.getItem(CLIENT_ID_KEY)) {
+    localStorage.setItem(CLIENT_ID_KEY, clientId);
+    window.dispatchEvent(new Event(ID_CHANGE_EVENT));
+  }
+  if (name && name !== localStorage.getItem(NAME_KEY)) {
+    localStorage.setItem(NAME_KEY, name);
+    window.dispatchEvent(new Event(NAME_CHANGE_EVENT));
+  }
 }

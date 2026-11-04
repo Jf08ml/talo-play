@@ -3,6 +3,7 @@ import { Albert_Sans, Dela_Gothic_One, Geist_Mono, JetBrains_Mono } from "next/f
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { SITE_DESCRIPTION, SITE_URL } from "@/lib/seo";
 import { VoiceKeeper } from "@/components/VoiceButton";
+import AccountProvider from "@/components/AccountProvider";
 import "./globals.css";
 
 // Talo's type (talo-handoff/tokens.css): Albert Sans for text and UI, Dela
@@ -76,7 +77,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${ui.variable} ${display.variable} ${code.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {children}
+        <AccountProvider>{children}</AccountProvider>
         <VoiceKeeper />
       </body>
       {process.env.NODE_ENV === "production" && GA_ID && <GoogleAnalytics gaId={GA_ID} />}

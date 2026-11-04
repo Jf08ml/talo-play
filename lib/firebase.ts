@@ -1,4 +1,5 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
+import { getAuth, type Auth } from "firebase/auth";
 import { getDatabase, type Database } from "firebase/database";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
 
@@ -20,10 +21,17 @@ function getFirebaseApp(): FirebaseApp {
 
 let dbInstance: Database | null = null;
 let storageInstance: FirebaseStorage | null = null;
+let authInstance: Auth | null = null;
 
 export function getDb(): Database {
   if (!dbInstance) dbInstance = getDatabase(getFirebaseApp());
   return dbInstance;
+}
+
+/** Accounts (lib/account.ts). Browser only. */
+export function getAuthInstance(): Auth {
+  if (!authInstance) authInstance = getAuth(getFirebaseApp());
+  return authInstance;
 }
 
 export function getStorageInstance(): FirebaseStorage {

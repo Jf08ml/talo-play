@@ -5,6 +5,7 @@ import { Share2 } from "lucide-react";
 import type { GameId } from "@/lib/games";
 import { canNativeShare, copyInvite, shareInvite, whatsappUrl } from "@/lib/share";
 import { trackEvent } from "@/lib/analytics";
+import { FriendInviteList } from "./FriendInvite";
 
 const subscribeNever = () => () => {};
 
@@ -74,6 +75,10 @@ export default function InviteCard({ game, roomId }: { game: GameId; roomId: str
             <Share2 className="h-5 w-5" />
           </button>
         )}
+      </div>
+      <div className="flex flex-col gap-2 border-t border-white/10 pt-3.5">
+        <h4 className="text-[15px] font-bold text-white/80">O invitá a tus amigos de Talo</h4>
+        <FriendInviteList game={game} roomId={roomId} />
       </div>
     </div>
   );

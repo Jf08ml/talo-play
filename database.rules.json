@@ -6,6 +6,79 @@
       "_index": {
         ".indexOn": ".value"
       }
+    },
+    "profiles": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid == $uid",
+        ".validate": "!newData.exists() || newData.hasChildren(['name', 'clientId', 'code'])",
+        "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 24" },
+        "clientId": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 32" },
+        "code": { ".validate": "newData.isString() && root.child('codes').child(newData.val()).val() == $uid" },
+        "$other": { ".validate": false }
+      }
+    },
+    "codes": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.val() == auth.uid) || (data.val() == auth.uid && !newData.exists()))",
+        ".validate": "newData.isString() && $code.length == 6"
+      }
+    },
+    "requests": {
+      "$to": {
+        ".read": "auth != null && auth.uid == $to",
+        ".write": "auth != null && auth.uid == $to && !newData.exists()",
+        "$from": {
+          ".read": "auth != null && auth.uid == $from",
+          ".write": "auth != null && ((auth.uid == $from && $from != $to && !data.exists() && newData.exists() && root.child('profiles').child($to).exists() && !root.child('blocks').child($to).child($from).exists()) || (!newData.exists() && (auth.uid == $from || auth.uid == $to)))",
+          ".validate": "newData.hasChildren(['at'])"
+        }
+      }
+    },
+    "friends": {
+      "$a": {
+        ".read": "auth != null && auth.uid == $a",
+        ".write": "auth != null && auth.uid == $a && !newData.exists()",
+        "$b": {
+          ".write": "auth != null && ((!newData.exists() && (auth.uid == $a || auth.uid == $b)) || (newData.val() == true && ((auth.uid == $a && (root.child('requests').child($a).child($b).exists() || root.child('friends').child($b).child($a).exists())) || (auth.uid == $b && root.child('requests').child($b).child($a).exists()))))",
+          ".validate": "newData.val() == true"
+        }
+      }
+    },
+    "blocks": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid",
+        "$other": { ".validate": "newData.val() == true" }
+      }
+    },
+    "status": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || root.child('friends').child($uid).child(auth.uid).exists())",
+        ".write": "auth != null && auth.uid == $uid",
+        "room": { ".validate": "newData.isString() && newData.val().length <= 8" },
+        "game": { ".validate": "newData.isString() && newData.val().length <= 20" },
+        "at": { ".validate": "newData.isNumber()" },
+        "$other": { ".validate": false }
+      }
+    },
+    "invites": {
+      "$to": {
+        ".read": "auth != null && auth.uid == $to",
+        ".write": "auth != null && auth.uid == $to && !newData.exists()",
+        "$id": {
+          ".write": "auth != null && ((!data.exists() && newData.child('from').val() == auth.uid && root.child('friends').child($to).child(auth.uid).exists()) || (auth.uid == $to && !newData.exists()))",
+          ".validate": "newData.hasChildren(['from', 'name', 'clientId', 'room', 'game', 'at'])",
+          "name": { ".validate": "newData.isString() && newData.val().length <= 24" },
+          "clientId": { ".validate": "newData.isString() && newData.val().length <= 32" },
+          "room": { ".validate": "newData.isString() && newData.val().length <= 8" },
+          "game": { ".validate": "newData.isString() && newData.val().length <= 20" },
+          "at": { ".validate": "newData.isNumber()" },
+          "from": { ".validate": "newData.isString()" },
+          "$other": { ".validate": false }
+        }
+      }
     }
   }
 }

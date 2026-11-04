@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import TaloLogo from "./TaloLogo";
+import FriendsLink from "./FriendsLink";
 
 const NAV = [
   { href: "/#juegos", label: "Juegos" },
@@ -11,7 +12,7 @@ const NAV = [
 /**
  * The top of Talo's light pages (home, lobbies). It sits inside each page's
  * colored hero, so it has no background of its own. `right` goes after the
- * nav (the player's name chip).
+ * nav and "Amigos" (the player's name chip).
  */
 export default function SiteHeader({ right }: { right?: ReactNode }) {
   return (
@@ -36,6 +37,7 @@ export default function SiteHeader({ right }: { right?: ReactNode }) {
             </Link>
           ))}
         </nav>
+        <FriendsLink />
         {right}
       </div>
     </header>
