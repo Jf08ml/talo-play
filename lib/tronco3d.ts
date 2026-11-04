@@ -27,6 +27,10 @@ export interface SceneView {
   logAngle: number;
   logDir: 1 | -1;
   shake: boolean;
+  /** The log is turning (not resting before the opening kick). */
+  rolling: boolean;
+  /** A kick now would work: the ring under me turns green. */
+  kickable: boolean;
   players: PlayerView[];
   /** Where my camera stands (my seat), or null to watch from the front. */
   myAngle: number | null;
@@ -288,16 +292,23 @@ export class TroncoScene {
     this.log.rotation.x = jiggle;
     this.log.position.y = 0.34 + (v.shake ? Math.abs(jiggle) * 0.6 : 0);
     // It rolls as it goes.
-    (this.log.children[0] as THREE.Mesh).rotation.x = v.time * 6 * v.logDir;
+    if (v.rolling) (this.log.children[0] as THREE.Mesh).rotation.x = v.time * 6 * v.logDir;
 
     // Warning under me.
     const me = v.players.find((p) => p.me && p.fallS < 0);
     const warnMat = this.warn.material as THREE.MeshBasicMaterial;
     if (me) {
       this.warn.position.copy(at(me.angle, RING)).setY(0.02);
-      warnMat.opacity = 0.25 + v.danger * 0.7;
-      warnMat.color.set(v.danger > 0.75 ? "#FF3B30" : v.danger > 0.4 ? "#FFD400" : "#FFFFFF");
-      this.warn.scale.setScalar(1.25 - v.danger * 0.25);
+      if (v.kickable) {
+        // Kick now: green and a bit bigger, pulsing.
+        warnMat.opacity = 0.95;
+        warnMat.color.set("#34C759");
+        this.warn.scale.setScalar(1.3 + Math.sin(v.time * 30) * 0.06);
+      } else {
+        warnMat.opacity = 0.25 + v.danger * 0.7;
+        warnMat.color.set(v.danger > 0.75 ? "#FF3B30" : v.danger > 0.4 ? "#FFD400" : "#FFFFFF");
+        this.warn.scale.setScalar(1.25 - v.danger * 0.25);
+      }
     } else {
       warnMat.opacity = 0;
     }

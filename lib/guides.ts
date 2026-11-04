@@ -482,23 +482,24 @@ export const GUIDES: Record<GameId, Guide> = {
         title: "La ronda",
         text: [
           "Todos están parados en ronda y en el medio gira un tronco que barre a cada uno. Tu talo es el de la etiqueta amarilla, y la cámara siempre está detrás tuyo.",
-          "El círculo que tenés en el piso avisa: se pone amarillo cuando el tronco se acerca y rojo cuando está por llegar.",
+          "Arranca uno de la ronda: el tronco descansa a sus pies y lo patea para el lado que quiera. Todos ven para dónde sale y arranca a girar un momento después.",
+          "El círculo que tenés en el piso avisa: se pone amarillo cuando el tronco se acerca, rojo cuando está por llegar y verde (igual que el botón «Patear») justo cuando lo podés patear.",
         ],
         art: "tronco",
       },
       {
         title: "Saltar o patear",
         text: [
-          "«Saltar» (o espacio / flecha arriba): el tronco pasa por abajo tuyo y sigue para el mismo lado, hacia el siguiente. Hay que saltar un poquito antes de que llegue; mientras estás en el aire no podés hacer otra cosa.",
-          "«Patear» (o K / flecha abajo): si lo pateás justo antes de que te toque, el tronco cambia de sentido y vuelve hacia el que te lo mandó. Si lo pateás muy temprano, pateás el aire y te quedás sin tiempo para saltar.",
+          "«Saltar» (o espacio / flecha arriba): el tronco pasa por abajo tuyo y sigue para el mismo lado, hacia el siguiente. Hay que saltar un poquito antes de que llegue; mientras estás en el aire no podés hacer otra cosa, pero apenas tocás el piso ya podés de nuevo.",
+          "«Patear» (o K / flecha abajo): si lo pateás cuando se pone verde, el tronco cambia de sentido y vuelve hacia el que te lo mandó. Si lo pateás muy temprano, pateás el aire y perdés un instante.",
           "Si el tronco te toca con los pies en el piso, te tumba y quedás afuera. Seguís mirando hasta que termine.",
         ],
       },
       {
         title: "Cada vez más difícil",
         text: [
-          "El tronco acelera con el tiempo. Además, cada tanto se da vuelta solo: antes de hacerlo tiembla, así que si lo ves temblar, preparate para cualquier cosa.",
-          "Ojo con saltar si tu vecino puede patearlo: te lo devuelve enseguida y todavía no tocaste el piso.",
+          "El tronco acelera con el tiempo, y solo cambia de sentido cuando alguien lo patea.",
+          "Ojo con saltar si tu vecino puede patearlo: te lo devuelve enseguida y tenés que estar listo para saltar otra vez.",
         ],
       },
       {
@@ -510,7 +511,8 @@ export const GUIDES: Record<GameId, Guide> = {
     ],
     tips: [
       "Patear es arriesgado pero le complica la vida al otro: se lo mandás rápido y quizás no lo espera.",
-      "Si el que está al lado tuyo acaba de saltar, pateáselo de vuelta: no va a poder saltar de nuevo a tiempo.",
+      "Si el que está al lado tuyo acaba de saltar, pateáselo de vuelta: con el tronco rápido le va a costar saltar de nuevo a tiempo.",
+      "Si arrancás vos, mandalo para el lado del que esté más distraído.",
     ],
   },
   ladrillazo: {

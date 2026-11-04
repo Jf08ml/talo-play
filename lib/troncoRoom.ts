@@ -1,14 +1,16 @@
 import { get, onValue, ref, runTransaction, serverTimestamp, set, update, type Unsubscribe } from "firebase/database";
 import { getDb } from "./firebase";
 import { generateRoomCode, PLAYER_COLORS } from "./ids";
-import { makeSeed, seededShuffle } from "./random";
+import { makeSeed, mulberry32, seededShuffle } from "./random";
 import { serverNow } from "./serverTime";
 import { transactState } from "./transact";
 import { kickWorks, seatAngle, type Timeline } from "./tronco";
 
 /**
  * El tronco in a room. The state holds the ring (`roster`, seat = index),
- * the start, the seed, the kicks (server times, in order) and who fell.
+ * the opening (`openAt` = end of the countdown, `opener`, then `startedAt`
+ * and `dir0` once they kick it off), the kicks (server times, in order) and
+ * who fell.
  * The log itself is computed by every phone from those (`lib/tronco.ts`).
  *
  * - A kick is a transaction that checks, with the timeline as the server
@@ -22,6 +24,10 @@ import { kickWorks, seatAngle, type Timeline } from "./tronco";
  */
 
 export const COUNTDOWN_MS = 4000;
+/** The log starts turning this long after the opening kick, so everyone sees which way. */
+export const OPEN_LEAD_MS = 900;
+/** If the opener doesn't kick within this long, it goes by itself to a random side. */
+export const OPEN_WAIT_MS = 7000;
 export const ONLINE_COUNTDOWN_MS = 6000;
 export const RESULTS_MS = 9000;
 export const MAX_RING = 8;
@@ -55,7 +61,13 @@ export interface TroncoState {
   online: boolean;
   seed: number;
   gameNo: number;
+  /** End of the countdown: from then the opener may kick it off. */
+  openAt: number;
+  /** Who kicks it off (the log rests at their feet). */
+  opener: string;
+  /** When the log starts turning (0 = not kicked off yet), and which way. */
   startedAt: number;
+  dir0: 1 | -1;
   pace: number;
   players: Record<string, TroncoPlayer>;
   bots: Record<string, TroncoPlayer>;
@@ -94,7 +106,11 @@ function normalizeState(raw: Partial<TroncoState> | null): TroncoState | null {
     online: raw.online ?? false,
     seed: raw.seed ?? 0,
     gameNo: raw.gameNo ?? 0,
+    // Matches from before the opening kick: the countdown was the start.
+    openAt: raw.openAt ?? raw.startedAt ?? 0,
+    opener: raw.opener ?? "",
     startedAt: raw.startedAt ?? 0,
+    dir0: raw.dir0 === -1 ? -1 : 1,
     pace: raw.pace ?? 1,
     players: raw.players ?? {},
     bots: raw.bots ?? {},
@@ -114,9 +130,19 @@ export function playerInfo(s: TroncoState, id: string): TroncoPlayer {
   return s.players[id] ?? s.bots[id] ?? { name: "?", color: "#64748b" };
 }
 
-export function timelineOf(s: Pick<TroncoState, "startedAt" | "seed" | "kicks" | "pace">, extraKicks: number[] = []): Timeline {
+export function timelineOf(
+  s: Pick<TroncoState, "startedAt" | "seed" | "kicks" | "pace" | "opener" | "roster" | "dir0">,
+  extraKicks: number[] = []
+): Timeline {
   const kicks = extraKicks.length ? [...s.kicks, ...extraKicks].sort((a, b) => a - b) : s.kicks;
-  return { startedAt: s.startedAt, seed: s.seed, kicks, pace: s.pace };
+  // Older matches had no opener: the log started from a seeded angle.
+  const angle0 = s.opener ? seatOf(s, s.opener) : mulberry32(s.seed)() * Math.PI * 2;
+  return { startedAt: s.startedAt || Infinity, angle0, dir0: s.dir0, kicks, pace: s.pace };
+}
+
+/** The side the opener sends it when nobody chooses (a timeout or a bot). */
+export function randomDir(seed: number): 1 | -1 {
+  return mulberry32(seed + 7)() < 0.5 ? 1 : -1;
 }
 
 export function seatOf(s: Pick<TroncoState, "roster">, id: string): number {
@@ -173,16 +199,20 @@ function newGame(s: TroncoState, settings: TroncoSettings, connected: string[], 
   const colors = seededShuffle([...PLAYER_COLORS, "#06b6d4", "#a3e635", "#f43f5e", "#d946ef"], seed + 1);
   const bots: Record<string, TroncoPlayer> = {};
   for (let i = 0; i < count; i++) bots[`bot${i}`] = { name: free[i % free.length], color: colors[i % colors.length] };
+  // People and bots mixed around the ring.
+  const roster = seededShuffle([...people, ...Object.keys(bots)], seed + 2);
   return {
     ...s,
     status: "playing",
     seed,
     gameNo,
-    startedAt: serverNow() + (s.online ? ONLINE_COUNTDOWN_MS : COUNTDOWN_MS),
+    openAt: serverNow() + (s.online ? ONLINE_COUNTDOWN_MS : COUNTDOWN_MS),
+    opener: roster[Math.floor(mulberry32(seed + 3)() * roster.length)],
+    startedAt: 0,
+    dir0: 1,
     pace: PACES[settings.pace] ?? 1,
     bots,
-    // People and bots mixed around the ring.
-    roster: seededShuffle([...people, ...Object.keys(bots)], seed + 2),
+    roster,
     kicks: [],
     kickBy: [],
     out: {},
@@ -199,10 +229,26 @@ export function playAgain(roomId: string, expected: number, settings: TroncoSett
   return mutate(roomId, (s) => (s.status === "finished" && s.gameNo === expected ? newGame(s, settings, connected, s.gameNo + 1) : null));
 }
 
+/**
+ * The opening kick: the opener sends the log to one side (`dir`), and it
+ * starts turning `OPEN_LEAD_MS` later. Anyone may do it for them (`forced`)
+ * once `OPEN_WAIT_MS` went by, so a ring never waits on someone who left.
+ */
+export function openKick(roomId: string, gameNo: number, id: string, dir: 1 | -1, forced = false) {
+  return mutate(roomId, (s) => {
+    if (s.status !== "playing" || s.gameNo !== gameNo || s.startedAt) return null;
+    const now = serverNow();
+    if (now < s.openAt) return null;
+    if (forced ? now < s.openAt + OPEN_WAIT_MS : id !== s.opener || s.out[id]) return null;
+    return { ...s, startedAt: now + OPEN_LEAD_MS, dir0: dir };
+  });
+}
+
 /** A kick at server time t; rejected if the log wasn't coming (or another kick got there first). */
 export function kick(roomId: string, gameNo: number, id: string, t: number) {
   return mutate(roomId, (s) => {
     if (s.status !== "playing" || s.gameNo !== gameNo || s.out[id] || !s.roster.includes(id)) return null;
+    if (!s.startedAt || t <= s.startedAt) return null;
     if (t <= (s.kicks[s.kicks.length - 1] ?? 0)) return null;
     if (!kickWorks(timelineOf(s), t, seatOf(s, id))) return null;
     return { ...s, kicks: [...s.kicks, t], kickBy: [...s.kickBy, id] };

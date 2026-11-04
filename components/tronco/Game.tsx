@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Footprints } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowUp, Footprints } from "lucide-react";
 import {
   botHost,
   isBot,
   kick,
+  openKick,
+  OPEN_LEAD_MS,
+  OPEN_WAIT_MS,
   playerInfo,
+  randomDir,
   reportOut,
   seatOf,
   sendAct,
@@ -15,7 +19,21 @@ import {
   type Act,
   type TroncoState,
 } from "@/lib/troncoRoom";
-import { JUMP_LEN, KICK_RECOVER, airborne, botAct, crossings, kickWorks, logAt, newMind, shaking, timeToReach, type BotMind } from "@/lib/tronco";
+import {
+  JUMP_LEN,
+  KICK_MISS_RECOVER,
+  KICK_RECOVER,
+  airborne,
+  botAct,
+  crossings,
+  kickWorks,
+  logAt,
+  newMind,
+  speedAt,
+  timeToReach,
+  wrapPi,
+  type BotMind,
+} from "@/lib/tronco";
 import { TroncoScene, type PlayerView } from "@/lib/tronco3d";
 import { serverNow } from "@/lib/serverTime";
 import { playSound } from "@/lib/sfx";
@@ -28,6 +46,10 @@ import { useWakeLock } from "@/components/carreras/Controller";
 const JUDGE_DELAY_MS = 160;
 /** A person missing this long falls (so a ring never waits on someone who left). */
 const GONE_MS = 4000;
+/** How fast a jump in the drawn log (a kick that arrived late) fades away, per second. */
+const SMOOTH_RATE = 10;
+/** A bot opener thinks this long before kicking it off. */
+const BOT_OPEN_MS = 1600;
 
 interface Runner {
   jump: number;
@@ -37,7 +59,10 @@ interface Runner {
   mind: BotMind;
 }
 
-/** The match: the 3D ring full screen, and "Saltar" / "Patear". */
+/** The log is turning (the opening kick happened and its lead went by). */
+const rolling = (s: TroncoState, now: number) => s.startedAt > 0 && now >= s.startedAt;
+
+/** The match: the 3D ring full screen, and "Saltar" / "Patear" (or the opening kick's sides). */
 export default function TroncoGame({
   roomId,
   state,
@@ -54,6 +79,7 @@ export default function TroncoGame({
   const g = state.gameNo;
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const kickBtn = useRef<HTMLButtonElement>(null);
   const stateRef = useRef(state);
   const presenceRef = useRef({ presence, presenceLoaded });
   const acts = useRef<Record<string, Act>>({});
@@ -63,6 +89,10 @@ export default function TroncoGame({
   /** Falls seen here before the state has them. */
   const fell = useRef<Record<string, number>>({});
   const absent = useRef<Record<string, number>>({});
+  /** The drawn log: an offset absorbs jumps (late kicks) and fades away. */
+  const shown = useRef({ prev: NaN, dir: 1, speed: 0, offset: 0, at: 0 });
+  /** Last time this phone tried to kick it off for someone else (a bot, or a timeout). */
+  const opening = useRef(0);
   const [flash, setFlash] = useState<{ text: string; key: number } | null>(null);
   const [hint, setHint] = useState(true);
   const playing = state.roster.includes(myId);
@@ -76,10 +106,12 @@ export default function TroncoGame({
     runners.current = new Map();
     pending.current = [];
     fell.current = {};
+    shown.current = { prev: NaN, dir: 1, speed: 0, offset: 0, at: 0 };
+    opening.current = 0;
     return subscribeActs(roomId, g, (a) => (acts.current = a));
   }, [roomId, g]);
   useEffect(() => {
-    const t = setTimeout(() => setHint(false), 12000);
+    const t = setTimeout(() => setHint(false), 15000);
     return () => clearTimeout(t);
   }, []);
   useEffect(() => {
@@ -92,7 +124,7 @@ export default function TroncoGame({
     let r = runners.current.get(id);
     if (!r) {
       const a = acts.current[id];
-      r = { jump: a?.j ?? -1e12, kick: a?.k ?? -1e12, busy: 0, judged: stateRef.current.startedAt, mind: newMind() };
+      r = { jump: a?.j ?? -1e12, kick: a?.k ?? -1e12, busy: 0, judged: 0, mind: newMind() };
       runners.current.set(id, r);
     }
     return r;
@@ -110,7 +142,7 @@ export default function TroncoGame({
   const doJump = (id: string) => {
     const now = serverNow();
     const r = runnerOf(id);
-    if (now < r.busy || isDown(id) || now < stateRef.current.startedAt) return false;
+    if (now < r.busy || isDown(id) || !rolling(stateRef.current, now)) return false;
     r.jump = now;
     r.busy = now + JUMP_LEN * 1000;
     sendAct(roomId, g, id, { j: r.jump, k: r.kick });
@@ -121,13 +153,14 @@ export default function TroncoGame({
     const s = stateRef.current;
     const now = serverNow();
     const r = runnerOf(id);
-    if (now < r.busy || isDown(id) || now < s.startedAt) return null;
-    r.kick = now;
-    r.busy = now + KICK_RECOVER * 1000;
-    sendAct(roomId, g, id, { j: r.jump, k: r.kick });
+    if (now < r.busy || isDown(id) || !rolling(s, now)) return null;
     const tl = timeline();
     const last = tl.kicks[tl.kicks.length - 1] ?? 0;
-    if (!kickWorks(tl, now, seatOf(s, id)) || now <= last) return "miss";
+    const works = kickWorks(tl, now, seatOf(s, id)) && now > last;
+    r.kick = now;
+    r.busy = now + (works ? KICK_RECOVER : KICK_MISS_RECOVER) * 1000;
+    sendAct(roomId, g, id, { j: r.jump, k: r.kick });
+    if (!works) return "miss";
     pending.current.push({ t: now, sentAt: Date.now() });
     kick(roomId, g, id, now)
       .then((res) => {
@@ -135,6 +168,25 @@ export default function TroncoGame({
       })
       .catch(console.error);
     return "ok";
+  };
+
+  /** The opening kick (opener = `id`), sending the log to `dir`. */
+  const doOpen = (id: string, dir: 1 | -1) => {
+    const now = serverNow();
+    const r = runnerOf(id);
+    r.kick = now;
+    sendAct(roomId, g, id, { j: r.jump, k: now });
+    openKick(roomId, g, id, dir).catch(console.error);
+  };
+
+  /** My opening kick, to my left or right as I see it. */
+  const openMe = (side: "left" | "right") => {
+    const s = stateRef.current;
+    if (s.opener !== myId || s.startedAt || serverNow() < s.openAt || isDown(myId)) return;
+    // From behind my seat, looking at the middle, a growing angle goes to the right.
+    doOpen(myId, side === "right" ? 1 : -1);
+    playSound("capture");
+    setFlash({ text: "¡PUM!", key: Date.now() });
   };
 
   const jumpMe = () => {
@@ -156,11 +208,17 @@ export default function TroncoGame({
     }
   };
 
-  // Keys: space / ↑ / W jump, K / ↓ / S kick.
+  // Keys: space / ↑ / W jump, K / ↓ / S kick; ← / A and → / D kick it off.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat) return;
-      if ([" ", "ArrowUp", "w", "W"].includes(e.key)) {
+      if (["ArrowLeft", "a", "A"].includes(e.key)) {
+        e.preventDefault();
+        openMe("left");
+      } else if (["ArrowRight", "d", "D"].includes(e.key)) {
+        e.preventDefault();
+        openMe("right");
+      } else if ([" ", "ArrowUp", "w", "W"].includes(e.key)) {
         e.preventDefault();
         jumpMe();
       } else if (["k", "K", "ArrowDown", "s", "S", "Enter"].includes(e.key)) {
@@ -172,7 +230,7 @@ export default function TroncoGame({
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  // The loop: bots, judging, and drawing.
+  // The loop: the opening, bots, judging, and drawing.
   useEffect(() => {
     const canvas = canvasRef.current;
     const wrap = wrapRef.current;
@@ -198,7 +256,18 @@ export default function TroncoGame({
       const tl = timeline();
       const host = loaded && botHost(Object.keys(pres)) === myId;
 
-      if (live && now > s.startedAt) {
+      // The opening: a bot opener is kicked off by its host; one who takes too long, by anyone.
+      if (live && !s.startedAt && s.opener && now >= s.openAt && Date.now() - opening.current > 1000) {
+        if (host && isBot(s.opener) && now >= s.openAt + BOT_OPEN_MS) {
+          opening.current = Date.now();
+          doOpen(s.opener, randomDir(s.seed));
+        } else if (now >= s.openAt + OPEN_WAIT_MS) {
+          opening.current = Date.now();
+          openKick(roomId, g, myId, randomDir(s.seed), true).catch(console.error);
+        }
+      }
+
+      if (live && rolling(s, now)) {
         const mine = [...(s.roster.includes(myId) ? [myId] : []), ...(host ? s.roster.filter(isBot) : [])];
         for (const id of mine) {
           if (isDown(id)) continue;
@@ -211,8 +280,9 @@ export default function TroncoGame({
           }
           // Judge passes that are old enough.
           const upto = now - JUDGE_DELAY_MS;
-          if (upto > r.judged) {
-            for (const c of crossings(tl, theta, Math.max(r.judged, s.startedAt), upto)) {
+          const from = Math.max(r.judged, s.startedAt);
+          if (upto > from) {
+            for (const c of crossings(tl, theta, from, upto)) {
               if (airborne(r.jump, c)) continue;
               fell.current[id] = c;
               reportOut(roomId, g, id, c).catch(console.error);
@@ -224,7 +294,28 @@ export default function TroncoGame({
         }
       }
 
+      // The drawn log. Before it rolls it nudges toward the side it was kicked;
+      // any jump (another's kick arriving late, the nudge ending) goes into an
+      // offset that fades, so it never snaps. Judging uses the real one.
       const log = logAt(tl, now);
+      let target = log.angle;
+      if (s.startedAt > 0 && now < s.startedAt) {
+        const p = Math.max(0, Math.min(1, 1 - (s.startedAt - now) / OPEN_LEAD_MS));
+        target += log.dir * 0.14 * Math.sin(p * (Math.PI / 2));
+      }
+      const v = shown.current;
+      const clock = performance.now();
+      const dt = Math.min(0.1, (clock - v.at) / 1000);
+      if (Number.isFinite(v.prev)) {
+        const jump = wrapPi(target - v.prev - v.dir * v.speed * dt);
+        if (Math.abs(jump) > 0.03) v.offset -= jump;
+        v.offset = wrapPi(v.offset) * Math.exp(-dt * SMOOTH_RATE);
+      }
+      v.prev = target;
+      v.dir = log.dir;
+      v.speed = rolling(s, now) ? speedAt(tl, now) : 0;
+      v.at = clock;
+
       const players: PlayerView[] = s.roster.map((id) => {
         const local = runners.current.get(id);
         const a = acts.current[id];
@@ -244,11 +335,18 @@ export default function TroncoGame({
         };
       });
       const meIn = s.roster.includes(myId);
-      const ttc = meIn && now > s.startedAt ? timeToReach(tl, now, seatOf(s, myId)) : 9;
+      const meUp = meIn && !isDown(myId);
+      const ttc = meUp && s.startedAt > 0 ? timeToReach(tl, now, seatOf(s, myId)) : 9;
+      const kickable = meUp && rolling(s, now) && kickWorks(tl, now, seatOf(s, myId));
+      const btn = kickBtn.current;
+      if (btn && (btn.dataset.ready === "1") !== kickable) btn.dataset.ready = kickable ? "1" : "";
       scene.frame({
-        logAngle: log.angle,
+        logAngle: target + v.offset,
         logDir: log.dir,
-        shake: live && now > s.startedAt && shaking(tl, now),
+        // It trembles at the opener's feet while waiting for the kick.
+        shake: live && !s.startedAt && now >= s.openAt,
+        rolling: rolling(s, now),
+        kickable,
         players,
         myAngle: meIn ? seatOf(s, myId) : null,
         danger: Math.max(0, Math.min(1, 1 - ttc / 1.1)),
@@ -271,7 +369,7 @@ export default function TroncoGame({
     const id = setInterval(() => {
       const s = stateRef.current;
       const { presence: pres, presenceLoaded: loaded } = presenceRef.current;
-      if (!loaded || serverNow() < s.startedAt) return;
+      if (!loaded || serverNow() < s.openAt) return;
       for (const p of s.roster) {
         if (isBot(p) || s.out[p]) continue;
         if (p in pres) {
@@ -286,8 +384,13 @@ export default function TroncoGame({
   }, [state.status, roomId, g]);
 
   const now = useServerNow(true, 250);
-  const countdown = now && now < state.startedAt ? Math.ceil((state.startedAt - now) / 1000) : 0;
+  const countdown = now && now < state.openAt ? Math.ceil((state.openAt - now) / 1000) : 0;
   useCountdownTicks(countdown || null, 3);
+  const live = state.status === "playing";
+  const waitingOpen = live && !countdown && !state.startedAt && !!state.opener;
+  const iOpen = waitingOpen && state.opener === myId && !state.out[myId];
+  const openLeft = waitingOpen && now ? Math.max(0, Math.ceil((state.openAt + OPEN_WAIT_MS - now) / 1000)) : 0;
+  const openerName = state.opener ? playerInfo(state, state.opener).name : "";
   const standing = state.roster.filter((p) => !state.out[p]).length;
   const meOut = state.out[myId];
   const place = meOut ? state.roster.length - Object.values(state.out).filter((t) => t < meOut).length : 0;
@@ -307,6 +410,21 @@ export default function TroncoGame({
               {countdown}
             </span>
             {playing && <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-bold text-white">Sos el de la etiqueta amarilla</span>}
+            {openerName && (
+              <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-bold text-white">
+                {state.opener === myId ? "Arrancás vos: vas a patear el tronco" : `Arranca ${openerName}`}
+              </span>
+            )}
+          </div>
+        )}
+        {waitingOpen && (
+          <div className="pointer-events-none absolute inset-x-0 top-12 flex flex-col items-center gap-1 px-4 text-center">
+            <span className="rounded-2xl bg-black/65 px-4 py-2 text-base font-bold text-white">
+              {iOpen ? "¡Arrancás vos! Pateá el tronco para un lado" : `${openerName} va a patear el tronco… ¿para qué lado?`}
+            </span>
+            {iOpen && openLeft <= 4 && (
+              <span className="rounded-full bg-black/50 px-3 py-0.5 text-sm font-bold text-white">Si no elegís, sale solo en {openLeft}</span>
+            )}
           </div>
         )}
         {flash && (
@@ -316,9 +434,9 @@ export default function TroncoGame({
             </span>
           </div>
         )}
-        {hint && playing && !countdown && !meOut && (
+        {hint && playing && !countdown && !waitingOpen && !meOut && (
           <p className="pointer-events-none absolute inset-x-4 bottom-3 rounded-xl bg-black/60 px-3 py-2 text-center text-xs font-bold text-white">
-            Cuando el tronco llegue a vos: saltalo, o pateálo para que vuelva para el otro lado. Si te toca, te tumba.
+            Cuando el tronco llegue a vos: saltalo, o pateálo cuando el círculo (y el botón) se ponen verdes para que vuelva para el otro lado.
           </p>
         )}
         {meOut && (
@@ -333,7 +451,29 @@ export default function TroncoGame({
           </p>
         )}
       </div>
-      {playing && (
+      {playing && iOpen && (
+        <div className="grid grid-cols-2 gap-3 bg-talo-ink p-3 pb-[max(12px,env(safe-area-inset-bottom))]">
+          <button
+            onPointerDown={(e) => {
+              e.preventDefault();
+              openMe("left");
+            }}
+            className="flex select-none items-center justify-center gap-2 rounded-2xl bg-talo-hero py-5 text-lg font-bold text-talo-ink active:scale-95"
+          >
+            <ArrowLeft className="h-6 w-6" strokeWidth={3} /> Para allá
+          </button>
+          <button
+            onPointerDown={(e) => {
+              e.preventDefault();
+              openMe("right");
+            }}
+            className="flex select-none items-center justify-center gap-2 rounded-2xl bg-talo-hero py-5 text-lg font-bold text-talo-ink active:scale-95"
+          >
+            Para allá <ArrowRight className="h-6 w-6" strokeWidth={3} />
+          </button>
+        </div>
+      )}
+      {playing && !iOpen && (
         <div className="grid grid-cols-2 gap-3 bg-talo-ink p-3 pb-[max(12px,env(safe-area-inset-bottom))]">
           <button
             onPointerDown={(e) => {
@@ -346,12 +486,13 @@ export default function TroncoGame({
             <ArrowUp className="h-6 w-6" strokeWidth={3} /> Saltar
           </button>
           <button
+            ref={kickBtn}
             onPointerDown={(e) => {
               e.preventDefault();
               kickMe();
             }}
             disabled={!!meOut}
-            className="flex select-none items-center justify-center gap-2 rounded-2xl bg-white py-5 text-lg font-bold text-talo-ink active:scale-95 disabled:opacity-30"
+            className="flex select-none items-center justify-center gap-2 rounded-2xl bg-white py-5 text-lg font-bold text-talo-ink transition-colors duration-75 active:scale-95 disabled:opacity-30 data-[ready=1]:bg-emerald-400"
           >
             <Footprints className="h-6 w-6" strokeWidth={2.5} /> Patear
           </button>
