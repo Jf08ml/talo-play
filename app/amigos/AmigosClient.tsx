@@ -31,7 +31,7 @@ import { colorForClient } from "@/lib/ids";
 import { playerTalo } from "@/lib/talos";
 import { trackEvent } from "@/lib/analytics";
 
-const CARD = "rounded-[24px] border-2 border-talo-ink bg-white p-5 sm:p-6";
+const CARD = "rounded-[24px] border-2 border-talo-ink bg-white p-4 sm:p-6";
 const H2 = "font-display text-[24px] leading-[1.05] sm:text-[28px]";
 const SMALL_BUTTON =
   "flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-3.5 text-[15px] font-bold transition active:scale-[0.97] disabled:opacity-50";
@@ -65,7 +65,8 @@ export default function AmigosClient({ initialCode }: { initialCode: string }) {
   return (
     <div className="talo-light flex flex-1 flex-col">
       <section className="overflow-hidden bg-talo-hero">
-        <SiteHeader right={<PlayerIdentity identity={identity} requireName={false} compact />} />
+        {/* Signed in, the profile card already shows (and renames) you. */}
+        <SiteHeader right={user ? undefined : <PlayerIdentity identity={identity} requireName={false} compact />} />
         <div className="mx-auto flex max-w-[1360px] flex-col gap-3 px-5 pb-10 pt-2 sm:px-10 sm:pb-14 sm:pt-6">
           <h1 className="font-display text-[44px] leading-none tracking-[-0.02em] sm:text-[clamp(56px,6vw,88px)]">Amigos</h1>
           <p className="max-w-xl text-[17px] font-medium leading-[1.4] sm:text-[22px]">
@@ -74,7 +75,7 @@ export default function AmigosClient({ initialCode }: { initialCode: string }) {
         </div>
       </section>
 
-      <div className="mx-auto w-full max-w-[1360px] flex-1 px-5 py-10 sm:px-10 sm:py-14">
+      <div className="mx-auto w-full max-w-[1360px] flex-1 px-4 py-8 sm:px-10 sm:py-14">
         {user === undefined || (user && !profile) ? (
           <p className="text-[17px] text-talo-text-3">Cargando…</p>
         ) : !user ? (
@@ -117,12 +118,12 @@ function SignedIn({
   initialCode: string;
 }) {
   return (
-    <div className="grid items-start gap-6 md:grid-cols-[1fr_1.2fr] lg:gap-10">
-      <div className="flex flex-col gap-6">
+    <div className="grid min-w-0 items-start gap-4 sm:gap-6 md:grid-cols-[1fr_1.2fr] lg:gap-10">
+      <div className="flex min-w-0 flex-col gap-4 sm:gap-6">
         <ProfileCard profile={profile} />
         <AddFriend uid={uid} initialCode={initialCode} />
       </div>
-      <div className="flex flex-col gap-6">
+      <div className="flex min-w-0 flex-col gap-4 sm:gap-6">
         {requests.length > 0 && (
           <section className={CARD}>
             <h2 className={H2}>Solicitudes</h2>
@@ -179,10 +180,10 @@ function ProfileCard({ profile }: { profile: Profile }) {
 
   return (
     <section className={CARD}>
-      <div className="flex items-center gap-4">
-        <PlayerTalo clientId={profile.clientId} size={64} happy label={profile.name} />
+      <div className="flex items-center gap-3 sm:gap-4">
+        <PlayerTalo clientId={profile.clientId} size={56} happy label={profile.name} />
         <div className="min-w-0">
-          <p className="truncate font-display text-[28px] leading-tight">{profile.name}</p>
+          <p className="truncate font-display text-[24px] leading-tight sm:text-[28px]">{profile.name}</p>
           <button onClick={() => setEditing(true)} className="text-[15px] font-bold text-talo-text-3 underline-offset-4 hover:underline">
             Cambiar nombre
           </button>
@@ -191,7 +192,7 @@ function ProfileCard({ profile }: { profile: Profile }) {
       <p className="mt-6 text-[15px] font-bold text-talo-text-3">Tu código de amigo</p>
       <div role="img" aria-label={`Tu código: ${profile.code.split("").join(" ")}`} className="mt-2 flex gap-1.5">
         {profile.code.split("").map((c, i) => (
-          <span key={i} className="grid h-[56px] flex-1 place-items-center rounded-xl bg-talo-surface font-code text-[26px]">
+          <span key={i} className="grid h-12 min-w-0 flex-1 place-items-center rounded-xl bg-talo-surface font-code text-[22px] sm:h-[56px] sm:text-[26px]">
             {c}
           </span>
         ))}
@@ -260,11 +261,11 @@ function AddFriend({ uid, initialCode }: { uid: string; initialCode: string }) {
           autoCapitalize="characters"
           autoComplete="off"
           spellCheck={false}
-          className="min-w-0 flex-1 rounded-xl border-2 border-talo-ink bg-white px-3 font-code text-[22px] uppercase tracking-[0.2em] outline-none placeholder:font-sans placeholder:text-[17px] placeholder:normal-case placeholder:tracking-normal placeholder:text-talo-text-3 focus:bg-talo-surface"
+          className="min-w-0 flex-1 rounded-xl border-2 border-talo-ink bg-white px-3 font-code text-[20px] uppercase tracking-[0.15em] sm:text-[22px] sm:tracking-[0.2em] outline-none placeholder:font-sans placeholder:text-[17px] placeholder:normal-case placeholder:tracking-normal placeholder:text-talo-text-3 focus:bg-talo-surface"
         />
         <button
           disabled={busy || code.length !== 6}
-          className={`${SMALL_BUTTON} min-h-[52px] bg-talo-ink px-5 text-white hover:bg-black`}
+          className={`${SMALL_BUTTON} min-h-[52px] shrink-0 bg-talo-ink px-4 text-white hover:bg-black sm:px-5`}
         >
           <UserPlus className="h-4 w-4" /> Agregar
         </button>
@@ -284,15 +285,32 @@ function useProfile(uid: string): Profile | null {
   return p;
 }
 
-function Row({ clientId, name, sub, happy, children }: { clientId: string; name: string; sub?: ReactNode; happy?: boolean; children: ReactNode }) {
+/** A person with actions. `wide`: on phones the actions go on their own line, sharing it. */
+function Row({
+  clientId,
+  name,
+  sub,
+  happy,
+  wide = false,
+  children,
+}: {
+  clientId: string;
+  name: string;
+  sub?: ReactNode;
+  happy?: boolean;
+  wide?: boolean;
+  children: ReactNode;
+}) {
   return (
-    <li className="flex flex-wrap items-center gap-3 py-3">
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
       <PlayerTalo clientId={clientId} happy={happy} label={name} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-[17px] font-bold">{name}</p>
         {sub}
       </div>
-      <div className="flex shrink-0 gap-2">{children}</div>
+      <div className={`flex max-w-full flex-wrap justify-end gap-2 ${wide ? "basis-full sm:basis-auto [&>*]:flex-1 sm:[&>*]:flex-none" : ""}`}>
+        {children}
+      </div>
     </li>
   );
 }
@@ -308,7 +326,7 @@ function RequestRow({ uid, from }: { uid: string; from: string }) {
       .finally(() => setBusy(false));
   };
   return (
-    <Row clientId={p.clientId} name={p.name} sub={<p className="text-sm text-talo-text-3">Quiere ser tu amigo</p>}>
+    <Row clientId={p.clientId} name={p.name} wide sub={<p className="text-sm text-talo-text-3">Quiere ser tu amigo</p>}>
       <button disabled={busy} onClick={() => act(() => acceptRequest(uid, from))} className={`${SMALL_BUTTON} bg-talo-ink text-white hover:bg-black`}>
         Aceptar
       </button>
@@ -337,6 +355,7 @@ function FriendRow({ uid, friend }: { uid: string; friend: Friend }) {
       clientId={p.clientId}
       name={p.name}
       happy={!!s}
+      wide={confirm}
       sub={
         <p className={`flex items-center gap-1.5 text-sm font-semibold ${s ? "text-talo-green" : "text-talo-text-3"}`}>
           <span className={`h-2 w-2 rounded-full ${s ? "bg-talo-green" : "bg-talo-line"}`} />
@@ -373,8 +392,8 @@ function AccountActions({ profile }: { profile: Profile }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   return (
-    <section className="flex flex-col gap-3 rounded-[24px] bg-talo-surface p-5 sm:p-6">
-      <p className="text-[15px] text-talo-text-3">
+    <section className="flex flex-col gap-3 rounded-[24px] bg-talo-surface p-4 sm:p-6">
+      <p className="break-words text-[15px] text-talo-text-3">
         Entraste con Google{user?.email ? ` (${user.email})` : ""}. Tu cuenta solo sirve para tus amigos; jugar sigue siendo igual.
       </p>
       <div className="flex flex-wrap gap-2">
