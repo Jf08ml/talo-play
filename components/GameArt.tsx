@@ -265,6 +265,21 @@ const SCENES: Record<GameId, ReactNode> = {
       ))}
     </>
   ),
+  tronco: (
+    <>
+      {/* A ring of talos; the log sweeps at one of them, who's in the air. */}
+      <ellipse cx={60} cy={78} rx={52} ry={26} fill={W} opacity={0.35} />
+      <g transform="rotate(-18 60 78)">
+        <rect x={56} y={72} width={58} height={12} rx={6} fill={OR} stroke={INK} strokeWidth={3} />
+        <circle cx={113} cy={78} r={5} fill={Y} stroke={INK} strokeWidth={2} />
+      </g>
+      <circle cx={60} cy={78} r={9} fill={INK} />
+      <T x={8} y={56} w={22} h={24} r={11} c={PINK} look={[1, 0.2]} />
+      <T x={46} y={88} w={24} h={26} r={12} c={GR} look={[0, -1]} />
+      <T x={40} y={30} w={22} h={24} r={11} c={W} look={[0.4, 1]} />
+      <T x={92} y={26} w={26} h={28} r={13} c={Y} look={[-0.4, 1]} expr="sorprendido" />
+    </>
+  ),
   ladrillazo: (
     <>
       {[Y, PINK, OR, W].map((c, i) => (

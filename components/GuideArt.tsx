@@ -592,6 +592,28 @@ function Puentes() {
   );
 }
 
+function Tronco() {
+  // Seen from above: the log sweeps toward you; jump it or kick it back.
+  return (
+    <Frame label="El tronco gira hacia vos: saltalo o pateálo para que vuelva">
+      <circle cx="90" cy="75" r="58" fill="#EAD39C" opacity="0.35" />
+      <circle cx="90" cy="75" r="9" fill="#8A5A2B" />
+      <g transform="rotate(-35 90 75)">
+        <rect x="88" y="69" width="68" height="12" rx="6" fill="#C98A4B" stroke="#6B4220" strokeWidth="2" />
+      </g>
+      {[0, 1, 2, 3, 4, 5].map((k) => {
+        const a = (k / 6) * Math.PI * 2 + Math.PI / 2;
+        return <circle key={k} cx={90 + Math.cos(a) * 58} cy={75 - Math.sin(a) * 58} r="9" fill={k === 5 ? "#FFD400" : "#FF5FA2"} stroke="#111" strokeWidth="2" />;
+      })}
+      <Arrow d="M150 48 A 62 62 0 0 1 145 92" color="#fbbf24" />
+      <text x="232" y="52" textAnchor="middle" {...TXT}>Saltar: pasa por abajo</text>
+      <text x="232" y="70" textAnchor="middle" {...TXT}>y sigue al siguiente</text>
+      <text x="232" y="98" textAnchor="middle" {...TXT}>Patear: vuelve para</text>
+      <text x="232" y="116" textAnchor="middle" {...TXT}>el otro lado</text>
+    </Frame>
+  );
+}
+
 const ART: Record<ArtId, () => ReactNode> = {
   parchis: Parchis,
   ludo: Ludo,
@@ -599,6 +621,7 @@ const ART: Record<ArtId, () => ReactNode> = {
   otelo: Otelo,
   triqui: Triqui,
   ladrillazo: Ladrillazo,
+  tronco: Tronco,
   damas: Damas,
   ajedrez: Ajedrez,
   truco: Truco,

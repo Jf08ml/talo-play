@@ -26,6 +26,7 @@ import {
   Hash,
   BrickWall,
   Waypoints,
+  RotateCw,
   Heart,
   NotebookPen,
   PartyPopper,
@@ -98,6 +99,7 @@ const GAME_ICONS: Record<GameId, LucideIcon> = {
   triqui: Hash,
   ladrillazo: BrickWall,
   puentes: Waypoints,
+  tronco: RotateCw,
 };
 
 export const CONTEXT_ICONS: Record<PlayContext, LucideIcon> = {

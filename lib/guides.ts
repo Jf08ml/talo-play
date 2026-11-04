@@ -31,6 +31,7 @@ export type ArtId =
   | "triqui"
   | "ladrillazo"
   | "puentes"
+  | "tronco"
   | "ludo";
 
 export interface GuideSection {
@@ -472,6 +473,44 @@ export const GUIDES: Record<GameId, Guide> = {
       "En línea, una víbora grande puede cruzarte su cabeza por delante: ¡no le pegues de frente!",
       "Si tu víbora es muy larga, enroscala para proteger la cola.",
       "Acelerá para cruzarte justo delante de otra víbora y cortarla antes de que se escape.",
+    ],
+  },
+  tronco: {
+    goal: "Ser el último talo que queda parado en la ronda.",
+    sections: [
+      {
+        title: "La ronda",
+        text: [
+          "Todos están parados en ronda y en el medio gira un tronco que barre a cada uno. Tu talo es el de la etiqueta amarilla, y la cámara siempre está detrás tuyo.",
+          "El círculo que tenés en el piso avisa: se pone amarillo cuando el tronco se acerca y rojo cuando está por llegar.",
+        ],
+        art: "tronco",
+      },
+      {
+        title: "Saltar o patear",
+        text: [
+          "«Saltar» (o espacio / flecha arriba): el tronco pasa por abajo tuyo y sigue para el mismo lado, hacia el siguiente. Hay que saltar un poquito antes de que llegue; mientras estás en el aire no podés hacer otra cosa.",
+          "«Patear» (o K / flecha abajo): si lo pateás justo antes de que te toque, el tronco cambia de sentido y vuelve hacia el que te lo mandó. Si lo pateás muy temprano, pateás el aire y te quedás sin tiempo para saltar.",
+          "Si el tronco te toca con los pies en el piso, te tumba y quedás afuera. Seguís mirando hasta que termine.",
+        ],
+      },
+      {
+        title: "Cada vez más difícil",
+        text: [
+          "El tronco acelera con el tiempo. Además, cada tanto se da vuelta solo: antes de hacerlo tiembla, así que si lo ves temblar, preparate para cualquier cosa.",
+          "Ojo con saltar si tu vecino puede patearlo: te lo devuelve enseguida y todavía no tocaste el piso.",
+        ],
+      },
+      {
+        title: "Para jugar",
+        text: [
+          "«Contra bots»: vos y la compu, al toque. «En línea»: rondas una atrás de la otra con gente de todos lados (y bots si hay poca). «Amigos»: una sala con link, y bots si quieren completar la ronda.",
+        ],
+      },
+    ],
+    tips: [
+      "Patear es arriesgado pero le complica la vida al otro: se lo mandás rápido y quizás no lo espera.",
+      "Si el que está al lado tuyo acaba de saltar, pateáselo de vuelta: no va a poder saltar de nuevo a tiempo.",
     ],
   },
   ladrillazo: {
