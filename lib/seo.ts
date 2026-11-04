@@ -6,7 +6,7 @@ import { CONTEXTS, GAME_ORDER, GAMES, playersLabel, type GameId, type PlayContex
  * and the FAQ shown on the home. Pure data, built from the catalog in
  * `lib/games.ts`, so a new game gets all of it for free.
  */
-export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://talo-play.vercel.app").replace(/\/$/, "");
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://taloplay.com").replace(/\/$/, "");
 
 export const SITE_NAME = "Talo";
 
