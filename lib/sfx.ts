@@ -79,12 +79,16 @@ export const AUDIO_GESTURES = ["pointerdown", "touchend", "click", "keydown"] as
  * "playback" so the ring/silent switch doesn't mute the game.
  */
 export function primeAudio(c: AudioContext) {
+  let session: { type: string } | undefined;
   try {
-    const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
+    session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
     if (session && session.type !== "playback") session.type = "playback";
   } catch {
     // Not supported: nothing to do.
   }
+  // Older iOS: a silent <audio> playing in a loop puts the page in "playback" too.
+  const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (!session && ios) playSilentLoop();
   if (c.state !== "running") {
     c.resume().catch(() => {});
     try {
@@ -95,6 +99,46 @@ export function primeAudio(c: AudioContext) {
     } catch {
       // Ignore: the next gesture tries again.
     }
+  }
+}
+
+let silentLoop: HTMLAudioElement | null = null;
+
+/** A short silent WAV (8 kHz, 8-bit) as a data URL. */
+function silentWav(): string {
+  const n = 800;
+  const bytes = new Uint8Array(44 + n);
+  const view = new DataView(bytes.buffer);
+  const str = (o: number, s: string) => [...s].forEach((ch, i) => view.setUint8(o + i, ch.charCodeAt(0)));
+  str(0, "RIFF");
+  view.setUint32(4, 36 + n, true);
+  str(8, "WAVEfmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, 8000, true);
+  view.setUint32(28, 8000, true);
+  view.setUint16(32, 1, true);
+  view.setUint16(34, 8, true);
+  str(36, "data");
+  view.setUint32(40, n, true);
+  bytes.fill(128, 44);
+  let bin = "";
+  bytes.forEach((b) => (bin += String.fromCharCode(b)));
+  return `data:audio/wav;base64,${btoa(bin)}`;
+}
+
+function playSilentLoop() {
+  try {
+    if (!silentLoop) {
+      silentLoop = new Audio(silentWav());
+      silentLoop.loop = true;
+      silentLoop.setAttribute("playsinline", "");
+      silentLoop.setAttribute("x-webkit-airplay", "deny");
+    }
+    if (silentLoop.paused) silentLoop.play().catch(() => {});
+  } catch {
+    // No HTML audio: nothing to do.
   }
 }
 
