@@ -30,6 +30,7 @@ export type ArtId =
   | "memotest"
   | "triqui"
   | "ladrillazo"
+  | "puentes"
   | "ludo";
 
 export interface GuideSection {
@@ -77,6 +78,55 @@ export const GUIDES: Record<GameId, Guide> = {
       { title: "La carrera", text: ["Todos arrancan con la misma mezcla después de la cuenta regresiva. Ves el avance de los demás en miniatura. Gana el primero que deja la imagen completa."] },
     ],
     tips: ["Resolvé primero la fila de arriba y la columna de la izquierda; después el tablero que queda es más chico.", "Los números en las fichas indican su orden: 1 va arriba a la izquierda."],
+  },
+  puentes: {
+    goal: "Cruzar todos los puentes del mapa sin pasar dos veces por el mismo, o darse cuenta de que no se puede.",
+    sections: [
+      {
+        title: "Cómo se juega",
+        text: [
+          "Tocá una isla para pararte ahí y empezar. Después tocá los puentes que salen de donde estás: tu talo los cruza y quedan marcados. Los que podés cruzar ahora brillan.",
+          "Cada puente se cruza una sola vez. Si te quedás en una isla sin puentes libres, te trabaste: deshacé los últimos pasos o empezá de nuevo desde otra isla.",
+        ],
+        art: "puentes",
+      },
+      {
+        title: "Nunca el mismo mapa",
+        text: ["Cada mapa se inventa en el momento a partir de un número al azar, así que no hay soluciones para aprenderse: lo que sirve es entender el truco."],
+      },
+      {
+        title: "El truco",
+        text: [
+          "Contá cuántos puentes tiene cada isla. Si todas tienen una cantidad par, podés empezar en cualquiera y vas a terminar donde empezaste. Si exactamente dos tienen una cantidad impar, tenés que salir de una de esas dos y vas a terminar en la otra.",
+          "Si hay más de dos islas con una cantidad impar de puentes, no existe ningún recorrido: es imposible.",
+        ],
+      },
+      {
+        title: "Las trampas",
+        text: [
+          "A medida que subís de nivel aparecen: puentes de una mano (solo se cruzan hacia donde marca la flecha), puentes dobles (con un número: hay que cruzarlos dos veces), una isla de salida o de llegada obligatoria (las banderas) y mapas sin solución.",
+          "Cuando puede tocarte un mapa sin solución aparece el botón «No se puede». Si tenías razón, ganás; si sí se podía, perdés ese mapa (o esa ronda).",
+        ],
+      },
+      {
+        title: "Solo",
+        text: [
+          "«Niveles sin fin»: cada nivel es un poco más grande que el anterior. Ganás hasta tres estrellas según cuántas veces deshiciste o empezaste de nuevo.",
+          "«Reto del día»: el mismo mapa para todo el mundo, con un solo intento. Los más rápidos quedan en el ranking del día.",
+        ],
+      },
+      {
+        title: "Carrera con amigos o en línea",
+        text: [
+          "Todos reciben el mismo mapa a la vez, cada uno en su pantalla. Ves cuántos puentes cruzó cada uno, pero no cuáles. El primero que lo resuelve suma 3 puntos, el segundo 2 y el resto que llega, 1. Cuando alguien termina, los demás tienen 40 segundos.",
+          "Entre ronda y ronda se muestra una forma de resolverlo (o por qué no se podía).",
+        ],
+      },
+    ],
+    tips: [
+      "Antes de tocar nada, contá los puentes de cada isla: te dice dónde empezar y si es posible.",
+      "Dejá para el final los puentes que te encierran: si cruzás el único camino de vuelta a una zona demasiado pronto, no podés volver.",
+    ],
   },
   memotest: {
     goal: "Encontrar todos los pares de cartas iguales.",

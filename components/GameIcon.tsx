@@ -25,6 +25,7 @@ import {
   Grid3x3,
   Hash,
   BrickWall,
+  Waypoints,
   Heart,
   NotebookPen,
   PartyPopper,
@@ -96,6 +97,7 @@ const GAME_ICONS: Record<GameId, LucideIcon> = {
   vibora: Worm,
   triqui: Hash,
   ladrillazo: BrickWall,
+  puentes: Waypoints,
 };
 
 export const CONTEXT_ICONS: Record<PlayContext, LucideIcon> = {

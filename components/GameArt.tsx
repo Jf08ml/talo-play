@@ -502,6 +502,26 @@ const SCENES: Record<GameId, ReactNode> = {
       <Eyes cx={96} cy={54} e={9} body={BL} look={[-1, 0.3]} />
     </>
   ),
+  puentes: (
+    <>
+      {/* A river across, two wooden bridges, and a talo halfway over one. */}
+      <path d="M0 44C28 34 50 58 76 48S108 34 120 40V70C104 64 88 80 62 78S22 64 0 74Z" fill={BL} />
+      <path d="M8 52q8-5 16 0M70 62q8-5 16 0" fill="none" stroke={W} strokeWidth={3} strokeLinecap="round" />
+      {[
+        [22, 32],
+        [84, 28],
+      ].map(([x, y], k) => (
+        <g key={k}>
+          <rect x={x} y={y} width={22} height={54} rx={4} fill={OR} stroke={INK} strokeWidth={3} />
+          {[10, 20, 30, 40].map((d) => (
+            <line key={d} x1={x + 3} y1={y + 2 + d} x2={x + 19} y2={y + 2 + d} stroke={INK} strokeWidth={2} />
+          ))}
+        </g>
+      ))}
+      <T x={78} y={44} w={34} h={30} r={15} c={PINK} look={[-0.6, -0.6]} />
+      <path d="M24 112V90M24 90l16 5-16 5" fill={GR} stroke={INK} strokeWidth={3} strokeLinejoin="round" strokeLinecap="round" />
+    </>
+  ),
   deslizante: (
     <>
       {Array.from({ length: 9 }, (_, i) =>

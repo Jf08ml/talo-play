@@ -562,6 +562,36 @@ function Ladrillazo() {
   );
 }
 
+function Puentes() {
+  // Count each island's bridges: two odd islands = start on one, finish on the other.
+  const isl = [
+    { x: 55, y: 75, n: 3 },
+    { x: 160, y: 40, n: 2 },
+    { x: 160, y: 112, n: 2 },
+    { x: 265, y: 75, n: 3 },
+  ];
+  const br: [number, number][] = [[0, 1], [0, 2], [0, 3], [1, 3], [2, 3]];
+  return (
+    <Frame label="Islas con cantidad impar de puentes: se empieza en una y se termina en la otra">
+      <rect x="0" y="0" width="320" height="150" fill="#4FB3E8" opacity="0.35" />
+      {br.map(([a, b], i) => (
+        <line key={i} x1={isl[a].x} y1={isl[a].y} x2={isl[b].x} y2={isl[b].y} stroke="#C98A4B" strokeWidth="7" />
+      ))}
+      {isl.map((p, i) => (
+        <g key={i}>
+          <circle cx={p.x} cy={p.y} r="22" fill="#7CC86A" />
+          <circle cx={p.x} cy={p.y} r="12" fill={p.n % 2 ? "#FF3B30" : "#fff"} />
+          <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize="12" fontWeight="800" fill={p.n % 2 ? "#fff" : "#111"}>
+            {p.n}
+          </text>
+        </g>
+      ))}
+      <text x="55" y="122" textAnchor="middle" {...TXT}>salís de acá</text>
+      <text x="265" y="122" textAnchor="middle" {...TXT}>…y llegás acá</text>
+    </Frame>
+  );
+}
+
 const ART: Record<ArtId, () => ReactNode> = {
   parchis: Parchis,
   ludo: Ludo,
@@ -586,6 +616,7 @@ const ART: Record<ArtId, () => ReactNode> = {
   sopa: Sopa,
   deslizante: Deslizante,
   memotest: Memotest,
+  puentes: Puentes,
 };
 
 export default function GuideArt({ art }: { art: ArtId }) {

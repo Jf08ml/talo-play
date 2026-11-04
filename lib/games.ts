@@ -6,7 +6,7 @@
  * Every room stores its game in `rooms/{id}/meta/game`; room codes are
  * global, so one code is enough to find any game's room (`lib/roomLookup.ts`).
  */
-export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena" | "yonunca" | "onda" | "telefono" | "ludo" | "lobo" | "ajedrez" | "chinchon" | "truco" | "fuego" | "otelo" | "backgammon" | "oca" | "domino" | "pasteleria" | "vibora" | "triqui" | "ladrillazo";
+export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena" | "yonunca" | "onda" | "telefono" | "ludo" | "lobo" | "ajedrez" | "chinchon" | "truco" | "fuego" | "otelo" | "backgammon" | "oca" | "domino" | "pasteleria" | "vibora" | "triqui" | "ladrillazo" | "puentes";
 
 /** Who you're playing with: the first question the home page asks. */
 export type PlayContext = "pareja" | "amigos" | "grupo" | "solo";
@@ -48,6 +48,21 @@ export const GAMES: Record<GameId, GameInfo> = {
       "Subí una foto y elegí cuántas piezas.",
       "Arrastrá las piezas: encajan solas cuando están cerca de su lugar.",
       "En competencia, cada equipo arma su copia y gana el más rápido.",
+    ],
+  },
+  puentes: {
+    id: "puentes",
+    title: "Puentes",
+    path: "puentes",
+    tagline: "Cruzá todos los puentes sin pasar dos veces por el mismo. Cada mapa se inventa en el momento, así que nunca te lo aprendés: niveles sin fin, reto del día y carreras con amigos o en línea.",
+    minPlayers: 1,
+    maxPlayers: 8,
+    duration: "2–10 min",
+    contexts: ["solo", "pareja", "amigos", "grupo"],
+    howTo: [
+      "Tocá la isla donde querés empezar y después los puentes, uno por uno.",
+      "Cada puente se cruza una sola vez: si te trabás, deshacé o empezá de nuevo.",
+      "Algunos mapas no tienen solución: si te das cuenta, tocá «No se puede» y ganás igual.",
     ],
   },
   deslizante: {
@@ -668,7 +683,7 @@ export const GAMES: Record<GameId, GameInfo> = {
 };
 
 /** Home page order: quickest to start first. */
-export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "yonunca", "onda", "telefono", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "lobo", "vibora", "ladrillazo", "arena", "fuego", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "triqui", "cajas", "naval", "damas", "ajedrez", "generala", "pasteleria", "chinchon", "truco", "ludo", "domino", "backgammon", "otelo", "oca", "tutti", "dibujo", "codigo", "deslizante", "rompecabezas"];
+export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "yonunca", "onda", "telefono", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "lobo", "vibora", "ladrillazo", "arena", "fuego", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "triqui", "cajas", "naval", "damas", "ajedrez", "generala", "pasteleria", "chinchon", "truco", "ludo", "domino", "backgammon", "otelo", "oca", "tutti", "dibujo", "codigo", "deslizante", "puentes", "rompecabezas"];
 
 /** The home's shelves: every game in exactly one, in the order listed. */
 export type GameCategory = "previa" | "palabras" | "mesa" | "cartas" | "accion" | "puzzles";
@@ -679,7 +694,7 @@ export const CATEGORIES: { id: GameCategory; label: string; hint: string; games:
   { id: "accion", label: "Acción y 3D", hint: "Carreras, combates y más", games: ["vibora", "ladrillazo", "fuego", "arena", "carreras3d", "carreras", "pasteleria"] },
   { id: "mesa", label: "Juegos de mesa", hint: "Los clásicos de siempre, uno contra uno o en familia", games: ["cuatro", "triqui", "cajas", "naval", "damas", "ajedrez", "ludo", "backgammon", "otelo", "oca"] },
   { id: "cartas", label: "Cartas y dados", hint: "Para jugar de sobremesa", games: ["truco", "chinchon", "generala", "domino"] },
-  { id: "puzzles", label: "Puzzles y memoria", hint: "Tranquilos, en equipo o a contrarreloj", games: ["memotest", "rompecabezas", "deslizante"] },
+  { id: "puzzles", label: "Puzzles y memoria", hint: "Tranquilos, en equipo o a contrarreloj", games: ["memotest", "puentes", "rompecabezas", "deslizante"] },
 ];
 
 export function roomPath(game: GameId, roomId: string): string {
