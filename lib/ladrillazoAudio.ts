@@ -1,4 +1,4 @@
-import { isMuted } from "./sfx";
+import { AUDIO_GESTURES, isMuted, primeAudio } from "./sfx";
 import type { Events } from "./ladrillazoSim";
 
 /**
@@ -36,15 +36,14 @@ function unlock() {
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
-  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  primeAudio(ctx);
 }
 
-/** Arms the audio on the page's first tap/key (idempotent). */
+/** Arms the audio on the page's taps/keys (idempotent; every gesture retries until it runs). */
 export function installLadriAudio() {
   if (installed || typeof window === "undefined") return;
   installed = true;
-  window.addEventListener("pointerdown", unlock, { capture: true });
-  window.addEventListener("keydown", unlock, { capture: true });
+  for (const ev of AUDIO_GESTURES) window.addEventListener(ev, unlock, { capture: true, passive: true });
 }
 
 function now(): number | null {

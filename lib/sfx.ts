@@ -63,17 +63,48 @@ function unlock() {
     master.gain.value = 0.5;
     master.connect(ctx.destination);
   }
-  if (ctx.state === "suspended") ctx.resume().catch(() => {});
+  primeAudio(ctx);
+}
+
+/**
+ * Gestures that may start audio. iOS only counts touchend/click (not
+ * pointerdown/touchstart), so all of them are listened to.
+ */
+export const AUDIO_GESTURES = ["pointerdown", "touchend", "click", "keydown"] as const;
+
+/**
+ * Inside a gesture: resumes the context (also iOS's "interrupted" state after
+ * a call or another app), plays a silent sample (iOS only unlocks a context
+ * that started a sound within the gesture) and, on Safari 16.4+, asks for
+ * "playback" so the ring/silent switch doesn't mute the game.
+ */
+export function primeAudio(c: AudioContext) {
+  try {
+    const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession;
+    if (session && session.type !== "playback") session.type = "playback";
+  } catch {
+    // Not supported: nothing to do.
+  }
+  if (c.state !== "running") {
+    c.resume().catch(() => {});
+    try {
+      const src = c.createBufferSource();
+      src.buffer = c.createBuffer(1, 1, 22050);
+      src.connect(c.destination);
+      src.start(0);
+    } catch {
+      // Ignore: the next gesture tries again.
+    }
+  }
 }
 
 let installed = false;
-/** Arms the audio on the page's first tap/key (idempotent). */
+/** Arms the audio on the page's taps/keys (idempotent; every gesture retries until it runs). */
 export function installUnlock() {
   if (installed || typeof window === "undefined") return;
   installed = true;
   const go = () => unlock();
-  window.addEventListener("pointerdown", go, { capture: true });
-  window.addEventListener("keydown", go, { capture: true });
+  for (const ev of AUDIO_GESTURES) window.addEventListener(ev, go, { capture: true, passive: true });
 }
 
 /** One enveloped oscillator note. */
