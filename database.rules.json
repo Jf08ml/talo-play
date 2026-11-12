@@ -7,6 +7,33 @@
         ".indexOn": ".value"
       }
     },
+    "community": {
+      "votes": {
+        ".read": true,
+        "$candidate": {
+          "$client": {
+            ".write": "$candidate.length <= 24 && $client.length <= 32",
+            ".validate": "newData.val() == true"
+          }
+        }
+      }
+    },
+    "feedback": {
+      "$id": {
+        ".write": "!data.exists()",
+        ".validate": "newData.hasChildren(['kind', 'text', 'clientId', 'at'])",
+        "kind": { ".validate": "newData.val() == 'juego' || newData.val() == 'mejora' || newData.val() == 'error' || newData.val() == 'otro'" },
+        "text": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 1000" },
+        "clientId": { ".validate": "newData.isString() && newData.val().length <= 32" },
+        "contact": { ".validate": "newData.isString() && newData.val().length <= 80" },
+        "name": { ".validate": "newData.isString() && newData.val().length <= 24" },
+        "uid": { ".validate": "auth != null && newData.val() == auth.uid" },
+        "page": { ".validate": "newData.isString() && newData.val().length <= 100" },
+        "ua": { ".validate": "newData.isString() && newData.val().length <= 200" },
+        "at": { ".validate": "newData.val() == now" },
+        "$other": { ".validate": false }
+      }
+    },
     "profiles": {
       "$uid": {
         ".read": "auth != null",

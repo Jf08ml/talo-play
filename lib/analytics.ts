@@ -12,6 +12,7 @@ import type { GameId } from "./games";
  * - `login`: someone signed in to an account; `add_friend`: a friend request was sent or accepted.
  * - `edit_room`: the host saved new settings from the waiting room.
  * - `open_rules`: someone opened a game's full instructions (`where`: lobby / sala / partida).
+ * - `feedback`: someone sent an idea from the community page (`kind`: juego / mejora / error / otro).
  */
 type Events = {
   create_room: { game: GameId; mode?: string };
@@ -22,6 +23,7 @@ type Events = {
   add_friend: { result: string };
   edit_room: { game: GameId };
   open_rules: { game: GameId; where: "lobby" | "sala" | "partida" };
+  feedback: { kind: string };
 };
 
 export function trackEvent<E extends keyof Events>(name: E, params: Events[E]): void {

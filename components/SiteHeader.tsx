@@ -2,11 +2,13 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import TaloLogo from "./TaloLogo";
 import FriendsLink from "./FriendsLink";
+import IdeasButton from "./IdeasButton";
 
 const NAV = [
   { href: "/#juegos", label: "Juegos" },
   { href: "/#como", label: "Cómo funciona" },
   { href: "/#faq", label: "Ayuda" },
+  { href: "/ideas", label: "Ideas" },
 ];
 
 /**
@@ -44,7 +46,7 @@ export default function SiteHeader({ right }: { right?: ReactNode }) {
   );
 }
 
-/** Black footer with the giant yellow wordmark. */
+/** Black footer with the giant yellow wordmark. Also brings the floating "Ideas" button to every light page. */
 export function SiteFooter() {
   return (
     <footer className="relative overflow-hidden bg-talo-ink text-white">
@@ -53,6 +55,9 @@ export function SiteFooter() {
           <span>Talo · Juegos para jugar juntos</span>
           <span>Gratis, sin registrarse y desde el celular.</span>
         </div>
+        <Link href="/ideas" className="w-fit text-[17px] font-semibold text-talo-hero underline-offset-4 hover:underline">
+          ¿Qué juego sumamos? Dejanos tu idea
+        </Link>
         <p
           aria-hidden="true"
           className="-mb-[0.16em] font-display text-[clamp(150px,27vw,400px)] leading-none tracking-[-0.03em] text-talo-hero"
@@ -60,6 +65,7 @@ export function SiteFooter() {
           talo
         </p>
       </div>
+      <IdeasButton />
     </footer>
   );
 }
