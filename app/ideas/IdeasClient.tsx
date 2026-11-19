@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { Check, Heart, Send } from "lucide-react";
 import SiteHeader, { SiteFooter } from "@/components/SiteHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { Talo } from "@/components/Talo";
+import NamePrompt from "@/components/NamePrompt";
 import { useAccount } from "@/components/AccountProvider";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import { isFirebaseConfigured } from "@/lib/firebase";
@@ -119,19 +121,26 @@ function VoteNextGame() {
 }
 
 function FeedbackForm() {
-  const { clientId, name } = useClientIdentity();
+  const { clientId, name, setName } = useClientIdentity();
   const { user } = useAccount();
+  // Ideas carry the same nick used to play: without one, it's asked on "Mandar".
+  const [askName, setAskName] = useState(false);
   const [kind, setKind] = useState<FeedbackKind>("juego");
   const [text, setText] = useState("");
   const [contact, setContact] = useState("");
   const [state, setState] = useState<"idle" | "busy" | "sent" | "wait" | "error">("idle");
 
-  const submit = async (e: FormEvent) => {
+  const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!text.trim() || !clientId) return;
+    if (!name) setAskName(true);
+    else send(name);
+  };
+
+  const send = async (nick: string) => {
     setState("busy");
     try {
-      const res = await sendFeedback({ kind, text, contact, name: name ?? undefined, clientId, uid: user?.uid });
+      const res = await sendFeedback({ kind, text, contact, name: nick, clientId, uid: user?.uid });
       setState(res);
       if (res === "sent") {
         setText("");
@@ -163,6 +172,19 @@ function FeedbackForm() {
 
   return (
     <section className={CARD}>
+      {askName &&
+        createPortal(
+          <NamePrompt
+            submitLabel="Mandar"
+            onCancel={() => setAskName(false)}
+            onSubmit={(nick) => {
+              setName(nick);
+              setAskName(false);
+              send(nick);
+            }}
+          />,
+          document.body,
+        )}
       <h2 className={H2}>Contanos</h2>
       <form onSubmit={submit} className="mt-4 flex flex-col gap-4">
         <fieldset>
@@ -228,7 +250,7 @@ function FeedbackForm() {
         {state === "wait" && <p className="text-[15px] font-semibold text-talo-text-2">Esperá unos segundos antes de mandar otra.</p>}
         {state === "error" && <p className="text-[15px] font-semibold text-red-700">No se pudo mandar. Probá de nuevo en un rato.</p>}
         <p className="flex items-center gap-1.5 text-[14px] text-talo-text-3">
-          <Check className="h-4 w-4" /> Solo lo leemos nosotros; no se publica.
+          <Check className="h-4 w-4" /> Solo lo leemos nosotros; no se publica.{name && ` Lo mandás como ${name}.`}
         </p>
       </form>
     </section>
