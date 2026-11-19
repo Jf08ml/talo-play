@@ -4,6 +4,7 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import { SITE_DESCRIPTION, SITE_URL } from "@/lib/seo";
 import { VoiceKeeper } from "@/components/VoiceButton";
 import AccountProvider from "@/components/AccountProvider";
+import PageViews from "@/components/PageViews";
 import "./globals.css";
 
 // Talo's type (talo-handoff/tokens.css): Albert Sans for text and UI, Dela
@@ -79,6 +80,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <AccountProvider>{children}</AccountProvider>
         <VoiceKeeper />
+        <PageViews />
       </body>
       {process.env.NODE_ENV === "production" && GA_ID && <GoogleAnalytics gaId={GA_ID} />}
     </html>

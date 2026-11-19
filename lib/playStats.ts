@@ -9,6 +9,8 @@
 import { get, ref, runTransaction } from "firebase/database";
 import { getDb } from "./firebase";
 import { GAME_ORDER, type GameId } from "./games";
+import { countDailyPlay } from "./dailyStats";
+import { trackEvent } from "./analytics";
 
 const STATS = "rooms/_stats/plays";
 
@@ -22,6 +24,8 @@ export function countPlay(game: GameId, roomId: string) {
     return; // no storage: don't count, rather than count every visit
   }
   runTransaction(ref(getDb(), `${STATS}/${game}`), (n: number | null) => (n ?? 0) + 1).catch(() => {});
+  countDailyPlay(game);
+  trackEvent("enter_room", { game });
 }
 
 export type PlayStats = Partial<Record<GameId, number>>;

@@ -1,5 +1,6 @@
 import { sendGAEvent } from "@next/third-parties/google";
 import type { GameId } from "./games";
+import { countDailyRoom } from "./dailyStats";
 
 /**
  * Google Analytics events. GA only loads in production builds (`app/layout.tsx`),
@@ -7,16 +8,23 @@ import type { GameId } from "./games";
  *
  * - `create_room`: someone created a room from a lobby.
  * - `join_room`: someone reached a room's waiting screen (`host` = it's the creator).
+ * - `enter_room`: someone entered a room (once per browser and room, `lib/playStats.ts`): the
+ *   best "people playing" count, rooms without a waiting room (puzzle, online worlds) included.
  * - `start_game`: "Empezar partida" was tapped.
  * - `share`: an invite was sent (`method`: whatsapp / nativo / copiar / header / amigo).
  * - `login`: someone signed in to an account; `add_friend`: a friend request was sent or accepted.
  * - `edit_room`: the host saved new settings from the waiting room.
  * - `open_rules`: someone opened a game's full instructions (`where`: lobby / sala / partida).
  * - `feedback`: someone sent an idea from the community page (`kind`: juego / mejora / error / otro).
+ * - `page_not_found`: a 404 (`path` = the broken URL).
+ *
+ * `create_room` also counts the room in our own per-day stats (lib/dailyStats.ts).
+ * Page views are sent by `PageViews` (components/PageViews.tsx), not here.
  */
 type Events = {
   create_room: { game: GameId; mode?: string };
   join_room: { game: GameId; host: boolean };
+  enter_room: { game: GameId };
   start_game: { game: GameId; players: number };
   share: { game: GameId; method: "whatsapp" | "nativo" | "copiar" | "header" | "amigo" };
   login: { method: "google" };
@@ -24,10 +32,12 @@ type Events = {
   edit_room: { game: GameId };
   open_rules: { game: GameId; where: "lobby" | "sala" | "partida" };
   feedback: { kind: string };
+  page_not_found: { path: string };
 };
 
 export function trackEvent<E extends keyof Events>(name: E, params: Events[E]): void {
   if (process.env.NODE_ENV !== "production") return;
+  if (name === "create_room") countDailyRoom((params as Events["create_room"]).game);
   try {
     sendGAEvent("event", name, params);
   } catch {
