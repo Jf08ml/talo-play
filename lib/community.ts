@@ -1,4 +1,4 @@
-import { onValue, push, ref, remove, serverTimestamp, set, type Unsubscribe } from "firebase/database";
+import { get, onValue, push, ref, remove, serverTimestamp, set, type Unsubscribe } from "firebase/database";
 import { getDb } from "./firebase";
 
 /**
@@ -8,8 +8,10 @@ import { getDb } from "./firebase";
  * - `community/votes/{candidate}/{clientId}` = true — public, one per browser
  *   and candidate (a toggle). Informal: nothing stops someone from making up
  *   client ids, so read it as a hint, not an election.
- * - `feedback/{pushId}` — write-only; nobody can read it from the app, only the
- *   Firebase console.
+ * - `feedback/{pushId}` — write-only for everyone; only accounts listed in
+ *   `admins/{uid}` = true can read it (the "Ideas" section of `/estadisticas`).
+ *   `admins` can't be written from the app: add one from the Firebase console
+ *   or with `firebase database:set /admins/{uid} true`.
  */
 
 export interface Candidate {
@@ -86,4 +88,29 @@ export async function sendFeedback(f: Feedback): Promise<"sent" | "wait"> {
   await push(ref(getDb(), "feedback"), data);
   lastSent = Date.now();
   return "sent";
+}
+
+/** A sent message, as the admins read it. */
+export interface FeedbackEntry extends Feedback {
+  id: string;
+  page?: string;
+  /** Server time (ms). */
+  at: number;
+}
+
+/** Whether this account may read the feedback (`admins/{uid}`). */
+export async function isAdmin(uid: string): Promise<boolean> {
+  try {
+    return (await get(ref(getDb(), `admins/${uid}`))).val() === true;
+  } catch {
+    return false; // the rules deny reading someone else's entry
+  }
+}
+
+/** Every message, newest first. Only works for admins. */
+export async function getFeedback(): Promise<FeedbackEntry[]> {
+  const raw = ((await get(ref(getDb(), "feedback"))).val() ?? {}) as Record<string, Omit<FeedbackEntry, "id">>;
+  return Object.entries(raw)
+    .map(([id, f]) => ({ ...f, id }))
+    .sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
 }

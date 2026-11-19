@@ -7,6 +7,17 @@ import { isFirebaseConfigured } from "@/lib/firebase";
 import { GAMES, type GameId } from "@/lib/games";
 import { getPlayStats, type PlayStats } from "@/lib/playStats";
 import { getDailyStats, isOwnBrowser, OWN_BROWSER_KEY, statsDay, type DayStats } from "@/lib/dailyStats";
+import { useAccount } from "@/components/AccountProvider";
+import { signInWithGoogle } from "@/lib/account";
+import {
+  CANDIDATES,
+  FEEDBACK_KINDS,
+  getFeedback,
+  isAdmin,
+  subscribeVotes,
+  type FeedbackEntry,
+  type Votes,
+} from "@/lib/community";
 
 // Two series in the daily chart, validated as a pair (CVD ΔE 35, normal 45);
 // the orange is under 3:1 on white, so every value is also in the table below.
@@ -83,6 +94,7 @@ export default function StatsClient() {
         ) : (
           <Dashboard days={days} allTime={allTime} />
         )}
+        <Community />
         <OwnBrowser />
       </div>
       <SiteFooter />
@@ -339,6 +351,115 @@ function OwnBrowser() {
         <input type="checkbox" checked={own} onChange={toggle} className="h-5 w-5 accent-talo-ink" />
         No contar este navegador
       </label>
+    </section>
+  );
+}
+
+/** Votes for the next game (public) and the messages sent from /ideas (admins only). */
+function Community() {
+  const { user } = useAccount();
+  const [votes, setVotes] = useState<Votes>({});
+  const [admin, setAdmin] = useState<boolean | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackEntry[] | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => subscribeVotes(setVotes), []);
+  useEffect(() => {
+    if (!user) return;
+    let alive = true;
+    isAdmin(user.uid).then(async (ok) => {
+      if (!alive) return;
+      setAdmin(ok);
+      if (!ok) return;
+      try {
+        const f = await getFeedback();
+        if (alive) setFeedback(f);
+      } catch {
+        if (alive) setError(true);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [user]);
+
+  const ranking = CANDIDATES.map((c) => ({ ...c, n: Object.keys(votes[c.id] ?? {}).length })).sort((a, b) => b.n - a.n);
+  const maxVotes = Math.max(1, ...ranking.map((r) => r.n));
+  const kindLabel = (k: string) => FEEDBACK_KINDS.find((f) => f.id === k)?.label ?? k;
+
+  return (
+    <section className={CARD}>
+      <h2 className={H2}>Ideas</h2>
+
+      <h3 className="mt-4 text-[15px] font-bold">Votos para el próximo juego</h3>
+      <ul className="mt-2 flex flex-col gap-1.5">
+        {ranking.map((r) => (
+          <li key={r.id} className="grid grid-cols-[minmax(0,10rem)_1fr] items-center gap-3 text-[15px]">
+            <span className="truncate font-semibold">{r.title}</span>
+            <span className="flex items-center gap-2">
+              <span
+                className="block h-3 rounded-r-[4px] bg-talo-ink"
+                style={{ width: `${(r.n / maxVotes) * 100}%`, minWidth: r.n ? 3 : 0 }}
+                aria-hidden="true"
+              />
+              <span className="font-mono tabular-nums">{r.n}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <h3 className="mt-6 text-[15px] font-bold">Mensajes</h3>
+      {user === undefined ? (
+        <p className="mt-2 text-talo-text-2">Cargando…</p>
+      ) : !user ? (
+        <div className="mt-2 flex flex-col items-start gap-3">
+          <p className="text-[15px] text-talo-text-2">Los mensajes son privados: entrá con la cuenta de Google de Talo.</p>
+          <button
+            type="button"
+            onClick={() => signInWithGoogle().catch(() => {})}
+            className="rounded-full bg-talo-ink px-5 py-2.5 text-[15px] font-bold text-white hover:bg-black"
+          >
+            Entrar con Google
+          </button>
+        </div>
+      ) : admin === null ? (
+        <p className="mt-2 text-talo-text-2">Revisando tu cuenta…</p>
+      ) : !admin ? (
+        <div className="mt-2 text-[15px] text-talo-text-2">
+          <p>Esta cuenta no puede leer los mensajes. Para habilitarla, el id de la cuenta va en la base:</p>
+          <code className="mt-2 block w-fit select-all rounded-lg bg-talo-surface px-3 py-2 font-code text-[14px] text-talo-ink">
+            firebase database:set /admins/{user.uid} true
+          </code>
+        </div>
+      ) : error ? (
+        <p className="mt-2">No se pudieron leer los mensajes.</p>
+      ) : !feedback ? (
+        <p className="mt-2 text-talo-text-2">Cargando…</p>
+      ) : feedback.length === 0 ? (
+        <p className="mt-2 text-talo-text-2">Todavía no llegó ninguno.</p>
+      ) : (
+        <ul className="mt-2 flex flex-col">
+          {feedback.map((f) => (
+            <li key={f.id} className="border-t border-talo-line py-3">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-talo-text-2">
+                <span className="rounded-full bg-talo-surface px-2.5 py-0.5 font-bold text-talo-ink">{kindLabel(f.kind)}</span>
+                <span>{f.name || "Sin nombre"}</span>
+                <span>
+                  {new Date(f.at).toLocaleString("es-AR", {
+                    timeZone: "America/Argentina/Buenos_Aires",
+                    day: "numeric",
+                    month: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </span>
+                {f.contact && <span className="select-all">Contacto: {f.contact}</span>}
+              </div>
+              <p className="mt-1 whitespace-pre-wrap text-[16px]">{f.text}</p>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
