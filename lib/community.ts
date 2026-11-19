@@ -30,7 +30,6 @@ export const CANDIDATES: Candidate[] = [
   { id: "palabras", title: "Palabras cruzadas", text: "Armar palabras en un tablero con letras al azar." },
   { id: "sudoku", title: "Sudoku en equipo", text: "Uno compartido, o una carrera a ver quién termina." },
   { id: "hockey", title: "Hockey de mesa", text: "Uno contra uno, rápido, con el dedo." },
-  { id: "minigolf", title: "Minigolf", text: "Hoyos por turnos, gana el de menos golpes." },
   { id: "damaschinas", title: "Damas chinas", text: "La estrella de seis puntas, de 2 a 6." },
 ];
 

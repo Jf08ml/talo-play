@@ -4,6 +4,7 @@ import {
   Car,
   CarFront,
   Dices,
+  Flag,
   Flame,
   Hand,
   PersonStanding,
@@ -100,6 +101,7 @@ const GAME_ICONS: Record<GameId, LucideIcon> = {
   ladrillazo: BrickWall,
   puentes: Waypoints,
   tronco: RotateCw,
+  minigolf: Flag,
 };
 
 export const CONTEXT_ICONS: Record<PlayContext, LucideIcon> = {

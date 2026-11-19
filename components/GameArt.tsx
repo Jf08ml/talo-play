@@ -517,6 +517,19 @@ const SCENES: Record<GameId, ReactNode> = {
       <Eyes cx={96} cy={54} e={9} body={BL} look={[-1, 0.3]} />
     </>
   ),
+  minigolf: (
+    <>
+      {/* A green with a white border, the cup and its flag, a ball rolling to it and a talo with a putter. */}
+      <path d={shape(6, 40, 108, 70, 26)} fill={GR} stroke={W} strokeWidth={5} />
+      <circle cx={88} cy={74} r={7} fill={INK} />
+      <path d="M88 74V30" stroke={W} strokeWidth={3} strokeLinecap="round" />
+      <path d="M88 30l20 7-20 7z" fill={Y} stroke={INK} strokeWidth={2.5} strokeLinejoin="round" />
+      <circle cx={54} cy={84} r={6} fill={W} stroke={INK} strokeWidth={2} />
+      <path d="M40 88h-6M42 82h-8" stroke={W} strokeWidth={2.5} strokeLinecap="round" opacity={0.8} />
+      <T x={10} y={16} w={30} h={52} r={[15, 15, 8, 8]} c={OR} look={[1, 0.6]} />
+      <path d="M36 50l10 34h8" fill="none" stroke={INK} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
+    </>
+  ),
   puentes: (
     <>
       {/* A river across, two wooden bridges, and a talo halfway over one. */}

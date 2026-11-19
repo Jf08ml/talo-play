@@ -129,6 +129,54 @@ export const GUIDES: Record<GameId, Guide> = {
       "Dejá para el final los puentes que te encierran: si cruzás el único camino de vuelta a una zona demasiado pronto, no podés volver.",
     ],
   },
+  minigolf: {
+    goal: "Meter la pelota en el hoyo con la menor cantidad de golpes, hoyo por hoyo, en todo el recorrido.",
+    sections: [
+      {
+        title: "Cómo se tira",
+        text: [
+          "Apoyá el dedo (o el mouse) en cualquier parte de la cancha y arrastrá hacia atrás, como si estiraras una gomera: la pelota sale para el lado contrario. Cuanto más arrastrás, más fuerte le pegás; los puntos te muestran para dónde va y qué tan fuerte.",
+          "Soltá para pegarle. Si te arrepentís, volvé el dedo cerca de donde empezaste y soltá: no cuenta.",
+          "La pelota rebota en las paredes y en los bordes blancos. Si llega al hoyo muy rápido, pega en el borde y sigue de largo: hay que llegar con la fuerza justa.",
+        ],
+      },
+      {
+        title: "La cancha",
+        text: [
+          "Pendientes: las flechas marcan para dónde cae la pelota.",
+          "Arena: frena mucho.",
+          "Agua: te cuesta un golpe extra y la pelota vuelve a donde le pegaste.",
+          "Molinos: giran sin parar; pasá cuando dejan el hueco.",
+          "Bumpers: los talos rosas te devuelven la pelota con más fuerza.",
+        ],
+      },
+      {
+        title: "Los golpes",
+        text: [
+          "Cada hoyo tiene un par: los golpes que debería llevarte. Menos es un birdie (uno menos) o un águila (dos menos); más es un bogey. En un golpe, ¡hoyo en uno!",
+          "Como máximo son 8 golpes por hoyo: si no entra antes, anotás 8 y pasás al siguiente.",
+        ],
+      },
+      {
+        title: "Solo",
+        text: [
+          "«Recorrido de 9 hoyos»: elegís la dificultad y cada recorrido se inventa en el momento. Se guarda tu mejor resultado contra el par.",
+          "«Hoyos del día»: los mismos 3 hoyos para todo el mundo, con un solo intento. Los de menos golpes quedan en el ranking del día.",
+        ],
+      },
+      {
+        title: "Con amigos o en línea",
+        text: [
+          "Todos juegan el mismo hoyo a la vez, cada uno en su pantalla, y ven las pelotas de los demás. Cuando todos terminan (o se acaba el tiempo) pasan juntos al siguiente; el que no llegó anota sus golpes más 2.",
+          "Gana el que suma menos golpes en todo el recorrido. Se pueden sumar bots, cada uno con su puntería.",
+        ],
+      },
+    ],
+    tips: [
+      "En los tiros largos, apuntá a dejarla cerca del hoyo antes que a meterla: un tiro fácil después vale más que un rebote loco.",
+      "Usá las paredes: un tiro en diagonal que rebota puede doblar una curva en un solo golpe.",
+    ],
+  },
   memotest: {
     goal: "Encontrar todos los pares de cartas iguales.",
     sections: [
