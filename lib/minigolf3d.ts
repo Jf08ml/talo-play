@@ -199,7 +199,8 @@ export class GolfScene {
       } else {
         const m = new THREE.Mesh(g, mat(z.kind === "sand" ? COLORS.sand : COLORS.water, { side: THREE.DoubleSide }));
         m.rotation.x = Math.PI / 2;
-        m.position.y = z.kind === "water" ? y - 0.02 : y;
+        // Just over the green (the green's top is at 0), like the sand.
+        m.position.y = y;
         m.receiveShadow = true;
         this.scene.add(m);
       }
