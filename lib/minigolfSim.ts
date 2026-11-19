@@ -168,6 +168,43 @@ export function distAt(h: Hole, x: number, y: number): number {
   return d + Math.hypot(x - cx, y - cy) * 0.5;
 }
 
+/**
+ * A point about `ahead` units further along the way to the cup (down the
+ * distance field), for a camera that looks where the route goes rather than
+ * straight at a cup behind a wall. The cup itself when it's that close.
+ */
+export function aheadPoint(h: Hole, x: number, y: number, ahead = 6): Vec {
+  let c = Math.floor(x / h.res);
+  let r = Math.floor(y / h.res);
+  const at = (cc: number, rr: number) => (cc < 0 || rr < 0 || cc >= h.cols || rr >= h.rows ? Infinity : h.dist[rr * h.cols + cc]);
+  // Off the field (hugging a wall): start from the nearest cell that has a distance.
+  if (!Number.isFinite(at(c, r))) {
+    let best: [number, number] | null = null;
+    for (let d = 1; d <= 3 && !best; d++)
+      for (let dr = -d; dr <= d; dr++)
+        for (let dc = -d; dc <= d; dc++) if (!best && Number.isFinite(at(c + dc, r + dr))) best = [c + dc, r + dr];
+    if (!best) return h.cup;
+    [c, r] = best;
+  }
+  const start = at(c, r);
+  if (start <= ahead) return h.cup;
+  while (start - at(c, r) < ahead) {
+    let next: [number, number] | null = null;
+    let low = at(c, r);
+    for (let dr = -1; dr <= 1; dr++)
+      for (let dc = -1; dc <= 1; dc++) {
+        const v = at(c + dc, r + dr);
+        if (v < low) {
+          low = v;
+          next = [c + dc, r + dr];
+        }
+      }
+    if (!next) break;
+    [c, r] = next;
+  }
+  return { x: (c + 0.5) * h.res, y: (r + 0.5) * h.res };
+}
+
 export function millAngle(m: Mill, t: number): number {
   return m.phase + m.w * t;
 }

@@ -31,6 +31,7 @@ import { useServerNow } from "@/hooks/useServerNow";
 import { formatTime } from "@/components/ladrillazo/Hud";
 import GolfField, { type OtherBall } from "./GolfField";
 import Scorecard from "./Scorecard";
+import ViewButtons, { useGolfView } from "./ViewButtons";
 
 /** A bot waits this long (s) after its ball stops before the next shot, plus a bit. */
 const BOT_THINK = [1.4, 2.6];
@@ -49,6 +50,7 @@ export default function RoomGame({
   presence: PresenceMap;
   presenceLoaded: boolean;
 }) {
+  const look = useGolfView();
   const g = state.gameNo;
   const holeNo = state.hole;
   const hk = holeKey(state);
@@ -178,6 +180,7 @@ export default function RoomGame({
               </span>
             )}
             {left > 0 && left < 60 && <span className="font-mono text-[#ff8a80]">{formatTime(left)}</span>}
+            {!between && <ViewButtons g={look} />}
           </div>
         </div>
 
@@ -196,6 +199,8 @@ export default function RoomGame({
             hole={hole}
             clock={clock}
             color={playerInfo(state, myId).color}
+            view={look.view}
+            shadows={look.shadows}
             enabled={playing && countdown === 0 && myDone === undefined}
             watching={!playing}
             initial={mine ?? null}

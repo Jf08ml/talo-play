@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Maximize2, Navigation } from "lucide-react";
 import { botShot, DT, noEvents, startRoll, stepRoll, type Hole, type Roll } from "@/lib/minigolfSim";
 import { drawHole, fitHole, screenToHoleVec, type DrawBall, type Fit } from "@/lib/minigolfDraw";
 import { golfAudio, installGolfAudio } from "@/lib/minigolfAudio";
 import { shotPose, type BallPose } from "@/lib/minigolf";
+import type { CameraMode, GolfScene } from "@/lib/minigolf3d";
 
 /** Another player's ball (or a bot's), as published. */
 export interface OtherBall {
@@ -43,6 +45,8 @@ export default function GolfField({
   initial,
   others,
   watching = false,
+  view = "2d",
+  shadows = false,
   onShot,
   onDone,
   children,
@@ -57,6 +61,10 @@ export default function GolfField({
   others?: Record<string, OtherBall>;
   /** Only watching: no ball of mine. */
   watching?: boolean;
+  /** Flat from above, or the 3D scene. */
+  view?: "2d" | "3d";
+  /** Real-time shadows in 3D. */
+  shadows?: boolean;
   /** Right after hitting: the shot and where it will end (penalties counted). */
   onShot?: (pose: BallPose) => void;
   /** Holed out (strokes) or out of strokes (`MAX_STROKES`), when the ball stops. */
@@ -65,11 +73,15 @@ export default function GolfField({
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const glRef = useRef<HTMLCanvasElement>(null);
+  const sceneRef = useRef<GolfScene | null>(null);
   const [fit, setFit] = useState<Fit>({ scale: 1, w: 0, h: 0, rot: false, holeH: 0 });
   const fitRef = useRef(fit);
-  const props = useRef({ hole, clock, color, enabled, others, watching, onShot, onDone });
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const [camMode, setCamMode] = useState<CameraMode>("seguir");
+  const props = useRef({ hole, clock, color, enabled, others, watching, view, onShot, onDone });
   useEffect(() => {
-    props.current = { hole, clock, color, enabled, others, watching, onShot, onDone };
+    props.current = { hole, clock, color, enabled, others, watching, view, onShot, onDone };
   });
 
   // My ball.
@@ -97,10 +109,41 @@ export default function GolfField({
       const next = fitHole(props.current.hole, r.width, r.height);
       fitRef.current = next;
       setFit(next);
+      setBox({ w: Math.floor(r.width), h: Math.floor(r.height) });
     });
     ro.observe(wrap);
     return () => ro.disconnect();
   }, []);
+
+  // The 3D scene, loaded only when it's wanted.
+  useEffect(() => {
+    if (view !== "3d") return;
+    let alive = true;
+    let scene: GolfScene | null = null;
+    import("@/lib/minigolf3d").then(({ GolfScene }) => {
+      if (!alive || !glRef.current) return;
+      try {
+        scene = new GolfScene(glRef.current, props.current.hole, shadows);
+      } catch (err) {
+        console.error(err);
+        return;
+      }
+      sceneRef.current = scene;
+      const r = wrapRef.current?.getBoundingClientRect();
+      if (r) scene.setSize(Math.floor(r.width), Math.floor(r.height));
+    });
+    return () => {
+      alive = false;
+      sceneRef.current = null;
+      scene?.dispose();
+    };
+  }, [view, shadows]);
+  useEffect(() => {
+    if (box.w && box.h) sceneRef.current?.setSize(box.w, box.h);
+  }, [box]);
+  useEffect(() => {
+    sceneRef.current?.setMode(camMode);
+  }, [camMode]);
 
   // Others' balls: replay each new shot.
   useEffect(() => {
@@ -183,28 +226,29 @@ export default function GolfField({
         }
       }
 
-      const canvas = canvasRef.current;
-      const ctx = canvas?.getContext("2d");
-      const f = fitRef.current;
-      if (ctx && f.w) {
-        const dpr = Math.min(2, window.devicePixelRatio || 1);
-        if (canvas!.width !== Math.round(f.w * dpr) || canvas!.height !== Math.round(f.h * dpr)) {
-          canvas!.width = Math.round(f.w * dpr);
-          canvas!.height = Math.round(f.h * dpr);
+      const balls: DrawBall[] = [];
+      for (const [id, g] of ghosts.current) balls.push({ id, x: g.x, y: g.y, color: o?.[id]?.color ?? "#999", sunk: g.sunk });
+      const sunk = m.fin && !m.roll && m.pendingEnd?.end === "in";
+      const mineSunk = sunk || (m.fin && !m.roll && initial?.end === "in" && !m.pendingEnd);
+      if (!props.current.watching) balls.push({ id: "me", x: m.x, y: m.y, color: props.current.color, me: true, sunk: mineSunk });
+      const a = aim.current;
+      const holeT = m.roll ? m.roll.t : props.current.clock();
+      const aimView = a && !m.roll ? { x: m.x, y: m.y, ...a } : null;
+      const scene = props.current.view === "3d" ? sceneRef.current : null;
+      if (scene) {
+        scene.render({ t: holeT, balls, aim: aimView, bumped: bumped.current, now: t / 1000 });
+      } else if (props.current.view === "2d") {
+        const canvas = canvasRef.current;
+        const ctx = canvas?.getContext("2d");
+        const f = fitRef.current;
+        if (ctx && f.w) {
+          const dpr = Math.min(2, window.devicePixelRatio || 1);
+          if (canvas!.width !== Math.round(f.w * dpr) || canvas!.height !== Math.round(f.h * dpr)) {
+            canvas!.width = Math.round(f.w * dpr);
+            canvas!.height = Math.round(f.h * dpr);
+          }
+          drawHole(ctx, { hole: h, t: holeT, balls, aim: aimView, bumped: bumped.current }, f, dpr, t / 1000);
         }
-        const balls: DrawBall[] = [];
-        for (const [id, g] of ghosts.current) balls.push({ id, x: g.x, y: g.y, color: o?.[id]?.color ?? "#999", sunk: g.sunk });
-        const sunk = m.fin && !m.roll && m.pendingEnd?.end === "in";
-        const mineSunk = sunk || (m.fin && !m.roll && initial?.end === "in" && !m.pendingEnd);
-        if (!props.current.watching) balls.push({ id: "me", x: m.x, y: m.y, color: props.current.color, me: true, sunk: mineSunk });
-        const a = aim.current;
-        drawHole(
-          ctx,
-          { hole: h, t: m.roll ? m.roll.t : props.current.clock(), balls, aim: a && !m.roll ? { x: m.x, y: m.y, ...a } : null, bumped: bumped.current },
-          f,
-          dpr,
-          t / 1000
-        );
       }
       raf = requestAnimationFrame(loop);
     };
@@ -216,7 +260,7 @@ export default function GolfField({
 
   // Pull back and release.
   useEffect(() => {
-    const canvas = canvasRef.current;
+    const canvas = wrapRef.current;
     if (!canvas) return;
     let drag: { id: number; x: number; y: number } | null = null;
     const canShoot = () => {
@@ -235,8 +279,10 @@ export default function GolfField({
       const dy = drag.y - e.clientY;
       const len = Math.hypot(dx, dy);
       const f = fitRef.current;
-      const full = Math.max(90, Math.min(f.w, f.h) * 0.42);
-      const v = screenToHoleVec(f, dx, dy);
+      const scene = props.current.view === "3d" ? sceneRef.current : null;
+      const r = canvas.getBoundingClientRect();
+      const full = Math.max(90, Math.min(scene ? r.width : f.w, scene ? r.height : f.h) * 0.42);
+      const v = scene ? scene.screenToHoleVec(dx, dy) : screenToHoleVec(f, dx, dy);
       aim.current = len < 8 ? null : { angle: Math.atan2(v.y, v.x), power: Math.min(1, len / full) };
     };
     const up = (e: PointerEvent) => {
@@ -289,13 +335,23 @@ export default function GolfField({
   }, []);
 
   return (
-    <div ref={wrapRef} className="relative flex min-h-0 w-full flex-1 items-center justify-center">
-      <div className="relative" style={{ width: fit.w, height: fit.h }}>
-        <canvas
-          ref={canvasRef}
-          style={{ width: fit.w, height: fit.h, touchAction: "none" }}
-          className="block select-none rounded-xl ring-1 ring-white/10"
-        />
+    <div ref={wrapRef} className="relative flex min-h-0 w-full flex-1 touch-none select-none items-center justify-center">
+      <div className="relative" style={view === "3d" ? { width: box.w, height: box.h } : { width: fit.w, height: fit.h }}>
+        {view === "3d" ? (
+          <>
+            <canvas ref={glRef} style={{ width: box.w, height: box.h }} className="block rounded-xl ring-1 ring-white/10" />
+            <button
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => setCamMode((m) => (m === "seguir" ? "todo" : "seguir"))}
+              className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded-xl bg-black/55 px-2.5 py-1.5 text-xs font-bold text-white"
+            >
+              {camMode === "seguir" ? <Maximize2 className="h-3.5 w-3.5" /> : <Navigation className="h-3.5 w-3.5" />}
+              {camMode === "seguir" ? "Ver todo" : "Seguir la pelota"}
+            </button>
+          </>
+        ) : (
+          <canvas ref={canvasRef} style={{ width: fit.w, height: fit.h }} className="block rounded-xl ring-1 ring-white/10" />
+        )}
         {children}
       </div>
     </div>

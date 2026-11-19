@@ -12,6 +12,7 @@ import { MuteButton } from "@/components/ladrillazo/Field";
 import { formatTime } from "@/components/ladrillazo/Hud";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import GolfField from "./GolfField";
+import ViewButtons, { useGolfView } from "./ViewButtons";
 import Scorecard from "./Scorecard";
 import { STARTED, readDay, saveDay, saveRecord } from "./progress";
 
@@ -24,6 +25,7 @@ const msSince = (t: number) => Math.round(performance.now() - t);
 /** Solo: a 9-hole course (new every time) or today's holes, with no room and no Firebase until the daily top. */
 export default function SoloGame({ start, onExit }: { start: SoloStart; onExit: () => void }) {
   const identity = useClientIdentity();
+  const look = useGolfView();
   const daily = start.kind === "daily";
   const [seed, setSeed] = useState(makeSeed);
   const holes = useMemo(
@@ -115,9 +117,10 @@ export default function SoloGame({ start, onExit }: { start: SoloStart; onExit: 
         </button>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold">
-            {finished ? "Recorrido terminado" : `Hoyo ${idx + 1} de ${holes.length} · Par ${hole.par}`}
+            {finished ? "Recorrido terminado" : `Hoyo ${idx + 1} de ${holes.length}`}
           </p>
           <p className="text-xs text-white/60">
+            {!finished && `Par ${hole.par} · `}
             {label}
             {card.length && !finished ? ` · llevás ${total} (${toPar(total, parSoFar)})` : ""}
           </p>
@@ -128,6 +131,7 @@ export default function SoloGame({ start, onExit }: { start: SoloStart; onExit: 
             <span className="text-[10px] text-white/50">{strokes === 1 ? "golpe" : "golpes"}</span>
           </span>
         )}
+        {!finished && <ViewButtons g={look} />}
         <MuteButton />
       </header>
 
@@ -186,6 +190,8 @@ export default function SoloGame({ start, onExit }: { start: SoloStart; onExit: 
             hole={hole}
             clock={clock}
             color={identity.color}
+            view={look.view}
+            shadows={look.shadows}
             enabled={holeDone === null}
             onShot={(p) => setStrokes(p.s)}
             onDone={(n) => done(n)}
