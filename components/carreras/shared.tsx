@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import {
   CARS,
+  BOT_NAMES,
   FINISH_GRACE_MS,
   backToWaiting,
   closeRace,
+  isBotSeat,
   racersOf,
   rematch,
   seatOf,
@@ -18,7 +20,7 @@ import type { PresenceMap } from "@/lib/presence";
 import { serverNow } from "@/lib/serverTime";
 import { formatRaceTime } from "@/lib/format";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
-import { Shuffle } from "lucide-react";
+import { Shuffle, Timer } from "lucide-react";
 
 export function CarDot({ seat, className = "h-5 w-8" }: { seat: Seat; className?: string }) {
   return (
@@ -30,6 +32,7 @@ export function CarDot({ seat, className = "h-5 w-8" }: { seat: Seat; className?
 }
 
 export function driverName(state: CarrerasState, seat: Seat, myId = ""): string {
+  if (isBotSeat(state, seat)) return `${BOT_NAMES[seat]} (bot)`;
   const id = state.seats[seat];
   if (id && id === myId) return "Vos";
   return state.players[id]?.name ?? CARS[seat].label;
@@ -44,7 +47,8 @@ export function useRaceCloser(roomId: string, state: CarrerasState | null, prese
   const gameNo = state?.gameNo ?? 0;
   const firstAt = state?.firstAt ?? 0;
   const pending = state && racing ? racersOf(state).filter((seat) => state.results[seat] === undefined) : [];
-  const othersGone = presenceLoaded && pending.every((seat) => !(state!.seats[seat] in presence));
+  // Bots are always there (whoever runs them is): with bots still driving, the grace time decides.
+  const othersGone = presenceLoaded && pending.every((seat) => !isBotSeat(state!, seat) && !(state!.seats[seat] in presence));
 
   useEffect(() => {
     if (!racing) return;
@@ -120,6 +124,10 @@ export function Standings({
   randomTrack?: boolean;
 }) {
   const rows = standings(state);
+  const fastest = rows.reduce<{ seat: Seat; ms: number } | null>((best, { seat }) => {
+    const ms = state.best[seat];
+    return ms && (!best || ms < best.ms) ? { seat, ms } : best;
+  }, null);
   const mySeat = seatOf(state, myId);
   const winner = state.winner || null;
   const title = !winner
@@ -153,10 +161,27 @@ export function Standings({
                 <span className="text-slate-500"> · {state.wins[state.seats[seat]]} ganadas</span>
               ) : null}
             </span>
-            <span className="font-mono text-slate-300">{ms !== null ? formatRaceTime(ms) : "no llegó"}</span>
+            <span className="flex flex-col items-end leading-tight">
+              <span className="font-mono text-slate-300">{ms !== null ? formatRaceTime(ms) : "no llegó"}</span>
+              {state.best[seat] ? (
+                <span
+                  className={`font-mono ${big ? "text-sm" : "text-[11px]"} ${fastest?.seat === seat ? "font-bold text-fuchsia-300" : "text-slate-500"}`}
+                  title={fastest?.seat === seat ? "Vuelta más rápida" : "Mejor vuelta"}
+                >
+                  <Timer className="mr-0.5 inline h-3 w-3" />
+                  {formatRaceTime(state.best[seat]!)}
+                </span>
+              ) : null}
+            </span>
           </li>
         ))}
       </ol>
+      {fastest && (
+        <p className={`${big ? "text-base" : "text-xs"} text-slate-400`}>
+          Vuelta más rápida: <span className="font-semibold text-fuchsia-300">{driverName(state, fastest.seat, myId)}</span>{" "}
+          <span className="font-mono">{formatRaceTime(fastest.ms)}</span>
+        </p>
+      )}
       <div className="flex w-full max-w-xs flex-col gap-2">
         <button onClick={() => rematch(roomId, state.gameNo)} className={`${big ? "text-lg" : ""} ${PRIMARY_BUTTON}`}>
           Revancha

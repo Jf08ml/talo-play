@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import {
   CARS,
+  BOT_NAMES,
   SEATS,
   backToWaiting,
   getCarrerasMeta,
+  isBotSeat,
   newTrack,
   normalizeMeta,
   racersOf,
@@ -25,15 +27,20 @@ import {
   type CarrerasState,
   type LiveCar,
   type Seat,
+  LapClock,
 } from "@/lib/carreras";
 import {
   MAX_SPEED,
+  botInput,
   collideCars,
   getTrack,
   gridCar,
   lapsDone,
+  newBrain,
   stepCar,
   trackLabel,
+  wrongWay,
+  type BotBrain,
   type Car,
   type CarInput,
 } from "@/lib/carrerasTrack";
@@ -51,7 +58,8 @@ import { Standings, driverName, useCameraMode, useRaceCloser, useSoundSetting } 
 import { TaloMark } from "@/components/TaloLogo";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { PRIMARY_BUTTON } from "@/components/ui";
-import { Eye, Maximize, Minimize, Shuffle, Smartphone, Volume2, VolumeX, X } from "lucide-react";
+import { Bot, Eye, Maximize, Minimize, Shuffle, Smartphone, Volume2, VolumeX, X } from "lucide-react";
+import { formatRaceTime } from "@/lib/format";
 import { useQuality } from "@/hooks/useQuality";
 import QualityButton from "@/components/QualityButton";
 
@@ -71,6 +79,9 @@ interface Engine {
   cars: Partial<Record<Seat, Car>>;
   reported: Set<Seat>;
   lastLive: string;
+  brains: Partial<Record<Seat, BotBrain>>;
+  laps: LapClock;
+  wrong: string;
 }
 
 /** Cars go back on the grid when this changes: a new race, or who's seated while waiting. */
@@ -97,6 +108,8 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
   const [presence, setPresence] = useState<PresenceMap>({});
   const [presenceLoaded, setPresenceLoaded] = useState(false);
   const [hud, setHud] = useState<Partial<Record<Seat, LiveCar>>>({});
+  const [flash, setFlash] = useState<Partial<Record<Seat, Flash>>>({});
+  const [wrong, setWrong] = useState<string>("");
   const [camera, toggleCamera] = useCameraMode();
   const [quality, toggleQuality] = useQuality("carreras.calidad");
   const [sound, toggleSound] = useSoundSetting();
@@ -205,8 +218,12 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
     let last = performance.now();
     let acc = 0;
 
-    const inputFor = (seat: Seat, s: CarrerasState): CarInput => {
+    const inputFor = (seat: Seat, s: CarrerasState, pace: number): CarInput => {
       if (s.status === "finished" || s.results[seat] !== undefined) return { steer: 0, brake: false, gas: false };
+      if (isBotSeat(s, seat)) {
+        const brain = (engine!.brains[seat] ??= newBrain(s.botLevel, SEATS.indexOf(seat)));
+        return botInput(engine!.cars[seat]!, track, brain, STEP, pace);
+      }
       const k = KEYS[seat];
       const keys = keysRef.current;
       const has = (list: string[]) => list.some((key) => keys.has(key));
@@ -228,22 +245,36 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
       if (!engine || engine.key !== engineKey(s)) {
         const cars: Partial<Record<Seat, Car>> = {};
         for (const seat of carSeats(s)) cars[seat] = gridCar(track, SEATS.indexOf(seat));
-        engine = { key: engineKey(s), cars, reported: new Set(), lastLive: "" };
+        engine = { key: engineKey(s), cars, reported: new Set(), lastLive: "", brains: {}, laps: new LapClock(), wrong: "" };
         scene?.setCars({});
+        setFlash({});
+        setWrong("");
       }
       const seats = SEATS.filter((seat) => engine!.cars[seat]);
-      scene?.setCars(Object.fromEntries(seats.map((seat) => [seat, { color: CARS[seat].color, label: driverName(s, seat) }])));
+      scene?.setCars(
+        Object.fromEntries(
+          seats.map((seat) => [seat, { color: CARS[seat].color, accent: CARS[seat].accent, number: SEATS.indexOf(seat) + 1, label: driverName(s, seat) }])
+        )
+      );
 
       const now = serverNow();
       const moving = s.status !== "waiting" && now >= s.startedAt;
       const lights = cues.countdown(s.gameNo, s.status === "waiting" ? -1 : Math.max(0, Math.ceil((s.startedAt - now) / 1000)));
       scene?.setStartLights(lights);
+      // A light rubber band for bots: a bit slower far ahead of the people, a bit faster far behind.
+      const people = seats.filter((seat) => !isBotSeat(s, seat));
+      const lead = people.length ? Math.max(...people.map((seat) => engine!.cars[seat]!.progress)) : 0;
+      const paceOf = (seat: Seat) => {
+        if (!people.length) return 1;
+        const gap = (engine!.cars[seat]!.progress - lead) / track.length;
+        return gap > 0.2 ? 0.92 : gap < -0.25 ? 1.06 : 1;
+      };
       if (moving) {
         acc += dt;
         while (acc >= STEP) {
           acc -= STEP;
           for (const seat of seats) {
-            const hit = stepCar(engine.cars[seat]!, inputFor(seat, s), track, STEP);
+            const hit = stepCar(engine.cars[seat]!, inputFor(seat, s, paceOf(seat)), track, STEP);
             if (cues.hit(seat, hit)) scene?.impact(seat, hit);
           }
           for (let i = 0; i < seats.length; i++) {
@@ -260,16 +291,32 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
         acc = 0;
       }
 
-      // Finish line, once per car; a chime on every other lap.
+      // Finish line, once per car; a chime on every other lap; lap times and the last lap on each view.
       if (s.status === "racing" && moving) {
+        const raceMs = now - s.startedAt;
+        let wrongNow = "";
         for (const seat of seats) {
           const car = engine.cars[seat]!;
-          cues.lap(seat, lapsDone(car, track), laps);
+          const done = lapsDone(car, track);
+          cues.lap(seat, done, laps);
+          const lapMs = engine.laps.update(seat, done, raceMs);
+          if (lapMs && done < laps) {
+            const best = engine.laps.best(seat) === lapMs;
+            setFlash((f) => ({
+              ...f,
+              [seat]: { text: done === laps - 1 ? "¡Última vuelta!" : `Vuelta ${done + 1}`, sub: formatRaceTime(lapMs), best, at: now },
+            }));
+          }
+          if (!engine.reported.has(seat) && !isBotSeat(s, seat) && wrongWay(car, track)) wrongNow += seat;
           if (engine.reported.has(seat) || car.progress < laps * track.length) continue;
           engine.reported.add(seat);
           audio?.finish(engine.reported.size === 1);
           scene?.confetti(seat);
-          reportFinish(roomId, s.gameNo, seat, now - s.startedAt).catch(console.error);
+          reportFinish(roomId, s.gameNo, seat, raceMs, engine.laps.best(seat)).catch(console.error);
+        }
+        if (wrongNow !== engine.wrong) {
+          engine.wrong = wrongNow;
+          setWrong(wrongNow);
         }
       }
 
@@ -356,7 +403,7 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
 
   if (!configured) return <FirebaseSetupNotice />;
 
-  const here = (seat: Seat) => !!state?.seats[seat] && state.seats[seat] in presence;
+  const here = (seat: Seat) => (!!state && isBotSeat(state, seat)) || (!!state?.seats[seat] && state.seats[seat] in presence);
   const left = state ? Math.ceil((state.startedAt - now) / 1000) : 0;
   const counting = state?.status === "racing" && now > 0 && left > 0;
   const go = state?.status === "racing" && now > 0 && left <= 0 && now - state.startedAt < 900;
@@ -377,7 +424,7 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
         <>
           {/* One tag per split-screen view, in the same order the 3D views are laid out. */}
           {is3d && state.status !== "waiting" && (
-            <ViewTags seats={onTrack} state={state} hud={hud} laps={meta.laps} here={here} />
+            <ViewTags seats={onTrack} state={state} hud={hud} laps={meta.laps} here={here} flash={flash} wrong={wrong} now={now} />
           )}
 
           <div className="pointer-events-none relative z-10 flex items-start justify-between gap-3 p-3">
@@ -390,7 +437,7 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
             {!is3d && state.status !== "waiting" && (
               <div className="flex flex-wrap justify-center gap-2">
                 {onTrack.map((seat) => (
-                  <SeatTag key={seat} seat={seat} state={state} hud={hud} laps={meta.laps} here={here} />
+                  <SeatTag key={seat} seat={seat} state={state} hud={hud} laps={meta.laps} here={here} flash={flash[seat]} wrong={wrong.includes(seat)} now={now} />
                 ))}
               </div>
             )}
@@ -451,20 +498,39 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
   );
 }
 
+/** A lap just done (its time) or the last lap starting, shown for a few seconds over a car's view. */
+interface Flash {
+  text: string;
+  sub: string;
+  best: boolean;
+  /** Server time it appeared. */
+  at: number;
+}
+
+const FLASH_MS = 2800;
+
 function SeatTag({
   seat,
   state,
   hud,
   laps,
   here,
+  flash,
+  wrong,
+  now,
 }: {
   seat: Seat;
   state: CarrerasState;
   hud: Partial<Record<Seat, LiveCar>>;
   laps: number;
   here: (seat: Seat) => boolean;
+  flash?: Flash;
+  wrong?: boolean;
+  now: number;
 }) {
   const done = state.results[seat] !== undefined;
+  const bot = isBotSeat(state, seat);
+  const showFlash = !!flash && now - flash.at < FLASH_MS;
   return (
     <div
       className="flex items-center gap-3 rounded-xl bg-slate-950/70 px-4 py-2 backdrop-blur"
@@ -472,31 +538,38 @@ function SeatTag({
     >
       <span className="font-display text-3xl font-bold">{hud[seat] ? `${hud[seat]!.place}°` : "–"}</span>
       <div>
-        <p className="max-w-40 truncate text-sm font-semibold" style={{ color: CARS[seat].color }}>
-          {driverName(state, seat)}
+        <p className="flex max-w-44 items-center gap-1 truncate text-sm font-semibold" style={{ color: CARS[seat].color }}>
+          {bot && <Bot className="h-4 w-4 shrink-0" />}
+          <span className="truncate">{driverName(state, seat)}</span>
           {!here(seat) && <span className="text-slate-400"> (sin conexión)</span>}
         </p>
         <p className="text-xs text-slate-300">
-          {done ? "¡Llegó! 🏁" : `Vuelta ${Math.min(hud[seat]?.lap ?? 1, laps)}/${laps}`}
+          {done ? "¡Llegó! 🏁" : wrong ? <span className="font-bold text-red-400">¡Contramano!</span> : showFlash ? `${flash!.text} · ${flash!.sub}` : `Vuelta ${Math.min(hud[seat]?.lap ?? 1, laps)}/${laps}`}
         </p>
       </div>
     </div>
   );
 }
 
-/** Each player's tag at the bottom of their own split-screen view. */
+/** Each player's tag at the bottom of their own split-screen view, plus big notices in the middle of it. */
 function ViewTags({
   seats,
   state,
   hud,
   laps,
   here,
+  flash,
+  wrong,
+  now,
 }: {
   seats: Seat[];
   state: CarrerasState;
   hud: Partial<Record<Seat, LiveCar>>;
   laps: number;
   here: (seat: Seat) => boolean;
+  flash: Partial<Record<Seat, Flash>>;
+  wrong: string;
+  now: number;
 }) {
   const n = Math.max(1, seats.length);
   const cols = n === 1 ? 1 : 2;
@@ -506,16 +579,39 @@ function ViewTags({
       className="pointer-events-none absolute inset-0 z-10 grid"
       style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)` }}
     >
-      {seats.map((seat) => (
-        <div key={seat} className="relative" style={{ boxShadow: n > 1 ? "inset 0 0 0 2px rgba(2,6,23,0.6)" : undefined }}>
-          <div className="absolute bottom-3 left-3">
-            <SeatTag seat={seat} state={state} hud={hud} laps={laps} here={here} />
+      {seats.map((seat) => {
+        const f = flash[seat];
+        const showFlash = !!f && now - f.at < FLASH_MS && state.results[seat] === undefined;
+        const isWrong = wrong.includes(seat);
+        return (
+          <div key={seat} className="relative" style={{ boxShadow: n > 1 ? "inset 0 0 0 2px rgba(2,6,23,0.6)" : undefined }}>
+            {(showFlash || isWrong) && (
+              <div className="absolute inset-x-0 top-[22%] flex justify-center">
+                <div
+                  key={isWrong ? "wrong" : f!.at}
+                  className={`animate-celebration-in rounded-2xl px-5 py-2 text-center backdrop-blur ${isWrong ? "bg-red-600/85" : "bg-slate-950/75"}`}
+                >
+                  <p className={`font-display font-bold text-white ${n > 2 ? "text-2xl" : "text-4xl"}`}>{isWrong ? "¡Contramano!" : f!.text}</p>
+                  {!isWrong && (
+                    <p className={`font-mono ${n > 2 ? "text-base" : "text-xl"} ${f!.best ? "text-fuchsia-300" : "text-slate-200"}`}>
+                      {f!.sub}
+                      {f!.best && " · tu mejor vuelta"}
+                    </p>
+                  )}
+                  {isWrong && <p className="text-sm text-red-100">Pegá la vuelta</p>}
+                </div>
+              </div>
+            )}
+            <div className="absolute bottom-3 left-3">
+              <SeatTag seat={seat} state={state} hud={hud} laps={laps} here={here} flash={f} wrong={isWrong} now={now} />
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
+
 
 function JoinCard({
   roomId,
@@ -530,6 +626,8 @@ function JoinCard({
 }) {
   const host = useSyncExternalStore(subscribeNever, () => window.location.host, () => "");
   const ready = SEATS.some(here);
+  // The free cars bots will drive if nobody takes them.
+  const botSeats = SEATS.filter((seat) => !state.seats[seat]).slice(0, state.botCount);
   return (
     <div className="flex w-full max-w-3xl flex-col items-center gap-5 rounded-3xl bg-slate-950/85 p-8 text-center shadow-2xl backdrop-blur">
       <div className="flex items-center gap-3 text-slate-300">
@@ -556,8 +654,16 @@ function JoinCard({
             style={{ boxShadow: `inset 0 0 0 2px ${CARS[seat].color}${here(seat) ? "" : "40"}` }}
           >
             <span className="h-7 w-12 shrink-0 rounded-lg" style={{ backgroundColor: CARS[seat].color, opacity: here(seat) ? 1 : 0.4 }} />
-            <p className={`truncate text-lg font-semibold ${here(seat) ? "text-slate-100" : "text-slate-500"}`}>
-              {here(seat) ? driverName(state, seat) : "Libre"}
+            <p className={`flex min-w-0 items-center gap-1.5 truncate text-lg font-semibold ${here(seat) ? "text-slate-100" : "text-slate-500"}`}>
+              {here(seat) ? (
+                driverName(state, seat)
+              ) : botSeats.includes(seat) ? (
+                <>
+                  <Bot className="h-5 w-5 shrink-0" /> {BOT_NAMES[seat]} (bot, si nadie entra)
+                </>
+              ) : (
+                "Libre"
+              )}
             </p>
           </div>
         ))}
@@ -582,7 +688,7 @@ function JoinCard({
         {ready ? "¡Largar!" : "Esperando pilotos…"}
       </button>
       <p className="text-xs text-slate-500">
-        Hasta 4 pilotos. También se puede largar desde un teléfono. Para probar sin teléfonos: A/D y S, o las flechas.
+        Hasta 4 pilotos{state.botCount > 0 ? ", los autos libres los manejan bots" : ""}. También se puede largar desde un teléfono. Para probar sin teléfonos: A/D y S, o las flechas.
       </p>
     </div>
   );

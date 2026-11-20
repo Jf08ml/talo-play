@@ -444,15 +444,15 @@ export const GAMES: Record<GameId, GameInfo> = {
     id: "carreras3d",
     title: "Carreras 3D",
     path: "carreras-3d",
-    tagline: "Carreras en 3D de hasta 4: en la tele o el proyector con el teléfono de volante, o cada uno en su teléfono.",
+    tagline: "Carreras en 3D de hasta 4, con bots si faltan pilotos: en la tele o el proyector con el teléfono de volante, o cada uno en su teléfono.",
     minPlayers: 1,
     maxPlayers: 4,
     duration: "3–5 min",
     contexts: ["pareja", "amigos", "grupo", "solo"],
     howTo: [
       "Elegí dónde se ve: en una pantalla grande (tele o proyector, dividida por piloto) o cada uno en su teléfono.",
-      "Cada piloto entra desde su teléfono con el código y elige un auto.",
-      "Manejá con botones o inclinando el teléfono, con cámara detrás del auto o desde la cabina.",
+      "Cada piloto entra desde su teléfono con el código y elige un auto; los autos libres los pueden manejar bots.",
+      "Manejá con botones o inclinando el teléfono, en pistas cortas o largas, con cámara detrás del auto o desde la cabina.",
     ],
   },
   arena: {

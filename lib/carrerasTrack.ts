@@ -16,7 +16,7 @@ import { mulberry32 } from "./random";
 export type TrackTheme = "campo" | "atardecer" | "desierto" | "nieve" | "noche";
 export const THEMES: TrackTheme[] = ["campo", "atardecer", "desierto", "nieve", "noche"];
 
-export type FixedTrackId = "ovalo" | "curvas" | "costa" | "rulos" | "serpentina";
+export type FixedTrackId = "ovalo" | "curvas" | "costa" | "rulos" | "serpentina" | "granpremio" | "canon" | "nocturna";
 /** `aleatoria` is generated from the race state's `trackSeed`. */
 export type TrackId = FixedTrackId | "aleatoria";
 
@@ -44,6 +44,10 @@ export interface TrackDef {
   points: TrackPoint[];
   ramps?: TrackFeature[];
   boosts?: TrackFeature[];
+  /** A long track in a big world: only offered in 3D (seen from above, its cars would be tiny). */
+  long?: boolean;
+  /** Buildings instead of most trees (3D only). */
+  city?: boolean;
 }
 
 /** Ramps: a wedge on the road, rising to its lip and dropping sharply. */
@@ -132,9 +136,74 @@ export const TRACKS: Record<FixedTrackId, TrackDef> = {
     ramps: [{ at: 16.05 }, { at: 20.4, side: 0.5, span: 0.55 }],
     boosts: [{ at: 1 }, { at: 14.5, side: -0.5, span: 0.5 }],
   },
+  granpremio: {
+    label: "Gran Premio",
+    hint: "Larga · ocho con puente",
+    width: 130,
+    theme: "campo",
+    long: true,
+    size: [4400, 2500],
+    points: [
+      [2600, 2250], [2000, 2250], [1400, 2240], [900, 2200], [550, 2060], [380, 1800],
+      [400, 1500], [600, 1300], [900, 1250], [1150, 1350], [1400, 1450], [1700, 1420],
+      [1950, 1250, 10], [2250, 1020, 45], [2535, 800, 76], [2850, 580, 76], [3200, 450, 58], [3600, 420, 40],
+      [3900, 300, 25], [3820, 130, 10], [3350, 110], [2700, 150], [2200, 190], [1800, 230], [1400, 240], [1050, 330],
+      [800, 520, 25], [800, 780, 45], [1050, 900, 30], [1350, 840, 10], [1650, 700], [1950, 620],
+      [2250, 680], [2535, 800], [2850, 1030], [3150, 1200], [3500, 1250], [3850, 1150],
+      [4100, 1300], [4150, 1650], [4000, 1950], [3650, 2150], [3200, 2250],
+    ],
+    ramps: [{ at: 21.4 }, { at: 36.3, side: -0.5, span: 0.55 }],
+    boosts: [{ at: 0.4, side: 0.5, span: 0.5 }, { at: 8.6 }, { at: 23.5, side: -0.5, span: 0.5 }, { at: 40.5 }],
+  },
+  canon: {
+    label: "Cañón",
+    hint: "Larga · subidas y saltos",
+    width: 125,
+    theme: "desierto",
+    long: true,
+    size: [4200, 2400],
+    points: [
+      [1000, 2200], [1600, 2200], [2200, 2180], [2700, 2100], [3100, 1950, 20], [3500, 1900, 50],
+      [3850, 1750, 70], [4000, 1450, 80], [3850, 1150, 60], [3500, 1050, 40], [3150, 1150, 20], [2850, 1350],
+      [2500, 1450], [2150, 1350], [1950, 1100], [2050, 800, 20], [2350, 600, 45], [2750, 500, 70],
+      [3150, 500, 85], [3550, 420, 95], [3800, 250, 80], [3600, 110, 60], [3200, 130, 40], [2700, 180, 20],
+      [2200, 220], [1700, 200], [1250, 240], [900, 400], [800, 700, 25], [1000, 950, 50],
+      [1300, 1100, 60], [1350, 1400, 40], [1100, 1650, 20], [700, 1700], [400, 1850], [400, 2100], [600, 2220],
+    ],
+    ramps: [{ at: 2.3 }, { at: 18.3, side: 0.5, span: 0.55 }, { at: 24.4 }],
+    boosts: [{ at: 0.5 }, { at: 11.3, side: -0.5, span: 0.5 }, { at: 25.4, side: 0.5, span: 0.5 }, { at: 32.5 }],
+  },
+  nocturna: {
+    label: "Nocturna",
+    hint: "Larga · ciudad y autopista",
+    width: 120,
+    theme: "noche",
+    long: true,
+    city: true,
+    size: [4400, 2500],
+    points: [
+      [1000, 2250], [1800, 2250], [2600, 2250], [2850, 2150], [2950, 1950], [2950, 1600, 30],
+      [2950, 1250, 70], [2950, 950, 75], [3000, 650, 45], [3200, 420, 15], [3550, 330], [3900, 400],
+      [4100, 650], [4100, 1000], [3900, 1150], [3500, 1150], [2950, 1120], [2400, 1100],
+      [1900, 1100], [1500, 1000], [1300, 750], [1300, 450], [1100, 250], [700, 250],
+      [400, 450], [350, 800], [450, 1150], [700, 1350], [1100, 1450], [1600, 1500],
+      [2150, 1550], [2450, 1750], [2250, 1950], [1700, 1950], [1100, 1900], [600, 1850], [400, 2050], [550, 2250],
+    ],
+    ramps: [{ at: 1.3 }, { at: 17.3, side: -0.5, span: 0.55 }],
+    boosts: [{ at: 0.4, side: -0.5, span: 0.5 }, { at: 10.3 }, { at: 21.2, side: 0.5, span: 0.5 }, { at: 33.4 }],
+  },
 };
 
-export const TRACK_ORDER: TrackId[] = ["ovalo", "curvas", "costa", "rulos", "serpentina", "aleatoria"];
+export const TRACK_ORDER: TrackId[] = ["ovalo", "curvas", "costa", "rulos", "serpentina", "granpremio", "canon", "nocturna", "aleatoria"];
+
+/** Tracks a game offers: the long ones only in 3D (from above their cars would be tiny). */
+export function tracksFor(is3d: boolean): TrackId[] {
+  return TRACK_ORDER.filter((id) => is3d || id === "aleatoria" || !TRACKS[id].long);
+}
+
+export function isLongTrack(id: TrackId): boolean {
+  return id !== "aleatoria" && !!TRACKS[id]?.long;
+}
 
 export const RANDOM_TRACK = { label: "Aleatoria", hint: "Sorpresa" };
 
@@ -743,4 +812,154 @@ export function collideWithGhost(car: Car, o: { x: number; y: number; z: number;
 /** Laps completed (0 until the first crossing after the start). */
 export function lapsDone(car: Car, track: Track): number {
   return Math.max(0, Math.floor(car.progress / track.length));
+}
+
+/** Seconds of race for a lap at about racing speed (to size things by track). */
+export function lapSeconds(track: Track): number {
+  return track.length / (MAX_SPEED * 0.85);
+}
+
+/** Going the wrong way: moving against the track's direction. */
+export function wrongWay(car: Car, track: Track): boolean {
+  const f = frameAt(track, car.s);
+  return car.vx * f.dx + car.vy * f.dy < -40;
+}
+
+/**
+ * A car rebuilt from a published pose, when another phone takes over a bot.
+ * Its place on the track is the closest centerline point at about its
+ * height, so a car on a bridge isn't moved to the road below.
+ */
+export function carFromPose(track: Track, p: { x: number; y: number; z?: number; l?: number; h: number; vx: number; vy: number; p: number }): Car {
+  const z = p.z ?? 0;
+  const lift = p.l ?? 0;
+  let seg = 0;
+  let best = Infinity;
+  for (let i = 0; i < track.xs.length; i++) {
+    const score = Math.hypot(track.xs[i] - p.x, track.ys[i] - p.y) + Math.abs(track.hs[i] - (z - lift)) * 3;
+    if (score < best) {
+      best = score;
+      seg = i;
+    }
+  }
+  const near = nearest(track, p.x, p.y, seg);
+  return {
+    x: p.x,
+    y: p.y,
+    z,
+    heading: p.h,
+    vx: p.vx,
+    vy: p.vy,
+    vz: 0,
+    ground: z - lift,
+    air: lift > 1 ? 0.01 : 0,
+    boost: 0,
+    seg: near.seg,
+    s: near.s,
+    progress: p.p,
+    bump: 0,
+  };
+}
+
+// ---- Bots ------------------------------------------------------------------
+
+export type BotLevel = "facil" | "normal" | "dificil";
+export const BOT_LEVELS: BotLevel[] = ["facil", "normal", "dificil"];
+
+/** How a bot drives: how close to the limit it takes bends, its top speed, how sloppy it steers, how often it goes for a boost pad. */
+const LEVEL: Record<BotLevel, { corner: number; top: number; wobble: number; boosts: number }> = {
+  facil: { corner: 0.5, top: 0.68, wobble: 0.3, boosts: 0.15 },
+  normal: { corner: 0.7, top: 0.86, wobble: 0.14, boosts: 0.55 },
+  dificil: { corner: 0.92, top: 1.02, wobble: 0.05, boosts: 1 },
+};
+
+export interface BotBrain {
+  level: BotLevel;
+  /** Its own line across the road, -1…1, so bots don't drive in single file. */
+  lane: number;
+  /** Seconds barely moving, and of backing up left to get unstuck. */
+  stuck: number;
+  reverse: number;
+  /** A slow drift in the steering, for lines that aren't perfect. */
+  wobble: number;
+  t: number;
+}
+
+export function newBrain(level: BotLevel, k: number): BotBrain {
+  return { level, lane: [0.3, -0.3, 0.1, -0.15][k % 4], stuck: 0, reverse: 0, wobble: 0, t: k * 1.7 };
+}
+
+function headingAt(track: Track, s: number): number {
+  const f = frameAt(track, s);
+  return Math.atan2(f.dy, f.dx);
+}
+
+function turn(from: number, to: number): number {
+  let d = to - from;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return d;
+}
+
+/** Same answer for the same bot and pad every lap (does it go for this pad?). */
+function likes(brain: BotBrain, s0: number): number {
+  const v = Math.sin(s0 * 12.9898 + brain.lane * 78.233) * 43758.5453;
+  return v - Math.floor(v);
+}
+
+/**
+ * A bot at the wheel. It aims at a point ahead on its own line, pulled to the
+ * inside of the next bend (and onto boost pads it likes), and lifts or brakes
+ * so the tightest bend within braking distance can still be taken. `pace`
+ * scales its top speed (a little rubber band, set by whoever runs it).
+ */
+export function botInput(car: Car, track: Track, brain: BotBrain, dt: number, pace = 1): CarInput {
+  const L = LEVEL[brain.level];
+  brain.t += dt;
+  const fx = Math.cos(car.heading);
+  const fy = Math.sin(car.heading);
+  const forward = car.vx * fx + car.vy * fy;
+  const speed = Math.abs(forward);
+  const half = track.def.width / 2;
+
+  // Stuck against something: back up, turning toward the road's direction.
+  if (brain.reverse > 0) {
+    brain.reverse -= dt;
+    return { steer: turn(car.heading, headingAt(track, car.s)) > 0 ? -1 : 1, brake: true };
+  }
+  brain.stuck = car.air === 0 && speed < 25 ? brain.stuck + dt : 0;
+  if (brain.stuck > 1.2) {
+    brain.stuck = 0;
+    brain.reverse = 0.9;
+  }
+
+  const look = 55 + speed * 0.42;
+  const bend = turn(headingAt(track, car.s + look * 0.5), headingAt(track, car.s + look + 120));
+  let lat = brain.lane * half * 0.45 + Math.max(-1, Math.min(1, bend * 1.6)) * half * 0.5;
+  for (const b of track.boosts) {
+    const ahead = track.length - intoZone(track, b, car.s);
+    if (ahead > 10 && ahead < 380 && likes(brain, b.s0) < L.boosts) lat = (b.lo + b.hi) / 2;
+  }
+  lat = Math.max(-half + 22, Math.min(half - 22, lat));
+  const f = frameAt(track, car.s + look);
+  const tx = f.x - f.dy * lat;
+  const ty = f.y + f.dx * lat;
+  brain.wobble += ((Math.sin(brain.t * 1.3) + Math.sin(brain.t * 0.47)) * 0.5 * L.wobble - brain.wobble) * Math.min(1, dt * 2);
+  const steer = Math.max(-1, Math.min(1, turn(car.heading, Math.atan2(ty - car.y, tx - car.x)) * 3 + brain.wobble));
+
+  // How fast it may go: the tightest bend it could still brake for.
+  let limit = MAX_SPEED * L.top * pace;
+  const reach = (speed * speed) / (2 * BRAKE) + 90;
+  let prev = headingAt(track, car.s);
+  for (let d = 30; d <= reach + 30; d += 30) {
+    const h = headingAt(track, car.s + d);
+    const k = Math.abs(turn(prev, h)) / 30;
+    prev = h;
+    if (k < 1e-4) continue;
+    const corner = (TURN_RATE * L.corner) / k;
+    limit = Math.min(limit, Math.sqrt(corner * corner + 2 * BRAKE * 0.7 * Math.max(0, d - 30)));
+  }
+  limit = Math.max(limit, 120);
+  if (forward > limit + 20) return { steer, brake: true };
+  return forward > limit ? { steer, brake: false, gas: false } : { steer, brake: false };
 }

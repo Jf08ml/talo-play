@@ -4,7 +4,7 @@ import { generateRoomCode } from "./ids";
 import { serverNow } from "./serverTime";
 import { transactState } from "./transact";
 import { makeSeed } from "./random";
-import { isTrackId, type TrackId } from "./carrerasTrack";
+import { BOT_LEVELS, isLongTrack, isTrackId, type BotLevel, type TrackId } from "./carrerasTrack";
 
 /**
  * Carreras, two games on the same rooms, physics and controls: `carreras`
@@ -34,12 +34,16 @@ export const LAP_OPTIONS = [2, 3, 5];
 export type Seat = "a" | "b" | "c" | "d";
 export const SEATS: Seat[] = ["a", "b", "c", "d"];
 
-export const CARS: Record<Seat, { label: string; color: string; glow: string }> = {
-  a: { label: "Auto rojo", color: "#fb3a5d", glow: "rgba(251,58,93,0.55)" },
-  b: { label: "Auto celeste", color: "#22d3ee", glow: "rgba(34,211,238,0.55)" },
-  c: { label: "Auto verde", color: "#4ade80", glow: "rgba(74,222,128,0.55)" },
-  d: { label: "Auto amarillo", color: "#facc15", glow: "rgba(250,204,21,0.55)" },
+export const CARS: Record<Seat, { label: string; color: string; glow: string; accent: string }> = {
+  a: { label: "Auto rojo", color: "#fb3a5d", glow: "rgba(251,58,93,0.55)", accent: "#f8fafc" },
+  b: { label: "Auto celeste", color: "#22d3ee", glow: "rgba(34,211,238,0.55)", accent: "#111827" },
+  c: { label: "Auto verde", color: "#4ade80", glow: "rgba(74,222,128,0.55)", accent: "#f8fafc" },
+  d: { label: "Auto amarillo", color: "#facc15", glow: "rgba(250,204,21,0.55)", accent: "#111827" },
 };
+
+/** Bots' names, by seat (they drive the seats nobody took). */
+export const BOT_NAMES: Record<Seat, string> = { a: "Turbo", b: "Chispa", c: "Rayo", d: "Nitro" };
+export const MAX_BOTS = 3;
 
 export type CarrerasGame = "carreras" | "carreras3d";
 export type CarrerasMode = "pantalla" | "telefono";
@@ -51,6 +55,9 @@ export interface CarrerasMeta {
   mode: CarrerasMode;
   track: TrackId;
   laps: number;
+  /** Bots that fill the free cars at the start (0 = none), and how well they drive. */
+  bots: number;
+  botLevel: BotLevel;
   createdAt: number | object;
 }
 
@@ -79,6 +86,13 @@ export interface CarrerasState {
   winner: Seat | "";
   /** Races won per client id. */
   wins: Record<string, number>;
+  /** Copied from the meta (the start's transaction only sees the state). */
+  botCount: number;
+  botLevel: BotLevel;
+  /** Seats driven by bots in this race (their seat stays empty). */
+  bots: string;
+  /** Best lap (ms) of every seat that finished. */
+  best: Partial<Record<Seat, number>>;
 }
 
 export interface CarInputWire {
@@ -124,10 +138,16 @@ export function normalizeMeta(raw: Partial<CarrerasMeta>): CarrerasMeta {
     game,
     hostId: raw.hostId,
     mode: game === "carreras3d" && raw.mode === "telefono" ? "telefono" : "pantalla",
-    track: isTrackId(raw.track) ? raw.track : "ovalo",
+    track: isTrackId(raw.track) && (game === "carreras3d" || !isLongTrack(raw.track)) ? raw.track : "ovalo",
     laps: raw.laps ?? 5,
+    bots: Math.max(0, Math.min(MAX_BOTS, raw.bots ?? 0)),
+    botLevel: levelOf(raw.botLevel),
     createdAt: raw.createdAt ?? 0,
   };
+}
+
+function levelOf(raw: unknown): BotLevel {
+  return BOT_LEVELS.includes(raw as BotLevel) ? (raw as BotLevel) : "normal";
 }
 
 function normalizeState(raw: Partial<CarrerasState> | null): CarrerasState | null {
@@ -144,6 +164,10 @@ function normalizeState(raw: Partial<CarrerasState> | null): CarrerasState | nul
     firstAt: raw.firstAt ?? 0,
     winner: raw.winner ?? "",
     wins: raw.wins ?? {},
+    botCount: Math.max(0, Math.min(MAX_BOTS, raw.botCount ?? 0)),
+    botLevel: levelOf(raw.botLevel),
+    bots: raw.bots ?? "",
+    best: raw.best ?? {},
   };
 }
 
@@ -155,6 +179,16 @@ export function trackSeedOf(meta: Pick<CarrerasMeta, "track">, state: Pick<Carre
 export function seatOf(state: Pick<CarrerasState, "seats">, clientId: string): Seat | null {
   if (!clientId) return null;
   return SEATS.find((seat) => state.seats[seat] === clientId) ?? null;
+}
+
+/** A bot drives this seat in the current race. */
+export function isBotSeat(state: Pick<CarrerasState, "bots" | "seats" | "status">, seat: Seat): boolean {
+  return state.status !== "waiting" && state.bots.includes(seat) && !state.seats[seat];
+}
+
+/** Where a car's pose is published (telefono): its driver's client id, or "bot-{seat}". */
+export function carKey(state: Pick<CarrerasState, "seats">, seat: Seat): string {
+  return state.seats[seat] || `bot-${seat}`;
 }
 
 export function racersOf(state: Pick<CarrerasState, "racers">): Seat[] {
@@ -185,11 +219,17 @@ function mutate(roomId: string, fn: (state: CarrerasState) => CarrerasState | nu
 export async function createCarrerasRoom(
   game: CarrerasGame,
   hostId: string,
-  settings: { mode: CarrerasMode; track: TrackId; laps: number }
+  settings: { mode: CarrerasMode; track: TrackId; laps: number; bots: number; botLevel: BotLevel }
 ): Promise<string> {
   const roomId = generateRoomCode();
   const meta: CarrerasMeta = { game, hostId, ...settings, createdAt: serverTimestamp() };
-  const state: Partial<CarrerasState> = { status: "waiting", gameNo: 0, trackSeed: makeSeed() };
+  const state: Partial<CarrerasState> = {
+    status: "waiting",
+    gameNo: 0,
+    trackSeed: makeSeed(),
+    botCount: settings.bots,
+    botLevel: settings.botLevel,
+  };
   await update(ref(getDb()), {
     [`rooms/${roomId}/meta`]: meta,
     [statePath(roomId)]: state,
@@ -244,10 +284,23 @@ export function leaveSeat(roomId: string, clientId: string) {
   });
 }
 
+/** A new race with whoever is seated, the free cars driven by bots (up to the room's count). */
 function raceFrom(s: CarrerasState): CarrerasState | null {
-  const racers = SEATS.filter((seat) => s.seats[seat]).join("");
-  if (!racers) return null;
-  return { ...s, status: "racing", racers, startedAt: serverNow() + COUNTDOWN_MS, results: {}, firstAt: 0, winner: "" };
+  const people = SEATS.filter((seat) => s.seats[seat]);
+  if (!people.length) return null;
+  const bots = SEATS.filter((seat) => !s.seats[seat]).slice(0, s.botCount);
+  const racers = SEATS.filter((seat) => people.includes(seat) || bots.includes(seat)).join("");
+  return {
+    ...s,
+    status: "racing",
+    racers,
+    bots: bots.join(""),
+    startedAt: serverNow() + COUNTDOWN_MS,
+    results: {},
+    best: {},
+    firstAt: 0,
+    winner: "",
+  };
 }
 
 /** Starts the countdown; one car is enough (a practice race against the clock). */
@@ -268,14 +321,15 @@ function finish(s: CarrerasState): CarrerasState {
   };
 }
 
-/** `seat` crossed the finish line after `raceMs` (once per seat). */
-export function reportFinish(roomId: string, expectedGame: number, seat: Seat, raceMs: number) {
+/** `seat` crossed the finish line after `raceMs`, its best lap `bestMs` (once per seat). */
+export function reportFinish(roomId: string, expectedGame: number, seat: Seat, raceMs: number, bestMs = 0) {
   return mutate(roomId, (s) => {
     if (s.status !== "racing" || s.gameNo !== expectedGame) return null;
     if (!s.racers.includes(seat) || s.results[seat] !== undefined) return null;
     const next = {
       ...s,
       results: { ...s.results, [seat]: Math.max(0, Math.round(raceMs)) },
+      best: bestMs > 0 ? { ...s.best, [seat]: Math.round(bestMs) } : s.best,
       firstAt: s.firstAt || serverNow(),
     };
     return racersOf(next).every((r) => next.results[r] !== undefined) ? finish(next) : next;
@@ -366,4 +420,49 @@ export function openPose(roomId: string, clientId: string) {
 
 export function subscribePoses(roomId: string, cb: (poses: Record<string, CarPose>) => void): Unsubscribe {
   return onValue(ref(getDb(), `${base(roomId)}/cars`), (snap) => cb(snap.val() ?? {}));
+}
+
+/** A bot's pose (telefono), written by whoever runs the bots. Not removed on disconnect: the next one continues from it. */
+export function sendBotPose(roomId: string, seat: Seat, pose: CarPose) {
+  return set(ref(getDb(), `${base(roomId)}/cars/bot-${seat}`), pose).catch(console.error);
+}
+
+// ---- Lap times ---------------------------------------------------------------
+
+interface LapEntry {
+  done: number;
+  /** Race time when the current lap started. */
+  at: number;
+  last: number;
+  best: number;
+}
+
+/** Lap times of each car, worked out by whoever runs it from its laps and the race clock. */
+export class LapClock {
+  private laps = new Map<string, LapEntry>();
+
+  /** Call every frame; returns the lap time just completed (ms), or 0. */
+  update(key: string, lapsDone: number, raceMs: number): number {
+    let e = this.laps.get(key);
+    if (!e) {
+      e = { done: lapsDone, at: 0, last: 0, best: 0 };
+      this.laps.set(key, e);
+    }
+    if (lapsDone <= e.done) return 0;
+    const t = raceMs - e.at;
+    e.done = lapsDone;
+    e.at = raceMs;
+    e.last = t;
+    e.best = e.best ? Math.min(e.best, t) : t;
+    return t;
+  }
+
+  best(key: string): number {
+    return this.laps.get(key)?.best ?? 0;
+  }
+
+  /** Time into the current lap. */
+  current(key: string, raceMs: number): number {
+    return Math.max(0, raceMs - (this.laps.get(key)?.at ?? 0));
+  }
 }

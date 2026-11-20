@@ -651,6 +651,12 @@ export const GUIDES: Record<GameId, Guide> = {
           "Las flechas de la pista te impulsan y las rampas te hacen volar. Chocar contra las paredes o los demás te frena.",
         ],
       },
+      {
+        title: "Bots",
+        text: [
+          "Si la sala tiene bots, los autos que nadie eligió los maneja la compu. Se elige cuántos (hasta 3) y cómo manejan: fácil, normal o difícil.",
+        ],
+      },
     ],
     tips: ["Frená un poco antes de las curvas cerradas: salís más rápido."],
   },
@@ -671,8 +677,25 @@ export const GUIDES: Record<GameId, Guide> = {
           "Podés cambiar la cámara: detrás del auto o desde la cabina. Las flechas del piso te impulsan y las rampas te hacen volar.",
         ],
       },
+      {
+        title: "Pistas",
+        text: [
+          "Hay pistas cortas para empezar y tres largas, solo en 3D: Gran Premio (un ocho con puente), Cañón (subidas y saltos en el desierto) y Nocturna (una ciudad de noche con autopista). También hay pistas armadas al azar.",
+          "Los carteles con flechas rojas avisan las curvas cerradas: frená un poco antes.",
+        ],
+      },
+      {
+        title: "Bots y tiempos",
+        text: [
+          "Con bots, los autos que nadie eligió los maneja la compu: elegí cuántos (hasta 3) y cómo manejan (fácil, normal o difícil). Así se puede correr solo o completar la grilla.",
+          "Cada vuelta te muestra su tiempo, y al final se ve la mejor vuelta de cada uno; la más rápida de la carrera queda marcada. Si das la vuelta al revés, aparece «¡Contramano!».",
+        ],
+      },
     ],
-    tips: ["Si el juego va lento, bajá la calidad gráfica desde el botón de la pantalla."],
+    tips: [
+      "Si el juego va lento, bajá la calidad gráfica desde el botón de la pantalla.",
+      "Pasá por las flechas naranjas del piso: el turbo te da una buena ventaja en las rectas largas.",
+    ],
   },
   arena: {
     goal: "Que tu equipo sea el último en pie en cada ronda, hasta ganar las rondas pedidas.",

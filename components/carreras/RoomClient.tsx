@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import {
   CARS,
+  BOT_NAMES,
   SEATS,
   getCarrerasMeta,
   joinCarreras,
@@ -46,6 +47,8 @@ import { carrerasSettings } from "./settings";
 import { MonitorPlay, Shuffle, Smartphone } from "lucide-react";
 
 type Status = "loading" | "not-found" | "ready" | "error";
+
+const BOT_LEVEL_LABEL = { facil: "fáciles", normal: "normales", dificil: "difíciles" } as const;
 
 /** A racing room on a phone (both games): seats, then the controller or the 3D race. */
 export default function RoomClient({ game, roomId }: { game: CarrerasGame; roomId: string }) {
@@ -111,7 +114,9 @@ export default function RoomClient({ game, roomId }: { game: CarrerasGame; roomI
 
   // Telefono mode: the race takes the whole screen.
   if (racing && meta.mode === "telefono") {
-    return <PhoneRace roomId={roomId} meta={meta} state={state} myId={myId} />;
+    // The connected person with the lowest id runs the bots.
+    const botHost = presenceLoaded && Object.keys(presence).sort()[0] === myId;
+    return <PhoneRace roomId={roomId} meta={meta} state={state} myId={myId} botHost={botHost} />;
   }
 
   return (
@@ -142,7 +147,7 @@ export default function RoomClient({ game, roomId }: { game: CarrerasGame; roomI
               myId={myId}
               summary={`Pista ${trackLabel(meta.track)} · ${meta.laps} vueltas · ${
                 meta.mode === "pantalla" ? "en pantalla grande" : "cada uno en su teléfono"
-              }`}
+              }${meta.bots ? ` · ${meta.bots} ${meta.bots === 1 ? "bot" : "bots"} (${BOT_LEVEL_LABEL[meta.botLevel]})` : ""}`}
               settings={<RoomSettingsEditor settings={settings} roomId={roomId} meta={meta} />}
               onStart={() => startRace(roomId)}
             >
@@ -231,6 +236,8 @@ function SeatPicker({
 }) {
   const mySeat = seatOf(state, myId);
   const seated = SEATS.filter((seat) => state.seats[seat]).length;
+  // The free cars bots will drive if nobody takes them.
+  const botSeats = SEATS.filter((seat) => !state.seats[seat]).slice(0, state.botCount);
   return (
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-2 gap-2">
@@ -246,7 +253,7 @@ function SeatPicker({
               <CarDot seat={seat} className="h-5 w-9" />
               <p className="text-xs uppercase tracking-wide text-slate-500">{CARS[seat].label}</p>
               <p className={`text-sm font-medium ${occupant && !isAway(occupant) ? "text-slate-100" : "text-slate-500"}`}>
-                {occupant ? driverName(state, seat, myId) : "Libre"}
+                {occupant ? driverName(state, seat, myId) : botSeats.includes(seat) ? `Libre · si no, ${BOT_NAMES[seat]} (bot)` : "Libre"}
                 {occupant && isAway(occupant) && " (se fue)"}
               </p>
               {occupant !== myId && free && (
@@ -269,7 +276,9 @@ function SeatPicker({
       </div>
       <p className="text-center text-xs text-slate-500">
         {seated < 2
-          ? "Hasta 4 pilotos: mandales el link (o largá solo para practicar contra el reloj)."
+          ? state.botCount > 0
+            ? "Hasta 4 pilotos: mandales el link. Los autos que queden libres los manejan bots."
+            : "Hasta 4 pilotos: mandales el link (o largá solo para practicar contra el reloj)."
           : mySeat
             ? "Cuando larguen, tu teléfono es el volante."
             : seated === SEATS.length
