@@ -16,6 +16,7 @@ import { countDailyRoom } from "./dailyStats";
  * - `edit_room`: the host saved new settings from the waiting room.
  * - `open_rules`: someone opened a game's full instructions (`where`: lobby / sala / partida).
  * - `feedback`: someone sent an idea from the community page (`kind`: juego / mejora / error / otro).
+ * - `plaza_message` / `plaza_call` / `plaza_join`: a message in the Plaza (`kind`: frase / texto), a waiting room asking it for players, someone joining a room from it.
  * - `page_not_found`: a 404 (`path` = the broken URL).
  *
  * `create_room` also counts the room in our own per-day stats (lib/dailyStats.ts).
@@ -32,6 +33,9 @@ type Events = {
   edit_room: { game: GameId };
   open_rules: { game: GameId; where: "lobby" | "sala" | "partida" };
   feedback: { kind: string };
+  plaza_message: { kind: "frase" | "texto" };
+  plaza_call: { game: GameId };
+  plaza_join: { game: GameId };
   page_not_found: { path: string };
 };
 

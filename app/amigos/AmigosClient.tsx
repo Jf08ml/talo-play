@@ -3,7 +3,8 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Check, Copy, LogOut, Share2, Trash2, UserPlus } from "lucide-react";
+import { Check, Copy, LogOut, MessageCircle, Share2, Trash2, UserPlus } from "lucide-react";
+import FriendChat, { useUnreadChats } from "@/components/FriendChat";
 import SiteHeader, { SiteFooter } from "@/components/SiteHeader";
 import PlayerIdentity from "@/components/PlayerIdentity";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
@@ -97,6 +98,7 @@ function SignedOut() {
         <li>· Tu talo y tu nombre te siguen en el celu y en la compu.</li>
         <li>· Agregás amigos con un código y ves quién está conectado y a qué juega.</li>
         <li>· Los invitás a tu sala con un toque: les aparece la invitación en Talo.</li>
+        <li>· Chateás con tus amigos y podés escribir en la Plaza.</li>
       </ul>
       <p className="text-[15px] text-talo-text-3">Para jugar no hace falta: la cuenta es solo para tener amigos.</p>
       <SignInButton light />
@@ -117,6 +119,8 @@ function SignedIn({
   friends: Friend[];
   initialCode: string;
 }) {
+  const unread = useUnreadChats(uid);
+  const [chat, setChat] = useState<Friend | null>(null);
   return (
     <div className="grid min-w-0 items-start gap-4 sm:gap-6 md:grid-cols-[1fr_1.2fr] lg:gap-10">
       <div className="flex min-w-0 flex-col gap-4 sm:gap-6">
@@ -143,13 +147,16 @@ function SignedIn({
           ) : (
             <ul className="mt-4 flex flex-col divide-y divide-talo-line">
               {friends.map((f) => (
-                <FriendRow key={f.uid} uid={uid} friend={f} />
+                <FriendRow key={f.uid} uid={uid} friend={f} unread={unread.has(f.uid)} onChat={() => setChat(f)} />
               ))}
             </ul>
           )}
         </section>
         <AccountActions profile={profile} />
       </div>
+      {chat?.profile && (
+        <FriendChat me={uid} other={chat.uid} name={chat.profile.name} clientId={chat.profile.clientId} onClose={() => setChat(null)} />
+      )}
     </div>
   );
 }
@@ -345,7 +352,7 @@ function RequestRow({ uid, from }: { uid: string; from: string }) {
   );
 }
 
-function FriendRow({ uid, friend }: { uid: string; friend: Friend }) {
+function FriendRow({ uid, friend, unread, onChat }: { uid: string; friend: Friend; unread: boolean; onChat: () => void }) {
   const [confirm, setConfirm] = useState(false);
   const p = friend.profile;
   if (!p) return null;
@@ -368,6 +375,10 @@ function FriendRow({ uid, friend }: { uid: string; friend: Friend }) {
           Unirme
         </Link>
       )}
+      <button onClick={onChat} aria-label={unread ? `Chat con ${p.name}, mensajes nuevos` : `Chat con ${p.name}`} className={`${SMALL_BUTTON} relative border-2 border-talo-ink hover:bg-talo-surface`}>
+        <MessageCircle className="h-4 w-4" /> Chat
+        {unread && <span className="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full border-2 border-white bg-red-600" />}
+      </button>
       {confirm ? (
         <>
           <button onClick={() => removeFriend(uid, friend.uid).catch(console.error)} className={`${SMALL_BUTTON} bg-red-600 text-white hover:bg-red-700`}>

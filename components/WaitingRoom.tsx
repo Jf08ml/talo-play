@@ -7,6 +7,7 @@ import type { PresenceMap } from "@/lib/presence";
 import { ChevronDown } from "lucide-react";
 import { categoryOf, gameColors } from "@/lib/talos";
 import InviteCard from "./InviteCard";
+import PlazaCallButton from "./PlazaCallButton";
 import TaloTable from "./TaloTable";
 import { PRIMARY_BUTTON } from "./ui";
 import { GuideBody } from "./HowToPlay";
@@ -99,7 +100,13 @@ export default function WaitingRoom({
     onStart();
   };
 
-  const invite = <InviteCard game={game} roomId={roomId} />;
+  const mine = players.find((p) => p.id === myId);
+  const invite = (
+    <>
+      <InviteCard game={game} roomId={roomId} />
+      <PlazaCallButton game={game} roomId={roomId} count={online.length} me={mine ? { clientId: mine.id, name: mine.name, color: mine.color } : null} />
+    </>
+  );
 
   const { color, ink } = gameColors(game);
 

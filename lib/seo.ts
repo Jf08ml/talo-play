@@ -107,6 +107,10 @@ export const HOME_FAQ: { q: string; a: string }[] = [
     a: "Elegí un juego y creá una sala. Mandá el link por WhatsApp (o pasá el código de 6 letras): tocan el link, escriben su nombre y entran a jugar.",
   },
   {
+    q: "¿Y si no tengo con quién jugar?",
+    a: "Entrá a la Plaza: ahí ves quién está conectado, podés saludar y sumarte a las salas que buscan jugadores. Si tu sala necesita más gente, tocá «Buscar gente en la Plaza» en la sala de espera.",
+  },
+  {
     q: "¿Qué juegos hay para jugar en pareja?",
     a: listFor("pareja"),
   },

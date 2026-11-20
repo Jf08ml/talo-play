@@ -10,6 +10,7 @@ import { CATEGORY_COLORS, gameColors } from "@/lib/talos";
 import { getPlayStats, mostPlayed } from "@/lib/playStats";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import JoinRoomForm from "@/components/JoinRoomForm";
+import PlazaBanner from "@/components/PlazaBanner";
 import PlayerIdentity from "@/components/PlayerIdentity";
 import SiteHeader from "@/components/SiteHeader";
 import HeroCrowd from "@/components/HeroCrowd";
@@ -93,6 +94,11 @@ export default function HomeClient() {
       {/* Phones: the code goes right under the hero. */}
       <div className="px-5 pt-5 sm:hidden">
         <JoinRoomForm id="code-mob" />
+      </div>
+
+      {/* LA PLAZA: find people to play with. */}
+      <div className="mx-auto max-w-[1360px] px-5 pt-8 sm:px-10 sm:pt-14">
+        <PlazaBanner />
       </div>
 
       {/* DESTACADOS */}
