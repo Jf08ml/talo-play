@@ -207,3 +207,46 @@ export function botAct(mind: BotMind, tl: Timeline, t: number, theta: number, sk
 
 /** localStorage: the practice was finished on this browser (the lobby stops pushing it). */
 export const PRACTICED_KEY = "tronco.practicado";
+
+// ---- Drawing helpers (pure) -------------------------------------------------
+
+/** How fast a jump in the drawn log (a kick that arrived late) fades away, per second. */
+const SMOOTH_RATE = 10;
+
+/**
+ * The log as drawn. Before it rolls it nudges toward the side it was kicked
+ * (`leadMs` = the time between the opening kick and the start); any jump
+ * (another's kick arriving late, the nudge ending) goes into an offset that
+ * fades, so it never snaps. Judging always uses the real `logAt`.
+ */
+export class DrawnLog {
+  private prev = NaN;
+  private dir = 1;
+  private speed = 0;
+  private offset = 0;
+  private at = 0;
+
+  /** The angle to draw now (`clock` = performance.now(), for the fade). */
+  angle(tl: Timeline, t: number, leadMs: number, clock: number): number {
+    const log = logAt(tl, t);
+    let target = log.angle;
+    if (Number.isFinite(tl.startedAt) && t < tl.startedAt) {
+      const p = Math.max(0, Math.min(1, 1 - (tl.startedAt - t) / leadMs));
+      target += log.dir * 0.14 * Math.sin(p * (Math.PI / 2));
+    }
+    const dt = Math.min(0.1, (clock - this.at) / 1000);
+    if (Number.isFinite(this.prev)) {
+      const jump = wrapPi(target - this.prev - this.dir * this.speed * dt);
+      if (Math.abs(jump) > 0.03) this.offset -= jump;
+      this.offset = wrapPi(this.offset) * Math.exp(-dt * SMOOTH_RATE);
+    }
+    this.prev = target;
+    this.dir = log.dir;
+    this.speed = t >= tl.startedAt ? speedAt(tl, t) : 0;
+    this.at = clock;
+    return target + this.offset;
+  }
+}
+
+/** The seat next to `i` the log reaches going in `dir` (1: the next index, −1: the previous). */
+export const neighbor = (i: number, n: number, dir: 1 | -1) => (i + dir + n) % n;

@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { roomPath } from "@/lib/games";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Crown } from "lucide-react";
+import { Gamepad2, MonitorPlay } from "lucide-react";
+import TroncoResults from "@/components/tronco/Results";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import {
   getTroncoMeta,
@@ -12,7 +14,6 @@ import {
   nextOnlineRound,
   normalizeMeta,
   playAgain,
-  playerInfo,
   startTronco,
   subscribeTronco,
   type TroncoMeta,
@@ -27,11 +28,10 @@ import WaitingRoom from "@/components/WaitingRoom";
 import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
-import { Confetti } from "@/components/Results";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { BackToRoomButton, RoomSettingsEditor } from "@/components/RoomSettings";
 import { watchRoomMeta } from "@/lib/roomSettings";
-import { CARD, PRIMARY_BUTTON } from "@/components/ui";
+import { PRIMARY_BUTTON } from "@/components/ui";
 import { SETTINGS } from "../settings";
 
 const TroncoGame = dynamic(() => import("@/components/tronco/Game"), { ssr: false });
@@ -39,7 +39,7 @@ const TroncoGame = dynamic(() => import("@/components/tronco/Game"), { ssr: fals
 type Status = "loading" | "not-found" | "ready" | "error";
 
 function summary(meta: TroncoMeta): string {
-  return `${meta.bots ? `${meta.bots} ${meta.bots === 1 ? "bot" : "bots"}` : "sin bots"} · velocidad ${meta.pace === "rapido" ? "rápida" : "normal"}`;
+  return `${meta.view === "pantalla" ? "en pantalla grande · " : ""}${meta.bots ? `${meta.bots} ${meta.bots === 1 ? "bot" : "bots"}` : "sin bots"} · velocidad ${meta.pace === "rapido" ? "rápida" : "normal"}`;
 }
 
 export default function TroncoClient({ roomId }: { roomId: string }) {
@@ -49,6 +49,8 @@ export default function TroncoClient({ roomId }: { roomId: string }) {
   const [status, setStatus] = useState<Status>("loading");
   const [meta, setMeta] = useState<TroncoMeta | null>(null);
   const [state, setState] = useState<TroncoState | null>(null);
+  /** With a big screen: this phone shows the ring too instead of being only the controller. */
+  const [seeHere, setSeeHere] = useState(false);
 
   const myId = identity.clientId;
   const me = myId && identity.name ? { clientId: myId, name: identity.name, color: identity.color } : null;
@@ -111,6 +113,7 @@ export default function TroncoClient({ roomId }: { roomId: string }) {
   if (!configured) return <FirebaseSetupNotice />;
   const connected = Object.keys(presence);
   const playing = status === "ready" && state && state.status === "playing";
+  const bigScreen = !!meta && meta.view === "pantalla" && !meta.solo && !online;
 
   return (
     <div className={`flex flex-col bg-talo-ink ${playing ? "h-dvh overflow-hidden" : "min-h-dvh"}`}>
@@ -141,15 +144,28 @@ export default function TroncoClient({ roomId }: { roomId: string }) {
               summary={summary(meta)}
               settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={meta} />}
               onStart={() => startTronco(roomId, meta, connected)}
-            />
+            >
+              {bigScreen && <ScreenCard roomId={roomId} />}
+            </WaitingRoom>
           </main>
         ))}
 
-      {playing && <TroncoGame key={state.gameNo} roomId={roomId} state={state} myId={myId} presence={presence} presenceLoaded={presenceLoaded} />}
+      {playing && (
+        <TroncoGame
+          key={state.gameNo}
+          roomId={roomId}
+          state={state}
+          myId={myId}
+          presence={presence}
+          presenceLoaded={presenceLoaded}
+          control={bigScreen && !seeHere}
+          onToggleView={bigScreen ? () => setSeeHere((v) => !v) : undefined}
+        />
+      )}
 
       {status === "ready" && state && meta && state.status === "finished" && (
         <main className="mx-auto flex w-full max-w-md flex-col gap-3 p-4">
-          {state.gameNo > 0 || !online ? <Results state={state} myId={myId} /> : <RoomLoading text="Armando la primera ronda…" />}
+          {state.gameNo > 0 || !online ? <TroncoResults state={state} myId={myId} /> : <RoomLoading text="Armando la primera ronda…" />}
           {online ? (
             <NextRound nextAt={state.nextAt} />
           ) : (
@@ -202,37 +218,30 @@ function AgainButton({ roomId, meta, state, connected }: { roomId: string; meta:
   );
 }
 
-/** Who lasted longest first: the winner, then by when each one fell. */
-function Results({ state, myId }: { state: TroncoState; myId: string }) {
-  const order = [...state.roster].sort((a, b) => {
-    if (a === state.winner) return -1;
-    if (b === state.winner) return 1;
-    return (state.out[b] ?? Infinity) - (state.out[a] ?? Infinity);
-  });
-  const iWon = state.winner === myId;
-  const winner = playerInfo(state, state.winner);
-  const wins = state.wins[myId] ?? 0;
-  const secs = (id: string) => Math.max(0, Math.round(((state.out[id] ?? 0) - state.startedAt) / 1000));
+/** In the waiting room of a big-screen room: how to open the screen, and what the phone does. */
+function ScreenCard({ roomId }: { roomId: string }) {
+  const path = `${roomPath("tronco", roomId)}/pantalla`;
+  const host = useSyncExternalStore(noSubscribe, () => window.location.host, () => "taloplay.com");
   return (
-    <div className={`${CARD} flex flex-col gap-4`}>
-      {iWon && <Confetti />}
-      <div className="text-center">
-        <p className="font-display text-3xl text-white">{iWon ? "¡Quedaste en pie!" : state.winner ? `¡Ganó ${winner.name}!` : "¡Terminó!"}</p>
-        {wins > 1 && <p className="mt-1 text-xs text-white/50">Llevás {wins} ganadas</p>}
+    <div className="flex flex-col gap-3 rounded-[20px] border border-white/[0.08] bg-[#1c1c1c] p-5">
+      <div className="flex items-start gap-3">
+        <MonitorPlay className="mt-0.5 h-6 w-6 shrink-0 text-talo-hero" />
+        <div>
+          <p className="font-bold text-white">Se juega en una pantalla grande</p>
+          <p className="mt-1 text-sm text-white/60">
+            Abrí este link en la compu conectada a la tele o al proyector. Los celulares son el control.
+          </p>
+        </div>
       </div>
-      <ol className="flex flex-col gap-1.5">
-        {order.map((id, i) => {
-          const info = playerInfo(state, id);
-          return (
-            <li key={id} className={`flex items-center gap-3 rounded-xl px-3 py-2 ${id === myId ? "bg-white/[0.08]" : ""}`}>
-              <span className="w-6 font-display text-lg text-white/70">{i + 1}</span>
-              <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: info.color }} />
-              <span className="min-w-0 flex-1 truncate text-sm font-bold text-white">{id === myId ? "Vos" : info.name}</span>
-              {id === state.winner ? <Crown className="h-4 w-4 text-talo-hero" /> : <span className="font-mono text-xs text-white/60">cayó a los {secs(id)} s</span>}
-            </li>
-          );
-        })}
-      </ol>
+      <p className="break-all rounded-xl bg-black/40 px-3 py-2 font-code text-sm text-white/80">{host}{path}</p>
+      <div className="flex items-center gap-2 text-xs text-white/50">
+        <Gamepad2 className="h-4 w-4 shrink-0" /> Si no tienen tele a mano, en la ronda podés tocar «Ver la ronda acá».
+      </div>
+      <a href={path} target="_blank" rel="noreferrer" className="text-center text-sm font-bold text-talo-hero underline-offset-2 hover:underline">
+        Abrir la pantalla en este dispositivo
+      </a>
     </div>
   );
 }
+
+const noSubscribe = () => () => {};

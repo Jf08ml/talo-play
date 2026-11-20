@@ -81,7 +81,7 @@ function useStartBots() {
   return async (bots: number, pace: Pace): Promise<boolean> => {
     if (!identity.clientId) return false;
     try {
-      const id = await createTroncoRoom(identity.clientId, { bots, pace }, true);
+      const id = await createTroncoRoom(identity.clientId, { bots, pace, view: "telefono" }, true);
       trackEvent("create_room", { game: "tronco", mode: "bots" });
       router.push(`/el-tronco/${id}`);
       return true;

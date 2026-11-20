@@ -555,6 +555,7 @@ export const GUIDES: Record<GameId, Guide> = {
         title: "Para jugar",
         text: [
           "¿Primera vez? En el lobby está «Practicar»: un minuto con el tronco lento que te enseña a saltar y a patear sin quedar afuera.",
+          "Con una tele: en «Amigos» elegí «En una pantalla grande» y creá la sala desde la compu conectada a la tele o al proyector. La ronda se ve ahí, con un anillo bajo cada talo que se pone amarillo (saltá) o verde (pateá), y los celulares son el control: dos botones grandes que vibran cuando el tronco llega. Para arrancar, el que patea elige hacia quién lo manda.",
           "«Contra bots»: vos y la compu, al toque. «En línea»: rondas una atrás de la otra con gente de todos lados (y bots si hay poca). «Amigos»: una sala con link, y bots si quieren completar la ronda.",
         ],
       },

@@ -28,6 +28,8 @@ export interface PlayerView {
   jumpS: number;
   kickS: number;
   fallS: number;
+  /** What their buttons would do now: shown as the ring under them (absent = no ring). */
+  cue?: Cue;
 }
 
 export interface SceneView {
@@ -38,8 +40,6 @@ export interface SceneView {
   shake: boolean;
   /** The log is turning (not resting before the opening kick). */
   rolling: boolean;
-  /** What my buttons would do now (the ring under me shows it). */
-  cue: Cue;
   players: PlayerView[];
   /** Where my camera stands (my seat), or null to watch from the front. */
   myAngle: number | null;
@@ -54,6 +54,7 @@ interface Talo {
   body: THREE.Group;
   foot: THREE.Mesh;
   spot: THREE.Mesh;
+  warn: THREE.Mesh;
   eyes: THREE.Mesh[];
   pupils: THREE.Mesh[];
   shadow: THREE.Mesh;
@@ -112,7 +113,9 @@ export class TroncoScene {
   private bark: THREE.Mesh;
   private streaks: { group: THREE.Group; mat: THREE.MeshBasicMaterial }[] = [];
   private talos = new Map<string, Talo>();
-  private warn: THREE.Mesh;
+  private warnGeo: THREE.BufferGeometry;
+  /** Bigger name tags, for a TV seen from the couch. */
+  private tv: boolean;
   private wave: THREE.Mesh;
   private waveLife = 1;
   private bits: Bit[] = [];
@@ -125,7 +128,8 @@ export class TroncoScene {
   private lastTime = 0;
   private disposables: { dispose: () => void }[] = [];
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, { tv = false }: { tv?: boolean } = {}) {
+    this.tv = tv;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     this.renderer.shadowMap.enabled = true;
@@ -282,13 +286,7 @@ export class TroncoScene {
     }
     this.scene.add(this.pivot);
 
-    // The warning ring under my talo.
-    const warnMat = new THREE.MeshBasicMaterial({ color: "#FFFFFF", transparent: true, opacity: 0.0, depthWrite: false });
-    this.disposables.push(warnMat);
-    this.warn = new THREE.Mesh(geo(new THREE.RingGeometry(0.62, 0.8, 32)), warnMat);
-    this.warn.rotation.x = -Math.PI / 2;
-    this.warn.position.y = 0.03;
-    this.scene.add(this.warn);
+    this.warnGeo = geo(new THREE.RingGeometry(0.62, 0.8, 32));
 
     // The shock ring of a kick.
     const waveMat = new THREE.MeshBasicMaterial({ color: "#FFFFFF", transparent: true, opacity: 0, depthWrite: false });
@@ -340,6 +338,12 @@ export class TroncoScene {
     spot.position.y = 0.013;
     spot.receiveShadow = true;
     root.add(spot);
+    // The warning ring (its own material: each one has its color).
+    const warn = new THREE.Mesh(this.warnGeo, new THREE.MeshBasicMaterial({ color: "#FFFFFF", transparent: true, opacity: 0, depthWrite: false }));
+    warn.rotation.x = -Math.PI / 2;
+    warn.position.y = 0.03;
+    warn.visible = false;
+    root.add(warn);
     const shadow = new THREE.Mesh(
       new THREE.CircleGeometry(0.5, 20),
       new THREE.MeshBasicMaterial({ color: "#000000", transparent: true, opacity: 0.22, depthWrite: false })
@@ -348,7 +352,8 @@ export class TroncoScene {
     shadow.position.y = 0.018;
     root.add(shadow);
     const label = labelSprite(p.me ? "Vos" : p.name, p.me);
-    label.position.y = 1.85;
+    label.position.y = this.tv ? 2.2 : 1.85;
+    if (this.tv) label.scale.multiplyScalar(1.7);
     root.add(label);
     // Stars going round the head of the fallen.
     const stars = new THREE.Group();
@@ -364,7 +369,7 @@ export class TroncoScene {
     this.scene.add(root);
     let phase = 0;
     for (const ch of p.id) phase = (phase * 31 + ch.charCodeAt(0)) % 1000;
-    return { root, body, foot, spot, eyes, pupils, shadow, label, stars, phase: phase / 159, lastJumpS: 99, wasDown: false };
+    return { root, body, foot, spot, warn, eyes, pupils, shadow, label, stars, phase: phase / 159, lastJumpS: 99, wasDown: false };
   }
 
   private dropTalo(t: Talo) {
@@ -372,7 +377,7 @@ export class TroncoScene {
     const keep = new Set<THREE.Material>([this.bitMat.star]);
     t.root.traverse((o) => {
       const m = o as THREE.Mesh;
-      m.geometry?.dispose();
+      if (m.geometry !== this.warnGeo) m.geometry?.dispose();
       const mats = Array.isArray(m.material) ? m.material : m.material ? [m.material] : [];
       for (const mat of mats) {
         if (keep.has(mat)) continue;
@@ -583,27 +588,33 @@ export class TroncoScene {
       s.mat.opacity = visible ? strength * 0.38 * (1 - k / 5) : 0;
     });
 
-    // Warning under me: grows as the log comes; yellow = jump now, green = kick (or jump) now.
-    const me = v.players.find((p) => p.me && p.fallS < 0);
-    const warnMat = this.warn.material as THREE.MeshBasicMaterial;
-    if (me) {
-      this.warn.position.copy(at(me.angle, RING)).setY(0.03);
-      const near = Number.isFinite(v.cue.ttc) ? Math.max(0, Math.min(1, 1 - v.cue.ttc / 1.3)) : 0;
-      if (v.cue.kick) {
-        warnMat.opacity = 0.95;
-        warnMat.color.set("#34C759");
-        this.warn.scale.setScalar(1.3 + Math.sin(v.time * 30) * 0.06);
-      } else if (v.cue.jump) {
-        warnMat.opacity = 0.95;
-        warnMat.color.set("#FFD400");
-        this.warn.scale.setScalar(1.2 + Math.sin(v.time * 30) * 0.05);
-      } else {
-        warnMat.opacity = 0.2 + near * 0.5;
-        warnMat.color.set("#FFFFFF");
-        this.warn.scale.setScalar(1.5 - near * 0.35);
+    // Warning rings (players with a cue: me, or everyone on the TV): they grow
+    // as the log comes; yellow = jump now, green = kick (or jump) now.
+    for (const p of v.players) {
+      const t = this.talos.get(p.id);
+      if (!t) continue;
+      const mat = t.warn.material as THREE.MeshBasicMaterial;
+      const cue = p.fallS < 0 ? p.cue : undefined;
+      if (!cue) {
+        t.warn.visible = false;
+        continue;
       }
-    } else {
-      warnMat.opacity = 0;
+      t.warn.visible = true;
+      const near = Number.isFinite(cue.ttc) ? Math.max(0, Math.min(1, 1 - cue.ttc / 1.3)) : 0;
+      if (cue.kick) {
+        mat.opacity = 0.95;
+        mat.color.set("#34C759");
+        t.warn.scale.setScalar(1.3 + Math.sin(v.time * 30) * 0.06);
+      } else if (cue.jump) {
+        mat.opacity = 0.95;
+        mat.color.set("#FFD400");
+        t.warn.scale.setScalar(1.2 + Math.sin(v.time * 30) * 0.05);
+      } else {
+        // On the TV, only a hint while it's coming; under me, always there.
+        mat.opacity = p.me ? 0.2 + near * 0.5 : near * 0.45;
+        mat.color.set("#FFFFFF");
+        t.warn.scale.setScalar(1.5 - near * 0.35);
+      }
     }
 
     // Kick shock ring.
@@ -617,16 +628,24 @@ export class TroncoScene {
     }
     this.stepBits(dt);
 
-    // Camera: behind my seat, looking over the ring; it shakes on hits.
-    const want = v.myAngle ?? Math.PI / 2 + Math.PI;
-    let d = want - this.camAngle;
-    d = Math.atan2(Math.sin(d), Math.cos(d));
-    this.camAngle += d * 0.08;
+    // Camera: behind my seat, looking over the ring; with no seat (the TV, or
+    // watching) high up in front, the whole ring in view. It shakes on hits.
     const narrow = this.camera.aspect < 0.8;
-    const back = at(this.camAngle, RING + (narrow ? 6.2 : 5.4));
-    this.camera.position.set(back.x, narrow ? 8.2 : 6.2, back.z);
-    const look = at(this.camAngle, narrow ? -0.6 : -0.3);
-    this.camera.lookAt(look.x, 0.2, look.z);
+    if (v.myAngle !== null) {
+      let d = v.myAngle - this.camAngle;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      this.camAngle += d * 0.08;
+      const back = at(this.camAngle, RING + (narrow ? 6.2 : 5.4));
+      this.camera.position.set(back.x, narrow ? 8.2 : 6.2, back.z);
+      const look = at(this.camAngle, narrow ? -0.6 : -0.3);
+      this.camera.lookAt(look.x, 0.2, look.z);
+    } else {
+      // A slow drift so the TV never looks frozen.
+      const sway = Math.sin(v.time * 0.15) * 0.12;
+      const pos = at(-Math.PI / 2 + sway, narrow ? 12.5 : 9.4);
+      this.camera.position.set(pos.x, narrow ? 15 : 12.2, pos.z);
+      this.camera.lookAt(0, 0, narrow ? 0.4 : 0.35);
+    }
     if (this.shakeAmt > 0.002) {
       this.camera.position.x += (Math.random() - 0.5) * this.shakeAmt;
       this.camera.position.y += (Math.random() - 0.5) * this.shakeAmt;

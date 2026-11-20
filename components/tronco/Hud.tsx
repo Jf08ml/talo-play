@@ -43,7 +43,9 @@ export function paintMeter(
   dir: 1 | -1,
   show: boolean,
   busy: boolean,
-  zones: { jump: boolean; kick: boolean } = { jump: true, kick: true }
+  zones: { jump: boolean; kick: boolean } = { jump: true, kick: true },
+  /** Who it comes from (as a controller, where left/right mean nothing). */
+  fromName = ""
 ) {
   if (!el) return;
   const visible = show && Number.isFinite(cue.ttc);
@@ -66,7 +68,7 @@ export function paintMeter(
     log.style.opacity = cue.ttc > SPAN ? "0.35" : "1";
   }
   const label = el.querySelector("[data-label]");
-  const text = busy ? "" : cue.kick ? "¡Ahora!" : cue.jump ? "¡Saltá!" : cue.ttc < SPAN ? (side < 0 ? "← Viene" : "Viene →") : "";
+  const text = busy ? "" : cue.kick ? "¡Ahora!" : cue.jump ? "¡Saltá!" : cue.ttc < SPAN ? (fromName ? `Viene de ${fromName}` : side < 0 ? "← Viene" : "Viene →") : "";
   if (label && label.textContent !== text) label.textContent = text;
 }
 
@@ -86,6 +88,7 @@ export function ActionButtons({
   disabled,
   jumpOff,
   kickOff,
+  big = false,
 }: {
   jumpRef: RefObject<HTMLButtonElement | null>;
   kickRef: RefObject<HTMLButtonElement | null>;
@@ -95,9 +98,13 @@ export function ActionButtons({
   /** Only one of them in use (the practice teaches them one at a time). */
   jumpOff?: boolean;
   kickOff?: boolean;
+  /** Filling the screen (a phone used as the controller). */
+  big?: boolean;
 }) {
+  const size = big ? "h-full flex-col text-2xl" : "py-5 text-lg";
+  const icon = big ? "h-12 w-12" : "h-6 w-6";
   return (
-    <div className="grid grid-cols-2 gap-3 bg-talo-ink p-3 pb-[max(12px,env(safe-area-inset-bottom))]">
+    <div className={`grid grid-cols-2 gap-3 bg-talo-ink p-3 pb-[max(12px,env(safe-area-inset-bottom))] ${big ? "min-h-0 flex-1" : ""}`}>
       <button
         ref={jumpRef}
         onPointerDown={(e) => {
@@ -105,9 +112,9 @@ export function ActionButtons({
           onJump();
         }}
         disabled={disabled || jumpOff}
-        className="flex select-none items-center justify-center gap-2 rounded-2xl bg-white/85 py-5 text-lg font-bold text-talo-ink ring-talo-hero/50 transition-[background-color,box-shadow,transform] duration-75 active:scale-95 disabled:opacity-30 data-[ready=1]:scale-[1.03] data-[ready=1]:bg-talo-hero data-[ready=1]:ring-4"
+        className={`flex select-none items-center justify-center gap-2 rounded-2xl bg-white/85 ${size} font-bold text-talo-ink ring-talo-hero/50 transition-[background-color,box-shadow,transform] duration-75 active:scale-95 disabled:opacity-30 data-[ready=1]:scale-[1.03] data-[ready=1]:bg-talo-hero data-[ready=1]:ring-4`}
       >
-        <ArrowUp className="h-6 w-6" strokeWidth={3} /> Saltar
+        <ArrowUp className={icon} strokeWidth={3} /> Saltar
       </button>
       <button
         ref={kickRef}
@@ -116,9 +123,9 @@ export function ActionButtons({
           onKick();
         }}
         disabled={disabled || kickOff}
-        className="flex select-none items-center justify-center gap-2 rounded-2xl bg-white/85 py-5 text-lg font-bold text-talo-ink ring-emerald-300/50 transition-[background-color,box-shadow,transform] duration-75 active:scale-95 disabled:opacity-30 data-[ready=1]:scale-[1.03] data-[ready=1]:bg-emerald-400 data-[ready=1]:ring-4"
+        className={`flex select-none items-center justify-center gap-2 rounded-2xl bg-white/85 ${size} font-bold text-talo-ink ring-emerald-300/50 transition-[background-color,box-shadow,transform] duration-75 active:scale-95 disabled:opacity-30 data-[ready=1]:scale-[1.03] data-[ready=1]:bg-emerald-400 data-[ready=1]:ring-4`}
       >
-        <Footprints className="h-6 w-6" strokeWidth={2.5} /> Patear
+        <Footprints className={icon} strokeWidth={2.5} /> Patear
       </button>
     </div>
   );

@@ -293,8 +293,7 @@ export default function TroncoPractice({ onClose, onPlay }: { onClose: () => voi
         speed,
         shake: false,
         rolling,
-        cue,
-        players,
+        players: players.map((p) => (p.me ? { ...p, cue } : p)),
         myAngle: myTheta,
         time: performance.now() / 1000,
       });

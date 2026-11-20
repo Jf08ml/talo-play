@@ -37,19 +37,22 @@ export const ONLINE_MAX_PEOPLE = 8;
 const ONLINE_RING = 6;
 export const PACES = { normal: 1, rapido: 1.25 } as const;
 export type Pace = keyof typeof PACES;
+/** Where the match is seen: each on their phone, or on a big screen (`/pantalla`) with the phones as controllers. */
+export type TroncoView = "telefono" | "pantalla";
 
 export interface TroncoMeta {
   game: "tronco";
   hostId?: string;
   bots: number;
   pace: Pace;
+  view: TroncoView;
   online: boolean;
   /** Made from "Contra bots": starts by itself, no waiting room. */
   solo: boolean;
   createdAt: number | object;
 }
 
-export type TroncoSettings = Pick<TroncoMeta, "bots" | "pace">;
+export type TroncoSettings = Pick<TroncoMeta, "bots" | "pace" | "view">;
 
 export interface TroncoPlayer {
   name: string;
@@ -93,6 +96,7 @@ export function normalizeMeta(raw: Partial<TroncoMeta>): TroncoMeta {
     hostId: raw.hostId,
     bots: raw.bots ?? 3,
     pace: raw.pace ?? "normal",
+    view: raw.view === "pantalla" ? "pantalla" : "telefono",
     online: raw.online ?? false,
     solo: raw.solo ?? false,
     createdAt: raw.createdAt ?? 0,
@@ -309,6 +313,6 @@ export async function enterOnline(): Promise<string> {
 export function nextOnlineRound(roomId: string, connected: string[]) {
   return mutate(roomId, (s) => {
     if (!s.online || s.status === "playing" || serverNow() < s.nextAt) return null;
-    return newGame(s, { bots: 0, pace: "normal" }, connected, s.gameNo + 1);
+    return newGame(s, { bots: 0, pace: "normal", view: "telefono" }, connected, s.gameNo + 1);
   });
 }

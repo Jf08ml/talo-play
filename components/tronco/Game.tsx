@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, Gauge } from "lucide-react";
+import { ArrowLeft, ArrowRight, Eye, Gamepad2, Gauge } from "lucide-react";
+import { Talo } from "@/components/Talo";
+import { playerTalo } from "@/lib/talos";
 import { ActionButtons, TimingMeter, paintButtons, paintMeter } from "./Hud";
 import {
   botHost,
@@ -36,7 +38,8 @@ import {
   logAt,
   newMind,
   speedAt,
-  wrapPi,
+  neighbor,
+  DrawnLog,
   type FallReason,
   type BotMind,
 } from "@/lib/tronco";
@@ -52,8 +55,6 @@ import { useWakeLock } from "@/components/carreras/Controller";
 const JUDGE_DELAY_MS = 160;
 /** A person missing this long falls (so a ring never waits on someone who left). */
 const GONE_MS = 4000;
-/** How fast a jump in the drawn log (a kick that arrived late) fades away, per second. */
-const SMOOTH_RATE = 10;
 /** A bot opener thinks this long before kicking it off. */
 const BOT_OPEN_MS = 1600;
 
@@ -75,12 +76,18 @@ export default function TroncoGame({
   myId,
   presence,
   presenceLoaded,
+  control = false,
+  onToggleView,
 }: {
   roomId: string;
   state: TroncoState;
   myId: string;
   presence: PresenceMap;
   presenceLoaded: boolean;
+  /** The game is on a big screen: this phone is only the controller. */
+  control?: boolean;
+  /** Switch between controller and the 3D view (rooms with a big screen). */
+  onToggleView?: () => void;
 }) {
   const g = state.gameNo;
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -98,9 +105,11 @@ export default function TroncoGame({
   const fell = useRef<Record<string, number>>({});
   const absent = useRef<Record<string, number>>({});
   /** The drawn log: an offset absorbs jumps (late kicks) and fades away. */
-  const shown = useRef({ prev: NaN, dir: 1, speed: 0, offset: 0, at: 0 });
+  const drawn = useRef(new DrawnLog());
   /** Last time this phone tried to kick it off for someone else (a bot, or a timeout). */
   const opening = useRef(0);
+  /** The jump window was open last frame (to buzz once when it opens). */
+  const buzzed = useRef(false);
   const [flash, setFlash] = useState<{ text: string; key: number } | null>(null);
   const [hint, setHint] = useState(true);
   /** Why I fell (shown under "¡Te tumbó!"). */
@@ -138,7 +147,7 @@ export default function TroncoGame({
     runners.current = new Map();
     pending.current = [];
     fell.current = {};
-    shown.current = { prev: NaN, dir: 1, speed: 0, offset: 0, at: 0 };
+    drawn.current = new DrawnLog();
     opening.current = 0;
     return subscribeActs(roomId, g, (a) => (acts.current = a));
   }, [roomId, g]);
@@ -268,19 +277,21 @@ export default function TroncoGame({
   useEffect(() => {
     const canvas = canvasRef.current;
     const wrap = wrapRef.current;
-    if (!canvas || !wrap) return;
-    let scene: TroncoScene;
-    try {
-      scene = new TroncoScene(canvas);
-    } catch (err) {
-      console.error(err);
-      return;
+    // As a controller (the game is on a TV) there's nothing to draw, but the
+    // loop still runs: opening, bots, judging, the bar and the buttons.
+    let scene: TroncoScene | null = null;
+    if (!control && canvas && wrap) {
+      try {
+        scene = new TroncoScene(canvas);
+      } catch (err) {
+        console.error(err);
+      }
     }
     const ro = new ResizeObserver(() => {
-      const r = wrap.getBoundingClientRect();
-      scene.resize(r.width, r.height);
+      const r = wrap!.getBoundingClientRect();
+      scene?.resize(r.width, r.height);
     });
-    ro.observe(wrap);
+    if (scene && wrap) ro.observe(wrap);
     let raf = 0;
     const loop = () => {
       const s = stateRef.current;
@@ -329,7 +340,10 @@ export default function TroncoGame({
               fell.current[id] = c;
               reportOut(roomId, g, id, c).catch(console.error);
               playSound(id === myId ? "bad" : "place");
-              if (id === myId) setReason(fallReason(r.jump, r.kick, c));
+              if (id === myId) {
+                setReason(fallReason(r.jump, r.kick, c));
+                navigator.vibrate?.([120, 60, 220]);
+              }
               break;
             }
             r.judged = upto;
@@ -337,27 +351,26 @@ export default function TroncoGame({
         }
       }
 
-      // The drawn log. Before it rolls it nudges toward the side it was kicked;
-      // any jump (another's kick arriving late, the nudge ending) goes into an
-      // offset that fades, so it never snaps. Judging uses the real one.
       const log = logAt(tl, now);
-      let target = log.angle;
-      if (s.startedAt > 0 && now < s.startedAt) {
-        const p = Math.max(0, Math.min(1, 1 - (s.startedAt - now) / OPEN_LEAD_MS));
-        target += log.dir * 0.14 * Math.sin(p * (Math.PI / 2));
+      const meIn = s.roster.includes(myId);
+      const meUp = meIn && !isDown(myId);
+      const cue = meUp && live ? cueAt(tl, now, seatOf(s, myId)) : NO_CUE;
+      const busy = now < (runners.current.get(myId)?.busy ?? 0);
+      // A buzz when the jump window opens (players may be looking at a TV).
+      const open = cue.jump && !busy;
+      if (open && !buzzed.current) navigator.vibrate?.(30);
+      buzzed.current = open;
+      let from = "";
+      if (control && meIn && Number.isFinite(cue.ttc)) {
+        const i = s.roster.indexOf(myId);
+        from = playerInfo(s, s.roster[neighbor(i, s.roster.length, log.dir === 1 ? -1 : 1)]).name;
       }
-      const v = shown.current;
-      const clock = performance.now();
-      const dt = Math.min(0.1, (clock - v.at) / 1000);
-      if (Number.isFinite(v.prev)) {
-        const jump = wrapPi(target - v.prev - v.dir * v.speed * dt);
-        if (Math.abs(jump) > 0.03) v.offset -= jump;
-        v.offset = wrapPi(v.offset) * Math.exp(-dt * SMOOTH_RATE);
+      paintButtons(jumpBtn.current, kickBtn.current, cue, busy);
+      paintMeter(meterRef.current, cue, log.dir, meUp && rolling(s, now), busy, undefined, from);
+      if (!scene) {
+        raf = requestAnimationFrame(loop);
+        return;
       }
-      v.prev = target;
-      v.dir = log.dir;
-      v.speed = rolling(s, now) ? speedAt(tl, now) : 0;
-      v.at = clock;
 
       const players: PlayerView[] = s.roster.map((id) => {
         const local = runners.current.get(id);
@@ -377,21 +390,14 @@ export default function TroncoGame({
           fallS: down !== undefined ? Math.max(0, (now - down) / 1000) : -1,
         };
       });
-      const meIn = s.roster.includes(myId);
-      const meUp = meIn && !isDown(myId);
-      const cue = meUp && live ? cueAt(tl, now, seatOf(s, myId)) : NO_CUE;
-      const busy = now < (runners.current.get(myId)?.busy ?? 0);
-      paintButtons(jumpBtn.current, kickBtn.current, cue, busy);
-      paintMeter(meterRef.current, cue, log.dir, meUp && rolling(s, now), busy);
       scene.frame({
-        logAngle: target + v.offset,
+        logAngle: drawn.current.angle(tl, now, OPEN_LEAD_MS, performance.now()),
         logDir: log.dir,
-        speed: v.speed,
+        speed: rolling(s, now) ? speedAt(tl, now) : 0,
         // It trembles at the opener's feet while waiting for the kick.
         shake: live && !s.startedAt && now >= s.openAt,
         rolling: rolling(s, now),
-        cue,
-        players,
+        players: players.map((p) => (p.me ? { ...p, cue } : p)),
         myAngle: meIn ? seatOf(s, myId) : null,
         time: performance.now() / 1000,
       });
@@ -401,10 +407,10 @@ export default function TroncoGame({
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
-      scene.dispose();
+      scene?.dispose();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one scene per game; everything else is read from refs.
-  }, [g, roomId, myId]);
+  }, [g, roomId, myId, control]);
 
   // People who left fall (any phone does it), so the ring doesn't wait for them.
   useEffect(() => {
@@ -440,25 +446,127 @@ export default function TroncoGame({
   const rollingNow = live && !!now && rolling(state, now);
   const pace = rollingNow ? speedAt(timelineOf(state), now) / BASE_SPEED : 1;
 
+  const myIdx = state.roster.indexOf(myId);
+  const sideName = (dir: 1 | -1) => (myIdx >= 0 ? playerInfo(state, state.roster[neighbor(myIdx, state.roster.length, dir)]).name : "");
+  const me = playerInfo(state, myId);
+
+  const chips = (
+    <div className="pointer-events-none flex flex-wrap justify-center gap-1.5 px-2">
+      <span className="rounded-full bg-black/55 px-3 py-1 text-sm font-bold text-white">
+        Quedan {standing} de {state.roster.length}
+      </span>
+      {rollingNow && (
+        <span className={`flex items-center gap-1 rounded-full px-3 py-1 text-sm font-bold ${pace >= 2 ? "bg-red-500/80 text-white" : pace >= 1.5 ? "bg-talo-hero text-talo-ink" : "bg-black/55 text-white"}`}>
+          <Gauge className="h-4 w-4" /> ×{pace.toFixed(1)}
+        </span>
+      )}
+      {playing && saved > 0 && !meOut && (
+        <span key={saved} className="animate-celebration-in rounded-full bg-black/55 px-3 py-1 text-sm font-bold text-white">
+          Esquivadas: {saved}
+        </span>
+      )}
+    </div>
+  );
+
+  const viewToggle = onToggleView && (
+    <button
+      onClick={onToggleView}
+      className="pointer-events-auto absolute right-2 top-2 z-10 flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-xs font-bold text-white hover:bg-black/70"
+    >
+      {control ? <Eye className="h-4 w-4" /> : <Gamepad2 className="h-4 w-4" />}
+      {control ? "Ver la ronda acá" : "Usar de control"}
+    </button>
+  );
+
+  // The opening kick: to my left/right as I see it, or (as a controller, with
+  // the ring on a TV) toward a neighbor by name.
+  const openButtons = (
+    <div className={`grid grid-cols-2 gap-3 bg-talo-ink p-3 pb-[max(12px,env(safe-area-inset-bottom))] ${control ? "min-h-0 flex-1" : ""}`}>
+      {(["left", "right"] as const).map((side) => (
+        <button
+          key={side}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            openMe(side);
+          }}
+          className={`flex select-none items-center justify-center gap-2 rounded-2xl bg-talo-hero font-bold text-talo-ink active:scale-95 ${control ? "h-full flex-col text-2xl" : "py-5 text-lg"}`}
+        >
+          {side === "left" && <ArrowLeft className={control ? "h-10 w-10" : "h-6 w-6"} strokeWidth={3} />}
+          {control ? `Hacia ${sideName(side === "right" ? 1 : -1)}` : "Para allá"}
+          {side === "right" && <ArrowRight className={control ? "h-10 w-10" : "h-6 w-6"} strokeWidth={3} />}
+        </button>
+      ))}
+    </div>
+  );
+
+  const buttons =
+    playing &&
+    (iOpen ? openButtons : <ActionButtons jumpRef={jumpBtn} kickRef={kickBtn} onJump={jumpMe} onKick={kickMe} disabled={!!meOut} big={control} />);
+
+  if (control) {
+    return (
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {viewToggle}
+        <div className="flex shrink-0 flex-col items-center gap-3 px-4 pb-3 pt-12 text-center">
+          {chips}
+          {playing ? (
+            <div className="flex items-center gap-3">
+              <Talo {...playerTalo(myId, me.color, 44)} expr={meOut ? "triste" : flash && !flash.text.includes("aire") ? "contento" : "normal"} />
+              <div className="text-left">
+                <p className="text-xs font-bold uppercase tracking-wide text-white/50">Sos</p>
+                <p className="font-display text-2xl leading-tight text-white">{me.name}</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-base font-bold text-white/80">Estás mirando: en la próxima entrás vos también.</p>
+          )}
+          <div className="flex min-h-[88px] flex-col items-center justify-center gap-1.5">
+            {countdown > 0 ? (
+              <>
+                <span key={countdown} className="animate-celebration-in font-display text-6xl text-white">
+                  {countdown}
+                </span>
+                <span className="text-sm font-bold text-white/70">
+                  {state.opener === myId ? "Arrancás vos: vas a patear el tronco" : `Mirá la pantalla · arranca ${openerName}`}
+                </span>
+              </>
+            ) : waitingOpen ? (
+              <span className="rounded-2xl bg-white/[0.08] px-4 py-2 text-base font-bold text-white">
+                {iOpen ? "¡Arrancás vos! ¿Para quién lo pateás?" : `${openerName} va a patear el tronco…`}
+                {iOpen && openLeft <= 4 && <span className="block text-sm text-white/60">Si no elegís, sale solo en {openLeft}</span>}
+              </span>
+            ) : meOut ? (
+              <>
+                <span className="font-display text-3xl text-white">¡Te tumbó!</span>
+                {reason && <span className="max-w-xs text-sm font-bold text-talo-hero">{FALL_TEXT[reason]}</span>}
+                <span className="text-sm font-bold text-white/70">
+                  Quedaste {place}º{saved > 0 ? ` · esquivaste ${saved}` : ""}
+                </span>
+              </>
+            ) : flash ? (
+              <span key={flash.key} className="animate-celebration-in font-display text-4xl text-talo-hero">
+                {flash.text}
+              </span>
+            ) : playing ? (
+              <span className="max-w-xs text-sm font-bold text-white/60">
+                Mirá la pantalla: el anillo bajo tu talo se pone amarillo para saltar y verde para patear. El celular vibra cuando llega.
+              </span>
+            ) : null}
+          </div>
+          {feed.length > 0 && <p className="text-xs font-bold text-white/50">{feed[feed.length - 1].text}</p>}
+          {playing && !meOut && <TimingMeter meterRef={meterRef} />}
+        </div>
+        {buttons}
+      </div>
+    );
+  }
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div ref={wrapRef} className="relative min-h-0 flex-1">
         <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none select-none" />
-        <div className="pointer-events-none absolute inset-x-0 top-2 flex flex-wrap justify-center gap-1.5 px-2">
-          <span className="rounded-full bg-black/55 px-3 py-1 text-sm font-bold text-white">
-            Quedan {standing} de {state.roster.length}
-          </span>
-          {rollingNow && (
-            <span className={`flex items-center gap-1 rounded-full px-3 py-1 text-sm font-bold ${pace >= 2 ? "bg-red-500/80 text-white" : pace >= 1.5 ? "bg-talo-hero text-talo-ink" : "bg-black/55 text-white"}`}>
-              <Gauge className="h-4 w-4" /> ×{pace.toFixed(1)}
-            </span>
-          )}
-          {playing && saved > 0 && !meOut && (
-            <span key={saved} className="animate-celebration-in rounded-full bg-black/55 px-3 py-1 text-sm font-bold text-white">
-              Esquivadas: {saved}
-            </span>
-          )}
-        </div>
+        {viewToggle}
+        <div className="absolute inset-x-0 top-2">{chips}</div>
         {feed.length > 0 && (
           <div className="pointer-events-none absolute left-2 top-12 flex flex-col gap-1">
             {feed.map((n) => (
@@ -529,29 +637,7 @@ export default function TroncoGame({
           </p>
         )}
       </div>
-      {playing && iOpen && (
-        <div className="grid grid-cols-2 gap-3 bg-talo-ink p-3 pb-[max(12px,env(safe-area-inset-bottom))]">
-          <button
-            onPointerDown={(e) => {
-              e.preventDefault();
-              openMe("left");
-            }}
-            className="flex select-none items-center justify-center gap-2 rounded-2xl bg-talo-hero py-5 text-lg font-bold text-talo-ink active:scale-95"
-          >
-            <ArrowLeft className="h-6 w-6" strokeWidth={3} /> Para allá
-          </button>
-          <button
-            onPointerDown={(e) => {
-              e.preventDefault();
-              openMe("right");
-            }}
-            className="flex select-none items-center justify-center gap-2 rounded-2xl bg-talo-hero py-5 text-lg font-bold text-talo-ink active:scale-95"
-          >
-            Para allá <ArrowRight className="h-6 w-6" strokeWidth={3} />
-          </button>
-        </div>
-      )}
-      {playing && !iOpen && <ActionButtons jumpRef={jumpBtn} kickRef={kickBtn} onJump={jumpMe} onKick={kickMe} disabled={!!meOut} />}
+      {buttons}
     </div>
   );
 }
