@@ -18,7 +18,7 @@
 /** Radius of the ring where the players stand. */
 export const RING = 4.2;
 export const LOG_LENGTH = RING + 1.3;
-const BASE_SPEED = 1.35;
+export const BASE_SPEED = 1.35;
 const ACCEL = 0.032;
 export const MAX_SPEED = 4.3;
 /** A jump clears the log between these seconds after the press; you can act again on landing. */
@@ -126,6 +126,45 @@ export function jumpHeight(s: number): number {
   return 4 * 1.25 * p * (1 - p);
 }
 
+// ---- Cues (what the screen tells the player) -------------------------------
+
+export interface Cue {
+  /** Seconds until the log reaches the player (Infinity before it rolls). */
+  ttc: number;
+  /** Pressing "Saltar" now would clear it. */
+  jump: boolean;
+  /** Pressing "Patear" now would send it back. */
+  kick: boolean;
+}
+
+export const NO_CUE: Cue = { ttc: Infinity, jump: false, kick: false };
+
+/** What each button would do right now for the player at θ (ignoring kicks to come). */
+export function cueAt(tl: Timeline, t: number, theta: number): Cue {
+  if (t < tl.startedAt) return NO_CUE;
+  const ttc = timeToReach(tl, t, theta);
+  return { ttc, jump: ttc >= JUMP_FROM && ttc <= JUMP_TO, kick: ttc <= KICK_REACH };
+}
+
+/** Why a pass at time c knocked someone down, from their last jump and kick around it. */
+export type FallReason = "late" | "early" | "kickEarly" | "nothing";
+
+export function fallReason(jumpAt: number, kickAt: number, c: number): FallReason {
+  const j = (c - jumpAt) / 1000;
+  const k = (c - kickAt) / 1000;
+  const near = (x: number) => x > -0.4 && x < 1.3;
+  if (near(j) && (!near(k) || Math.abs(j) <= Math.abs(k))) return j < JUMP_FROM ? "late" : "early";
+  if (near(k)) return k < 0 ? "late" : "kickEarly";
+  return "nothing";
+}
+
+export const FALL_TEXT: Record<FallReason, string> = {
+  late: "Llegaste tarde: apretá apenas se ilumina el botón",
+  early: "Saltaste muy temprano: ya estabas bajando cuando pasó",
+  kickEarly: "Pateaste antes de tiempo: esperá a que se ponga verde",
+  nothing: "No saltaste ni pateaste: cuando llegue, apretá el botón que se ilumina",
+};
+
 // ---- Bots ------------------------------------------------------------------
 
 export interface BotMind {
@@ -165,3 +204,6 @@ export function botAct(mind: BotMind, tl: Timeline, t: number, theta: number, sk
   }
   return null;
 }
+
+/** localStorage: the practice was finished on this browser (the lobby stops pushing it). */
+export const PRACTICED_KEY = "tronco.practicado";

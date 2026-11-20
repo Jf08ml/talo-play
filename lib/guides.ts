@@ -531,7 +531,7 @@ export const GUIDES: Record<GameId, Guide> = {
         text: [
           "Todos están parados en ronda y en el medio gira un tronco que barre a cada uno. Tu talo es el de la etiqueta amarilla, y la cámara siempre está detrás tuyo.",
           "Arranca uno de la ronda: el tronco descansa a sus pies y lo patea para el lado que quiera. Todos ven para dónde sale y arranca a girar un momento después.",
-          "El círculo que tenés en el piso avisa: se pone amarillo cuando el tronco se acerca, rojo cuando está por llegar y verde (igual que el botón «Patear») justo cuando lo podés patear.",
+          "Abajo de todo hay una barra: el tronco aparece del lado del que viene y se acerca a tu círculo. Cuando entra en la parte amarilla se ilumina «Saltar»; cuando entra en la verde (más cerca) se iluminan los dos. El círculo que tenés en el piso se pinta igual.",
         ],
         art: "tronco",
       },
@@ -541,6 +541,7 @@ export const GUIDES: Record<GameId, Guide> = {
           "«Saltar» (o espacio / flecha arriba): el tronco pasa por abajo tuyo y sigue para el mismo lado, hacia el siguiente. Hay que saltar un poquito antes de que llegue; mientras estás en el aire no podés hacer otra cosa, pero apenas tocás el piso ya podés de nuevo.",
           "«Patear» (o K / flecha abajo): si lo pateás cuando se pone verde, el tronco cambia de sentido y vuelve hacia el que te lo mandó. Si lo pateás muy temprano, pateás el aire y perdés un instante.",
           "Si el tronco te toca con los pies en el piso, te tumba y quedás afuera. Seguís mirando hasta que termine.",
+          "Si te tumba, te dice por qué: si llegaste tarde, si saltaste demasiado temprano (ya estabas bajando) o si pateaste antes de que se pusiera verde.",
         ],
       },
       {
@@ -553,6 +554,7 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Para jugar",
         text: [
+          "¿Primera vez? En el lobby está «Practicar»: un minuto con el tronco lento que te enseña a saltar y a patear sin quedar afuera.",
           "«Contra bots»: vos y la compu, al toque. «En línea»: rondas una atrás de la otra con gente de todos lados (y bots si hay poca). «Amigos»: una sala con link, y bots si quieren completar la ronda.",
         ],
       },

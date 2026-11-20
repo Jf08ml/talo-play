@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, ArrowUp, Footprints } from "lucide-react";
+import { ArrowLeft, ArrowRight, Gauge } from "lucide-react";
+import { ActionButtons, TimingMeter, paintButtons, paintMeter } from "./Hud";
 import {
   botHost,
   isBot,
@@ -20,18 +21,23 @@ import {
   type TroncoState,
 } from "@/lib/troncoRoom";
 import {
+  BASE_SPEED,
+  FALL_TEXT,
   JUMP_LEN,
+  NO_CUE,
   KICK_MISS_RECOVER,
   KICK_RECOVER,
   airborne,
   botAct,
   crossings,
+  cueAt,
+  fallReason,
   kickWorks,
   logAt,
   newMind,
   speedAt,
-  timeToReach,
   wrapPi,
+  type FallReason,
   type BotMind,
 } from "@/lib/tronco";
 import { TroncoScene, type PlayerView } from "@/lib/tronco3d";
@@ -79,7 +85,9 @@ export default function TroncoGame({
   const g = state.gameNo;
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const jumpBtn = useRef<HTMLButtonElement>(null);
   const kickBtn = useRef<HTMLButtonElement>(null);
+  const meterRef = useRef<HTMLDivElement>(null);
   const stateRef = useRef(state);
   const presenceRef = useRef({ presence, presenceLoaded });
   const acts = useRef<Record<string, Act>>({});
@@ -95,8 +103,32 @@ export default function TroncoGame({
   const opening = useRef(0);
   const [flash, setFlash] = useState<{ text: string; key: number } | null>(null);
   const [hint, setHint] = useState(true);
+  /** Why I fell (shown under "¡Te tumbó!"). */
+  const [reason, setReason] = useState<FallReason | null>(null);
+  /** Passes I survived this match (jumped or kicked back). */
+  const [saved, setSaved] = useState(0);
+  /** "X quedó afuera" notes. */
+  const [feed, setFeed] = useState<{ id: string; text: string }[]>([]);
+  const seenOut = useRef<Set<string> | null>(null);
   const playing = state.roster.includes(myId);
   useWakeLock();
+
+  // Announce each one who falls (not the ones already out when I arrived).
+  useEffect(() => {
+    const ids = Object.keys(state.out);
+    if (!seenOut.current) {
+      seenOut.current = new Set(ids);
+      return;
+    }
+    const fresh = ids.filter((id) => !seenOut.current!.has(id));
+    if (!fresh.length) return;
+    fresh.forEach((id) => seenOut.current!.add(id));
+    const notes = fresh.filter((id) => id !== myId).map((id) => ({ id: `${id}${Date.now()}`, text: `${playerInfo(state, id).name} quedó afuera` }));
+    if (!notes.length) return;
+    setFeed((f) => [...f, ...notes].slice(-3));
+    // Not cleared on re-render: the state changes on every kick and the note must still go away.
+    setTimeout(() => setFeed((f) => f.filter((n) => !notes.includes(n))), 2600);
+  }, [state, myId]);
 
   useEffect(() => {
     stateRef.current = state;
@@ -202,9 +234,11 @@ export default function TroncoGame({
     if (res === "ok") {
       playSound("capture");
       setFlash({ text: "¡PUM!", key: Date.now() });
+      setSaved((n) => n + 1);
       setHint(false);
     } else if (res === "miss") {
       playSound("tick");
+      setFlash({ text: "¡Al aire!", key: Date.now() });
     }
   };
 
@@ -283,10 +317,19 @@ export default function TroncoGame({
           const from = Math.max(r.judged, s.startedAt);
           if (upto > from) {
             for (const c of crossings(tl, theta, from, upto)) {
-              if (airborne(r.jump, c)) continue;
+              if (airborne(r.jump, c)) {
+                // Cleared it.
+                if (id === myId) {
+                  playSound("whoosh");
+                  setSaved((n) => n + 1);
+                  setFlash({ text: "¡Bien!", key: Date.now() });
+                }
+                continue;
+              }
               fell.current[id] = c;
               reportOut(roomId, g, id, c).catch(console.error);
               playSound(id === myId ? "bad" : "place");
+              if (id === myId) setReason(fallReason(r.jump, r.kick, c));
               break;
             }
             r.judged = upto;
@@ -336,20 +379,20 @@ export default function TroncoGame({
       });
       const meIn = s.roster.includes(myId);
       const meUp = meIn && !isDown(myId);
-      const ttc = meUp && s.startedAt > 0 ? timeToReach(tl, now, seatOf(s, myId)) : 9;
-      const kickable = meUp && rolling(s, now) && kickWorks(tl, now, seatOf(s, myId));
-      const btn = kickBtn.current;
-      if (btn && (btn.dataset.ready === "1") !== kickable) btn.dataset.ready = kickable ? "1" : "";
+      const cue = meUp && live ? cueAt(tl, now, seatOf(s, myId)) : NO_CUE;
+      const busy = now < (runners.current.get(myId)?.busy ?? 0);
+      paintButtons(jumpBtn.current, kickBtn.current, cue, busy);
+      paintMeter(meterRef.current, cue, log.dir, meUp && rolling(s, now), busy);
       scene.frame({
         logAngle: target + v.offset,
         logDir: log.dir,
+        speed: v.speed,
         // It trembles at the opener's feet while waiting for the kick.
         shake: live && !s.startedAt && now >= s.openAt,
         rolling: rolling(s, now),
-        kickable,
+        cue,
         players,
         myAngle: meIn ? seatOf(s, myId) : null,
-        danger: Math.max(0, Math.min(1, 1 - ttc / 1.1)),
         time: performance.now() / 1000,
       });
       raf = requestAnimationFrame(loop);
@@ -394,22 +437,49 @@ export default function TroncoGame({
   const standing = state.roster.filter((p) => !state.out[p]).length;
   const meOut = state.out[myId];
   const place = meOut ? state.roster.length - Object.values(state.out).filter((t) => t < meOut).length : 0;
+  const rollingNow = live && !!now && rolling(state, now);
+  const pace = rollingNow ? speedAt(timelineOf(state), now) / BASE_SPEED : 1;
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div ref={wrapRef} className="relative min-h-0 flex-1">
         <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none select-none" />
-        <div className="pointer-events-none absolute inset-x-0 top-2 flex justify-center">
+        <div className="pointer-events-none absolute inset-x-0 top-2 flex flex-wrap justify-center gap-1.5 px-2">
           <span className="rounded-full bg-black/55 px-3 py-1 text-sm font-bold text-white">
             Quedan {standing} de {state.roster.length}
           </span>
+          {rollingNow && (
+            <span className={`flex items-center gap-1 rounded-full px-3 py-1 text-sm font-bold ${pace >= 2 ? "bg-red-500/80 text-white" : pace >= 1.5 ? "bg-talo-hero text-talo-ink" : "bg-black/55 text-white"}`}>
+              <Gauge className="h-4 w-4" /> ×{pace.toFixed(1)}
+            </span>
+          )}
+          {playing && saved > 0 && !meOut && (
+            <span key={saved} className="animate-celebration-in rounded-full bg-black/55 px-3 py-1 text-sm font-bold text-white">
+              Esquivadas: {saved}
+            </span>
+          )}
         </div>
+        {feed.length > 0 && (
+          <div className="pointer-events-none absolute left-2 top-12 flex flex-col gap-1">
+            {feed.map((n) => (
+              <span key={n.id} className="animate-celebration-in rounded-full bg-black/60 px-3 py-1 text-xs font-bold text-white">
+                {n.text}
+              </span>
+            ))}
+          </div>
+        )}
         {countdown > 0 && (
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/30">
             <span key={countdown} className="animate-celebration-in font-display text-8xl text-white drop-shadow">
               {countdown}
             </span>
             {playing && <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-bold text-white">Sos el de la etiqueta amarilla</span>}
+            {playing && (
+              <span className="max-w-xs rounded-2xl bg-black/60 px-3 py-1.5 text-center text-sm font-bold text-white">
+                Apretá el botón que se ilumina: <span className="text-talo-hero">amarillo, saltá</span> ·{" "}
+                <span className="text-emerald-300">verde, pateá</span>
+              </span>
+            )}
             {openerName && (
               <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-bold text-white">
                 {state.opener === myId ? "Arrancás vos: vas a patear el tronco" : `Arranca ${openerName}`}
@@ -435,14 +505,22 @@ export default function TroncoGame({
           </div>
         )}
         {hint && playing && !countdown && !waitingOpen && !meOut && (
-          <p className="pointer-events-none absolute inset-x-4 bottom-3 rounded-xl bg-black/60 px-3 py-2 text-center text-xs font-bold text-white">
-            Cuando el tronco llegue a vos: saltalo, o pateálo cuando el círculo (y el botón) se ponen verdes para que vuelva para el otro lado.
+          <p className="pointer-events-none absolute inset-x-4 bottom-[92px] mx-auto max-w-sm rounded-xl bg-black/60 px-3 py-2 text-center text-xs font-bold text-white">
+            La barra de abajo te muestra el tronco viniendo. Saltá cuando entre en lo amarillo, o pateálo en lo verde para que vuelva para el otro lado.
           </p>
         )}
+        {playing && !meOut && (
+          <div className="absolute inset-x-4 bottom-3">
+            <TimingMeter meterRef={meterRef} />
+          </div>
+        )}
         {meOut && (
-          <div className="pointer-events-none absolute inset-x-0 top-1/4 flex flex-col items-center gap-1">
-            <span className="font-display text-4xl text-white drop-shadow">¡Te tumbó!</span>
-            <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-bold text-white">Quedaste {place}º · mirá cómo sigue</span>
+          <div className="pointer-events-none absolute inset-x-0 top-1/4 flex flex-col items-center gap-2 px-4">
+            <span className="animate-celebration-in font-display text-4xl text-white drop-shadow">¡Te tumbó!</span>
+            {reason && <span className="max-w-xs rounded-2xl bg-black/65 px-3 py-1.5 text-center text-sm font-bold text-talo-hero">{FALL_TEXT[reason]}</span>}
+            <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-bold text-white">
+              Quedaste {place}º{saved > 0 ? ` · esquivaste ${saved}` : ""} · mirá cómo sigue
+            </span>
           </div>
         )}
         {!playing && (
@@ -473,31 +551,7 @@ export default function TroncoGame({
           </button>
         </div>
       )}
-      {playing && !iOpen && (
-        <div className="grid grid-cols-2 gap-3 bg-talo-ink p-3 pb-[max(12px,env(safe-area-inset-bottom))]">
-          <button
-            onPointerDown={(e) => {
-              e.preventDefault();
-              jumpMe();
-            }}
-            disabled={!!meOut}
-            className="flex select-none items-center justify-center gap-2 rounded-2xl bg-talo-hero py-5 text-lg font-bold text-talo-ink active:scale-95 disabled:opacity-30"
-          >
-            <ArrowUp className="h-6 w-6" strokeWidth={3} /> Saltar
-          </button>
-          <button
-            ref={kickBtn}
-            onPointerDown={(e) => {
-              e.preventDefault();
-              kickMe();
-            }}
-            disabled={!!meOut}
-            className="flex select-none items-center justify-center gap-2 rounded-2xl bg-white py-5 text-lg font-bold text-talo-ink transition-colors duration-75 active:scale-95 disabled:opacity-30 data-[ready=1]:bg-emerald-400"
-          >
-            <Footprints className="h-6 w-6" strokeWidth={2.5} /> Patear
-          </button>
-        </div>
-      )}
+      {playing && !iOpen && <ActionButtons jumpRef={jumpBtn} kickRef={kickBtn} onJump={jumpMe} onKick={kickMe} disabled={!!meOut} />}
     </div>
   );
 }

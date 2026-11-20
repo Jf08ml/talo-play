@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { Bot, Globe, Users } from "lucide-react";
+import { Bot, ChevronRight, Globe, GraduationCap, Users } from "lucide-react";
 import GameLobby from "@/components/GameLobby";
 import { CreateRoomForm } from "@/components/RoomSettings";
 import { CARD, PRIMARY_BUTTON, chipClass, segmentClass } from "@/components/ui";
@@ -10,14 +11,50 @@ import { createTroncoRoom, enterOnline, onlineCount, type Pace } from "@/lib/tro
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import { trackEvent } from "@/lib/analytics";
 import { PACE_OPTIONS, SETTINGS } from "./settings";
+import { PRACTICED_KEY } from "@/lib/tronco";
+
+const TroncoPractice = dynamic(() => import("@/components/tronco/Practice"), { ssr: false });
 
 type Tab = "bots" | "online" | "amigos";
 
+// Read on every render (closing the practice re-renders the lobby); no events to follow.
+const noSubscribe = () => () => {};
+function readPracticed(): boolean {
+  try {
+    return localStorage.getItem(PRACTICED_KEY) === "1";
+  } catch {
+    return true;
+  }
+}
+
 export default function TroncoHome() {
   const [tab, setTab] = useState<Tab>("bots");
+  const [practice, setPractice] = useState(false);
+  const practiced = useSyncExternalStore(noSubscribe, readPracticed, () => true);
+  const startBots = useStartBots();
   return (
     <GameLobby game="tronco">
       <div className="flex flex-col gap-3">
+        <button
+          onClick={() => setPractice(true)}
+          className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${practiced ? "bg-white/[0.06] text-white hover:bg-white/10" : "bg-talo-hero text-talo-ink hover:brightness-95"}`}
+        >
+          <GraduationCap className="h-6 w-6 shrink-0" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-bold">{practiced ? "Practicar" : "¿Primera vez? Practicá un minuto"}</span>
+            <span className={`block text-xs ${practiced ? "text-white/60" : "text-talo-ink/70"}`}>Te enseña cuándo saltar y cuándo patear, sin quedar afuera.</span>
+          </span>
+          <ChevronRight className="h-5 w-5 shrink-0" />
+        </button>
+        {practice && (
+          <TroncoPractice
+            onClose={() => setPractice(false)}
+            onPlay={() => {
+              setPractice(false);
+              startBots(5, "normal");
+            }}
+          />
+        )}
         <div className="grid grid-cols-3 gap-1 rounded-xl bg-slate-900/80 p-1 ring-1 ring-slate-700/60">
           <button onClick={() => setTab("bots")} className={`flex items-center justify-center gap-1.5 ${segmentClass(tab === "bots")}`}>
             <Bot className="h-4 w-4" /> Contra bots
@@ -37,23 +74,35 @@ export default function TroncoHome() {
   );
 }
 
-function BotsCard() {
+/** Creates a "Contra bots" room and goes there; false if it failed. */
+function useStartBots() {
   const router = useRouter();
   const identity = useClientIdentity();
+  return async (bots: number, pace: Pace): Promise<boolean> => {
+    if (!identity.clientId) return false;
+    try {
+      const id = await createTroncoRoom(identity.clientId, { bots, pace }, true);
+      trackEvent("create_room", { game: "tronco", mode: "bots" });
+      router.push(`/el-tronco/${id}`);
+      return true;
+    } catch (err) {
+      console.error(err);
+      return false;
+    }
+  };
+}
+
+function BotsCard() {
+  const identity = useClientIdentity();
+  const startBots = useStartBots();
   const [bots, setBots] = useState(5);
   const [pace, setPace] = useState<Pace>("normal");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const go = async () => {
-    if (!identity.clientId) return;
     setBusy(true);
     setError(null);
-    try {
-      const id = await createTroncoRoom(identity.clientId, { bots, pace }, true);
-      trackEvent("create_room", { game: "tronco", mode: "bots" });
-      router.push(`/el-tronco/${id}`);
-    } catch (err) {
-      console.error(err);
+    if (!(await startBots(bots, pace))) {
       setError("No se pudo empezar. Probá de nuevo.");
       setBusy(false);
     }

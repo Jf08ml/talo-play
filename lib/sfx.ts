@@ -10,7 +10,7 @@
  * keep their own audio.
  */
 
-export type SoundName = "place" | "capture" | "turn" | "good" | "bad" | "dice" | "tick" | "win" | "end" | "flip";
+export type SoundName = "place" | "capture" | "turn" | "good" | "bad" | "dice" | "tick" | "win" | "end" | "flip" | "whoosh";
 
 const MUTE_KEY = "talo.sonido";
 
@@ -185,6 +185,28 @@ function noise(start: number, dur: number, peak: number, freq: number) {
   src.start(start);
 }
 
+/** Noise swept through a bandpass from `f1` to `f2`: something rushing past. */
+function sweep(start: number, dur: number, peak: number, f1: number, f2: number) {
+  if (!ctx || !master) return;
+  const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
+  const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  const filter = ctx.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.Q.value = 1.2;
+  filter.frequency.setValueAtTime(f1, start);
+  filter.frequency.exponentialRampToValueAtTime(f2, start + dur);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(peak, start + dur * 0.4);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+  src.connect(filter).connect(gain).connect(master);
+  src.start(start);
+}
+
 const N = (semis: number) => 523.25 * Math.pow(2, semis / 12); // from C5
 
 /** Plays a sound now (skipped while muted or before the first tap). */
@@ -220,6 +242,9 @@ export function playSound(name: SoundName) {
       break;
     case "tick":
       tone(N(12), t, 0.04, "square", 0.06);
+      break;
+    case "whoosh":
+      sweep(t, 0.3, 0.45, 500, 2600);
       break;
     case "win":
       [0, 4, 7, 12].forEach((s, i) => tone(N(s), t + i * 0.1, 0.25, "triangle", 0.22));
