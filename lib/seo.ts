@@ -108,7 +108,7 @@ export const HOME_FAQ: { q: string; a: string }[] = [
   },
   {
     q: "¿Y si no tengo con quién jugar?",
-    a: "Entrá a la Plaza: ahí ves quién está conectado, podés saludar y sumarte a las salas que buscan jugadores. Si tu sala necesita más gente, tocá «Buscar gente en la Plaza» en la sala de espera.",
+    a: "Abrí la Plaza (el botón negro de abajo a la izquierda): ahí ves cuánta gente está jugando, podés saludar y sumarte a las salas que buscan jugadores. Si tu sala necesita más gente, tocá «Buscar gente en la Plaza» en la sala de espera.",
   },
   {
     q: "¿Qué juegos hay para jugar en pareja?",

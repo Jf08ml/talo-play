@@ -327,6 +327,15 @@
           ".validate": "newData.isNumber() && newData.val() <= now"
         }
       }
+    },
+    "online": {
+      ".read": true,
+      "$client": {
+        "$tab": {
+          ".write": "$client.length <= 32 && $tab.length <= 12",
+          ".validate": "newData.val() == true"
+        }
+      }
     }
   }
 }

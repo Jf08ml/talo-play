@@ -91,12 +91,12 @@ export default function FriendChat({
   };
 
   return createPortal(
-    <div className="talo-light fixed inset-0 z-[80] flex items-end justify-center bg-black/50 sm:items-center sm:p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/50 sm:items-center sm:p-6" onClick={onClose}>
       <div
         role="dialog"
         aria-label={`Chat con ${name}`}
         onClick={(e) => e.stopPropagation()}
-        className="flex h-[85dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[24px] border-2 border-talo-ink bg-white sm:h-[640px] sm:rounded-[24px]"
+        className="talo-light flex h-[85dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[24px] border-2 border-talo-ink bg-white sm:h-[640px] sm:rounded-[24px]"
       >
         <div className="flex items-center gap-3 border-b-2 border-talo-ink px-4 py-3">
           <span className="flex h-9 w-10 items-end justify-center">

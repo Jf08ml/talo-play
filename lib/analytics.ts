@@ -36,6 +36,7 @@ type Events = {
   plaza_message: { kind: "frase" | "texto" };
   plaza_call: { game: GameId };
   plaza_join: { game: GameId };
+  plaza_open: { where: "boton" | "inicio" | "sala" | "link" };
   page_not_found: { path: string };
 };
 

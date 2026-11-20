@@ -5,6 +5,7 @@ import { SITE_DESCRIPTION, SITE_URL } from "@/lib/seo";
 import { VoiceKeeper } from "@/components/VoiceButton";
 import AccountProvider from "@/components/AccountProvider";
 import PageViews from "@/components/PageViews";
+import PlazaProvider from "@/components/PlazaProvider";
 import "./globals.css";
 
 // Talo's type (talo-handoff/tokens.css): Albert Sans for text and UI, Dela
@@ -78,7 +79,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${ui.variable} ${display.variable} ${code.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <AccountProvider>{children}</AccountProvider>
+        <AccountProvider>
+          <PlazaProvider>{children}</PlazaProvider>
+        </AccountProvider>
         <VoiceKeeper />
         <PageViews />
       </body>

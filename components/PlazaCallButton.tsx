@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { Megaphone } from "lucide-react";
 import type { GameId } from "@/lib/games";
 import { removeCall, sendCall, subscribeCall, updateCallCount, waitToPost, type Me } from "@/lib/plaza";
 import { trackEvent } from "@/lib/analytics";
 import { useServerNow } from "@/hooks/useServerNow";
+import { usePlaza } from "./PlazaProvider";
 
 /**
  * "Buscar gente en la Plaza" (waiting rooms): posts the room as a card in
@@ -15,6 +15,7 @@ import { useServerNow } from "@/hooks/useServerNow";
  * down when the waiting room closes (the game started or they left).
  */
 export default function PlazaCallButton({ game, roomId, count, me }: { game: GameId; roomId: string; count: number; me: Me | null }) {
+  const { show } = usePlaza();
   const [call, setCall] = useState<{ by: string; at: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const now = useServerNow(!!call, 30000);
@@ -60,9 +61,9 @@ export default function PlazaCallButton({ game, roomId, count, me }: { game: Gam
           ) : (
             <p>
               <b className="text-white">¿Faltan jugadores?</b> Publicá la sala en{" "}
-              <Link href="/plaza" target="_blank" className="font-semibold text-talo-hero underline underline-offset-4">
+              <button onClick={() => show("sala")} className="font-semibold text-talo-hero underline underline-offset-4">
                 la Plaza
-              </Link>{" "}
+              </button>{" "}
               y que se sume gente de Talo.
             </p>
           )}

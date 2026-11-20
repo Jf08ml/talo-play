@@ -3,12 +3,12 @@ import type { ReactNode } from "react";
 import TaloLogo from "./TaloLogo";
 import FriendsLink from "./FriendsLink";
 import IdeasButton from "./IdeasButton";
+import PlazaButton from "./PlazaButton";
 
 const NAV = [
   { href: "/#juegos", label: "Juegos" },
   { href: "/#como", label: "Cómo funciona" },
   { href: "/#faq", label: "Ayuda" },
-  { href: "/plaza", label: "Plaza" },
   { href: "/ideas", label: "Ideas" },
 ];
 
@@ -47,8 +47,8 @@ export default function SiteHeader({ right }: { right?: ReactNode }) {
   );
 }
 
-/** Black footer with the giant yellow wordmark. Also brings the floating "Ideas" button to every light page (`ideas={false}` where it would cover something, like the Plaza's chat box). */
-export function SiteFooter({ ideas = true }: { ideas?: boolean } = {}) {
+/** Black footer with the giant yellow wordmark. Also brings the floating "Ideas" button to every light page and the "Plaza" one (bottom left). */
+export function SiteFooter() {
   return (
     <footer className="relative overflow-hidden bg-talo-ink text-white">
       <div className="mx-auto flex w-full max-w-[1360px] flex-col gap-6 px-5 pt-16 sm:px-10 sm:pt-[72px]">
@@ -66,7 +66,8 @@ export function SiteFooter({ ideas = true }: { ideas?: boolean } = {}) {
           talo
         </p>
       </div>
-      {ideas && <IdeasButton />}
+      <IdeasButton />
+      <PlazaButton />
     </footer>
   );
 }

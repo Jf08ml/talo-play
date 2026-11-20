@@ -1,12 +1,6 @@
-import type { Metadata } from "next";
-import PlazaClient from "./PlazaClient";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "La Plaza: encontrá gente para jugar",
-  description: "El chat de Talo: saludá, mirá quién está y sumate a las salas que buscan jugadores.",
-  alternates: { canonical: "/plaza" },
-};
-
+/** La Plaza is a drawer over any page now (`PlazaProvider`): old links open it on the home. */
 export default function PlazaPage() {
-  return <PlazaClient />;
+  redirect("/?plaza=1");
 }

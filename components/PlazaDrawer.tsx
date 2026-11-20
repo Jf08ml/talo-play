@@ -1,17 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
-import { BadgeCheck, Ban, Flag, Megaphone, Pin, Send, ShieldCheck, Trash2, Undo2, Users, VolumeX } from "lucide-react";
-import SiteHeader, { SiteFooter } from "@/components/SiteHeader";
-import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
-import NamePrompt from "@/components/NamePrompt";
-import GameIcon from "@/components/GameIcon";
-import { Talo } from "@/components/Talo";
-import { useAccount } from "@/components/AccountProvider";
+import { BadgeCheck, Ban, Flag, Megaphone, Pin, Send, ShieldCheck, Trash2, Undo2, Users, VolumeX, X } from "lucide-react";
+import GameIcon from "./GameIcon";
+import { Talo } from "./Talo";
+import { useAccount } from "./AccountProvider";
+import { useActiveCount } from "./PlazaProvider";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import { useServerNow } from "@/hooks/useServerNow";
-import { isFirebaseConfigured, getDb } from "@/lib/firebase";
+import { getDb } from "@/lib/firebase";
 import { inAppBrowser, signInWithGoogle } from "@/lib/account";
 import { isAdmin } from "@/lib/community";
 import { GAMES, roomPath } from "@/lib/games";
@@ -48,7 +47,6 @@ import {
   type PlazaPerson,
 } from "@/lib/plaza";
 
-const CARD = "rounded-[24px] border-2 border-talo-ink bg-white";
 const H2 = "font-display text-[22px] leading-[1.05] sm:text-[26px]";
 
 function clock(at: number): string {
@@ -61,15 +59,18 @@ function ago(ms: number): string {
   return min < 1 ? "recién" : `hace ${min} min`;
 }
 
-/** La Plaza: Talo's global chat, who's around, and rooms looking for players. */
-export default function PlazaClient() {
-  if (!isFirebaseConfigured()) return <FirebaseSetupNotice />;
-  return <Plaza />;
-}
+type Tab = "chat" | "gente" | "admin";
 
-function Plaza() {
+/**
+ * La Plaza, as a drawer over any page (`PlazaProvider`): from the right on
+ * wide screens, from the bottom on phones. Rooms looking for players on
+ * top, then the chat; "Gente" lists who's in the Plaza and the rules; admins
+ * get their tools in "Admin".
+ */
+export default function PlazaDrawer({ onClose }: { onClose: () => void }) {
   const identity = useClientIdentity();
   const { user, profile } = useAccount();
+  const active = useActiveCount();
   const [messages, setMessages] = useState<PlazaMessage[]>([]);
   const [calls, setCalls] = useState<PlazaCall[]>([]);
   const [people, setPeople] = useState<PlazaPerson[]>([]);
@@ -78,6 +79,7 @@ function Plaza() {
   const [pinned, setPinnedState] = useState<Pinned | null>(null);
   const [muted, setMuted] = useState<string[]>([]);
   const [admin, setAdmin] = useState(false);
+  const [tab, setTab] = useState<Tab>("chat");
   const cleaned = useRef(false);
 
   const me = identity.clientId && identity.name ? { clientId: identity.clientId, name: identity.name, color: identity.color } : null;
@@ -111,7 +113,7 @@ function Plaza() {
     };
   }, [uid]);
 
-  // I'm in the Plaza while the page is open.
+  // I'm in the Plaza while the drawer is open.
   const meKey = me ? `${me.clientId}|${me.name}|${me.color}|${admin}` : "";
   useEffect(() => {
     if (!meKey) return;
@@ -128,61 +130,102 @@ function Plaza() {
       .catch(() => {});
   }, [messages]);
 
+  // Esc closes; the page behind doesn't scroll while it's open.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = overflow;
+    };
+  }, [onClose]);
+
   const toggleMute = (by: string) => {
     const next = muted.includes(by) ? muted.filter((x) => x !== by) : [...muted, by];
     setMuted(next);
     saveMuted(next);
   };
 
-  return (
-    <div className="talo-light flex flex-1 flex-col">
-      <section className="overflow-hidden bg-talo-hero">
-        <SiteHeader />
-        <div className="mx-auto flex max-w-[1360px] flex-col gap-3 px-5 pb-8 pt-2 sm:px-10 sm:pb-12 sm:pt-6">
-          <h1 className="font-display text-[44px] leading-none tracking-[-0.02em] sm:text-[clamp(56px,6vw,88px)]">La Plaza</h1>
-          <p className="max-w-2xl text-[17px] font-medium leading-[1.4] sm:text-[22px]">
-            Encontrá gente para jugar: saludá, mirá quién está y sumate a las salas que buscan jugadores.
-          </p>
-          <p className="flex items-center gap-2 text-[15px] font-bold">
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "chat", label: "Chat" },
+    { id: "gente", label: `Gente (${people.length})` },
+    ...(admin ? [{ id: "admin" as const, label: "Admin" }] : []),
+  ];
+
+  return createPortal(
+    <div className="fixed inset-0 z-[75] flex items-end justify-end bg-black/45 sm:items-stretch" onClick={onClose}>
+      <aside
+        role="dialog"
+        aria-label="La Plaza"
+        onClick={(e) => e.stopPropagation()}
+        className="talo-light flex h-[92dvh] w-full flex-col overflow-hidden rounded-t-[24px] border-2 border-b-0 border-talo-ink bg-white text-talo-ink sm:h-full sm:w-[460px] sm:rounded-none sm:rounded-l-[24px] sm:border-b-2 sm:border-r-0"
+      >
+        <header className="flex flex-col gap-2 bg-talo-hero px-4 pb-3 pt-3 sm:px-5 sm:pt-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-display text-[30px] leading-none">La Plaza</h2>
+            <button onClick={onClose} aria-label="Cerrar la Plaza" className="grid h-10 w-10 place-items-center rounded-xl hover:bg-black/10">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <p className="flex flex-wrap items-center gap-x-2 text-[14px] font-bold">
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-600" />
-            {people.length === 1 ? "1 persona en la Plaza" : `${people.length} personas en la Plaza`}
-            {calls.length > 0 && ` · ${calls.length === 1 ? "1 sala busca gente" : `${calls.length} salas buscan gente`}`}
+            {active === 1 ? "1 persona en Talo ahora" : `${active} personas en Talo ahora`}
+            <span className="font-semibold opacity-70">· {people.length} en la Plaza</span>
           </p>
-        </div>
-      </section>
+          <div className="flex gap-1" role="tablist">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={tab === t.id}
+                onClick={() => setTab(t.id)}
+                className={`rounded-full px-3.5 py-1.5 text-sm font-bold ${tab === t.id ? "bg-talo-ink text-talo-hero" : "hover:bg-black/10"}`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </header>
 
-      {identity.clientId && !identity.name && <NamePrompt onSubmit={identity.setName} submitLabel="Entrar a la Plaza" />}
-
-      {/* Phones: the rooms that want players first, then the chat. Wide screens: chat on the left. */}
-      <div className="mx-auto grid w-full max-w-[1360px] flex-1 grid-cols-[minmax(0,1fr)] items-start gap-4 px-4 py-6 sm:gap-6 sm:px-10 sm:py-10 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-8">
-        <Chat
-          messages={messages}
-          reports={reports}
-          bans={bans}
-          pinned={pinned}
-          muted={muted}
-          admin={admin}
-          me={me}
-          uid={uid}
-          signedIn={!!user && !!profile}
-          myClientId={identity.clientId}
-          onToggleMute={toggleMute}
-          onUnmuteAll={() => {
-            setMuted([]);
-            saveMuted([]);
-          }}
-        />
-        <div className="order-first lg:order-none lg:col-start-2 lg:row-start-1">
-          <Calls calls={calls} myClientId={identity.clientId} />
-        </div>
-        <div className="flex min-w-0 flex-col gap-4 sm:gap-6 lg:col-start-2">
-          <People people={people} />
-          <Rules />
-          {admin && <AdminPanel pinned={pinned} bans={bans} messages={messages} name={profile?.name ?? identity.name ?? "Talo"} />}
-        </div>
-      </div>
-      <SiteFooter ideas={false} />
-    </div>
+        {tab === "chat" && (
+          <>
+            <Calls calls={calls} myClientId={identity.clientId} onJoin={onClose} />
+            <Chat
+              messages={messages}
+              reports={reports}
+              bans={bans}
+              pinned={pinned}
+              muted={muted}
+              admin={admin}
+              me={me}
+              uid={uid}
+              signedIn={!!user && !!profile}
+              myClientId={identity.clientId}
+              onSetName={identity.setName}
+              onToggleMute={toggleMute}
+              onUnmuteAll={() => {
+                setMuted([]);
+                saveMuted([]);
+              }}
+            />
+          </>
+        )}
+        {tab === "gente" && (
+          <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4 sm:p-5">
+            <People people={people} />
+            <Rules />
+          </div>
+        )}
+        {tab === "admin" && admin && (
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+            <AdminPanel pinned={pinned} bans={bans} messages={messages} name={profile?.name ?? identity.name ?? "Talo"} />
+          </div>
+        )}
+      </aside>
+    </div>,
+    document.body
   );
 }
 
@@ -197,6 +240,7 @@ function Chat({
   uid,
   signedIn,
   myClientId,
+  onSetName,
   onToggleMute,
   onUnmuteAll,
 }: {
@@ -210,6 +254,7 @@ function Chat({
   uid: string | undefined;
   signedIn: boolean;
   myClientId: string;
+  onSetName: (name: string) => void;
   onToggleMute: (by: string) => void;
   onUnmuteAll: () => void;
 }) {
@@ -235,15 +280,14 @@ function Chat({
   };
 
   return (
-    <section className={`${CARD} flex h-[70dvh] min-h-[440px] min-w-0 flex-col overflow-hidden lg:col-start-1 lg:row-span-3 lg:row-start-1 lg:h-[calc(100dvh-140px)] lg:max-h-[760px]`}>
-      <div className="flex items-center justify-between gap-3 border-b-2 border-talo-ink px-4 py-3 sm:px-5">
-        <h2 className={H2}>Chat</h2>
-        {muted.length > 0 && (
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden border-t-2 border-talo-ink">
+      {muted.length > 0 && (
+        <div className="flex justify-end border-b border-black/10 px-4 py-1.5">
           <button onClick={onUnmuteAll} className="text-sm font-semibold underline underline-offset-4">
             Mostrar a {muted.length === 1 ? "1 silenciado" : `${muted.length} silenciados`}
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {pinned && (
         <div className="flex gap-2.5 border-b-2 border-talo-ink bg-talo-hero px-4 py-3 sm:px-5">
@@ -284,7 +328,8 @@ function Chat({
         ))}
       </div>
 
-      <Composer me={me} uid={uid} signedIn={signedIn} admin={admin} banned={!!uid && bans.has(uid)} />
+      <Composer me={me} uid={uid} signedIn={signedIn} admin={admin} banned={!!uid && bans.has(uid)} onSetName={onSetName} />
+      <p className="bg-[#f6f6f6] px-4 pb-2 text-[11px] text-black/50">Sé amable · sin datos personales ni links · reportá con la banderita.</p>
     </section>
   );
 }
@@ -391,14 +436,17 @@ function Composer({
   signedIn,
   admin,
   banned,
+  onSetName,
 }: {
   me: { clientId: string; name: string; color: string } | null;
   uid: string | undefined;
   signedIn: boolean;
   admin: boolean;
   banned: boolean;
+  onSetName: (name: string) => void;
 }) {
   const [text, setText] = useState("");
+  const [nameDraft, setNameDraft] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const inApp = typeof navigator !== "undefined" && inAppBrowser();
@@ -436,6 +484,36 @@ function Composer({
       .catch(() => setNote("No se pudo mandar. Probá de nuevo en unos segundos."))
       .finally(() => setBusy(false));
   };
+
+  // No name yet: ask for one here (the Plaza shows who writes).
+  if (!me) {
+    return (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const n = nameDraft.trim().slice(0, 24);
+          if (n) onSetName(n);
+        }}
+        className="flex flex-col gap-2 border-t-2 border-talo-ink bg-[#f6f6f6] px-3 py-3 sm:px-4"
+      >
+        <label htmlFor="plaza-name" className="text-sm font-bold">
+          Poné tu nombre para participar
+        </label>
+        <div className="flex gap-2">
+          <input
+            id="plaza-name"
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value.slice(0, 24))}
+            placeholder="Tu nombre"
+            className="min-h-11 min-w-0 flex-1 rounded-xl border-2 border-talo-ink bg-white px-3 text-[15px] outline-none focus:ring-2 focus:ring-talo-hero"
+          />
+          <button type="submit" disabled={!nameDraft.trim()} className="min-h-11 rounded-xl bg-talo-ink px-4 font-bold text-talo-hero disabled:opacity-40">
+            Entrar
+          </button>
+        </div>
+      </form>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2 border-t-2 border-talo-ink bg-[#f6f6f6] px-3 py-3 sm:px-4">
@@ -482,20 +560,20 @@ function Composer({
   );
 }
 
-function Calls({ calls, myClientId }: { calls: PlazaCall[]; myClientId: string }) {
+function Calls({ calls, myClientId, onJoin }: { calls: PlazaCall[]; myClientId: string; onJoin: () => void }) {
   const now = useServerNow(true, 30000);
   return (
-    <section className={`${CARD} flex flex-col gap-3 p-4 sm:p-5`}>
-      <h2 className={H2}>Buscan gente</h2>
+    <section className="flex max-h-[38%] shrink-0 flex-col gap-2 overflow-y-auto px-4 py-3 sm:px-5">
+      <h3 className="text-[15px] font-extrabold">Buscan gente{calls.length > 0 && ` (${calls.length})`}</h3>
       {calls.length === 0 ? (
-        <p className="text-[15px] leading-snug text-black/65">
-          Ahora no hay salas buscando jugadores. Para pedir gente, creá una sala en cualquier juego y tocá{" "}
-          <b>«Buscar gente en la Plaza»</b> en la sala de espera.
+        <p className="text-[13px] leading-snug text-black/60">
+          Ninguna sala ahora. Para pedir gente, creá una sala y tocá <b>«Buscar gente en la Plaza»</b> en la sala de espera.
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
+
           {calls.map((c) => (
-            <li key={c.room} className="flex items-center gap-3 rounded-2xl border-2 border-talo-ink p-2.5">
+            <li key={c.room} className="flex items-center gap-3 rounded-2xl border-2 border-talo-ink p-2">
               <GameIcon game={c.game} size="lg" />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-bold">{GAMES[c.game].title}</p>
@@ -506,7 +584,10 @@ function Calls({ calls, myClientId }: { calls: PlazaCall[]; myClientId: string }
               {c.by !== myClientId && (
                 <Link
                   href={roomPath(c.game, c.room)}
-                  onClick={() => trackEvent("plaza_join", { game: c.game })}
+                  onClick={() => {
+                    trackEvent("plaza_join", { game: c.game });
+                    onJoin();
+                  }}
                   className="shrink-0 rounded-xl bg-talo-ink px-3.5 py-2 text-sm font-bold text-talo-hero"
                 >
                   Unirme
@@ -523,7 +604,7 @@ function Calls({ calls, myClientId }: { calls: PlazaCall[]; myClientId: string }
 function People({ people }: { people: PlazaPerson[] }) {
   const shown = people.slice(0, 30);
   return (
-    <section className={`${CARD} flex flex-col gap-3 p-4 sm:p-5`}>
+    <section className="flex flex-col gap-3">
       <h2 className={`${H2} flex items-center gap-2`}>
         <Users className="h-6 w-6" /> Ahora en la Plaza
       </h2>
@@ -552,7 +633,7 @@ function People({ people }: { people: PlazaPerson[] }) {
 
 function Rules() {
   return (
-    <section className={`${CARD} flex flex-col gap-2 p-4 sm:p-5`}>
+    <section className="flex flex-col gap-2 border-t-2 border-talo-ink pt-4">
       <h2 className={H2}>Para que la Plaza esté buena</h2>
       <ul className="list-disc space-y-1 pl-5 text-[15px] leading-snug">
         <li>Sé amable: es un lugar para encontrar con quién jugar.</li>
@@ -568,7 +649,7 @@ function AdminPanel({ pinned, bans, messages, name }: { pinned: Pinned | null; b
   const [text, setText] = useState(pinned?.text ?? "");
   const names = new Map(messages.filter((m) => m.uid).map((m) => [m.uid!, m.name]));
   return (
-    <section className={`${CARD} flex flex-col gap-3 border-dashed p-4 sm:p-5`}>
+    <section className="flex flex-col gap-3">
       <h2 className={`${H2} flex items-center gap-2`}>
         <ShieldCheck className="h-6 w-6" /> Administración
       </h2>

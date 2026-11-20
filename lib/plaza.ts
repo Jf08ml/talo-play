@@ -332,3 +332,25 @@ export function subscribeCall(room: string, cb: (call: { by: string; at: number 
     cb(v && serverNow() - at < CALL_TTL_MS ? { by: str(v.by, 32), at } : null);
   });
 }
+
+// ---- Who's on Talo right now (every page, with or without an account) ------------
+
+/**
+ * Marks this tab as on Talo: `online/{clientId}/{tab}` = true, removed on
+ * disconnect. Keyed by player first, so several tabs count as one person.
+ */
+export function trackOnline(clientId: string): () => void {
+  const tab = Math.random().toString(36).slice(2, 10);
+  const r = ref(db(), `online/${clientId}/${tab}`);
+  onDisconnect(r).remove().catch(() => {});
+  set(r, true).catch(() => {});
+  return () => {
+    onDisconnect(r).cancel().catch(() => {});
+    remove(r).catch(() => {});
+  };
+}
+
+/** How many people have Talo open right now. */
+export function subscribeActive(cb: (count: number) => void): Unsubscribe {
+  return onValue(ref(db(), "online"), (snap) => cb(snap.size));
+}
