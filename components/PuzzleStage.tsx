@@ -10,6 +10,7 @@ import { playSound } from "@/lib/sfx";
 import type { TeamId } from "@/lib/teams";
 import type { PresenceMap } from "@/lib/presence";
 import { useElementSize } from "@/hooks/useElementSize";
+import FullscreenButton from "./FullscreenButton";
 import PuzzlePiece from "./PuzzlePiece";
 
 const SNAP_DISTANCE = 26;
@@ -136,7 +137,6 @@ export default function PuzzleStage({
   const releaseTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const centered = useRef(false);
   const pinch = useRef<{ dist: number; center: TouchPoint } | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   // Live positions for pieces this client is dragging (or just released, for
   // a short grace period) — set only from event handlers, never from an
   // effect, so it never fights the Firebase-driven `pieces` prop mid-drag.
@@ -172,29 +172,22 @@ export default function PuzzleStage({
     };
   }, []);
 
-  // Track fullscreen state (also flips back when the user hits Esc, not just our button).
+  // Entering or leaving full screen (our button, Esc, the browser's own).
   // Entering/exiting fullscreen resizes the container drastically, so the old
   // scale/position (computed for the previous size) would leave the board
   // stranded off-screen — clearing `centered` makes the size-change effect
   // above re-run `fitToScreen()` once the container settles into its new size.
   useEffect(() => {
     const onChange = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
       centered.current = false;
     };
     document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
+    document.addEventListener("webkitfullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      document.removeEventListener("webkitfullscreenchange", onChange);
+    };
   }, []);
-
-  const toggleFullscreen = useCallback(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
-    } else {
-      el.requestFullscreen?.().catch(() => {});
-    }
-  }, [containerRef]);
 
   const zoomByFactor = useCallback((factor: number) => {
     const stage = stageRef.current;
@@ -467,14 +460,11 @@ export default function PuzzleStage({
         >
           <RecenterIcon />
         </button>
-        <button
-          type="button"
-          onClick={toggleFullscreen}
-          aria-label={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+        <FullscreenButton
           className="flex h-11 w-11 items-center justify-center rounded-full border border-cyan-400/25 bg-slate-900/90 text-cyan-300 shadow-[0_0_15px_rgba(34,211,238,0.2)] hover:bg-slate-800 hover:text-cyan-200 active:scale-95"
-        >
-          {isFullscreen ? <MinimizeIcon /> : <MaximizeIcon />}
-        </button>
+          target={() => containerRef.current}
+          icon={(active) => (active ? <MinimizeIcon /> : <MaximizeIcon />)}
+        />
       </div>
     </div>
   );

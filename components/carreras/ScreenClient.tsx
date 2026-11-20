@@ -58,7 +58,8 @@ import { Standings, driverName, useCameraMode, useRaceCloser, useSoundSetting } 
 import { TaloMark } from "@/components/TaloLogo";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { PRIMARY_BUTTON } from "@/components/ui";
-import { Bot, Eye, Maximize, Minimize, Shuffle, Smartphone, Volume2, VolumeX, X } from "lucide-react";
+import { Bot, Eye, Shuffle, Smartphone, Volume2, VolumeX, X } from "lucide-react";
+import FullscreenButton from "@/components/FullscreenButton";
 import { formatRaceTime } from "@/lib/format";
 import { useQuality } from "@/hooks/useQuality";
 import QualityButton from "@/components/QualityButton";
@@ -390,16 +391,6 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
   }, [trackId, trackSeed, hasState, laps, roomId, is3d, quality]);
 
   const now = useServerNow(state?.status === "racing", 100);
-  const [fullscreen, setFullscreen] = useState(false);
-  useEffect(() => {
-    const onChange = () => setFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, []);
-  const toggleFullscreen = () => {
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    else document.documentElement.requestFullscreen().catch(() => {});
-  };
 
   if (!configured) return <FirebaseSetupNotice />;
 
@@ -456,9 +447,7 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
                   <X className="h-4 w-4" />
                 </button>
               )}
-              <button onClick={toggleFullscreen} className={chip} aria-label={fullscreen ? "Salir de pantalla completa" : "Pantalla completa"}>
-                {fullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
-              </button>
+              <FullscreenButton className={chip} iconClassName="h-4 w-4" />
             </div>
           </div>
 

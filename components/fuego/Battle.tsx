@@ -75,7 +75,8 @@ import { useWakeLock } from "@/components/carreras/Controller";
 import { TaloMark } from "@/components/TaloLogo";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { MOUSE_LOOK, TOUCH_LOOK, TouchControls, newControls, useDesktopControls, useFinePointer, type ControlState } from "./Controls";
-import { ListOrdered, Maximize, MousePointerClick, RotateCw, Volume2, VolumeX } from "lucide-react";
+import { ListOrdered, MousePointerClick, RotateCw, Volume2, VolumeX } from "lucide-react";
+import FullscreenButton from "@/components/FullscreenButton";
 
 const STEP = 1 / 60;
 const POSE_MS = 50;
@@ -1011,7 +1012,6 @@ export default function Battle({
   const count = Math.ceil((state.startedAt - now) / 1000);
   const left = state.endsAt - now;
   const inRoster = myId in state.roster;
-  const fullscreenable = typeof document !== "undefined" && document.fullscreenEnabled;
   const showBoard = board || !!hud?.board;
   const feed = Object.entries(state.feed)
     .sort((a, b) => Number(a[0].slice(1)) - Number(b[0].slice(1)))
@@ -1114,15 +1114,7 @@ export default function Battle({
             <button onClick={() => setBoard((v) => !v)} aria-label="Tabla" className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur">
               <ListOrdered className="h-4 w-4" />
             </button>
-            {fullscreenable && (
-              <button
-                onClick={() => (document.fullscreenElement ? document.exitFullscreen().catch(() => {}) : document.documentElement.requestFullscreen().catch(() => {}))}
-                aria-label="Pantalla completa"
-                className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur"
-              >
-                <Maximize className="h-4 w-4" />
-              </button>
-            )}
+            <FullscreenButton className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur" />
           </div>
           <ul className="flex flex-col items-end gap-0.5">
             {feed.map((e, i) => (

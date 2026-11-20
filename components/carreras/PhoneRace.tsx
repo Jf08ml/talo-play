@@ -45,7 +45,8 @@ import { useServerNow } from "@/hooks/useServerNow";
 import { TaloMark } from "@/components/TaloLogo";
 import Controller, { useWakeLock } from "./Controller";
 import { Standings, driverName, useCameraMode, useSoundSetting } from "./shared";
-import { Eye, Maximize, RotateCw, Volume2, VolumeX } from "lucide-react";
+import { Eye, RotateCw, Volume2, VolumeX } from "lucide-react";
+import FullscreenButton from "@/components/FullscreenButton";
 import { useQuality } from "@/hooks/useQuality";
 import QualityButton from "@/components/QualityButton";
 
@@ -482,7 +483,6 @@ export default function PhoneRace({
   const counting = state.status === "racing" && now > 0 && left > 0;
   const go = state.status === "racing" && now > 0 && left <= 0 && now - state.startedAt < 900;
   const myResult = mySeat ? state.results[mySeat] : undefined;
-  const fullscreenable = typeof document !== "undefined" && document.fullscreenEnabled;
 
   return (
     <div className="fixed inset-0 z-40 select-none overflow-hidden bg-sky-300" style={{ touchAction: "none" }}>
@@ -532,19 +532,7 @@ export default function PhoneRace({
             >
               <Eye className="h-4 w-4" /> {camera === "detras" ? "Detrás" : "Cabina"}
             </button>
-            {fullscreenable && (
-              <button
-                onClick={() =>
-                  document.fullscreenElement
-                    ? document.exitFullscreen().catch(() => {})
-                    : document.documentElement.requestFullscreen().catch(() => {})
-                }
-                aria-label="Pantalla completa"
-                className="flex items-center justify-center rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur"
-              >
-                <Maximize className="h-4 w-4" />
-              </button>
-            )}
+            <FullscreenButton className="flex items-center justify-center rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur" />
           </div>
         </div>
       </div>

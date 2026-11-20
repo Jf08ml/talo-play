@@ -186,6 +186,8 @@
 html {
   /* Dela Gothic One has a single weight: never fake a bold of it. */
   font-synthesis-weight: none;
+  /* No double-tap zoom anywhere (taps in games stay fast); pinching is stopped by the viewport and ZoomGuard. */
+  touch-action: manipulation;
 }
 
 body {

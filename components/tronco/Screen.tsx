@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Gauge, Maximize, Minimize, Smartphone, Volume2, VolumeX } from "lucide-react";
+import { Gauge, Smartphone, Volume2, VolumeX } from "lucide-react";
+import FullscreenButton from "@/components/FullscreenButton";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import {
   OPEN_LEAD_MS,
@@ -227,16 +228,6 @@ export default function TroncoScreen({ roomId }: { roomId: string }) {
     };
   }, [hasState]);
 
-  const [fullscreen, setFullscreen] = useState(false);
-  useEffect(() => {
-    const onChange = () => setFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", onChange);
-    return () => document.removeEventListener("fullscreenchange", onChange);
-  }, []);
-  const toggleFullscreen = () => {
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    else document.documentElement.requestFullscreen().catch(() => {});
-  };
 
   const now = useServerNow(state?.status === "playing", 250);
   const countdown = state?.status === "playing" && now && now < state.openAt ? Math.ceil((state.openAt - now) / 1000) : 0;
@@ -287,9 +278,7 @@ export default function TroncoScreen({ roomId }: { roomId: string }) {
               <button onClick={() => setMuted(!muted)} className={chip} aria-label={muted ? "Activar sonido" : "Silenciar"}>
                 {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
               </button>
-              <button onClick={toggleFullscreen} className={chip} aria-label={fullscreen ? "Salir de pantalla completa" : "Pantalla completa"}>
-                {fullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
-              </button>
+              <FullscreenButton className={chip} iconClassName="h-5 w-5" />
             </div>
           </div>
 

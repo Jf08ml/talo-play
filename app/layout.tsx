@@ -6,6 +6,7 @@ import { VoiceKeeper } from "@/components/VoiceButton";
 import AccountProvider from "@/components/AccountProvider";
 import PageViews from "@/components/PageViews";
 import PlazaProvider from "@/components/PlazaProvider";
+import ZoomGuard from "@/components/ZoomGuard";
 import "./globals.css";
 
 // Talo's type (talo-handoff/tokens.css): Albert Sans for text and UI, Dela
@@ -60,6 +61,8 @@ export const metadata: Metadata = {
     type: "website",
   },
   twitter: { card: "summary_large_image" },
+  // Added to the home screen on iPhone, it opens as an app, without Safari's bars (the only full screen iOS gives a page).
+  appleWebApp: { capable: true, title: "Talo", statusBarStyle: "black" },
 };
 
 // The puzzle board has its own pinch-to-zoom; locking the page viewport keeps
@@ -84,6 +87,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </AccountProvider>
         <VoiceKeeper />
         <PageViews />
+        <ZoomGuard />
       </body>
       {process.env.NODE_ENV === "production" && GA_ID && <GoogleAnalytics gaId={GA_ID} />}
     </html>

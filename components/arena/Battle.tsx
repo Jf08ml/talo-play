@@ -69,7 +69,8 @@ import QualityButton from "@/components/QualityButton";
 import { TaloMark } from "@/components/TaloLogo";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { MOUSE_LOOK, TOUCH_LOOK, TouchControls, newControls, useDesktopControls, useFinePointer, type ControlState } from "./Controls";
-import { Eye, Maximize, MousePointerClick, RotateCw, Shield, Users, Volume2, VolumeX } from "lucide-react";
+import { Eye, MousePointerClick, RotateCw, Shield, Users, Volume2, VolumeX } from "lucide-react";
+import FullscreenButton from "@/components/FullscreenButton";
 
 const STEP = 1 / 60;
 const POSE_MS = 50;
@@ -832,7 +833,6 @@ export default function Battle({
   const justStarted = state.status === "fighting" && now >= state.startedAt && now - state.startedAt < 1200;
   const roundLeft = state.startedAt + ROUND_SECONDS * 1000 - now;
   const bow = hud?.gear.w === "arco";
-  const fullscreenable = typeof document !== "undefined" && document.fullscreenEnabled;
 
   return (
     <div ref={wrapRef} className="fixed inset-0 z-40 select-none overflow-hidden bg-[#f2c48d]" style={{ touchAction: "none" }}>
@@ -891,19 +891,7 @@ export default function Battle({
             <button onClick={toggleCamera} className="flex items-center gap-1 rounded-xl bg-slate-950/60 px-2.5 py-2 text-xs text-white backdrop-blur">
               <Eye className="h-4 w-4" /> {camera === "primera" ? "1ª persona" : "3ª persona"}
             </button>
-            {fullscreenable && (
-              <button
-                onClick={() =>
-                  document.fullscreenElement
-                    ? document.exitFullscreen().catch(() => {})
-                    : document.documentElement.requestFullscreen().catch(() => {})
-                }
-                aria-label="Pantalla completa"
-                className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur"
-              >
-                <Maximize className="h-4 w-4" />
-              </button>
-            )}
+            <FullscreenButton className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur" />
           </div>
           <TeamBars state={state} team="blue" myId={myId} />
         </div>
