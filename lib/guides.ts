@@ -673,7 +673,7 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Manejar",
         text: [
-          "El auto acelera solo. Doblá con los botones o inclinando el teléfono; el freno frena y da marcha atrás.",
+          "El auto acelera solo. Doblá con los botones o inclinando el teléfono; el freno frena y da marcha atrás. En la compu, con las flechas (o A y D) y la flecha abajo o la barra espaciadora para frenar.",
           "Podés cambiar la cámara: detrás del auto o desde la cabina. Las flechas del piso te impulsan y las rampas te hacen volar.",
         ],
       },

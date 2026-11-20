@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { openInput, type CarInputWire } from "@/lib/carreras";
-import { ChevronLeft, ChevronRight, Hand, Smartphone, Gamepad2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Hand, Keyboard, Smartphone, Gamepad2 } from "lucide-react";
 
 export type ControlMode = "botones" | "inclinacion";
 
@@ -14,6 +14,31 @@ const FULL_TILT_DEG = 30;
 const DEAD_ZONE = 0.06;
 
 type Zone = "left" | "right" | "brake";
+
+/** Keyboard driving (computers): arrows or A/D to steer, down arrow, S or space to brake. */
+const KEY_ZONES: Record<string, Zone> = {
+  ArrowLeft: "left",
+  a: "left",
+  A: "left",
+  ArrowRight: "right",
+  d: "right",
+  D: "right",
+  ArrowDown: "brake",
+  s: "brake",
+  S: "brake",
+  " ": "brake",
+};
+
+const FINE_POINTER = "(hover: hover) and (pointer: fine)";
+const subscribePointer = (cb: () => void) => {
+  const q = window.matchMedia(FINE_POINTER);
+  q.addEventListener("change", cb);
+  return () => q.removeEventListener("change", cb);
+};
+/** A mouse (a computer): the keys drive, and the big touch zones give way to a hint. */
+function useFinePointer(): boolean {
+  return useSyncExternalStore(subscribePointer, () => window.matchMedia(FINE_POINTER).matches, () => false);
+}
 
 function readMode(): ControlMode {
   try {
@@ -160,7 +185,11 @@ export default function Controller({
   const [tiltReady, setTiltReady] = useState(false);
   const [pressed, setPressed] = useState<Record<Zone, boolean>>({ left: false, right: false, brake: false });
   const [tilt, setTilt] = useState(0);
+  const tiltRef = useRef(0);
   const pointers = useRef(new Map<number, Zone>());
+  const keys = useRef(new Set<Zone>());
+  const fine = useFinePointer();
+  const [showTouch, setShowTouch] = useState(false);
   const current = useRef<CarInputWire>({ s: 0, b: false });
 
   const emit = (wire: CarInputWire) => {
@@ -168,12 +197,13 @@ export default function Controller({
     onInput(wire);
   };
 
-  // Buttons: every finger is tracked by pointer id, so left + brake works at once.
+  // Buttons: every finger is tracked by pointer id, so left + brake works at once; held keys count too.
   const updateFromPointers = () => {
-    const zones = new Set(pointers.current.values());
+    const zones = new Set([...pointers.current.values(), ...keys.current]);
     const next = { left: zones.has("left"), right: zones.has("right"), brake: zones.has("brake") };
     setPressed(next);
-    const steer = mode === "botones" ? (next.right ? 1 : 0) - (next.left ? 1 : 0) : current.current.s;
+    const keySteer = (keys.current.has("right") ? 1 : 0) - (keys.current.has("left") ? 1 : 0);
+    const steer = mode === "botones" || keySteer ? (next.right ? 1 : 0) - (next.left ? 1 : 0) : tiltRef.current;
     emit({ s: steer, b: next.brake });
   };
 
@@ -196,6 +226,34 @@ export default function Controller({
     };
   });
 
+  // Keyboard.
+  useEffect(() => {
+    const typing = (e: KeyboardEvent) => e.target instanceof HTMLElement && (e.target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName));
+    const onKey = (e: KeyboardEvent) => {
+      const zone = KEY_ZONES[e.key];
+      if (!zone || typing(e) || e.metaKey || e.ctrlKey || e.altKey) return;
+      e.preventDefault();
+      const had = keys.current.has(zone);
+      if (e.type === "keydown") keys.current.add(zone);
+      else keys.current.delete(zone);
+      if (had !== keys.current.has(zone)) updateFromPointers();
+    };
+    // Switching windows mid-press: let go of everything.
+    const release = () => {
+      if (!keys.current.size) return;
+      keys.current.clear();
+      updateFromPointers();
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKey);
+    window.addEventListener("blur", release);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKey);
+      window.removeEventListener("blur", release);
+    };
+  });
+
   // Tilt.
   useEffect(() => {
     if (mode !== "inclinacion") return;
@@ -203,7 +261,9 @@ export default function Controller({
       const steer = tiltSteer(e);
       if (steer === null) return;
       setTilt(steer);
-      emit({ s: steer, b: current.current.b });
+      tiltRef.current = steer;
+      // Held arrow keys win over the tilt.
+      if (!keys.current.has("left") && !keys.current.has("right")) emit({ s: steer, b: current.current.b });
     };
     window.addEventListener("deviceorientation", onTilt);
     return () => window.removeEventListener("deviceorientation", onTilt);
@@ -219,12 +279,25 @@ export default function Controller({
     saveMode(next);
     setMode(next);
     setTilt(0);
+    tiltRef.current = 0;
     emit({ s: 0, b: current.current.b });
   };
 
   // A tilt mode remembered from last time still needs iOS's permission: ask on the first tap.
   const needsTiltTap = mode === "inclinacion" && !tiltReady && tiltNeedsPermission();
   const overlay = variant === "overlay";
+
+  const keysHint = (
+    <p className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-slate-200">
+      <Keyboard className="h-4 w-4" />
+      <span>
+        <Key>←</Key> <Key>→</Key> o <Key>A</Key> <Key>D</Key> doblar
+      </span>
+      <span>
+        <Key>↓</Key> o <Key>Espacio</Key> frenar
+      </span>
+    </p>
+  );
 
   const modeToggle = (
     <div className={`grid grid-cols-2 gap-1 rounded-xl p-1 ring-1 ${overlay ? "bg-slate-950/60 ring-white/15" : "bg-slate-900/80 ring-slate-700"}`}>
@@ -281,6 +354,20 @@ export default function Controller({
       Tocá para activar la inclinación
     </button>
   );
+
+  // On a computer, over the race: just the keys (the touch zones only on request).
+  if (overlay && fine && !showTouch) {
+    return (
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center p-3">
+        <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-3 rounded-2xl bg-slate-950/60 px-4 py-2 backdrop-blur">
+          {keysHint}
+          <button onClick={() => setShowTouch(true)} className="text-xs text-slate-400 underline hover:text-slate-200">
+            Usar botones
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (overlay) {
     return (
@@ -343,9 +430,14 @@ export default function Controller({
         </div>
       )}
 
+      {fine && <div className="rounded-xl bg-slate-900/80 p-2 ring-1 ring-slate-700">{keysHint}</div>}
       <p className="text-center text-xs text-slate-500">
         {locked ? "Preparate: el auto acelera solo cuando largan." : "El auto acelera solo. Frená para doblar cerrado o ir marcha atrás."}
       </p>
     </div>
   );
+}
+
+function Key({ children }: { children: ReactNode }) {
+  return <kbd className="rounded-md bg-white/15 px-1.5 py-0.5 font-mono text-[11px] text-white ring-1 ring-white/20">{children}</kbd>;
 }
