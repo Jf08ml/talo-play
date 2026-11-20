@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { CONTEXTS, GAME_ORDER, GAMES, playersLabel, type GameId, type PlayContext } from "./games";
+import { categoryOf } from "./talos";
+import { landing, shelfLanding } from "./landings";
 
 /**
  * Search (SEO) and AI-answer (GEO) data: per-game metadata, schema.org JSON-LD
@@ -42,8 +44,40 @@ function gameTitle(game: GameId): string {
 
 function gameDescription(game: GameId): string {
   const info = GAMES[game];
-  return `${info.tagline} Jugá ${contextsText(info.contexts)} desde el celular: ${playersText(game)}, ${info.duration}. Gratis y sin registrarse.`;
+  // Most taglines already say where it's played: don't say "desde el celular" twice.
+  const where = /celular|teléfono|compu/i.test(info.tagline) ? "" : " desde el celular o la compu";
+  return `${info.tagline} Jugá ${contextsText(info.contexts)}${where}: ${playersText(game)}, ${info.duration}. Gratis y sin registrarse.`;
 }
+
+/** The game's preview image (`app/og/[game]`): its scene on its shelf's color. */
+export const gameImage = (game: GameId) => `/og/${game}`;
+
+/** Questions about a game, shown on its lobby and sent as FAQPage JSON-LD (must match what's shown). */
+export function gameFaq(game: GameId): { q: string; a: string }[] {
+  const info = GAMES[game];
+  const out = [
+    { q: `¿Cómo se juega ${info.title} online?`, a: info.howTo.join(" ") },
+    {
+      q: `¿Cuántos jugadores pueden jugar ${info.title}?`,
+      a: `Se juega ${info.maxPlayers === 1 ? "de a 1" : `de ${playersText(game)}`} y una partida dura ${info.duration}.`,
+    },
+    {
+      q: "¿Hay que pagar, descargar algo o registrarse?",
+      a: `No. ${info.title} es gratis y se juega desde el navegador del celular o la compu, sin instalar nada ni crear una cuenta: solo ponés un nombre.`,
+    },
+  ];
+  if (info.maxPlayers > 1) {
+    out.push({
+      q: "¿Se puede jugar a distancia?",
+      a: "Sí. Cada uno entra desde su celular con el link de la sala y la partida se sincroniza en vivo, así que sirve estando juntos o cada uno en su casa.",
+    });
+  }
+  if (info.maxPlayers > 1 && info.contexts.includes("solo")) {
+    out.push({ q: `¿Se puede jugar ${info.title} solo?`, a: `Sí, ${info.title} también se puede jugar solo, sin esperar a nadie.` });
+  }
+  return out;
+}
+
 
 /** Metadata for a game's lobby (`/{path}`); its rooms override it with `inviteMetadata`. */
 export function gameMetadata(game: GameId): Metadata {
@@ -62,35 +96,102 @@ export function gameMetadata(game: GameId): Metadata {
       "sin registrarse",
     ],
     alternates: { canonical: `/${info.path}` },
-    openGraph: { title: `${title} · ${SITE_NAME}`, description, url: `/${info.path}`, images: ["/opengraph-image"] },
+    openGraph: { title: `${title} · ${SITE_NAME}`, description, url: `/${info.path}`, images: [gameImage(game)] },
+    twitter: { card: "summary_large_image", images: [gameImage(game)] },
   };
 }
 
-/** schema.org data for a game's lobby. */
+/** schema.org data for a game's lobby: the game, where it sits on the site (breadcrumbs) and its FAQ. */
 export function gameJsonLd(game: GameId) {
   const info = GAMES[game];
   const url = `${SITE_URL}/${info.path}`;
+  const shelf = shelfLanding(categoryOf(game).id);
+  return [
+    {
+      "@context": "https://schema.org",
+      "@type": "VideoGame",
+      "@id": `${url}#game`,
+      name: info.title,
+      url,
+      image: `${SITE_URL}${gameImage(game)}`,
+      description: gameDescription(game),
+      inLanguage: "es",
+      genre: shelf.label,
+      applicationCategory: "GameApplication",
+      gamePlatform: ["Navegador web", "Android", "iOS", "PC"],
+      operatingSystem: "Web, Android, iOS",
+      isAccessibleForFree: true,
+      offers: { "@type": "Offer", price: 0, priceCurrency: "USD" },
+      playMode: info.maxPlayers > 1 ? "MultiPlayer" : "SinglePlayer",
+      numberOfPlayers: { "@type": "QuantitativeValue", minValue: info.minPlayers, maxValue: info.maxPlayers },
+      timeRequired: info.duration,
+      gameTip: info.howTo,
+      publisher: { "@id": `${SITE_URL}/#org` },
+      isPartOf: { "@id": `${SITE_URL}/#website` },
+    },
+    breadcrumbs([
+      { name: "Inicio", url: SITE_URL },
+      { name: shelf.label, url: `${SITE_URL}/${shelf.slug}` },
+      { name: info.title, url },
+    ]),
+    faqJsonLd(gameFaq(game)),
+  ];
+}
+
+function breadcrumbs(items: { name: string; url: string }[]) {
   return {
     "@context": "https://schema.org",
-    "@type": "VideoGame",
-    "@id": `${url}#game`,
-    name: info.title,
-    url,
-    description: gameDescription(game),
-    inLanguage: "es",
-    genre: "Juego social",
-    applicationCategory: "GameApplication",
-    operatingSystem: "Web, Android, iOS",
-    isAccessibleForFree: true,
-    offers: { "@type": "Offer", price: 0, priceCurrency: "USD" },
-    playMode: info.maxPlayers > 1 ? "MultiPlayer" : "SinglePlayer",
-    numberOfPlayers: { "@type": "QuantitativeValue", minValue: info.minPlayers, maxValue: info.maxPlayers },
-    timeRequired: info.duration,
-    gameTip: info.howTo,
-    publisher: { "@id": `${SITE_URL}/#org` },
-    isPartOf: { "@id": `${SITE_URL}/#website` },
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((it, i) => ({ "@type": "ListItem", position: i + 1, name: it.name, item: it.url })),
   };
 }
+
+function faqJsonLd(faq: { q: string; a: string }[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faq.map(({ q, a }) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } })),
+  };
+}
+
+/** Metadata for a landing page (`lib/landings.ts`). */
+export function landingMetadata(slug: string): Metadata {
+  const l = landing(slug);
+  return {
+    title: l.title,
+    description: l.description,
+    alternates: { canonical: `/${l.slug}` },
+    openGraph: { title: `${l.title} · ${SITE_NAME}`, description: l.description, url: `/${l.slug}`, images: ["/opengraph-image"] },
+  };
+}
+
+/** schema.org data for a landing page: the collection of games, breadcrumbs and its FAQ. */
+export function landingJsonLd(slug: string) {
+  const l = landing(slug);
+  const url = `${SITE_URL}/${l.slug}`;
+  return [
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      "@id": `${url}#page`,
+      name: l.h1,
+      url,
+      description: l.description,
+      inLanguage: "es",
+      isPartOf: { "@id": `${SITE_URL}/#website` },
+      mainEntity: {
+        "@type": "ItemList",
+        itemListElement: l.games.map((id, i) => ({ "@type": "ListItem", position: i + 1, url: `${SITE_URL}/${GAMES[id].path}`, name: GAMES[id].title })),
+      },
+    },
+    breadcrumbs([
+      { name: "Inicio", url: SITE_URL },
+      { name: l.label, url },
+    ]),
+    faqJsonLd(l.faq),
+  ];
+}
+
 
 /** Questions answered on the home, also sent as FAQPage JSON-LD (must match what's shown). */
 export const HOME_FAQ: { q: string; a: string }[] = [

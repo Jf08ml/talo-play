@@ -4,6 +4,8 @@ import TaloLogo from "./TaloLogo";
 import FriendsLink from "./FriendsLink";
 import IdeasButton from "./IdeasButton";
 import PlazaButton from "./PlazaButton";
+import { CATEGORIES, CONTEXTS, GAMES } from "@/lib/games";
+import { contextLanding, shelfLanding } from "@/lib/landings";
 
 const NAV = [
   { href: "/#juegos", label: "Juegos" },
@@ -56,6 +58,33 @@ export function SiteFooter() {
           <span>Talo · Juegos para jugar juntos</span>
           <span>Gratis, sin registrarse y desde el celular.</span>
         </div>
+        {/* Every game and landing page, linked from every light page (helps people and search engines find them). */}
+        <nav aria-label="Todos los juegos" className="grid grid-cols-2 gap-x-6 gap-y-8 border-y border-white/15 py-10 sm:grid-cols-3 lg:grid-cols-6">
+          {CATEGORIES.map((c) => (
+            <div key={c.id} className="flex flex-col gap-2">
+              <Link href={`/${shelfLanding(c.id).slug}`} className="text-[15px] font-extrabold text-talo-hero underline-offset-4 hover:underline">
+                {c.label}
+              </Link>
+              <ul className="flex flex-col gap-1.5">
+                {c.games.map((id) => (
+                  <li key={id}>
+                    <Link href={`/${GAMES[id].path}`} className="text-[14px] text-[#CCCCCC] underline-offset-4 hover:text-white hover:underline">
+                      {GAMES[id].title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </nav>
+        <p className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[15px] font-semibold text-[#DDDDDD]">
+          <span>Para jugar:</span>
+          {CONTEXTS.map((c) => (
+            <Link key={c.id} href={`/${contextLanding(c.id).slug}`} className="text-white underline-offset-4 hover:underline">
+              {c.label.toLowerCase()}
+            </Link>
+          ))}
+        </p>
         <Link href="/ideas" className="w-fit text-[17px] font-semibold text-talo-hero underline-offset-4 hover:underline">
           ¿Qué juego sumamos? Dejanos tu idea
         </Link>

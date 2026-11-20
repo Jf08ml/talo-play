@@ -11,6 +11,7 @@ import { getPlayStats, mostPlayed } from "@/lib/playStats";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import JoinRoomForm from "@/components/JoinRoomForm";
 import PlazaBanner from "@/components/PlazaBanner";
+import { shelfLanding } from "@/lib/landings";
 import PlayerIdentity from "@/components/PlayerIdentity";
 import SiteHeader from "@/components/SiteHeader";
 import HeroCrowd from "@/components/HeroCrowd";
@@ -186,7 +187,12 @@ export default function HomeClient() {
         </div>
 
         <div id="catalogo" role="tabpanel" aria-label={current.label}>
-          <p className="mb-3 text-[15px] text-talo-text-3">{current.hint}</p>
+          <p className="mb-3 text-[15px] text-talo-text-3">
+            {current.hint} ·{" "}
+            <Link href={`/${shelfLanding(current.id).slug}`} className="font-bold text-talo-ink underline underline-offset-4">
+              Ver la página de {current.label.toLowerCase()}
+            </Link>
+          </p>
           {games.length ? (
             <div className="grid grid-cols-1 border-t-2 border-talo-ink sm:grid-cols-[repeat(auto-fill,minmax(300px,1fr))] sm:gap-x-6">
               {games.map((id) => {

@@ -9,10 +9,13 @@ import GuideArt from "./GuideArt";
 import GameIcon from "./GameIcon";
 
 /** A game's full instructions: goal, numbered sections (with diagrams) and tips. */
-export function GuideBody({ game }: { game: GameId }) {
+/** A game's full rules. `light`: on a light page (the lobby), bigger and in ink; otherwise for the dark rooms. */
+export function GuideBody({ game, light = false }: { game: GameId; light?: boolean }) {
   const guide = GUIDES[game];
+  const title = light ? "text-[19px] font-extrabold text-talo-ink" : "font-bold text-white";
+  const body = light ? "leading-relaxed text-talo-text-2" : "leading-relaxed text-white/70";
   return (
-    <div className="flex flex-col gap-4 text-sm">
+    <div className={`flex flex-col gap-4 ${light ? "text-[17px]" : "text-sm"}`}>
       <p className="flex gap-2 rounded-[14px] bg-talo-hero p-3 text-talo-ink">
         <Target className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2.4} />
         <span>
@@ -23,13 +26,13 @@ export function GuideBody({ game }: { game: GameId }) {
       <ol className="flex flex-col gap-4">
         {guide.sections.map((s, i) => (
           <li key={s.title} className="flex gap-3">
-            <span className="w-6 shrink-0 text-center font-display text-xl leading-none text-talo-hero">
+            <span className={`w-6 shrink-0 text-center font-display text-xl leading-none ${light ? "text-talo-ink" : "text-talo-hero"}`}>
               {i + 1}
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <p className="font-bold text-white">{s.title}</p>
+              {light ? <h3 className={title}>{s.title}</h3> : <p className={title}>{s.title}</p>}
               {s.text.map((t) => (
-                <p key={t} className="leading-relaxed text-white/70">
+                <p key={t} className={body}>
                   {t}
                 </p>
               ))}
@@ -43,11 +46,11 @@ export function GuideBody({ game }: { game: GameId }) {
         ))}
       </ol>
       {guide.tips && (
-        <div className="rounded-[14px] bg-white/[0.06] p-3">
-          <p className="mb-1 flex items-center gap-1.5 font-bold text-white">
+        <div className={`rounded-[14px] p-3 ${light ? "bg-talo-surface" : "bg-white/[0.06]"}`}>
+          <p className={`mb-1 flex items-center gap-1.5 font-bold ${light ? "text-talo-ink" : "text-white"}`}>
             <Lightbulb className="h-4 w-4" /> Consejos
           </p>
-          <ul className="list-disc space-y-1 pl-5 text-white/70">
+          <ul className={`list-disc space-y-1 pl-5 ${light ? "text-talo-text-2" : "text-white/70"}`}>
             {guide.tips.map((t) => (
               <li key={t}>{t}</li>
             ))}

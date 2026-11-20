@@ -564,6 +564,11 @@ const SCENES: Record<GameId, ReactNode> = {
 };
 
 /** A game's illustration, filling its box (keep the box square-ish). */
+/** A game's scene alone (the SVG content of its art), for drawing it somewhere else, like its link preview. */
+export function gameScene(game: GameId): ReactNode {
+  return SCENES[game];
+}
+
 export default function GameArt({ game, className = "" }: { game: GameId; className?: string }) {
   // Each game blinks at its own moment, so a shelf of them doesn't blink in unison.
   const delay = `${[...game].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 60 / 10}s`;
