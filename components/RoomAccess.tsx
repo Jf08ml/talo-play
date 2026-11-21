@@ -14,6 +14,9 @@ import {
   setAccess,
   subscribeAccess,
   subscribeWaiting,
+  unlistOnDisconnect,
+  unlistRoom,
+  onUnlisted,
   type OpenEntry,
   type RoomAccess,
 } from "@/lib/openRooms";
@@ -73,9 +76,28 @@ function useOpenBeacon(roomId: string, access: RoomAccess, presence: PresenceMap
   useEffect(() => {
     if (!beats) return;
     beatOpenRoom(roomId, latest.current);
+    const cancel = unlistOnDisconnect(roomId);
     const t = setInterval(() => beatOpenRoom(roomId, latest.current), BEAT_MS);
-    return () => clearInterval(t);
+    // Taken down by another device of mine leaving (same player id): list it again.
+    const unwatch = onUnlisted(roomId, () => beatOpenRoom(roomId, latest.current));
+    return () => {
+      clearInterval(t);
+      unwatch();
+      cancel();
+    };
   }, [beats, roomId, key]);
+  // Leaving last (to another page) takes the room off the list at once. Declared after the
+  // beacon so its listener is gone by then (cleanups run in order).
+  const lastOne = useRef(false);
+  useEffect(() => {
+    lastOne.current = beats && ids.length <= 1;
+  });
+  useEffect(
+    () => () => {
+      if (lastOne.current) unlistRoom(roomId);
+    },
+    [roomId]
+  );
 }
 
 const OPTIONS: { id: RoomAccess; title: string; text: string; Icon: typeof Lock }[] = [

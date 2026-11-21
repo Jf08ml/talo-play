@@ -1,4 +1,4 @@
-import { onValue, ref, serverTimestamp, set, update, type Unsubscribe } from "firebase/database";
+import { onDisconnect, onValue, ref, remove, serverTimestamp, set, update, type Unsubscribe } from "firebase/database";
 import { getDb } from "./firebase";
 import { GAMES, type GameId } from "./games";
 import { serverNow } from "./serverTime";
@@ -65,6 +65,30 @@ export function setAccess(roomId: string, access: RoomAccess, entry: OpenEntry) 
 /** Keeps an open room listed (see `BEAT_MS`). */
 export function beatOpenRoom(roomId: string, entry: OpenEntry) {
   return set(ref(db(), `openRooms/${roomId}`), entryValue(entry)).catch(() => {});
+}
+
+/**
+ * While I keep a room listed, closing my tab takes it off the list: if others
+ * stay, the next one in line lists it again at once (the count changed).
+ */
+export function unlistOnDisconnect(roomId: string): () => void {
+  const r = ref(db(), `openRooms/${roomId}`);
+  onDisconnect(r).remove().catch(() => {});
+  return () => {
+    onDisconnect(r).cancel().catch(() => {});
+  };
+}
+
+/** Calls back when the room's listing is gone (someone else took it down while I'm still here). */
+export function onUnlisted(roomId: string, cb: () => void): Unsubscribe {
+  return onValue(ref(db(), `openRooms/${roomId}`), (snap) => {
+    if (!snap.exists()) cb();
+  });
+}
+
+/** The last one left the room: off the list now, not when it goes stale. */
+export function unlistRoom(roomId: string) {
+  return remove(ref(db(), `openRooms/${roomId}`)).catch(() => {});
 }
 
 /** A room someone can walk into: open, or asking the Plaza for people. */

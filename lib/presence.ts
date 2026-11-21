@@ -38,22 +38,38 @@ export function joinPresence(
   const myRef = ref(db, `rooms/${roomId}/presence/${clientId}`);
   const connectedRef = ref(db, ".info/connected");
 
+  let connected = false;
+  let written = false;
+  const write = () => {
+    const payload: PresenceInfo = {
+      name: info.name,
+      color: info.color,
+      joinedAt: serverTimestamp(),
+    };
+    if (info.team) payload.team = info.team;
+    return set(myRef, payload);
+  };
+
   const unsubConnected = onValue(connectedRef, (snap) => {
-    if (snap.val() === true) {
+    connected = snap.val() === true;
+    if (connected) {
       touchRoom(roomId);
       onDisconnect(roomIndexRef(roomId)).set(serverTimestamp()).catch(() => {});
       onDisconnect(myRef)
         .remove()
+        .then(write)
         .then(() => {
-          const payload: PresenceInfo = {
-            name: info.name,
-            color: info.color,
-            joinedAt: serverTimestamp(),
-          };
-          if (info.team) payload.team = info.team;
-          set(myRef, payload);
-        });
+          written = true;
+        })
+        .catch(() => {});
     }
+  });
+
+  // The same player on two devices (an account adopts one client id
+  // everywhere) shares this entry: when the other one leaves and removes it,
+  // I'm still here, so it goes back.
+  const unsubMine = onValue(myRef, (snap) => {
+    if (connected && written && !snap.exists()) write().catch(() => {});
   });
 
   const touching = setInterval(() => touchRoom(roomId), TOUCH_EVERY_MS);
@@ -61,6 +77,7 @@ export function joinPresence(
   return () => {
     clearInterval(touching);
     unsubConnected();
+    unsubMine();
     remove(myRef);
     touchRoom(roomId);
   };
