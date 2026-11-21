@@ -6,6 +6,8 @@ import { generateClientId, colorForClient } from "@/lib/ids";
 // Identity is shared by every game in Talo, so keys aren't game-scoped.
 const CLIENT_ID_KEY = "salon.clientId";
 const NAME_KEY = "salon.playerName";
+// This device's own id, kept while it uses an account's (see adoptIdentity).
+const DEVICE_ID_KEY = "salon.deviceId";
 const NAME_CHANGE_EVENT = "salon:name-changed";
 const ID_CHANGE_EVENT = "salon:id-changed";
 
@@ -86,6 +88,8 @@ export function useClientIdentity(): ClientIdentity {
  */
 export function adoptIdentity(clientId: string, name: string | null) {
   if (clientId && clientId !== localStorage.getItem(CLIENT_ID_KEY)) {
+    const own = localStorage.getItem(CLIENT_ID_KEY);
+    if (own && !localStorage.getItem(DEVICE_ID_KEY)) localStorage.setItem(DEVICE_ID_KEY, own);
     localStorage.setItem(CLIENT_ID_KEY, clientId);
     window.dispatchEvent(new Event(ID_CHANGE_EVENT));
   }
@@ -93,4 +97,19 @@ export function adoptIdentity(clientId: string, name: string | null) {
     localStorage.setItem(NAME_KEY, name);
     window.dispatchEvent(new Event(NAME_CHANGE_EVENT));
   }
+}
+
+/**
+ * Signing out: this device stops being the account's player. It gets its own
+ * id back (or a new one), so it's a different player from the account's
+ * other devices — otherwise both would share one seat and one presence.
+ */
+export function dropAccountIdentity(accountClientId: string | null) {
+  const current = localStorage.getItem(CLIENT_ID_KEY);
+  const own = localStorage.getItem(DEVICE_ID_KEY);
+  localStorage.removeItem(DEVICE_ID_KEY);
+  if (accountClientId && current !== accountClientId) return;
+  const next = own && own !== accountClientId ? own : generateClientId();
+  localStorage.setItem(CLIENT_ID_KEY, next);
+  window.dispatchEvent(new Event(ID_CHANGE_EVENT));
 }

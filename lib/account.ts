@@ -24,6 +24,7 @@ import {
 } from "firebase/database";
 import { getAuthInstance, getDb } from "./firebase";
 import { generateRoomCode } from "./ids";
+import { dropAccountIdentity } from "@/hooks/useClientIdentity";
 import type { GameId } from "./games";
 
 /**
@@ -100,6 +101,9 @@ export async function signInWithGoogle(): Promise<void> {
 
 /** Signs out, first taking down the online status (afterwards the rules wouldn't let us). */
 export async function signOutAccount() {
+  // The account's player id, to give this device its own back afterwards.
+  const uid = getAuthInstance().currentUser?.uid;
+  const accountId = uid ? await get(ref(db(), `profiles/${uid}/clientId`)).then((s) => (typeof s.val() === "string" ? (s.val() as string) : null)).catch(() => null) : null;
   if (statusUid) {
     const myRef = ref(db(), `status/${statusUid}`);
     statusUid = null;
@@ -107,6 +111,7 @@ export async function signOutAccount() {
     await remove(myRef).catch(() => {});
   }
   await signOut(getAuthInstance());
+  dropAccountIdentity(accountId);
 }
 
 // ---- Profile --------------------------------------------------------------------
