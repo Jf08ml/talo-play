@@ -2,18 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
 import { BadgeCheck, Ban, Flag, Megaphone, Pin, Send, ShieldCheck, Trash2, Undo2, Users, VolumeX, X } from "lucide-react";
-import GameIcon from "./GameIcon";
+import OpenRoomsList from "./OpenRoomsList";
 import { Talo } from "./Talo";
 import { useAccount } from "./AccountProvider";
 import { useActiveCount } from "./PlazaProvider";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
-import { useServerNow } from "@/hooks/useServerNow";
 import { getDb } from "@/lib/firebase";
 import { inAppBrowser, signInWithGoogle } from "@/lib/account";
 import { isAdmin } from "@/lib/community";
-import { GAMES, roomPath } from "@/lib/games";
 import { playerTalo } from "@/lib/talos";
 import { trackEvent } from "@/lib/analytics";
 import { ref, get } from "firebase/database";
@@ -35,14 +32,12 @@ import {
   setPinned,
   softenText,
   subscribeBans,
-  subscribeCalls,
   subscribeMessages,
   subscribeOnline,
   subscribePinned,
   subscribeReports,
   waitToPost,
   type Pinned,
-  type PlazaCall,
   type PlazaMessage,
   type PlazaPerson,
 } from "@/lib/plaza";
@@ -52,11 +47,6 @@ const H2 = "font-display text-[22px] leading-[1.05] sm:text-[26px]";
 function clock(at: number): string {
   const d = new Date(at);
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-
-function ago(ms: number): string {
-  const min = Math.max(0, Math.floor(ms / 60000));
-  return min < 1 ? "recién" : `hace ${min} min`;
 }
 
 type Tab = "chat" | "gente" | "admin";
@@ -72,7 +62,6 @@ export default function PlazaDrawer({ onClose }: { onClose: () => void }) {
   const { user, profile } = useAccount();
   const active = useActiveCount();
   const [messages, setMessages] = useState<PlazaMessage[]>([]);
-  const [calls, setCalls] = useState<PlazaCall[]>([]);
   const [people, setPeople] = useState<PlazaPerson[]>([]);
   const [reports, setReports] = useState<Record<string, number>>({});
   const [bans, setBans] = useState<Set<string>>(new Set());
@@ -88,7 +77,6 @@ export default function PlazaDrawer({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     const unsubs = [
       subscribeMessages(setMessages),
-      subscribeCalls(setCalls),
       subscribeOnline(setPeople),
       subscribeReports(setReports),
       subscribeBans(setBans),
@@ -191,7 +179,18 @@ export default function PlazaDrawer({ onClose }: { onClose: () => void }) {
 
         {tab === "chat" && (
           <>
-            <Calls calls={calls} myClientId={identity.clientId} onJoin={onClose} />
+            <div className="max-h-[38%] shrink-0 overflow-y-auto px-4 py-3 sm:px-5">
+              <OpenRoomsList
+                where="plaza"
+                limit={30}
+                onJoin={onClose}
+                empty={
+                  <p className="text-[13px] leading-snug text-black/60">
+                    Ninguna ahora. Creá una sala y dejala <b>abierta</b>, o tocá <b>«Buscar gente en la Plaza»</b> en la sala de espera.
+                  </p>
+                }
+              />
+            </div>
             <Chat
               messages={messages}
               reports={reports}
@@ -557,47 +556,6 @@ function Composer({
       )}
       {note && <p className="text-sm font-semibold text-red-700">{note}</p>}
     </div>
-  );
-}
-
-function Calls({ calls, myClientId, onJoin }: { calls: PlazaCall[]; myClientId: string; onJoin: () => void }) {
-  const now = useServerNow(true, 30000);
-  return (
-    <section className="flex max-h-[38%] shrink-0 flex-col gap-2 overflow-y-auto px-4 py-3 sm:px-5">
-      <h3 className="text-[15px] font-extrabold">Buscan gente{calls.length > 0 && ` (${calls.length})`}</h3>
-      {calls.length === 0 ? (
-        <p className="text-[13px] leading-snug text-black/60">
-          Ninguna sala ahora. Para pedir gente, creá una sala y tocá <b>«Buscar gente en la Plaza»</b> en la sala de espera.
-        </p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-
-          {calls.map((c) => (
-            <li key={c.room} className="flex items-center gap-3 rounded-2xl border-2 border-talo-ink p-2">
-              <GameIcon game={c.game} size="lg" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-bold">{GAMES[c.game].title}</p>
-                <p className="truncate text-[13px] text-black/60">
-                  {c.by === myClientId ? "Tu sala" : c.name} · {c.count === 1 ? "1 en la sala" : `${c.count} en la sala`} · {ago(now - c.at)}
-                </p>
-              </div>
-              {c.by !== myClientId && (
-                <Link
-                  href={roomPath(c.game, c.room)}
-                  onClick={() => {
-                    trackEvent("plaza_join", { game: c.game });
-                    onJoin();
-                  }}
-                  className="shrink-0 rounded-xl bg-talo-ink px-3.5 py-2 text-sm font-bold text-talo-hero"
-                >
-                  Unirme
-                </Link>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
   );
 }
 

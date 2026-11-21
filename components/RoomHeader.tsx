@@ -11,6 +11,7 @@ import GameIcon from "./GameIcon";
 import { RulesButton } from "./HowToPlay";
 import VoiceButton from "./VoiceButton";
 import ChatButton from "./ChatButton";
+import { RoomAccessButton } from "./RoomAccess";
 import { FriendsButton } from "./FriendInvite";
 import { setActivity } from "@/lib/account";
 import { Check, Share2, Volume2, VolumeX } from "lucide-react";
@@ -101,6 +102,7 @@ export default function RoomHeader({
         </button>
         <RulesButton game={game} where="partida" compact />
         {!OWN_AUDIO.has(game) && <SoundButton />}
+        {social && <RoomAccessButton game={game} roomId={roomId} />}
         {social && <FriendsButton game={game} roomId={roomId} />}
         {social && <ChatButton roomId={roomId} locked={chatLocked} />}
         {social && <VoiceButton roomId={roomId} />}

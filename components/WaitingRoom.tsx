@@ -8,6 +8,8 @@ import { ChevronDown } from "lucide-react";
 import { categoryOf, gameColors } from "@/lib/talos";
 import InviteCard from "./InviteCard";
 import PlazaCallButton from "./PlazaCallButton";
+import { RoomAccessCard } from "./RoomAccess";
+import { markWaiting } from "@/lib/openRooms";
 import TaloTable from "./TaloTable";
 import { PRIMARY_BUTTON } from "./ui";
 import { GuideBody } from "./HowToPlay";
@@ -91,6 +93,9 @@ export default function WaitingRoom({
   const inviteFirst = missing > 0 || online.length < 2;
   const isHost = hostId === myId;
 
+  // An open room's listing says "esperando" while this is on screen (lib/openRooms.ts).
+  useEffect(() => markWaiting(roomId), [roomId]);
+
   useEffect(() => {
     trackEvent("join_room", { game, host: isHost });
   }, [game, roomId, isHost]);
@@ -104,6 +109,7 @@ export default function WaitingRoom({
   const invite = (
     <>
       <InviteCard game={game} roomId={roomId} />
+      <RoomAccessCard game={game} roomId={roomId} />
       <PlazaCallButton game={game} roomId={roomId} count={online.length} me={mine ? { clientId: mine.id, name: mine.name, color: mine.color } : null} />
     </>
   );

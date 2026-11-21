@@ -11,6 +11,7 @@ import { getPlayStats, mostPlayed } from "@/lib/playStats";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import JoinRoomForm from "@/components/JoinRoomForm";
 import PlazaBanner from "@/components/PlazaBanner";
+import OpenRoomsList from "@/components/OpenRoomsList";
 import { shelfLanding } from "@/lib/landings";
 import PlayerIdentity from "@/components/PlayerIdentity";
 import SiteHeader from "@/components/SiteHeader";
@@ -100,6 +101,7 @@ export default function HomeClient() {
       {/* LA PLAZA: find people to play with. */}
       <div className="mx-auto max-w-[1360px] px-5 pt-8 sm:px-10 sm:pt-14">
         <PlazaBanner />
+        <OpenRoomsList where="inicio" limit={6} title="Salas abiertas ahora" className="mt-6" />
       </div>
 
       {/* DESTACADOS */}

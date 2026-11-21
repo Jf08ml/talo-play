@@ -11,6 +11,7 @@ import { shelfLanding } from "@/lib/landings";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import FirebaseSetupNotice from "./FirebaseSetupNotice";
 import PlayerIdentity from "./PlayerIdentity";
+import OpenRoomsList from "./OpenRoomsList";
 import SiteHeader, { SiteFooter } from "./SiteHeader";
 import GameArt from "./GameArt";
 import { GuideBody } from "./HowToPlay";
@@ -84,6 +85,7 @@ export default function GameLobby({ game, children }: { game: GameId; children: 
       </section>
 
       <div className="mx-auto grid w-full max-w-[1360px] items-start gap-8 px-5 py-10 sm:px-10 sm:py-16 md:grid-cols-[1.4fr_1fr] lg:gap-12">
+        <OpenRoomsList game={game} where="lobby" title={`Salas abiertas de ${info.title}`} className="md:col-span-2" />
         {/* The create form shares its controls with the dark rooms, so it sits on an ink panel. */}
         <div className="rounded-[28px] bg-talo-ink p-2 text-slate-100 [color-scheme:dark] sm:p-3">
           {identity.name ? (
