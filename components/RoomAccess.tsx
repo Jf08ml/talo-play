@@ -195,3 +195,13 @@ export function RoomAccessButton({ roomId, game }: { roomId: string; game: GameI
     </div>
   );
 }
+
+/**
+ * Keeps an open room listed where the room header isn't on screen (the 3D
+ * games' full-screen matches). Draws nothing.
+ */
+export function OpenRoomBeacon({ roomId, game }: { roomId: string; game: GameId }) {
+  const { access, presence, entry } = useRoomAccess(roomId, game);
+  useOpenBeacon(roomId, access, presence, entry);
+  return null;
+}

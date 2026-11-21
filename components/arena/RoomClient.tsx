@@ -22,6 +22,7 @@ import NamePrompt from "@/components/NamePrompt";
 import WaitingRoom from "@/components/WaitingRoom";
 import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
+import { OpenRoomBeacon } from "@/components/RoomAccess";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { RoomSettingsEditor } from "@/components/RoomSettings";
@@ -88,7 +89,12 @@ export default function RoomClient({ roomId }: { roomId: string }) {
   if (!configured) return <FirebaseSetupNotice />;
 
   if (status === "ready" && state && meta && state.status !== "waiting") {
-    return <Battle roomId={roomId} meta={meta} state={state} myId={myId} presence={presence} presenceLoaded={presenceLoaded} />;
+    return (
+      <>
+        <OpenRoomBeacon roomId={roomId} game="arena" />
+        <Battle roomId={roomId} meta={meta} state={state} myId={myId} presence={presence} presenceLoaded={presenceLoaded} />
+      </>
+    );
   }
 
   const connected = Object.keys(presence);

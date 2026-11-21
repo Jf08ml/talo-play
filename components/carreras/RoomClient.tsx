@@ -35,6 +35,7 @@ import NamePrompt from "@/components/NamePrompt";
 import WaitingRoom from "@/components/WaitingRoom";
 import PlayerBadges from "@/components/PlayerBadges";
 import RoomHeader from "@/components/RoomHeader";
+import { OpenRoomBeacon } from "@/components/RoomAccess";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import Controller, { useInputSender, useWakeLock } from "@/components/carreras/Controller";
 import PhoneRace from "@/components/carreras/PhoneRace";
@@ -116,7 +117,12 @@ export default function RoomClient({ game, roomId }: { game: CarrerasGame; roomI
   if (racing && meta.mode === "telefono") {
     // The connected person with the lowest id runs the bots.
     const botHost = presenceLoaded && Object.keys(presence).sort()[0] === myId;
-    return <PhoneRace roomId={roomId} meta={meta} state={state} myId={myId} botHost={botHost} />;
+    return (
+      <>
+        <OpenRoomBeacon roomId={roomId} game={game} />
+        <PhoneRace roomId={roomId} meta={meta} state={state} myId={myId} botHost={botHost} />
+      </>
+    );
   }
 
   return (
