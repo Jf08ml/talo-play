@@ -6,7 +6,18 @@ import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { GAMES, type GameId } from "@/lib/games";
 import { getPlayStats, type PlayStats } from "@/lib/playStats";
-import { getDailyStats, isOwnBrowser, OWN_BROWSER_KEY, statsDay, type DayStats } from "@/lib/dailyStats";
+import {
+  getDailyStats,
+  getPeriodStats,
+  isOwnBrowser,
+  monthOf,
+  OWN_BROWSER_KEY,
+  statsDay,
+  weekOf,
+  type DayStats,
+  type PeriodStats,
+} from "@/lib/dailyStats";
+import { countryOfTimeZone } from "@/lib/timezones";
 import { useAccount } from "@/components/AccountProvider";
 import { signInWithGoogle } from "@/lib/account";
 import {
@@ -59,14 +70,18 @@ function totals(days: DayStats[]): Totals {
 export default function StatsClient() {
   const [days, setDays] = useState<DayStats[] | null>(null);
   const [allTime, setAllTime] = useState<PlayStats>({});
+  const [weeks, setWeeks] = useState<PeriodStats[]>([]);
+  const [months, setMonths] = useState<PeriodStats[]>([]);
   const [error, setError] = useState(false);
 
   useEffect(() => {
     if (!isFirebaseConfigured()) return;
-    Promise.all([getDailyStats(90), getPlayStats()])
-      .then(([d, p]) => {
+    Promise.all([getDailyStats(90), getPlayStats(), getPeriodStats("weeks", 12), getPeriodStats("months", 12)])
+      .then(([d, p, w, m]) => {
         setDays(d);
         setAllTime(p);
+        setWeeks(w);
+        setMonths(m);
       })
       .catch(() => setError(true));
   }, []);
@@ -80,8 +95,7 @@ export default function StatsClient() {
         <div className="mx-auto flex max-w-[1360px] flex-col gap-3 px-5 pb-10 pt-2 sm:px-10 sm:pb-14 sm:pt-6">
           <h1 className="font-display text-[44px] leading-none tracking-[-0.02em] sm:text-[72px]">Estadísticas</h1>
           <p className="max-w-2xl text-[17px] font-medium leading-[1.4] sm:text-[20px]">
-            Lo que cuenta Talo por su cuenta, día por día (hora de Argentina). Para fuentes, países y páginas, mirá Google
-            Analytics.
+            Lo que cuenta Talo por su cuenta, día por día (hora de Argentina). Para fuentes y páginas, mirá Google Analytics.
           </p>
         </div>
       </section>
@@ -92,7 +106,7 @@ export default function StatsClient() {
         ) : !days ? (
           <p className="text-talo-text-2">Cargando…</p>
         ) : (
-          <Dashboard days={days} allTime={allTime} />
+          <Dashboard days={days} allTime={allTime} weeks={weeks} months={months} />
         )}
         <Community />
         <OwnBrowser />
@@ -102,10 +116,20 @@ export default function StatsClient() {
   );
 }
 
-function Dashboard({ days, allTime }: { days: DayStats[]; allTime: PlayStats }) {
+function Dashboard({
+  days,
+  allTime,
+  weeks,
+  months,
+}: {
+  days: DayStats[];
+  allTime: PlayStats;
+  weeks: PeriodStats[];
+  months: PeriodStats[];
+}) {
   const today = statsDay();
   const byDay = useMemo(() => new Map(days.map((d) => [d.day, d])), [days]);
-  const empty = (day: string): DayStats => ({ day, visits: 0, new: 0, plays: {}, rooms: {} });
+  const empty = (day: string): DayStats => ({ day, visits: 0, new: 0, plays: {}, rooms: {}, tz: {} });
   /** The last `n` days up to today, gaps filled with zeros, oldest first. */
   const lastDays = (n: number, offset = 0) =>
     Array.from({ length: n }, (_, i) => {
@@ -130,13 +154,17 @@ function Dashboard({ days, allTime }: { days: DayStats[]; allTime: PlayStats }) 
     <>
       <p className="text-[15px] font-semibold text-talo-text-2">Contando desde el {label(since)}.</p>
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <Tile title="Visitas" hint="navegadores por día" now={week.visits} before={prevWeek.visits} />
+        <Tile title="Visitas" hint="suma de cada día, no únicos" now={week.visits} before={prevWeek.visits} />
         <Tile title="Nuevos" hint="primera vez en Talo" now={week.new} before={prevWeek.new} />
         <Tile title="Entradas a salas" hint="personas jugando" now={week.plays} before={prevWeek.plays} />
         <Tile title="Salas creadas" hint="desde un lobby" now={week.rooms} before={prevWeek.rooms} />
       </div>
 
+      <Uniques today={today} weeks={weeks} months={months} />
+
       <DailyChart days={lastDays(30)} />
+
+      <Countries today={today} weeks={weeks} months={months} />
 
       <section className={CARD}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -160,6 +188,183 @@ function Dashboard({ days, allTime }: { days: DayStats[]; allTime: PlayStats }) 
 
       <DayTable days={lastDays(30).reverse()} />
     </>
+  );
+}
+
+const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+
+function periodLabel(kind: "weeks" | "months", key: string) {
+  if (kind === "months") return `${MONTHS[+key.slice(4, 6) - 1]} ${key.slice(0, 4)}`;
+  return `Semana del ${label(key)}`;
+}
+
+/** The previous month's yyyymm. */
+function prevMonth(m: string) {
+  const y = +m.slice(0, 4);
+  const mo = +m.slice(4, 6);
+  return mo === 1 ? `${y - 1}12` : `${y}${String(mo - 1).padStart(2, "0")}`;
+}
+
+type Period = "weeks" | "months";
+
+function PeriodSwitch({ value, onChange }: { value: Period; onChange: (v: Period) => void }) {
+  return (
+    <div role="group" aria-label="Período" className="flex gap-1 rounded-full border-2 border-talo-ink p-1">
+      {(["weeks", "months"] as const).map((k) => (
+        <button
+          key={k}
+          type="button"
+          aria-pressed={value === k}
+          onClick={() => onChange(k)}
+          className={`rounded-full px-4 py-1.5 text-[15px] font-bold ${value === k ? "bg-talo-ink text-white" : "text-talo-ink"}`}
+        >
+          {k === "weeks" ? "Semanas" : "Meses"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Unique browsers per week (Monday to Sunday) and per month: each counted once per period. */
+function Uniques({ today, weeks, months }: { today: string; weeks: PeriodStats[]; months: PeriodStats[] }) {
+  const [kind, setKind] = useState<Period>("weeks");
+  const thisWeek = weekOf(today);
+  const thisMonth = monthOf(today);
+  const find = (list: PeriodStats[], key: string) => list.find((p) => p.key === key);
+  const rows = (kind === "weeks" ? weeks : months).slice().reverse();
+  return (
+    <section className={CARD}>
+      <h2 className={H2}>Usuarios únicos</h2>
+      <p className="mt-2 max-w-2xl text-[15px] text-talo-text-2">
+        Cada navegador cuenta una sola vez por semana (de lunes a domingo) y por mes, aunque entre todos los días.
+        «Vuelven» son los que ya conocían Talo de antes.
+      </p>
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+        <UniqueTile
+          title="Esta semana"
+          now={find(weeks, thisWeek)}
+          before={find(weeks, shiftDay(thisWeek, 7))}
+          beforeText="la semana pasada"
+        />
+        <UniqueTile
+          title="Este mes"
+          now={find(months, thisMonth)}
+          before={find(months, prevMonth(thisMonth))}
+          beforeText="el mes pasado"
+        />
+      </div>
+      {rows.length > 0 && (
+        <>
+          <div className="mb-2 mt-6 flex justify-end">
+            <PeriodSwitch value={kind} onChange={setKind} />
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-[15px]">
+              <thead className="text-[13px] text-talo-text-2">
+                <tr>
+                  <th className="py-2 pr-3 text-left font-semibold">{kind === "weeks" ? "Semana" : "Mes"}</th>
+                  <th className="py-2 pr-3 font-semibold">Únicos</th>
+                  <th className="py-2 pr-3 font-semibold">Nuevos</th>
+                  <th className="py-2 font-semibold">Vuelven</th>
+                </tr>
+              </thead>
+              <tbody className="font-mono tabular-nums">
+                {rows.map((p) => (
+                  <tr key={p.key} className="border-t border-talo-line">
+                    <td className="py-1.5 pr-3 text-left font-sans font-semibold">{periodLabel(kind, p.key)}</td>
+                    <td className="py-1.5 pr-3">{p.visits}</td>
+                    <td className="py-1.5 pr-3">{p.new}</td>
+                    <td className="py-1.5">{Math.max(0, p.visits - p.new)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function UniqueTile({
+  title,
+  now,
+  before,
+  beforeText,
+}: {
+  title: string;
+  now?: PeriodStats;
+  before?: PeriodStats;
+  beforeText: string;
+}) {
+  const visits = now?.visits ?? 0;
+  const fresh = now?.new ?? 0;
+  return (
+    <div className="rounded-[20px] bg-talo-surface p-4">
+      <div className="text-[15px] font-bold">{title}</div>
+      <div className="font-display text-[40px] leading-none sm:text-[52px]">{visits}</div>
+      <div className="mt-2 text-[14px]">
+        <b>{fresh}</b> nuevos · <b>{Math.max(0, visits - fresh)}</b> vuelven
+      </div>
+      <div className="mt-1 text-[13px] text-talo-text-2">
+        {before ? `${before.visits} ${beforeText}` : `Sin datos de ${beforeText}`}
+      </div>
+    </div>
+  );
+}
+
+/** Where visitors are, from their browser's time zone: unique per week or month. */
+function Countries({ today, weeks, months }: { today: string; weeks: PeriodStats[]; months: PeriodStats[] }) {
+  const [kind, setKind] = useState<Period>("weeks");
+  const key = kind === "weeks" ? weekOf(today) : monthOf(today);
+  const period = (kind === "weeks" ? weeks : months).find((p) => p.key === key);
+  const rows = useMemo(() => {
+    const by = new Map<string, number>();
+    for (const [tz, n] of Object.entries(period?.tz ?? {})) {
+      const c = countryOfTimeZone(tz);
+      by.set(c, (by.get(c) ?? 0) + n);
+    }
+    return [...by.entries()].sort((a, b) => b[1] - a[1]);
+  }, [period]);
+  const total = rows.reduce((t, [, n]) => t + n, 0);
+  const max = Math.max(1, ...rows.map(([, n]) => n));
+  return (
+    <section className={CARD}>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+        <h2 className={H2}>Países</h2>
+        <PeriodSwitch value={kind} onChange={setKind} />
+      </div>
+      <p className="mb-4 max-w-2xl text-[15px] text-talo-text-2">
+        {kind === "weeks" ? "Esta semana" : "Este mes"}: usuarios únicos según la zona horaria de su navegador. Es una
+        aproximación (alguien de viaje cuenta donde está).
+      </p>
+      {total === 0 ? (
+        <p className="text-[15px]">Todavía no hay datos: se empieza a contar desde que esta versión está publicada.</p>
+      ) : (
+        <table className="w-full text-left text-[15px]">
+          <tbody>
+            {rows.map(([c, n]) => (
+              <tr key={c} className="border-t border-talo-line">
+                <td className="py-2 pr-3 font-semibold">{c}</td>
+                <td className="w-[50%] py-2 pr-3">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="block h-3 rounded-r-[4px] bg-talo-ink"
+                      style={{ width: `${(n / max) * 100}%`, minWidth: 3 }}
+                      aria-hidden="true"
+                    />
+                    <span className="font-mono tabular-nums">{n}</span>
+                  </div>
+                </td>
+                <td className="py-2 text-right font-mono tabular-nums text-talo-text-2">
+                  {Math.round((n / total) * 100)}%
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
   );
 }
 
