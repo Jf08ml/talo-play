@@ -543,7 +543,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     id: "onda",
     title: "En la misma onda",
     path: "en-la-misma-onda",
-    tagline: "Uno ve dónde cae un punto en una escala (frío ↔ caliente, barato ↔ caro…) y da una pista. ¿Los demás lo encuentran en el dial?",
+    tagline: "Uno ve dónde cae un punto en una escala (frío ↔ caliente, barato ↔ caro…) y da una pista. ¿Los demás lo encuentran en el dial? Cada uno por su cuenta, todos juntos o rojo contra azul.",
     minPlayers: 2,
     maxPlayers: 12,
     duration: "15–20 min",
@@ -551,7 +551,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     howTo: [
       "Por turnos, a uno le toca ver en secreto dónde está el objetivo en una escala.",
       "Da una pista: una palabra, una cosa o un personaje que esté justo ahí.",
-      "Los demás mueven la aguja del dial. Cuanto más cerca, más puntos; el que dio la pista suma el promedio.",
+      "Los demás mueven la aguja del dial: cada uno la suya, una entre todos o una por equipo. Cuanto más cerca, más puntos.",
     ],
   },
   telefono: {

@@ -207,7 +207,10 @@ Stack: Next.js 16 App Router + React 19, Tailwind v4, Konva/react-konva for the 
 
 ### En la misma onda (`app/en-la-misma-onda`, `lib/onda.ts`, `components/onda/Dial.tsx`)
 
-- Wavelength-style. `order` (psychics) fixed at start, `meta.rounds` laps. The turn's scale and hidden target come from the seed (`spectrumFor`, `targetFor`; `lib/ondaSpectra.ts` append-only; `skips` moves to another scale). `clue → guessing → reveal`: guesses are locked once (`submitGuess`), points by distance (`BANDS` 4/3/2), the psychic gets the guessers' average.
+- Wavelength-style. Three modes (`meta.mode`, copied into the state at start; none = `cada`): `cada` (each guesser locks their own needle, `submitGuess`; the psychic gets the average; fine for two), `juntos` (one shared needle at `onda/live`, plain writes while dragging tagged with `liveKey`; anyone locks it, `lockNeedle`; the group scores `teamScores.grupo` and ends with its `harmony` %) and `equipos` (red vs blue, alternating `turnTeam`; the team locks the shared needle, then the rival bets left/right, `placeBet`, +1 if right). Flow `clue → guessing → (betting) → reveal`.
+- The psychic is picked when each turn starts (`beginTurn`: fewest clues given among the connected, from the turn's team), so latecomers (`joinOnda` appends them to `order`, and to a team in equipos) also give clues; the game ends when everyone connected gave `rounds` clues (and both teams had as many turns). Optional clock (`seconds` to guess, `BET_SECONDS` to bet): any client closes the phase. Clues with digits are refused (`clueProblem`). `log` keeps each turn for the end recap.
+- Scales: `lib/ondaSpectra.ts`, append-only, each with a deck (`ONDA_DECKS`); `spectrumPool(meta)` = the chosen decks + `customSpectra` ("Left|Right"); rooms without `meta.decks` use the first `LEGACY_COUNT`, so they keep their scales. Scale and target come from the seed (`spectrumFor`, `targetFor`; `skips` moves to another scale), points by distance (`BANDS` 4/3/2).
+- `components/onda/Dial.tsx`: flat dial; on a reveal the bands are under a cover that swings open (the needles drop in after), players' needles are little talos, arrow keys and −/+ fine-tune, Enter confirms.
 
 ### Teléfono descompuesto (`app/telefono-descompuesto`, `lib/telefono.ts`)
 

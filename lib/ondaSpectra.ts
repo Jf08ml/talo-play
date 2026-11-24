@@ -1,9 +1,22 @@
 /**
- * Scales for En la misma onda: [left end, right end]. The scale of each turn
- * comes from a seeded shuffle of the list's indexes, so it's append-only:
- * reordering or removing changes the scales of rooms already created.
+ * Scales for En la misma onda: [left end, right end, deck]. The scale of each
+ * turn comes from a seeded shuffle of the pool's indexes, so the list is
+ * append-only: reordering or removing changes the scales of rooms already
+ * created. No deck = "clasicas". Rooms from before the decks (no `meta.decks`)
+ * use the first LEGACY_COUNT scales only, so their games stay the same.
  */
-export const ONDA_SPECTRA: [string, string][] = [
+export type OndaDeck = "clasicas" | "pareja" | "previa" | "argentinas";
+
+export const ONDA_DECKS: { id: OndaDeck; label: string; hint: string }[] = [
+  { id: "clasicas", label: "Clásicas", hint: "Para cualquier grupo: comida, plata, películas, animales…" },
+  { id: "pareja", label: "En pareja", hint: "Citas, regalos, planes y la convivencia." },
+  { id: "previa", label: "Para la previa", hint: "Salidas, fiestas, chismes y vergüenzas." },
+  { id: "argentinas", label: "Bien argentinas", hint: "Asado, mate, fútbol y cosas de acá." },
+];
+
+export const LEGACY_COUNT = 70;
+
+export const ONDA_SPECTRA: [string, string, OndaDeck?][] = [
   ["Frío", "Caliente"],
   ["Barato", "Caro"],
   ["Aburrido", "Divertido"],
@@ -74,4 +87,67 @@ export const ONDA_SPECTRA: [string, string][] = [
   ["Nada argentino", "Re argentino"],
   ["Pasa desapercibido", "Llama la atención"],
   ["Recuerdo de la infancia malo", "Recuerdo de la infancia lindo"],
+  // ---- Added with the decks (append only) ----
+  ["Plan de domingo aburrido", "Plan de domingo perfecto"],
+  ["Comida para picar", "Comida para sentarse a comer"],
+  ["Se lava a mano", "Va al lavarropas"],
+  ["Película para llorar", "Película para reír"],
+  ["Mal consejo", "Gran consejo"],
+  ["Hecho a mano", "Hecho en fábrica"],
+  ["Ruido molesto", "Ruido relajante"],
+  ["Trabajo tranquilo", "Trabajo estresante"],
+  ["Lugar para vacaciones aburrido", "Lugar para vacaciones soñado"],
+  ["Dura un rato", "Dura para siempre"],
+  ["Tecnología vieja", "Tecnología del futuro"],
+  ["Mal olor", "Olor rico"],
+  ["Fruta fea", "Fruta rica"],
+  ["Superhéroe flojo", "Superhéroe poderoso"],
+  ["Algo que se presta", "Algo que no se presta ni loco"],
+  ["Cita aburrida", "Cita perfecta", "pareja"],
+  ["Regalo de compromiso", "Regalo del corazón", "pareja"],
+  ["Apodo de pareja horrible", "Apodo de pareja tierno", "pareja"],
+  ["Pelea tonta", "Pelea seria", "pareja"],
+  ["Plan para hacer solo", "Plan para hacer juntos", "pareja"],
+  ["Poco romántico", "Muy romántico", "pareja"],
+  ["Mala costumbre en casa", "Buena costumbre en casa", "pareja"],
+  ["Se perdona fácil", "Imperdonable", "pareja"],
+  ["Serie para maratonear juntos", "Serie para ver cada uno por su lado", "pareja"],
+  ["Comida para pedir mala", "Comida para pedir buena", "pareja"],
+  ["Destino de luna de miel feo", "Destino de luna de miel soñado", "pareja"],
+  ["Tarea que odiamos", "Tarea que nos divierte", "pareja"],
+  ["Mensaje para despertar feo", "Mensaje para despertar lindo", "pareja"],
+  ["Celoso", "Relajado", "pareja"],
+  ["Recuerdo que hay que olvidar", "Recuerdo para siempre", "pareja"],
+  ["Se dice en la primera cita", "Se dice después de años", "pareja"],
+  ["Fiesta aburrida", "Fiestón", "previa"],
+  ["Vergüenza ajena", "Orgullo", "previa"],
+  ["Canción para ir a dormir", "Canción para darlo todo", "previa"],
+  ["Trago suave", "Trago fuerte", "previa"],
+  ["Chisme sin importancia", "Chisme bomba", "previa"],
+  ["Excusa para irse temprano mala", "Excusa para irse temprano perfecta", "previa"],
+  ["Mal lugar para conocer a alguien", "Buen lugar para conocer a alguien", "previa"],
+  ["Mensaje que mandás sobrio", "Mensaje que mandás a las 4 de la mañana", "previa"],
+  ["Disfraz fácil", "Disfraz épico", "previa"],
+  ["Foto para borrar", "Foto de perfil", "previa"],
+  ["Plan de sábado tranquilo", "Plan de sábado descontrolado", "previa"],
+  ["Secreto que se cuenta", "Secreto que se lleva a la tumba", "previa"],
+  ["Mala frase para levantar", "Buena frase para levantar", "previa"],
+  ["Cosa que se hace en la previa", "Cosa que se hace en el boliche", "previa"],
+  ["Anécdota aburrida", "Anécdota legendaria", "previa"],
+  ["Corte de asado feo", "Corte de asado buenísimo", "argentinas"],
+  ["Mate lavado", "Mate perfecto", "argentinas"],
+  ["Factura fea", "Factura riquísima", "argentinas"],
+  ["Jugador de fútbol olvidable", "Ídolo eterno", "argentinas"],
+  ["Palabra de abuelo", "Palabra de centennial", "argentinas"],
+  ["Destino argentino feo", "Destino argentino soñado", "argentinas"],
+  ["Golosina de kiosco mala", "Golosina de kiosco top", "argentinas"],
+  ["Programa de tele malo", "Programa de tele de culto", "argentinas"],
+  ["Cosa porteña", "Cosa del interior", "argentinas"],
+  ["Comida de cumpleaños de chico mala", "Comida de cumpleaños de chico buena", "argentinas"],
+  ["Canción de cancha floja", "Canción de cancha histórica", "argentinas"],
+  ["Gusto de empanada raro", "Gusto de empanada clásico", "argentinas"],
+  ["Frase de madre leve", "Frase de madre amenazante", "argentinas"],
+  ["Feriado inútil", "Feriado sagrado", "argentinas"],
+  ["Bebida de la infancia fea", "Bebida de la infancia rica", "argentinas"],
+  ["Rock nacional olvidable", "Rock nacional inmortal", "argentinas"],
 ];

@@ -830,11 +830,39 @@ export const GUIDES: Record<GameId, Guide> = {
         title: "La pista",
         text: [
           "A uno le toca ver en secreto dónde está el objetivo en una escala entre dos extremos (por ejemplo «Frío ↔ Caliente»).",
-          "Da una pista: una palabra, una cosa o un personaje que, para él, esté justo en ese punto.",
+          "Da una pista: una palabra, una cosa o un personaje que, para quien la da, esté justo en ese punto. No vale usar números.",
+          "Si la escala no le sirve, puede pedir otra antes de dar la pista.",
         ],
         art: "onda",
       },
-      { title: "Adivinar", text: ["Los demás mueven la aguja del dial y confirman. Cuanto más cerca del objetivo, más puntos (4, 3 o 2). El que dio la pista suma el promedio del grupo."] },
+      {
+        title: "Adivinar",
+        text: [
+          "Los demás mueven la aguja del dial: arrastrándola, con los botones − y + para afinar, o con las flechas del teclado en la compu.",
+          "Cuanto más cerca del objetivo, más puntos: 4 en el centro (la zona amarilla), 3 al lado y 2 un poco más lejos.",
+          "Al revelar se abre la tapa del dial y se ve dónde estaba el objetivo.",
+        ],
+      },
+      {
+        title: "Tres formas de jugar",
+        text: [
+          "Cada uno por su cuenta: cada uno mueve su aguja en secreto y suma sus puntos; el que dio la pista suma el promedio de los demás. Ideal de a dos o para competir.",
+          "Todos juntos: hay una sola aguja y la mueven entre todos (todos la ven moverse en vivo). La discuten y cualquiera confirma. Suman en equipo y al final ven su sintonía: qué porcentaje de los puntos posibles lograron.",
+          "Rojo contra azul: los turnos van alternando entre los equipos. El equipo que juega ubica su aguja; después el otro equipo apuesta si el objetivo está más a la izquierda o más a la derecha de esa aguja, y si acierta suma 1. Se necesitan al menos 2 por equipo.",
+        ],
+      },
+      {
+        title: "Turnos y final",
+        text: [
+          "Todos dan la pista la cantidad de vueltas elegida. Si alguien entra con la partida empezada, también le toca dar pista.",
+          "Si la sala tiene tiempo, al terminarse se toma la aguja como esté. Al final se ve un repaso de cada turno: la escala, la pista y cómo les fue.",
+        ],
+      },
+    ],
+    tips: [
+      "Pensá en qué piensan los demás, no solo vos: una pista muy personal puede despistar.",
+      "Si el objetivo está en un extremo, buscá algo bien exagerado; si está en el medio, algo bien neutro.",
+      "Se pueden escribir escalas propias al crear la sala: «Plan aburrido | Plan ideal».",
     ],
   },
   telefono: {
