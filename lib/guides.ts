@@ -602,6 +602,63 @@ export const GUIDES: Record<GameId, Guide> = {
       "Un empujón que no le pega a nadie te puede tirar solo al agua: apuntá bien cerca del borde.",
     ],
   },
+  golpe: {
+    goal: "Poner a salvo más diamantes que los demás: robarlos del museo sin que te atrapen y llevarlos hasta una salida antes de que se acabe el tiempo.",
+    sections: [
+      {
+        title: "El museo",
+        text: [
+          "Cada partida es un museo distinto, armado con salas y puertas. Cada ladrón arranca en una salida, en las esquinas: son las zonas a rayas que dicen «SALIDA».",
+          "En las salas hay diamantes celestes (valen 1). En la bóveda, la sala del medio con alfombra, están los rosas (valen 3), pero es la más vigilada. Cuando alguien agarra uno, al rato aparece otro en la misma sala.",
+          "Arriba a la izquierda tenés el mapa: ahí ves las salidas, la bóveda y dónde estás.",
+        ],
+      },
+      {
+        title: "La seguridad",
+        text: [
+          "Guardias: hacen siempre la misma ronda y en cada esquina se frenan a mirar. Lo que alumbra su linterna (la luz amarilla) lo ven. Si te ven, se llena una barra sobre tu cabeza: salí de la luz antes de que se complete. Si te chocás con un guardia, te atrapa al toque, aunque no te esté mirando.",
+          "Cámaras: están en las esquinas y van girando de un lado a otro. Su luz es roja y tardan un poco más que un guardia en darse cuenta.",
+          "Láseres: cruzan algunas puertas y se prenden y apagan solos. Antes de prenderse titilan. Si tocás uno prendido, te atrapa en el acto.",
+          "Ni las paredes ni las puertas dejan ver a través: escondete detrás de una pared y esperá a que pase la luz.",
+        ],
+      },
+      {
+        title: "La mochila y la salida",
+        text: [
+          "Lo que agarrás va a la mochila (entran 10). Cuanto más cargás, más lento caminás.",
+          "Los diamantes recién cuentan cuando entrás con ellos a una salida: ahí se vacía la mochila y quedan a salvo. Lo que todavía tengas en la mochila cuando se termina el tiempo no cuenta.",
+          "Si te atrapan, te esposan unos segundos y se te cae la mitad de la mochila al piso (cualquiera la puede levantar). Después volvés a tu salida y por un momento nadie te ve.",
+        ],
+      },
+      {
+        title: "Robar",
+        text: [
+          "Pegate a un rival que tenga diamantes en la mochila y tocá «Robar» (espacio o E en la compu): le sacás hasta 2. Después tenés que esperar unos segundos para volver a robar, y al que robaste no se le puede robar de nuevo enseguida.",
+          "Lo que ya está a salvo en la salida no se puede robar.",
+        ],
+      },
+      {
+        title: "Equipos",
+        text: [
+          "En «Rojo contra azul», cada equipo usa sus dos salidas (las de su color) y suma todo lo que ponen a salvo sus ladrones. Entre compañeros no se roba.",
+          "Los equipos se eligen en la sala de espera. Al empezar, el que no eligió va al equipo más chico, y los bots emparejan.",
+        ],
+      },
+      {
+        title: "Los controles",
+        text: [
+          "En el celular: apoyá el dedo en cualquier lado y movelo para caminar, como un joystick. El botón «Robar» se prende cuando tenés a alguien a tiro.",
+          "En la compu: WASD o las flechas para caminar, espacio o E para robar.",
+        ],
+      },
+    ],
+    tips: [
+      "Antes de entrar a una sala, mirá desde la puerta para qué lado va el guardia: entrá cuando te da la espalda.",
+      "No vayas a la salida con un diamante solo: juntá unos cuantos, pero no tantos que te pongan lento justo cuando hay que escapar.",
+      "Si alguien vuelve cargado hacia su salida, esperalo en el camino y robale.",
+      "En el último minuto volvé a la salida: lo que quede en la mochila se pierde.",
+    ],
+  },
   ladrillazo: {
     goal: "Romper ladrillos con la pelota sin dejarla caer: los objetivos rojos o todo el nivel, según cuál toque.",
     sections: [

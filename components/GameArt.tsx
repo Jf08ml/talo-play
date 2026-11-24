@@ -298,6 +298,25 @@ const SCENES: Record<GameId, ReactNode> = {
       <T x={44} y={88} w={20} h={22} r={10} c={OR} look={[0.6, -0.8]} />
     </>
   ),
+  golpe: (
+    <>
+      {/* A guard's light sweeps the floor; a masked talo sneaks off with a diamond from its pedestal. */}
+      <path d="M100 30L40 70L64 92Z" fill={Y} opacity={0.35} />
+      <T x={88} y={14} w={24} h={26} r={9} c={W} look={[-1, 0.6]} />
+      <path d={shape(88, 14, 24, 8, [9, 9, 0, 0])} fill={INK} />
+      <rect x={22} y={78} width={26} height={30} rx={3} fill={W} />
+      <rect x={18} y={74} width={34} height={7} rx={3} fill={W} />
+      <path d="M27 58l6-7h10l6 7-11 14z" fill={PINK} />
+      <path d="M27 58l6-7h5l-3 7z" fill={W} opacity={0.7} />
+      <g>
+        <T x={56} y={68} w={30} h={34} r={12} c={OR} look={[-1, -0.3]} eyesAt={11} />
+        <rect x={57} y={74} width={28} height={10} rx={5} fill={INK} />
+        <Eyes cx={71} cy={79} e={6.5} look={[-1, -0.3]} body={OR} />
+        <circle cx={92} cy={88} r={9} fill="#B07A3C" />
+        <rect x={88} y={77} width={8} height={4} rx={2} fill="#7A5124" />
+      </g>
+    </>
+  ),
   ladrillazo: (
     <>
       {[Y, PINK, OR, W].map((c, i) => (
