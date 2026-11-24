@@ -8,7 +8,7 @@ export function inviteUrl(game: GameId, roomId: string): string {
 }
 
 export function inviteText(game: GameId, roomId: string): string {
-  return `¡Vení a jugar ${GAMES[game].title} conmigo en Talo! 🎲 Sala ${roomId}`;
+  return `¡Ven a jugar ${GAMES[game].title} conmigo en Talo! 🎲 Sala ${roomId}`;
 }
 
 export function whatsappUrl(game: GameId, roomId: string): string {

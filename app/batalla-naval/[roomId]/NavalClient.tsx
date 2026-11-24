@@ -178,7 +178,7 @@ export default function NavalClient({ roomId }: { roomId: string }) {
 }
 
 function nameOf(state: NavalState, id: string, myId: string): string {
-  if (id === myId) return "vos";
+  if (id === myId) return "tú";
   return state.players[id]?.name ?? "?";
 }
 
@@ -212,7 +212,7 @@ function SeatPicker({
                 {label}
               </p>
               <p className={`text-sm font-medium ${occupant && !isAway(occupant) ? "text-slate-100" : "text-slate-500"}`}>
-                {occupant ? (occupant === myId ? "Vos" : nameOf(state, occupant, myId)) : "Libre"}
+                {occupant ? (occupant === myId ? "Tú" : nameOf(state, occupant, myId)) : "Libre"}
                 {occupant && isAway(occupant) && " (se fue)"}
               </p>
               {occupant !== myId && free && (
@@ -235,7 +235,7 @@ function SeatPicker({
       </div>
       <p className="text-center text-xs text-slate-500">
         {!ready
-          ? "Falta un capitán: mandale el link a tu rival."
+          ? "Falta un capitán: mándale el link a tu rival."
           : mySeat
             ? "Al empezar, cada uno ubica sus barcos."
             : "Los dos lugares están ocupados: vas a mirar la batalla."}
@@ -288,7 +288,7 @@ function PlayersBar({
             <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: color }} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-slate-100">
-                {id ? (id === myId ? "Vos" : nameOf(state, id, myId)) : "—"}
+                {id ? (id === myId ? "Tú" : nameOf(state, id, myId)) : "—"}
                 {away && <span className="font-normal text-slate-500"> (se fue)</span>}
               </p>
               <p className="text-xs text-slate-400">
@@ -385,18 +385,18 @@ function Placement({ initial, onReady }: { initial: string | null; onReady: (fle
     if (selected === null) return;
     setProblem(null);
     if (!moveTo(shipCells(fleet, selected)[0], !isHorizontal(fleet, selected))) {
-      setProblem("No hay lugar para girarlo ahí. Movelo primero.");
+      setProblem("No hay lugar para girarlo ahí. Muévelo primero.");
     }
   };
 
   return (
     <div className={`${CARD} flex flex-col items-center gap-3`}>
       <div className="text-center">
-        <p className="font-display text-lg font-semibold text-slate-100">Ubicá tu flota</p>
+        <p className="font-display text-lg font-semibold text-slate-100">Ubica tu flota</p>
         <p className="text-sm text-slate-400">
           {selected === null
-            ? "Tocá un barco para elegirlo, o mezclalos al azar."
-            : `${FLEET[selected].name}: tocá el agua para moverlo o giralo.`}
+            ? "Toca un barco para elegirlo, o mézclalos al azar."
+            : `${FLEET[selected].name}: toca el agua para moverlo o gíralo.`}
         </p>
       </div>
       <MapGrid
@@ -495,7 +495,7 @@ function Battle({ roomId, state, myId }: { roomId: string; state: NavalState; my
             key={seat}
             label={
               <span style={{ color: SEAT_COLORS[seat].color }}>
-                Mapa de {nameOf(state, state.seats[seat], myId)}
+                {state.seats[seat] === myId ? "Tu mapa" : `Mapa de ${nameOf(state, state.seats[seat], myId)}`}
               </span>
             }
             cell={(idx) => seatMapCell(state, seat, idx, over)}
@@ -516,7 +516,7 @@ function Battle({ roomId, state, myId }: { roomId: string; state: NavalState; my
         <MapGrid
           label={
             <span className={myTurn ? "text-fuchsia-300" : ""}>
-              {myTurn ? "¡Disparale! Mapa de " : "Mapa de "}
+              {myTurn ? "¡Dispárale! Mapa de " : "Mapa de "}
               {nameOf(state, state.seats[rival], myId)}
             </span>
           }
@@ -588,7 +588,7 @@ function Spectators({ state, presence, myId }: { state: NavalState; presence: Pr
   if (watching.length === 0) return null;
   return (
     <p className="text-center text-xs text-slate-500">
-      Mirando: {watching.map((id) => (id === myId ? "vos" : (presence[id]?.name ?? "?"))).join(", ")}
+      Mirando: {watching.map((id) => (id === myId ? "tú" : (presence[id]?.name ?? "?"))).join(", ")}
     </p>
   );
 }

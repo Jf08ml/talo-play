@@ -38,7 +38,7 @@ export default function IdeasClient() {
             Talo lo armamos entre todos
           </h1>
           <p className="max-w-2xl text-[17px] font-medium leading-[1.4] sm:text-[22px]">
-            Votá qué juego querés que sumemos y contanos qué mejorarías. Leemos todo.
+            Vota qué juego quieres que sumemos y cuéntanos qué mejorarías. Leemos todo.
           </p>
         </div>
       </section>
@@ -81,8 +81,8 @@ function VoteNextGame() {
   return (
     <section className={CARD}>
       <h2 className={H2}>¿Qué juego sumamos?</h2>
-      <p className="mt-2 text-[17px] text-talo-text-2">Votá todos los que quieras. El más pedido va primero en la fila.</p>
-      {error && <p className="mt-2 text-[15px] font-semibold text-red-700">No se pudo guardar el voto. Probá de nuevo.</p>}
+      <p className="mt-2 text-[17px] text-talo-text-2">Vota todos los que quieras. El más pedido va primero en la fila.</p>
+      {error && <p className="mt-2 text-[15px] font-semibold text-red-700">No se pudo guardar el voto. Prueba de nuevo.</p>}
       <ul className="mt-4 flex flex-col gap-2">
         {rows.map((r) => (
           <li key={r.id}>
@@ -115,7 +115,7 @@ function VoteNextGame() {
           </li>
         ))}
       </ul>
-      <p className="mt-4 text-[15px] text-talo-text-3">¿No está el que querés? Pedilo en el formulario.</p>
+      <p className="mt-4 text-[15px] text-talo-text-3">¿No está el que quieres? Pídelo en el formulario.</p>
     </section>
   );
 }
@@ -185,10 +185,10 @@ function FeedbackForm() {
           />,
           document.body,
         )}
-      <h2 className={H2}>Contanos</h2>
+      <h2 className={H2}>Cuéntanos</h2>
       <form onSubmit={submit} className="mt-4 flex flex-col gap-4">
         <fieldset>
-          <legend className="mb-2 text-[15px] font-bold text-talo-text-3">¿Qué nos querés contar?</legend>
+          <legend className="mb-2 text-[15px] font-bold text-talo-text-3">¿Qué nos quieres contar?</legend>
           <div className="flex flex-wrap gap-2">
             {FEEDBACK_KINDS.map((k) => (
               <button
@@ -210,7 +210,7 @@ function FeedbackForm() {
             {kind === "juego"
               ? "¿Qué juego te gustaría? ¿Cómo se juega?"
               : kind === "error"
-                ? "¿Qué pasó y en qué juego? (y desde qué celu o compu)"
+                ? "¿Qué pasó y en qué juego? (y desde qué celular o computadora)"
                 : "Tu idea"}
           </span>
           <textarea
@@ -247,10 +247,10 @@ function FeedbackForm() {
             </>
           )}
         </button>
-        {state === "wait" && <p className="text-[15px] font-semibold text-talo-text-2">Esperá unos segundos antes de mandar otra.</p>}
-        {state === "error" && <p className="text-[15px] font-semibold text-red-700">No se pudo mandar. Probá de nuevo en un rato.</p>}
+        {state === "wait" && <p className="text-[15px] font-semibold text-talo-text-2">Espera unos segundos antes de mandar otra.</p>}
+        {state === "error" && <p className="text-[15px] font-semibold text-red-700">No se pudo mandar. Prueba de nuevo en un rato.</p>}
         <p className="flex items-center gap-1.5 text-[14px] text-talo-text-3">
-          <Check className="h-4 w-4" /> Solo lo leemos nosotros; no se publica.{name && ` Lo mandás como ${name}.`}
+          <Check className="h-4 w-4" /> Solo lo leemos nosotros; no se publica.{name && ` Lo mandas como ${name}.`}
         </p>
       </form>
     </section>

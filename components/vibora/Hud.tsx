@@ -72,14 +72,14 @@ export default function Hud({
 }) {
   const [showTop, setShowTop] = useState(false);
   if (!hud) return null;
-  const controls = touch ? "Arrastrá el dedo para guiar · mantené el rayo para acelerar" : "Guiá con el mouse · click o espacio para acelerar";
+  const controls = touch ? "Arrastra el dedo para guiar · mantén el rayo para acelerar" : "Guía con el mouse · click o espacio para acelerar";
   const lastSeconds = hud.secondsLeft !== null && hud.secondsLeft <= 10;
 
   return (
     <>
       {hud.edge > 0.6 && (
         <p className="pointer-events-none absolute inset-x-0 bottom-28 mx-auto w-fit animate-pulse rounded-full bg-rose-600/80 px-3 py-1 text-sm font-semibold text-white shadow-lg">
-          {online ? "¡Cuidado! El borde te elimina" : "¡El borde quema! Alejate"}
+          {online ? "¡Cuidado! El borde te elimina" : "¡El borde quema! Aléjate"}
         </p>
       )}
       {hud.hurt && <div className="pointer-events-none absolute inset-0 animate-pulse bg-rose-500/15" />}
@@ -151,7 +151,7 @@ export default function Hud({
               <li className="flex items-center gap-1.5 rounded-lg bg-lime-400/15 px-1.5 py-1 font-semibold text-white ring-1 ring-lime-300/30">
                 <span className="w-3.5 text-right tabular-nums text-slate-400">{hud.rank}</span>
                 <span className="h-2 w-2 shrink-0 rounded-full bg-white" />
-                <span className="flex-1 truncate">Vos</span>
+                <span className="flex-1 truncate">Tú</span>
                 <span className="font-mono tabular-nums">{hud.mass}</span>
               </li>
             )}
@@ -190,7 +190,7 @@ export default function Hud({
               ))}
             </ol>
           ) : (
-            <p className="text-sm text-slate-400">Todavía nadie. ¡Llegá a 20 puntos y entrás!</p>
+            <p className="text-sm text-slate-400">Todavía nadie. ¡Llega a 20 puntos y entras!</p>
           )}
         </div>
       )}
@@ -230,7 +230,7 @@ export default function Hud({
           <p className={`px-3 py-1.5 text-slate-200 ${GLASS}`}>{controls}</p>
           <p className={`flex items-center gap-1.5 px-3 py-1.5 text-slate-200 ${GLASS}`}>
             <Shield className="h-3.5 w-3.5 shrink-0 text-slate-100" />
-            {online ? "Cabeza y cuello blindados: si los chocás, perdés." : "Cabeza y cuello blindados: no se cortan."}
+            {online ? "Cabeza y cuello blindados: si los chocas, pierdes." : "Cabeza y cuello blindados: no se cortan."}
           </p>
           <p className={`flex items-center gap-1.5 px-3 py-1.5 text-slate-200 ${GLASS}`}>
             <Scissors className="h-3.5 w-3.5 shrink-0 text-lime-300" /> El resto del cuerpo se corta con la cabeza.

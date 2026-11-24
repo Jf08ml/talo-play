@@ -34,7 +34,7 @@ export function CarDot({ seat, className = "h-5 w-8" }: { seat: Seat; className?
 export function driverName(state: CarrerasState, seat: Seat, myId = ""): string {
   if (isBotSeat(state, seat)) return `${BOT_NAMES[seat]} (bot)`;
   const id = state.seats[seat];
-  if (id && id === myId) return "Vos";
+  if (id && id === myId) return "Tú";
   return state.players[id]?.name ?? CARS[seat].label;
 }
 

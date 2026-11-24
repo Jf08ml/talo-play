@@ -83,7 +83,7 @@ const pips = (cx: number, cy: number, s: number, list: [number, number][], fill 
   list.map(([dx, dy], i) => <circle key={i} cx={cx + dx * s} cy={cy + dy * s} r={s * 0.36} fill={fill} />);
 
 const SCENES: Record<GameId, ReactNode> = {
-  // ── Para la previa ──
+  // ── Para la fiesta ──
   impostor: (
     <>
       <T x={4} y={78} w={32} h={42} r={[16, 16, 6, 6]} c={W} look={[1, 0]} />

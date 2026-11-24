@@ -223,7 +223,7 @@ function normalizeState(raw: Partial<ArenaState> | null): ArenaState | null {
 export const isBot = (id: string) => id.startsWith("bot");
 
 export function fighterName(state: ArenaState, id: string, myId = ""): string {
-  if (id === myId) return "Vos";
+  if (id === myId) return "Tú";
   return state.bots[id] ?? state.players[id]?.name ?? "Caballero";
 }
 

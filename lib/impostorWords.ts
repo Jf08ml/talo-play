@@ -13,8 +13,10 @@ export const IMPOSTOR_CATEGORIES: { id: ImpostorCategory; label: string; emoji: 
     emoji: "🍕",
     words: [
       "pizza", "empanada", "asado", "milanesa", "helado", "sushi", "hamburguesa", "ñoquis", "alfajor", "choripán",
-      "tarta", "panqueque", "medialuna", "ravioles", "guiso", "ensalada", "sopa", "tacos", "flan", "dulce de leche",
+      "tarta", "panqueque", "croissant", "ravioles", "guiso", "ensalada", "sopa", "tacos", "flan", "dulce de leche",
       "mate", "café", "papas fritas", "chocolate", "queso",
+      // Added when Talo went global (append only).
+      "arepa", "ceviche", "tamal", "pupusa", "burrito", "churros", "guacamole", "quesadilla", "paella", "completo",
     ],
   },
   {
@@ -33,7 +35,7 @@ export const IMPOSTOR_CATEGORIES: { id: ImpostorCategory; label: string; emoji: 
     emoji: "🏖️",
     words: [
       "playa", "hospital", "escuela", "aeropuerto", "cine", "supermercado", "gimnasio", "biblioteca", "estadio", "museo",
-      "iglesia", "banco", "restaurante", "montaña", "zoológico", "cárcel", "peluquería", "farmacia", "hotel", "boliche",
+      "iglesia", "banco", "restaurante", "montaña", "zoológico", "cárcel", "peluquería", "farmacia", "hotel", "discoteca",
       "plaza", "comisaría", "circo", "oficina", "camping",
     ],
   },
@@ -43,7 +45,7 @@ export const IMPOSTOR_CATEGORIES: { id: ImpostorCategory; label: string; emoji: 
     emoji: "🔑",
     words: [
       "celular", "paraguas", "reloj", "anteojos", "llave", "espejo", "mochila", "almohada", "tijera", "lámpara",
-      "guitarra", "cepillo de dientes", "control remoto", "auriculares", "billetera", "vela", "bicicleta", "heladera",
+      "guitarra", "cepillo de dientes", "control remoto", "auriculares", "billetera", "vela", "bicicleta", "refrigerador",
       "cuchillo", "sartén", "computadora", "pelota", "linterna", "silla", "televisor",
     ],
   },

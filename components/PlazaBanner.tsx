@@ -46,7 +46,7 @@ export default function PlazaBanner() {
           )}
         </span>
         <span className="text-[15px] font-medium leading-snug text-white/85 sm:text-[17px]">
-          ¿Son pocos? Encontrá gente para jugar y sumate a las salas que buscan jugadores.
+          ¿Son pocos? Encuentra gente para jugar y únete a las salas que buscan jugadores.
         </span>
         {extra && <span className="text-sm font-semibold text-white/60">{extra}</span>}
       </span>

@@ -21,7 +21,7 @@ import { levenshtein, normalizeText } from "./text";
 import { DEFAULT_WORDS } from "./dibujoWords";
 
 /**
- * Dibujá y adiviná. Turn flow lives in `rooms/{id}/dibujo/state` and only
+ * Dibuja y adivina. Turn flow lives in `rooms/{id}/dibujo/state` and only
  * changes through transactions; strokes and chat are plain writes in their
  * own nodes, keyed per turn (`turnKey`). The secret word is in the state, so
  * it's visible with DevTools — accepted, as there is no backend to hide it.

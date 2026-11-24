@@ -320,7 +320,7 @@ export function CreateRoomForm<T>({ settings }: { settings: GameSettings<T> }) {
       router.push(settings.afterCreate?.(roomId, value) ?? roomPath(settings.game, roomId));
     } catch (err) {
       console.error(err);
-      setCreateError(err instanceof Error && err.message ? err.message : "No se pudo crear la sala. Probá de nuevo.");
+      setCreateError(err instanceof Error && err.message ? err.message : "No se pudo crear la sala. Prueba de nuevo.");
       setCreating(false);
     }
   };
@@ -370,7 +370,7 @@ export function RoomSettingsEditor<T>({
       setSavedAt(Date.now());
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error && err.message ? err.message : "No se pudo guardar. Probá de nuevo.");
+      setError(err instanceof Error && err.message ? err.message : "No se pudo guardar. Prueba de nuevo.");
     } finally {
       setSaving(false);
     }

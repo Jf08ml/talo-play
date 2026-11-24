@@ -9,9 +9,9 @@ import { choices, type GameSettings } from "@/components/RoomSettings";
 const MODE_ICONS = { carrera: Flag, ataque: Zap, duelo: Swords, coop: Users } as const;
 
 const NOTES: Record<LadriMode, string> = {
-  carrera: "Todos juegan el mismo nivel, cada uno en su pantalla. Si te quedás sin pelotas, el nivel vuelve a empezar.",
-  ataque: "La pared baja sola y cada combo le manda filas a otro. Si los ladrillos llegan a la línea roja, quedás afuera.",
-  duelo: "Uno abajo y otro arriba, con ladrillos en el medio: hacé pasar la pelota por detrás del otro. Si estás solo, jugás contra la compu.",
+  carrera: "Todos juegan el mismo nivel, cada uno en su pantalla. Si te quedas sin pelotas, el nivel vuelve a empezar.",
+  ataque: "La pared baja sola y cada combo le manda filas a otro. Si los ladrillos llegan a la línea roja, quedas afuera.",
+  duelo: "Uno abajo y otro arriba, con ladrillos en el medio: haz pasar la pelota por detrás del otro. Si estás solo, juegas contra la computadora.",
   coop: "Hasta cuatro, cada uno cuida su parte de abajo. Las vidas son de todos.",
 };
 

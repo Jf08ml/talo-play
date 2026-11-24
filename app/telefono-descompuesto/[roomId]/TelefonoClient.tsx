@@ -186,12 +186,12 @@ export default function TelefonoClient({ roomId }: { roomId: string }) {
 }
 
 function nameOf(state: TelefonoState, id: string, myId: string): string {
-  return id === myId ? "Vos" : (state.players[id]?.name ?? "?");
+  return id === myId ? "Tú" : (state.players[id]?.name ?? "?");
 }
 
 function StepHeader({ state, left, total }: { state: TelefonoState; left: number; total: number }) {
   const steps = totalSteps(state);
-  const label = state.step === 0 ? "Escribí una frase" : isDrawStep(state.step) ? "Dibujá" : "Describí el dibujo";
+  const label = state.step === 0 ? "Escribe una frase" : isDrawStep(state.step) ? "Dibuja" : "Describe el dibujo";
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between">
@@ -283,7 +283,7 @@ function TaskPanel({
             <p className="text-slate-500">Cargando…</p>
           ) : drawing ? (
             <p className="font-display text-2xl font-bold text-slate-100">
-              {prev?.text || <span className="text-slate-500">(llegó en blanco: dibujá lo que quieras)</span>}
+              {prev?.text || <span className="text-slate-500">(llegó en blanco: dibuja lo que quieras)</span>}
             </p>
           ) : (
             <ReadOnlyDrawing strokes={prev?.strokes ?? []} />
@@ -302,14 +302,14 @@ function TaskPanel({
         <form onSubmit={onText} className={`${CARD} flex flex-col gap-2`}>
           <p className="text-sm text-slate-400">
             {state.step === 0
-              ? "Inventá una frase divertida para que el siguiente la dibuje."
-              : "¿Qué ves en el dibujo? Escribilo para que el siguiente lo dibuje."}
+              ? "Inventa una frase divertida para que el siguiente la dibuje."
+              : "¿Qué ves en el dibujo? Escríbelo para que el siguiente lo dibuje."}
           </p>
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
             maxLength={MAX_TEXT_LENGTH}
-            placeholder={state.step === 0 ? "Un gato manejando un colectivo" : "Es…"}
+            placeholder={state.step === 0 ? "Un gato manejando un autobús" : "Es…"}
             className={TEXT_INPUT}
             autoFocus
           />

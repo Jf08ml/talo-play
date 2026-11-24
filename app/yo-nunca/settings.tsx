@@ -25,7 +25,7 @@ export const SETTINGS: GameSettings<Settings> = {
       text: "Nadie ve tu respuesta hasta que contestan todos. Sirve en persona o por videollamada.",
     },
   ],
-  problem: (v) => (v.levels.length === 0 ? "Elegí al menos un nivel." : null),
+  problem: (v) => (v.levels.length === 0 ? "Elige al menos un nivel." : null),
   create: (v, hostId) => createYoNuncaRoom(v, hostId),
   save: (roomId, v) => saveRoomSettings(roomId, "yonunca/state", v),
   fromMeta: (meta) => normalizeMeta(meta),

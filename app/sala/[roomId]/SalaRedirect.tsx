@@ -37,7 +37,7 @@ export default function SalaRedirect({ roomId }: { roomId: string }) {
     <main className="flex h-dvh flex-col">
       {status === "loading" && <RoomLoading text="Buscando la sala…" />}
       {status === "not-found" && <RoomNotFound />}
-      {status === "error" && <RoomError message="No pudimos buscar la sala. Probá de nuevo." />}
+      {status === "error" && <RoomError message="No pudimos buscar la sala. Prueba de nuevo." />}
     </main>
   );
 }

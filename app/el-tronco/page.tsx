@@ -41,7 +41,7 @@ export default function TroncoHome() {
         >
           <GraduationCap className="h-6 w-6 shrink-0" />
           <span className="min-w-0 flex-1">
-            <span className="block font-bold">{practiced ? "Practicar" : "¿Primera vez? Practicá un minuto"}</span>
+            <span className="block font-bold">{practiced ? "Practicar" : "¿Primera vez? Practica un minuto"}</span>
             <span className={`block text-xs ${practiced ? "text-white/60" : "text-talo-ink/70"}`}>Te enseña cuándo saltar y cuándo patear, sin quedar afuera.</span>
           </span>
           <ChevronRight className="h-5 w-5 shrink-0" />
@@ -103,15 +103,15 @@ function BotsCard() {
     setBusy(true);
     setError(null);
     if (!(await startBots(bots, pace))) {
-      setError("No se pudo empezar. Probá de nuevo.");
+      setError("No se pudo empezar. Prueba de nuevo.");
       setBusy(false);
     }
   };
   return (
     <div className={`${CARD} flex flex-col gap-4`}>
       <div>
-        <h2 className="font-display text-lg text-slate-100">Vos contra la compu</h2>
-        <p className="mt-1 text-sm text-slate-400">Una ronda de talos y un tronco que no para. Aguantá hasta ser el último parado.</p>
+        <h2 className="font-display text-lg text-slate-100">Tú contra la computadora</h2>
+        <p className="mt-1 text-sm text-slate-400">Una ronda de talos y un tronco que no para. Aguanta hasta ser el último parado.</p>
       </div>
       <div>
         <p className="mb-1.5 text-[13px] font-bold text-white/60">Rivales</p>
@@ -158,7 +158,7 @@ function OnlineCard() {
       router.push(`/el-tronco/${id}`);
     } catch (err) {
       console.error(err);
-      setError("No se pudo entrar. Probá de nuevo.");
+      setError("No se pudo entrar. Prueba de nuevo.");
       setEntering(false);
     }
   };
@@ -166,7 +166,7 @@ function OnlineCard() {
     <div className={`${CARD} flex flex-col gap-4`}>
       <div>
         <h2 className="font-display text-lg text-slate-100">Una ronda con gente de todos lados</h2>
-        <p className="mt-1 text-sm text-slate-400">Partidas cortas, una atrás de la otra. Si llegás en medio de una, mirás y entrás en la siguiente. Si hay poca gente, completan unos bots.</p>
+        <p className="mt-1 text-sm text-slate-400">Partidas cortas, una atrás de la otra. Si llegas en medio de una, miras y entras en la siguiente. Si hay poca gente, completan unos bots.</p>
       </div>
       {count !== null && count > 0 && (
         <p className="flex items-center gap-2 text-sm text-lime-200">

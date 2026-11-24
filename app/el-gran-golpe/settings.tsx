@@ -7,7 +7,7 @@ import { choices, type GameSettings } from "@/components/RoomSettings";
 
 const LEVEL_HINT: Record<BotLevel, string> = {
   facil: "Se dejan ver seguido y roban poco: ideales para aprender.",
-  normal: "Esquivan a los guardias y te roban si te descuidás.",
+  normal: "Esquivan a los guardias y te roban si te descuidas.",
   dificil: "Se mueven entre las luces, cargan mucho y roban siempre que pueden.",
 };
 

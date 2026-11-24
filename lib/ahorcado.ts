@@ -7,7 +7,7 @@ import { DEFAULT_WORDS } from "./dibujoWords";
 
 /**
  * Ahorcado. Each round one player (the setter, in turn order) writes a secret
- * word, or lets the app pick one from Dibujá y adiviná's list; the others take
+ * word, or lets the app pick one from Dibuja y adivina's list; the others take
  * turns guessing a letter or the whole word. Six misses and the setter wins
  * the round. Each player sets once; then the game ends.
  *

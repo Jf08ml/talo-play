@@ -264,7 +264,7 @@ function BoardView({ roomId, state, myId }: { roomId: string; state: OteloState;
         {state.passed && state.status === "playing"
           ? `${SEAT_STYLE[state.passed].label} no tenían jugada: pasan y vuelven a jugar las ${SEAT_STYLE[state.turn].label.toLowerCase()}.`
           : myTurn
-            ? "Tocá una casilla marcada: las fichas que encerrás se dan vuelta."
+            ? "Toca una casilla marcada: las fichas que encierras se dan vuelta."
             : ""}
       </p>
     </div>
@@ -280,7 +280,7 @@ function ResignButton({ roomId, myId }: { roomId: string; myId: string }) {
       className="mx-auto flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-400 transition hover:text-slate-200"
     >
       <Flag className="h-4 w-4" />
-      {confirm ? "¿Seguro? Tocá de nuevo" : "Rendirme"}
+      {confirm ? "¿Seguro? Toca de nuevo" : "Rendirme"}
     </button>
   );
 }

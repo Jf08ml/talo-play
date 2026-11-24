@@ -25,7 +25,7 @@ export default function AhorcadoHome() {
       router.push(roomPath("ahorcado", roomId));
     } catch (err) {
       console.error(err);
-      setCreateError("No se pudo crear la sala. Probá de nuevo.");
+      setCreateError("No se pudo crear la sala. Prueba de nuevo.");
       setCreating(false);
     }
   };

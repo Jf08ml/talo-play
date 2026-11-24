@@ -474,7 +474,7 @@ export default function TroncoGame({
       className="pointer-events-auto absolute right-2 top-2 z-10 flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-xs font-bold text-white hover:bg-black/70"
     >
       {control ? <Eye className="h-4 w-4" /> : <Gamepad2 className="h-4 w-4" />}
-      {control ? "Ver la ronda acá" : "Usar de control"}
+      {control ? "Ver la ronda aquí" : "Usar de control"}
     </button>
   );
 
@@ -513,12 +513,12 @@ export default function TroncoGame({
             <div className="flex items-center gap-3">
               <Talo {...playerTalo(myId, me.color, 44)} expr={meOut ? "triste" : flash && !flash.text.includes("aire") ? "contento" : "normal"} />
               <div className="text-left">
-                <p className="text-xs font-bold uppercase tracking-wide text-white/50">Sos</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-white/50">Eres</p>
                 <p className="font-display text-2xl leading-tight text-white">{me.name}</p>
               </div>
             </div>
           ) : (
-            <p className="text-base font-bold text-white/80">Estás mirando: en la próxima entrás vos también.</p>
+            <p className="text-base font-bold text-white/80">Estás mirando: en la próxima entras tú también.</p>
           )}
           <div className="flex min-h-[88px] flex-col items-center justify-center gap-1.5">
             {countdown > 0 ? (
@@ -527,13 +527,13 @@ export default function TroncoGame({
                   {countdown}
                 </span>
                 <span className="text-sm font-bold text-white/70">
-                  {state.opener === myId ? "Arrancás vos: vas a patear el tronco" : `Mirá la pantalla · arranca ${openerName}`}
+                  {state.opener === myId ? "Empiezas tú: vas a patear el tronco" : `Mira la pantalla · arranca ${openerName}`}
                 </span>
               </>
             ) : waitingOpen ? (
               <span className="rounded-2xl bg-white/[0.08] px-4 py-2 text-base font-bold text-white">
-                {iOpen ? "¡Arrancás vos! ¿Para quién lo pateás?" : `${openerName} va a patear el tronco…`}
-                {iOpen && openLeft <= 4 && <span className="block text-sm text-white/60">Si no elegís, sale solo en {openLeft}</span>}
+                {iOpen ? "¡Empiezas tú! ¿Para quién lo pateas?" : `${openerName} va a patear el tronco…`}
+                {iOpen && openLeft <= 4 && <span className="block text-sm text-white/60">Si no eliges, sale solo en {openLeft}</span>}
               </span>
             ) : meOut ? (
               <>
@@ -549,7 +549,7 @@ export default function TroncoGame({
               </span>
             ) : playing ? (
               <span className="max-w-xs text-sm font-bold text-white/60">
-                Mirá la pantalla: el anillo bajo tu talo se pone amarillo para saltar y verde para patear. El celular vibra cuando llega.
+                Mira la pantalla: el anillo bajo tu talo se pone amarillo para saltar y verde para patear. El celular vibra cuando llega.
               </span>
             ) : null}
           </div>
@@ -581,16 +581,16 @@ export default function TroncoGame({
             <span key={countdown} className="animate-celebration-in font-display text-8xl text-white drop-shadow">
               {countdown}
             </span>
-            {playing && <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-bold text-white">Sos el de la etiqueta amarilla</span>}
+            {playing && <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-bold text-white">Eres el de la etiqueta amarilla</span>}
             {playing && (
               <span className="max-w-xs rounded-2xl bg-black/60 px-3 py-1.5 text-center text-sm font-bold text-white">
-                Apretá el botón que se ilumina: <span className="text-talo-hero">amarillo, saltá</span> ·{" "}
-                <span className="text-emerald-300">verde, pateá</span>
+                Aprieta el botón que se ilumina: <span className="text-talo-hero">amarillo, salta</span> ·{" "}
+                <span className="text-emerald-300">verde, patea</span>
               </span>
             )}
             {openerName && (
               <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-bold text-white">
-                {state.opener === myId ? "Arrancás vos: vas a patear el tronco" : `Arranca ${openerName}`}
+                {state.opener === myId ? "Empiezas tú: vas a patear el tronco" : `Arranca ${openerName}`}
               </span>
             )}
           </div>
@@ -598,10 +598,10 @@ export default function TroncoGame({
         {waitingOpen && (
           <div className="pointer-events-none absolute inset-x-0 top-12 flex flex-col items-center gap-1 px-4 text-center">
             <span className="rounded-2xl bg-black/65 px-4 py-2 text-base font-bold text-white">
-              {iOpen ? "¡Arrancás vos! Pateá el tronco para un lado" : `${openerName} va a patear el tronco… ¿para qué lado?`}
+              {iOpen ? "¡Empiezas tú! Patea el tronco para un lado" : `${openerName} va a patear el tronco… ¿para qué lado?`}
             </span>
             {iOpen && openLeft <= 4 && (
-              <span className="rounded-full bg-black/50 px-3 py-0.5 text-sm font-bold text-white">Si no elegís, sale solo en {openLeft}</span>
+              <span className="rounded-full bg-black/50 px-3 py-0.5 text-sm font-bold text-white">Si no eliges, sale solo en {openLeft}</span>
             )}
           </div>
         )}
@@ -614,7 +614,7 @@ export default function TroncoGame({
         )}
         {hint && playing && !countdown && !waitingOpen && !meOut && (
           <p className="pointer-events-none absolute inset-x-4 bottom-[92px] mx-auto max-w-sm rounded-xl bg-black/60 px-3 py-2 text-center text-xs font-bold text-white">
-            La barra de abajo te muestra el tronco viniendo. Saltá cuando entre en lo amarillo, o pateálo en lo verde para que vuelva para el otro lado.
+            La barra de abajo te muestra el tronco viniendo. Salta cuando entre en lo amarillo, o patéalo en lo verde para que vuelva para el otro lado.
           </p>
         )}
         {playing && !meOut && (
@@ -627,13 +627,13 @@ export default function TroncoGame({
             <span className="animate-celebration-in font-display text-4xl text-white drop-shadow">¡Te tumbó!</span>
             {reason && <span className="max-w-xs rounded-2xl bg-black/65 px-3 py-1.5 text-center text-sm font-bold text-talo-hero">{FALL_TEXT[reason]}</span>}
             <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-bold text-white">
-              Quedaste {place}º{saved > 0 ? ` · esquivaste ${saved}` : ""} · mirá cómo sigue
+              Quedaste {place}º{saved > 0 ? ` · esquivaste ${saved}` : ""} · mira cómo sigue
             </span>
           </div>
         )}
         {!playing && (
           <p className="pointer-events-none absolute inset-x-4 bottom-3 rounded-xl bg-black/60 px-3 py-2 text-center text-xs font-bold text-white">
-            Estás mirando: en la próxima entrás vos también.
+            Estás mirando: en la próxima entras tú también.
           </p>
         )}
       </div>

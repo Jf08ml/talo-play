@@ -21,7 +21,7 @@ export const SETTINGS: GameSettings<Settings> = {
       options: EMOJI_CATEGORIES.map((c) => ({ value: c.id, label: `${c.emoji} ${c.label}` })),
     },
   ],
-  problem: (v) => (v.categories.length === 0 ? "Elegí al menos una categoría." : null),
+  problem: (v) => (v.categories.length === 0 ? "Elige al menos una categoría." : null),
   create: (v, hostId) => createEmojisRoom(v, hostId),
   save: (roomId, v) => saveRoomSettings(roomId, "emojis/state", v),
   fromMeta: (meta) => normalizeMeta(meta),

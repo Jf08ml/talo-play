@@ -113,7 +113,7 @@ function RankTalo({ entry, reaction, look, size }: { entry: RankEntry; reaction:
 }
 
 /**
- * The final screen. `ranking` comes sorted best first; `myId` names "Vos".
+ * The final screen. `ranking` comes sorted best first; `myId` names "Tú".
  * `title` overrides the automatic "¡Ganaste!" / "Ganó X"; `children` adds
  * highlights under the podium and `actions` the buttons (play again…).
  * The talos react to the final result, which everyone sees at once: the
@@ -143,7 +143,7 @@ export default function GameResults({
   const best = ranking[0]?.score ?? 0;
   const winners = ranking.filter((r) => r.score === best && best > 0);
   const iWon = winners.some((w) => w.id === myId);
-  const nameOf = (r: RankEntry, capital = false) => (r.id === myId ? (capital ? "Vos" : "vos") : r.name);
+  const nameOf = (r: RankEntry, capital = false) => (r.id === myId ? (capital ? "Tú" : "tú") : r.name);
   const auto = !winners.length
     ? "¡Terminó!"
     : iWon
@@ -202,7 +202,7 @@ export default function GameResults({
               <div key={entry.id} className="flex min-w-0 flex-col items-center gap-1.5">
                 <RankTalo entry={entry} reaction={reaction} look={look} size={place === 1 ? 72 : 56} />
                 <span className={`w-full truncate text-sm font-bold ${entry.id === myId ? "text-talo-hero" : "text-white"}`}>
-                  {entry.id === myId ? "Vos" : entry.name}
+                  {entry.id === myId ? "Tú" : entry.name}
                 </span>
                 <span className="font-mono text-xs text-white/60">{entry.score}</span>
                 <div
@@ -227,7 +227,7 @@ export default function GameResults({
             >
               <span className="w-5 text-right font-mono text-white/50">{pos[podium.length + i]}</span>
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: r.color ?? "#64748b" }} />
-              <span className="flex-1 truncate text-left text-white">{r.id === myId ? "Vos" : r.name}</span>
+              <span className="flex-1 truncate text-left text-white">{r.id === myId ? "Tú" : r.name}</span>
               <span className="font-mono text-white/80">{r.score}</span>
             </li>
           ))}

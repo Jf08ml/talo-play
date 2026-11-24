@@ -68,7 +68,7 @@ export default function Hud({
                 <p key={t.id} className="flex items-center justify-between gap-3 font-bold" style={{ color: t.color }}>
                   <span>
                     {t.label.replace("Equipo ", "")}
-                    {hud.myTeam === t.id && <span className="font-normal text-white/60"> · vos</span>}
+                    {hud.myTeam === t.id && <span className="font-normal text-white/60"> · tú</span>}
                   </span>
                   <span className="font-mono">{hud.teams![t.id]}</span>
                 </p>
@@ -80,7 +80,7 @@ export default function Hud({
                 <li key={r.id} className={`flex items-center gap-1.5 ${r.me ? "font-bold text-white" : "text-white/80"}`}>
                   <span className="w-3 text-right text-white/45">{i + 1}</span>
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: r.color }} />
-                  <span className="max-w-[90px] flex-1 truncate">{r.me ? "Vos" : r.name}</span>
+                  <span className="max-w-[90px] flex-1 truncate">{r.me ? "Tú" : r.name}</span>
                   <span className="font-mono">{r.bank}</span>
                 </li>
               ))}
@@ -93,10 +93,10 @@ export default function Hud({
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/30 text-center">
           <span className="font-display text-7xl text-talo-hero">{hud.countdown}</span>
           <p className={`${PANEL} max-w-xs px-4 py-2 text-sm text-white/90`}>
-            Agarrá diamantes sin que te vean y llevalos a {hud.myTeam ? "una salida de tu color" : "una salida"}. Solo cuenta lo que dejás ahí.
+            Agarra diamantes sin que te vean y llévalos a {hud.myTeam ? "una salida de tu color" : "una salida"}. Solo cuenta lo que dejas ahí.
           </p>
           <p className="text-xs text-white/70">
-            {touch ? "Arrastrá el dedo para moverte · «Robar» le saca diamantes al que tengas al lado" : "WASD o flechas para moverte · espacio o E para robar"}
+            {touch ? "Arrastra el dedo para moverte · «Robar» le saca diamantes al que tengas al lado" : "WASD o flechas para moverte · espacio o E para robar"}
           </p>
         </div>
       )}
@@ -108,7 +108,7 @@ export default function Hud({
               <Siren className="h-6 w-6" /> ¡Te atraparon!
             </p>
             <p className="text-sm">
-              {hud.lost > 0 ? `Se te cayeron ${hud.lost} ${hud.lost === 1 ? "diamante" : "diamantes"}. ` : ""}Volvés a la salida en {hud.cuffed}…
+              {hud.lost > 0 ? `Se te cayeron ${hud.lost} ${hud.lost === 1 ? "diamante" : "diamantes"}. ` : ""}Vuelves a la salida en {hud.cuffed}…
             </p>
           </div>
         </div>
@@ -117,7 +117,7 @@ export default function Hud({
       {lastSeconds && hud.bag > 0 && hud.cuffed === null && hud.countdown === null && (
         <div className="pointer-events-none absolute inset-x-0 top-14 flex justify-center px-4 sm:top-16">
           <p className="animate-pulse rounded-full bg-talo-hero px-4 py-1.5 text-center text-sm font-bold text-talo-ink">
-            ¡Volvé a la salida! Lo que quede en la mochila no cuenta
+            ¡Vuelve a la salida! Lo que quede en la mochila no cuenta
           </p>
         </div>
       )}

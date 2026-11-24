@@ -73,7 +73,7 @@ export async function prepareImage(
     // rejecting — left unchecked, that 0x0 size flows all the way into each
     // piece's canvas and crashes the board on drawImage.
     throw new Error(
-      "No se pudo leer esa imagen (¿está dañada o en un formato no soportado, como HEIC?). Probá con un JPG, PNG o WEBP."
+      "No se pudo leer esa imagen (¿está dañada o en un formato no soportado, como HEIC?). Prueba con un JPG, PNG o WEBP."
     );
   }
   const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));

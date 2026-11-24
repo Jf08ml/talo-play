@@ -143,7 +143,7 @@ export default function DamasClient({ roomId }: { roomId: string }) {
 }
 
 function nameOf(state: DamasState, id: string, myId: string): string {
-  if (id === myId) return "Vos";
+  if (id === myId) return "Tú";
   return state.players[id]?.name ?? "?";
 }
 
@@ -217,7 +217,7 @@ function SeatPicker({
       </div>
       <p className="text-center text-xs text-slate-500">
         {!ready
-          ? "Falta un jugador: mandale el link a tu rival."
+          ? "Falta un jugador: mándale el link a tu rival."
           : mySeat
             ? "Empiezan las blancas. En la revancha se cambian los colores."
             : "Las dos sillas están ocupadas: vas a mirar la partida."}
@@ -261,7 +261,7 @@ function PlayersBar({
                 {active
                   ? seat === mySeat
                     ? state.chain >= 0
-                      ? "¡Seguí comiendo!"
+                      ? "¡Sigue comiendo!"
                       : "¡Te toca!"
                     : "Pensando…"
                   : `${pieceCount(state.cells, seat)} fichas · ${state.wins[id] ?? 0} ganadas`}
@@ -351,10 +351,10 @@ function BoardView({ roomId, state, myId }: { roomId: string; state: DamasState;
       {myTurn && (
         <p className="mt-2 text-center text-xs text-slate-500">
           {state.chain >= 0
-            ? "Podés seguir comiendo con la misma ficha: ¡es obligatorio!"
+            ? "Puedes seguir comiendo con la misma ficha: ¡es obligatorio!"
             : mustCapture
-              ? "Tenés que comer: las fichas marcadas en rojo pueden."
-              : "Tocá una ficha y después la casilla a donde moverla."}
+              ? "Tienes que comer: las fichas marcadas en rojo pueden."
+              : "Toca una ficha y después la casilla a donde moverla."}
         </p>
       )}
     </div>
@@ -385,7 +385,7 @@ function GameActions({ roomId, state, myId }: { roomId: string; state: DamasStat
           className="flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-2.5 text-xs text-slate-400 transition hover:text-slate-200"
         >
           <Flag className="h-4 w-4" />
-          {confirmResign ? "¿Seguro? Tocá de nuevo" : "Rendirme"}
+          {confirmResign ? "¿Seguro? Toca de nuevo" : "Rendirme"}
         </button>
       </div>
     </div>
@@ -435,7 +435,7 @@ function Spectators({ state, presence, myId }: { state: DamasState; presence: Pr
   if (watching.length === 0) return null;
   return (
     <p className="text-center text-xs text-slate-500">
-      Mirando: {watching.map((id) => (id === myId ? "vos" : (presence[id]?.name ?? "?"))).join(", ")}
+      Mirando: {watching.map((id) => (id === myId ? "tú" : (presence[id]?.name ?? "?"))).join(", ")}
     </p>
   );
 }

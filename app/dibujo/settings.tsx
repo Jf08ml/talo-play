@@ -45,7 +45,7 @@ export const SETTINGS: GameSettings<Settings> = {
     { kind: "toggle", key: "useDefaultWords", label: `Sumar las ${DEFAULT_WORDS.length} palabras incluidas` },
   ],
   problem: (v) =>
-    !v.useDefaultWords && parseWords(v.wordsText).length < 3 ? "Sin las palabras incluidas, escribí al menos 3 propias." : null,
+    !v.useDefaultWords && parseWords(v.wordsText).length < 3 ? "Sin las palabras incluidas, escribe al menos 3 propias." : null,
   create: (v, hostId) =>
     createDibujoRoom(
       { rounds: v.rounds, drawSeconds: v.drawSeconds, customWords: parseWords(v.wordsText), useDefaultWords: v.useDefaultWords },

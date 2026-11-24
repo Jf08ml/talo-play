@@ -57,7 +57,7 @@ export default function PhotoPicker({
           }}
         />
         <p className="text-sm font-medium text-slate-300">
-          Arrastrá fotos acá, o hacé clic para elegirlas
+          Arrastra fotos aquí, o haz clic para elegirlas
         </p>
         <p className="mt-1 text-xs text-slate-500">
           Una por par · se recortan en cuadrado · {files.length}/{max}

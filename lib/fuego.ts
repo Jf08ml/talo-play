@@ -220,7 +220,7 @@ function normalizeState(raw: Partial<FuegoState> | null): FuegoState | null {
 export const isBot = (id: string) => id.startsWith("bot");
 
 export function fighterName(s: FuegoState, id: string, myId = ""): string {
-  if (id === myId) return "Vos";
+  if (id === myId) return "Tú";
   return s.bots[id] ?? s.players[id]?.name ?? "Soldado";
 }
 

@@ -291,7 +291,7 @@ function PuzzleView({
           </div>
           {feedback && (
             <p className={`text-center text-sm ${feedback.kind === "close" ? "text-amber-300" : "text-slate-500"}`}>
-              {feedback.kind === "close" ? "¡Casi! Estás muy cerca." : "No es eso. Probá de nuevo."}
+              {feedback.kind === "close" ? "¡Casi! Estás muy cerca." : "No es eso. Prueba de nuevo."}
             </p>
           )}
         </form>
@@ -306,7 +306,7 @@ function PuzzleView({
             ? `✓ ¡Adivinaste! +${mine}. Esperando a los demás (${solvedCount}/${solversNeeded})…`
             : halfway
               ? "Pista: ya se ve la primera letra de cada palabra."
-              : "Escribí rápido: cuanto antes, más puntos."}
+              : "Escribe rápido: cuanto antes, más puntos."}
       </p>
     </div>
   );
@@ -328,7 +328,7 @@ function Scoreboard({ state, presence, myId }: { state: EmojisState; presence: P
             <li key={id} className={`flex items-center gap-2 ${id in presence ? "" : "opacity-40"}`}>
               <span className="w-5 text-slate-500">{i + 1}.</span>
               <span className="flex-1 truncate" style={{ color: state.players[id]?.color }}>
-                {id === myId ? "Vos" : (state.players[id]?.name ?? "?")}
+                {id === myId ? "Tú" : (state.players[id]?.name ?? "?")}
               </span>
               {pts !== undefined && <span className="text-xs font-semibold text-emerald-400">+{pts}</span>}
               <span className="w-14 text-right font-mono text-slate-200">{state.scores[id] ?? 0}</span>

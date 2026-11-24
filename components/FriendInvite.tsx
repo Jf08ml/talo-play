@@ -20,7 +20,7 @@ export function SignInButton({ className = "", light = false }: { className?: st
   if (inAppBrowser()) {
     return (
       <p className={`text-sm ${light ? "text-talo-text-2" : "text-white/70"} ${className}`}>
-        Para entrar con Google, abrí Talo en tu navegador (Chrome o Safari): desde el menú «⋯», «Abrir en el navegador».
+        Para entrar con Google, abre Talo en tu navegador (Chrome o Safari): desde el menú «⋯», «Abrir en el navegador».
       </p>
     );
   }
@@ -36,7 +36,7 @@ export function SignInButton({ className = "", light = false }: { className?: st
             trackEvent("login", { method: "google" });
           } catch (err) {
             console.error(err);
-            setError("No se pudo entrar. Probá de nuevo.");
+            setError("No se pudo entrar. Prueba de nuevo.");
           } finally {
             setBusy(false);
           }
@@ -68,7 +68,7 @@ export function FriendInviteList({ game, roomId }: { game: GameId; roomId: strin
   if (!user) {
     return (
       <div className="flex flex-col gap-2 rounded-[14px] bg-white/[0.05] p-3.5">
-        <p className="text-[15px] font-bold text-white">Invitá a tus amigos sin mandar links</p>
+        <p className="text-[15px] font-bold text-white">Invita a tus amigos sin mandar links</p>
         <p className="text-sm text-white/65">Con una cuenta les llega la invitación directo en Talo, estén donde estén.</p>
         <SignInButton />
       </div>
@@ -90,9 +90,9 @@ export function FriendInviteList({ game, roomId }: { game: GameId; roomId: strin
   if (!friends.length) {
     return (
       <div className="flex flex-col gap-1 rounded-[14px] bg-white/[0.05] p-3.5 text-sm text-white/70">
-        <p className="font-bold text-white">Todavía no tenés amigos en Talo</p>
+        <p className="font-bold text-white">Todavía no tienes amigos en Talo</p>
         <p>
-          Pasales tu código de amigo desde{" "}
+          Pásales tu código de amigo desde{" "}
           <Link href="/amigos" target="_blank" className="font-bold text-talo-hero underline-offset-2 hover:underline">
             Amigos
           </Link>

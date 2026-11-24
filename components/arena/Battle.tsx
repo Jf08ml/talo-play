@@ -710,7 +710,7 @@ export default function Battle({
 
       // Draw.
       scene.setFighters(
-        Object.fromEntries(ids.map((id) => [id, { team: s.roster[id], label: id === myId ? "Vos" : fighterName(s, id) }]))
+        Object.fromEntries(ids.map((id) => [id, { team: s.roster[id], label: id === myId ? "Tú" : fighterName(s, id) }]))
       );
       for (const id of ids) {
         const v = viewOf(s, id);
@@ -930,14 +930,14 @@ export default function Battle({
         <div className="pointer-events-none absolute inset-x-0 bottom-24 z-20 flex justify-center">
           <p className="flex items-center gap-2 rounded-xl bg-slate-950/75 px-4 py-2 text-sm text-white backdrop-blur">
             <MousePointerClick className="h-4 w-4" />
-            Hacé clic en la arena para pelear · WASD moverte · Shift correr · clic atacar (de nuevo = combo) · clic derecho o F bloquear · Q esquivar · E agarrar · espacio saltar · V cámara · Esc soltar el mouse
+            Haz clic en la arena para pelear · WASD moverte · Shift correr · clic atacar (de nuevo = combo) · clic derecho o F bloquear · Q esquivar · E agarrar · espacio saltar · V cámara · Esc soltar el mouse
           </p>
         </div>
       )}
 
       {!fine && (
         <p className="pointer-events-none absolute inset-x-0 top-24 z-20 hidden items-center justify-center gap-1.5 text-xs text-white drop-shadow portrait:flex">
-          <RotateCw className="h-3.5 w-3.5" /> Girá el teléfono para pelear mejor
+          <RotateCw className="h-3.5 w-3.5" /> Gira el teléfono para pelear mejor
         </p>
       )}
 

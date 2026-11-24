@@ -11,7 +11,7 @@ interface SeatsView {
 }
 
 export function seatName(state: SeatsView, id: string, myId: string): string {
-  if (id === myId) return "Vos";
+  if (id === myId) return "Tú";
   return state.players[id]?.name ?? "?";
 }
 
@@ -86,7 +86,7 @@ export default function TwoSeatPicker({
       </div>
       <p className="text-center text-xs text-slate-500">
         {!ready
-          ? "Falta un jugador: mandale el link a tu rival."
+          ? "Falta un jugador: mándale el link a tu rival."
           : mySeat
             ? note
             : "Las dos sillas están ocupadas: vas a mirar la partida."}
@@ -101,7 +101,7 @@ export function Spectators({ state, presence, myId }: { state: SeatsView; presen
   if (watching.length === 0) return null;
   return (
     <p className="text-center text-xs text-slate-500">
-      Mirando: {watching.map((id) => (id === myId ? "vos" : (presence[id]?.name ?? "?"))).join(", ")}
+      Mirando: {watching.map((id) => (id === myId ? "tú" : (presence[id]?.name ?? "?"))).join(", ")}
     </p>
   );
 }

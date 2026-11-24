@@ -255,7 +255,7 @@ function ScoreBar({
                 {state.cube === 1 ? 64 : state.cube}
               </span>
               <span className="mt-0.5 text-[10px] text-slate-500">
-                {state.cubeOwner ? `de ${seatName(state, state.seats[state.cubeOwner], myId)}` : "al centro"}
+                {state.cubeOwner ? (state.seats[state.cubeOwner] === myId ? "tuyo" : `de ${seatName(state, state.seats[state.cubeOwner], myId)}`) : "al centro"}
               </span>
             </div>
           ),
@@ -467,12 +467,12 @@ function BoardView({
       {myTurn && (
         <p className="mt-2 text-center text-xs text-slate-500">
           {steps.length === 0
-            ? "No te quedan movimientos: tocá «Listo»."
+            ? "No te quedan movimientos: toca «Listo»."
             : source === null
-              ? "Tocá una ficha marcada y después a dónde moverla."
+              ? "Toca una ficha marcada y después a dónde moverla."
               : targets.has(OFF)
-                ? "Tocá el verde para moverla (o la bandeja de la derecha para sacarla)."
-                : "Tocá un punto verde para moverla."}
+                ? "Toca el verde para moverla (o la bandeja de la derecha para sacarla)."
+                : "Toca un punto verde para moverla."}
         </p>
       )}
     </div>
@@ -531,7 +531,7 @@ function TurnPanel({ roomId, state, myId }: { roomId: string; state: BgState; my
 
       {state.opening && state.phase === "move" && (
         <p className="text-xs text-slate-400">
-          Primera tirada: blancas {rolled[0]}, negras {rolled[1]}. {myTurn ? "Arrancás vos" : `Arranca ${turnName}`} con {rolled[0]}-{rolled[1]}.
+          Primera tirada: blancas {rolled[0]}, negras {rolled[1]}. {myTurn ? "Empiezas tú" : `Arranca ${turnName}`} con {rolled[0]}-{rolled[1]}.
         </p>
       )}
       {state.blocked && state.phase === "roll" && (
@@ -557,7 +557,7 @@ function TurnPanel({ roomId, state, myId }: { roomId: string; state: BgState; my
       {state.phase === "double" &&
         (mySeat === otherSeat(state.turn) ? (
           <div className="flex w-full flex-col gap-2">
-            <p className="text-sm text-slate-300">Si aceptás, la partida pasa a valer {state.cube * 2} y el cubo queda de tu lado.</p>
+            <p className="text-sm text-slate-300">Si aceptas, la partida pasa a valer {state.cube * 2} y el cubo queda de tu lado.</p>
             <button onClick={() => answerDouble(roomId, myId, true, state.moveNo)} className={`w-full ${PRIMARY_BUTTON}`}>
               Acepto
             </button>
@@ -650,7 +650,7 @@ function ResignButton({ roomId, myId, cube }: { roomId: string; myId: string; cu
       className="mx-auto flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-400 transition hover:text-slate-200"
     >
       <Flag className="h-4 w-4" />
-      {confirm ? `¿Seguro? Perdés ${cube}. Tocá de nuevo` : "Abandonar esta partida"}
+      {confirm ? `¿Seguro? Pierdes ${cube}. Toca de nuevo` : "Abandonar esta partida"}
     </button>
   );
 }

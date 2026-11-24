@@ -94,8 +94,8 @@ export default function GameLobby({ game, children }: { game: GameId; children: 
             children
           ) : (
             <div className="flex min-h-48 flex-col items-center justify-center gap-2 p-6 text-center">
-              <p className="font-display text-[24px] text-white">Armá una sala</p>
-              <p className="max-w-sm text-[15px] text-white/70">Poné tu nombre para crear la sala y mandarles el link a los demás.</p>
+              <p className="font-display text-[24px] text-white">Arma una sala</p>
+              <p className="max-w-sm text-[15px] text-white/70">Pon tu nombre para crear la sala y mandarles el link a los demás.</p>
             </div>
           )}
         </div>
@@ -118,7 +118,7 @@ export default function GameLobby({ game, children }: { game: GameId; children: 
           >
             Ver las reglas completas <ChevronDown className="h-5 w-5" />
           </a>
-          <p className="mt-5 text-[15px] text-talo-text-3">Creás la sala, mandás el link por WhatsApp y los demás entran con un toque.</p>
+          <p className="mt-5 text-[15px] text-talo-text-3">Creas la sala, mandas el link por WhatsApp y los demás entran con un toque.</p>
         </div>
       </div>
 

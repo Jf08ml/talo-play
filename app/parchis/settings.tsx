@@ -8,8 +8,8 @@ type Settings = { rules: LudoRules };
 
 const RULES_TEXT: Record<LudoRules, string> = {
   parchis:
-    "El parchís de siempre: salís con un 5, el 6 repite, dos fichas juntas forman barrera, comer cuenta 20 y llegar cuenta 10. Hay seguros donde no se come.",
-  ludo: "La versión más simple: salís con un 6, no hay barreras y caer sobre una rival fuera de las estrellas la manda a su base.",
+    "El parchís de siempre: sales con un 5, el 6 repite, dos fichas juntas forman barrera, comer cuenta 20 y llegar cuenta 10. Hay seguros donde no se come.",
+  ludo: "La versión más simple: sales con un 6, no hay barreras y caer sobre una rival fuera de las estrellas la manda a su base.",
 };
 
 export const SETTINGS: GameSettings<Settings> = {

@@ -403,9 +403,9 @@ export interface TopEntry extends ViboraPlayer {
   best: number;
 }
 
-/** Today in Argentina (UTC−3), so the top resets at midnight there. */
+/** Today (UTC), so the top resets at midnight UTC for everyone. */
 function today(): string {
-  return new Date(serverNow() - 3 * 3600_000).toISOString().slice(0, 10).replace(/-/g, "");
+  return new Date(serverNow()).toISOString().slice(0, 10).replace(/-/g, "");
 }
 
 const topRef = () => ref(getDb(), `${base(ONLINE_WORLDS[0])}/top/d${today()}`);

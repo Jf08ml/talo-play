@@ -159,11 +159,11 @@ export default function ChatButton({ roomId, locked }: { roomId: string; locked?
           </div>
 
           <div ref={list} className="min-h-24 flex-1 space-y-1.5 overflow-y-auto px-3 py-1">
-            {messages.length === 0 && <p className="py-6 text-center text-sm text-slate-500">Todavía no escribió nadie. ¡Arrancá vos!</p>}
+            {messages.length === 0 && <p className="py-6 text-center text-sm text-slate-500">Todavía no escribió nadie. ¡Empieza tú!</p>}
             {messages.map((m) => (
               <p key={m.id} className="break-words text-sm leading-snug text-slate-200">
                 <span className="font-semibold" style={{ color: m.color }}>
-                  {m.by === clientId ? "Vos" : m.name}
+                  {m.by === clientId ? "Tú" : m.name}
                 </span>{" "}
                 {m.text}
               </p>
@@ -195,7 +195,7 @@ export default function ChatButton({ roomId, locked }: { roomId: string; locked?
               value={text}
               onChange={(e) => setText(e.target.value)}
               maxLength={MAX_CHARS}
-              placeholder={name ? "Escribí un mensaje…" : "Poné tu nombre para escribir"}
+              placeholder={name ? "Escribe un mensaje…" : "Pon tu nombre para escribir"}
               disabled={!name}
               autoFocus
               className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-violet-500"

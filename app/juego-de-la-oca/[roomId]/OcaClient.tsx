@@ -137,7 +137,7 @@ export default function OcaClient({ roomId }: { roomId: string }) {
 }
 
 function nameOf(state: OcaState, id: string, myId: string): string {
-  if (id === myId) return "Vos";
+  if (id === myId) return "Tú";
   return state.players[id]?.name ?? "?";
 }
 
@@ -232,7 +232,7 @@ function Game({
             style={{ borderColor: colorOf(state, turnId) }}
           >
             <p className="font-display text-lg font-semibold text-slate-100">
-              {myTurn ? (last.again && last.who === myId ? "¡Tirá de nuevo!" : "¡Te toca!") : `Juega ${nameOf(state, turnId, myId)}`}
+              {myTurn ? (last.again && last.who === myId ? "¡Tira de nuevo!" : "¡Te toca!") : `Juega ${nameOf(state, turnId, myId)}`}
             </p>
             <div className="flex gap-2">
               {dice.map((d, i) => (
@@ -283,7 +283,7 @@ function Game({
               Mirando:{" "}
               {Object.keys(presence)
                 .filter((id) => !state.order.includes(id))
-                .map((id) => (id === myId ? "vos" : presence[id]?.name))
+                .map((id) => (id === myId ? "tú" : presence[id]?.name))
                 .join(", ")}
             </p>
           )}
@@ -292,11 +292,11 @@ function Game({
         <details className="rounded-2xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-400">
           <summary className="cursor-pointer text-sm font-medium text-slate-300">Las casillas</summary>
           <ul className="mt-2 space-y-1">
-            <li>🪿 Oca: saltás a la siguiente oca y volvés a tirar.</li>
-            <li>🌉 Puentes (6 y 12) y 🎲 dados (26 y 53): vas al otro y volvés a tirar.</li>
-            <li>🏨 Posada (19): perdés un turno. ⛓️ Cárcel (52): perdés dos.</li>
-            <li>🕳️ Pozo (31): te quedás hasta que caiga otro y te rescate.</li>
-            <li>🌀 Laberinto (42): volvés a la 30. 💀 Calavera (58): volvés a empezar.</li>
+            <li>🪿 Oca: saltas a la siguiente oca y vuelves a tirar.</li>
+            <li>🌉 Puentes (6 y 12) y 🎲 dados (26 y 53): vas al otro y vuelves a tirar.</li>
+            <li>🏨 Posada (19): pierdes un turno. ⛓️ Cárcel (52): pierdes dos.</li>
+            <li>🕳️ Pozo (31): te quedas hasta que caiga otro y te rescate.</li>
+            <li>🌀 Laberinto (42): vuelves a la 30. 💀 Calavera (58): vuelves a empezar.</li>
             <li>🌷 Para entrar al jardín (63) hace falta el número justo: lo que sobra, rebota.</li>
           </ul>
         </details>

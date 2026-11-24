@@ -24,7 +24,7 @@ export const SETTINGS: GameSettings<Settings> = {
             <div className="flex items-center gap-3 text-xs text-slate-400">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={v.imageUrl} alt="Imagen actual" className="h-14 w-14 rounded-lg object-cover" />
-              Esta es la imagen actual. Si elegís otra, la reemplaza.
+              Esta es la imagen actual. Si eliges otra, la reemplaza.
             </div>
           )}
           <ImageDropzone file={v.file} onChange={(file) => set({ file })} />
@@ -39,7 +39,7 @@ export const SETTINGS: GameSettings<Settings> = {
     },
     { kind: "toggle", key: "showNumbers", label: "Mostrar números en las fichas", hint: "Ayuda a saber dónde va cada una." },
   ],
-  problem: (v) => (!v.file && !v.imageUrl ? "Elegí una imagen." : null),
+  problem: (v) => (!v.file && !v.imageUrl ? "Elige una imagen." : null),
   create: (v, hostId) => createDeslizRoom({ file: v.file!, size: v.size, showNumbers: v.showNumbers }, hostId),
   save: (roomId, v) => updateDeslizSettings(roomId, { file: v.file, size: v.size, showNumbers: v.showNumbers }),
   fromMeta: (meta) => ({ file: null, imageUrl: meta.imageUrl ?? "", size: meta.size ?? 4, showNumbers: meta.showNumbers ?? true }),

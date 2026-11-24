@@ -597,7 +597,7 @@ function chevronTexture(): THREE.CanvasTexture {
 const BOARDS: { bg: string; fg: string; text: string }[] = [
   { bg: "#FFD400", fg: "#111111", text: "TALO" },
   { bg: "#111111", fg: "#FFD400", text: "taloplay.com" },
-  { bg: "#f8fafc", fg: "#111111", text: "¡Jugá con amigos!" },
+  { bg: "#f8fafc", fg: "#111111", text: "¡Juega con amigos!" },
   { bg: "#2563eb", fg: "#f8fafc", text: "CARRERAS 3D" },
 ];
 

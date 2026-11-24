@@ -432,7 +432,7 @@ export default function PuzzleStage({
         </Layer>
       </Stage>
       <div className="pointer-events-none absolute bottom-3 left-3 hidden rounded-full border border-violet-500/20 bg-slate-900/90 px-3 py-1 text-xs text-slate-300 shadow-[0_0_15px_rgba(139,92,246,0.15)] sm:block">
-        Rueda del mouse o pellizcá para hacer zoom · Arrastrá el fondo para mover la vista
+        Rueda del mouse o pellizca para hacer zoom · Arrastra el fondo para mover la vista
       </div>
 
       <div className="absolute bottom-3 right-3 flex flex-col gap-2">

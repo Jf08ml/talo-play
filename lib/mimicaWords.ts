@@ -14,10 +14,10 @@ const group = (cat: string, words: string[]): MimicaWord[] => words.map((w) => (
 export const MIMICA_WORDS: MimicaWord[] = [
   ...group("Acción", [
     "Lavarse los dientes", "Cebar mate", "Andar en bicicleta", "Hacer un asado", "Cambiar un pañal",
-    "Pescar", "Bailar tango", "Manejar un colectivo", "Peinarse", "Hacer flexiones",
+    "Pescar", "Bailar tango", "Manejar un autobús", "Peinarse", "Hacer flexiones",
     "Saltar la soga", "Planchar", "Sacar una selfie", "Pintar una pared", "Tejer",
     "Atarse los cordones", "Hacer malabares", "Esquiar", "Remar", "Escalar una montaña",
-    "Ordeñar una vaca", "Barrer", "Cortar el pasto", "Hacer pochoclo", "Tocar el timbre y salir corriendo",
+    "Ordeñar una vaca", "Barrer", "Cortar el pasto", "Hacer palomitas", "Tocar el timbre y salir corriendo",
     "Inflar un globo", "Despertarse tarde", "Meditar", "Hacer surf", "Patear un penal",
     "Abrir un regalo", "Ponerse lentes de contacto", "Estornudar", "Bostezar", "Dar un discurso",
   ]),

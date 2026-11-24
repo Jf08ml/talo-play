@@ -60,7 +60,7 @@ function SoloCard({ onStart }: { onStart: (s: SoloStart) => void }) {
       <div className="flex items-end justify-between gap-3">
         <div>
           <h2 className="font-display text-lg text-slate-100">Niveles</h2>
-          <p className="text-sm text-slate-400">Pasá uno para abrir el siguiente. Hasta tres estrellas por nivel.</p>
+          <p className="text-sm text-slate-400">Pasa uno para abrir el siguiente. Hasta tres estrellas por nivel.</p>
         </div>
         <span className="shrink-0 text-sm font-bold text-slate-300">
           {total}/{CAMPAIGN.length * 3} ★
@@ -119,7 +119,7 @@ function OnlineCard() {
       router.push(`/ladrillazo/${id}`);
     } catch (err) {
       console.error(err);
-      setError("No se pudo entrar. Probá de nuevo.");
+      setError("No se pudo entrar. Prueba de nuevo.");
       setEntering(false);
     }
   };

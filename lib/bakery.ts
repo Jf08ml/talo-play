@@ -163,7 +163,7 @@ export const LEVELS: Level[] = [
   },
   {
     name: "Chef estrella",
-    hint: "Memorizá el pedido: se esconde a los 8 segundos. Sin segunda oportunidad.",
+    hint: "Memoriza el pedido: se esconde a los 8 segundos. Sin segunda oportunidad.",
     orders: 6,
     shapes: ["redonda", "cuadrada"],
     sponges: ALL_FLAVORS,

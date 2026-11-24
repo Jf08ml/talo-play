@@ -554,7 +554,7 @@ function JoinCard({ roomId, meta, state, presence }: { roomId: string; meta: Emp
       <div className="flex w-full flex-col gap-5 rounded-3xl bg-talo-ink/90 p-6 sm:p-8">
         <div className="flex items-center gap-3 text-white/80">
           <Smartphone className="h-7 w-7 text-talo-hero" />
-          <p className="text-xl font-bold">Entrá desde tu celular</p>
+          <p className="text-xl font-bold">Entra desde tu celular</p>
         </div>
         <div>
           <p className="break-all font-code text-base text-white/60 sm:text-xl">

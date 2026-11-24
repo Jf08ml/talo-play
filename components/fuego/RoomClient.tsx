@@ -130,7 +130,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
               <div className="flex gap-2.5 rounded-xl bg-sky-500/10 p-3 text-sm text-sky-100 ring-1 ring-sky-400/20">
                 <Smartphone className="mt-0.5 h-5 w-5 shrink-0" />
                 <p>
-                  Cada uno juega desde su teléfono (horizontal) o su compu con mouse y teclado. Arrancás con fusil, pistola y dos
+                  Cada uno juega desde su teléfono (horizontal) o su computadora con mouse y teclado. Empiezas con fusil, pistola y dos
                   granadas: las armas pesadas están repartidas por el mapa.
                 </p>
               </div>
@@ -180,7 +180,7 @@ function TeamPicker({
                 const id = list[i];
                 return (
                   <p key={i} className={`flex items-center justify-center gap-1 rounded-lg bg-slate-900/70 px-2 py-1.5 text-center text-sm ${id ? "text-slate-100" : "text-slate-500"}`}>
-                    {id ? (id === myId ? "Vos" : state.players[id]?.name) : bots ? (
+                    {id ? (id === myId ? "Tú" : state.players[id]?.name) : bots ? (
                       <>
                         <Bot className="h-3.5 w-3.5" /> bot
                       </>

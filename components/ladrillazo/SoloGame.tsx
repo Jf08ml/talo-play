@@ -202,7 +202,7 @@ export default function SoloGame({ start, onExit }: { start: SoloStart; onExit: 
         <Field frame={frame} input={input} paddleX={() => boardRef.current?.paddles[0].x ?? 10} controls={phase === "playing"}>
           {hint && phase === "playing" && (
             <p className="pointer-events-none absolute inset-x-0 bottom-12 text-center text-xs text-white/70">
-              Mové la paleta con el dedo, el mouse o las flechas · tocá para sacar
+              Mueve la paleta con el dedo, el mouse o las flechas · toca para sacar
             </p>
           )}
           {phase === "paused" && (

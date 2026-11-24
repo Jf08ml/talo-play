@@ -64,8 +64,8 @@ export default function IdeasButton() {
           >
             <X className="h-4 w-4" />
           </button>
-          <p className="text-[17px] font-bold leading-tight">¿Qué juego querés que sumemos?</p>
-          <p className="mt-1 text-[15px] text-talo-text-2">Votá o contanos tu idea. Talo lo armamos entre todos.</p>
+          <p className="text-[17px] font-bold leading-tight">¿Qué juego quieres que sumemos?</p>
+          <p className="mt-1 text-[15px] text-talo-text-2">Vota o cuéntanos tu idea. Talo lo armamos entre todos.</p>
           <Link
             href="/ideas"
             onClick={markSeen}

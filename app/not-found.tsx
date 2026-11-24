@@ -18,7 +18,7 @@ export default function NotFound() {
         <div className="mx-auto flex w-full max-w-[1360px] flex-1 flex-col items-start gap-5 px-5 pb-14 pt-4 sm:px-10 sm:pt-10">
           <Talo w={84} h={84} color="#111111" radius="22px" expr="sorprendido" />
           <h1 className="font-display text-[44px] leading-none tracking-[-0.02em] sm:text-[72px]">
-            Acá no hay ningún juego
+            Aquí no hay ningún juego
           </h1>
           <p className="max-w-xl text-[17px] font-medium leading-[1.4] sm:text-[22px]">
             El link está mal o la sala ya no existe: las salas se borran después de unos días sin jugar.

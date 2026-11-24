@@ -12,8 +12,8 @@ export const metadata: Metadata = {
 };
 
 const STEPS = [
-  { color: "#FF5FA2", title: "Elegí un juego", text: "Para la previa, de mesa, de cartas o para jugar solo. Todos en español." },
-  { color: "#2D5BFF", title: "Mandá el link", text: "Por WhatsApp o pasando el código de la sala. Cada uno entra con su nombre." },
+  { color: "#FF5FA2", title: "Elige un juego", text: "Para la fiesta, de mesa, de cartas o para jugar solo. Todos en español." },
+  { color: "#2D5BFF", title: "Manda el link", text: "Por WhatsApp o pasando el código de la sala. Cada uno entra con su nombre." },
   { color: "#00A863", title: "A jugar", text: "Todo se sincroniza en vivo: en la misma mesa o cada uno en su casa, por videollamada." },
 ];
 

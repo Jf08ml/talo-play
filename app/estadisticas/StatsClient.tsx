@@ -47,7 +47,7 @@ function shiftDay(day: string, n: number): string {
 
 function label(day: string, long = false) {
   const d = new Date(Date.UTC(+day.slice(0, 4), +day.slice(4, 6) - 1, +day.slice(6, 8)));
-  return d.toLocaleDateString("es-AR", {
+  return d.toLocaleDateString("es", {
     timeZone: "UTC",
     day: "numeric",
     month: "numeric",
@@ -95,7 +95,7 @@ export default function StatsClient() {
         <div className="mx-auto flex max-w-[1360px] flex-col gap-3 px-5 pb-10 pt-2 sm:px-10 sm:pb-14 sm:pt-6">
           <h1 className="font-display text-[44px] leading-none tracking-[-0.02em] sm:text-[72px]">Estadísticas</h1>
           <p className="max-w-2xl text-[17px] font-medium leading-[1.4] sm:text-[20px]">
-            Lo que cuenta Talo por su cuenta, día por día (hora de Argentina). Para fuentes y páginas, mirá Google Analytics.
+            Lo que cuenta Talo por su cuenta, día por día (días en hora UTC). Para fuentes y páginas, mira Google Analytics.
           </p>
         </div>
       </section>
@@ -145,7 +145,7 @@ function Dashboard({
   if (!since) {
     return (
       <p className={CARD}>
-        Todavía no hay datos: se empieza a contar desde que esta versión está publicada. Volvé mañana.
+        Todavía no hay datos: se empieza a contar desde que esta versión está publicada. Vuelve mañana.
       </p>
     );
   }
@@ -549,7 +549,7 @@ function OwnBrowser() {
     <section className={CARD}>
       <h2 className={H2}>Este navegador</h2>
       <p className="mt-2 max-w-2xl text-[15px] text-talo-text-2">
-        Marcalo en los navegadores de quienes hacemos Talo para no inflar los números: deja de sumar acá y Google
+        Márcalo en los navegadores de quienes hacemos Talo para no inflar los números: deja de sumar aquí y Google
         Analytics lo marca como tráfico interno.
       </p>
       <label className="mt-4 flex w-fit cursor-pointer items-center gap-3 text-[16px] font-bold">
@@ -618,7 +618,7 @@ function Community() {
         <p className="mt-2 text-talo-text-2">Cargando…</p>
       ) : !user ? (
         <div className="mt-2 flex flex-col items-start gap-3">
-          <p className="text-[15px] text-talo-text-2">Los mensajes son privados: entrá con la cuenta de Google de Talo.</p>
+          <p className="text-[15px] text-talo-text-2">Los mensajes son privados: entra con la cuenta de Google de Talo.</p>
           <button
             type="button"
             onClick={() => signInWithGoogle().catch(() => {})}
@@ -650,8 +650,7 @@ function Community() {
                 <span className="rounded-full bg-talo-surface px-2.5 py-0.5 font-bold text-talo-ink">{kindLabel(f.kind)}</span>
                 <span>{f.name || "Sin nombre"}</span>
                 <span>
-                  {new Date(f.at).toLocaleString("es-AR", {
-                    timeZone: "America/Argentina/Buenos_Aires",
+                  {new Date(f.at).toLocaleString("es", {
                     day: "numeric",
                     month: "numeric",
                     hour: "2-digit",

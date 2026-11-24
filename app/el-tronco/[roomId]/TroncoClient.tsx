@@ -229,13 +229,13 @@ function ScreenCard({ roomId }: { roomId: string }) {
         <div>
           <p className="font-bold text-white">Se juega en una pantalla grande</p>
           <p className="mt-1 text-sm text-white/60">
-            Abrí este link en la compu conectada a la tele o al proyector. Los celulares son el control.
+            Abre este link en la computadora conectada a la tele o al proyector. Los celulares son el control.
           </p>
         </div>
       </div>
       <p className="break-all rounded-xl bg-black/40 px-3 py-2 font-code text-sm text-white/80">{host}{path}</p>
       <div className="flex items-center gap-2 text-xs text-white/50">
-        <Gamepad2 className="h-4 w-4 shrink-0" /> Si no tienen tele a mano, en la ronda podés tocar «Ver la ronda acá».
+        <Gamepad2 className="h-4 w-4 shrink-0" /> Si no tienen tele a mano, en la ronda puedes tocar «Ver la ronda aquí».
       </div>
       <a href={path} target="_blank" rel="noreferrer" className="text-center text-sm font-bold text-talo-hero underline-offset-2 hover:underline">
         Abrir la pantalla en este dispositivo

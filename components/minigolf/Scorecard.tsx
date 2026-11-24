@@ -45,7 +45,7 @@ export default function Scorecard({ pars, rows, myId, current }: { pars: number[
                 <td className="max-w-[7rem] px-2 py-1.5 text-left">
                   <span className="flex items-center gap-1.5">
                     <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: r.color }} />
-                    <span className="truncate font-bold">{r.id === myId ? "Vos" : r.name}</span>
+                    <span className="truncate font-bold">{r.id === myId ? "Tú" : r.name}</span>
                   </span>
                 </td>
                 {pars.map((p, i) => {

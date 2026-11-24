@@ -85,7 +85,7 @@ export const SETTINGS: GameSettings<Settings> = {
       options: choices(SECOND_OPTIONS, (n) => (n ? `${n} s` : "Sin límite")),
     },
   ],
-  problem: (v) => (v.decks.length === 0 && parseSpectra(v.spectraText).length < 3 ? "Elegí al menos un grupo de escalas o escribí 3 propias." : null),
+  problem: (v) => (v.decks.length === 0 && parseSpectra(v.spectraText).length < 3 ? "Elige al menos un grupo de escalas o escribe 3 propias." : null),
   create: (v, hostId) => createOndaRoom(toParams(v), hostId),
   save: (roomId, v) => saveRoomSettings(roomId, "onda/state", { ...toParams(v) }, { mode: v.mode }),
   fromMeta: (meta) => {

@@ -111,7 +111,7 @@ export default function FriendChat({
           {messages === null ? (
             <p className="m-auto text-black/50">Cargando…</p>
           ) : messages.length === 0 ? (
-            <p className="m-auto max-w-xs text-center text-black/55">Todavía no se escribieron. ¡Mandale un saludo!</p>
+            <p className="m-auto max-w-xs text-center text-black/55">Todavía no se escribieron. ¡Mándale un saludo!</p>
           ) : (
             messages.map((m) => {
               const mine = m.from === me;
@@ -124,7 +124,7 @@ export default function FriendChat({
                   >
                     {m.text}
                     <span className={`ml-2 align-bottom text-[11px] ${mine ? "text-white/55" : "text-black/40"}`}>
-                      {new Date(m.at).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(m.at).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" })}
                     </span>
                   </p>
                 </div>
@@ -137,7 +137,7 @@ export default function FriendChat({
             autoFocus
             value={text}
             onChange={(e) => setText(e.target.value.slice(0, DM_MAX_CHARS))}
-            placeholder={`Escribile a ${name}…`}
+            placeholder={`Escríbele a ${name}…`}
             aria-label="Mensaje"
             enterKeyHint="send"
             className="min-h-11 min-w-0 flex-1 rounded-xl border-2 border-talo-ink px-3 text-[15px] outline-none focus:ring-2 focus:ring-talo-hero"

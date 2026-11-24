@@ -3,7 +3,7 @@ import IdeasClient from "./IdeasClient";
 
 export const metadata: Metadata = {
   title: "Ideas y sugerencias",
-  description: "Votá qué juego sumamos a Talo y mandanos tus ideas, mejoras o lo que anda mal.",
+  description: "Vota qué juego sumamos a Talo y mándanos tus ideas, mejoras o lo que anda mal.",
   alternates: { canonical: "/ideas" },
 };
 

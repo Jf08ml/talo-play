@@ -5,7 +5,7 @@ export async function cropSquare(file: File, size: number, quality = 0.85): Prom
     // Browsers that can't decode a format (HEIC is the classic case) may
     // resolve with a 0×0 bitmap instead of rejecting.
     throw new Error(
-      `No se pudo leer "${file.name}" (¿está dañada o en un formato no soportado, como HEIC?). Probá con JPG, PNG o WEBP.`
+      `No se pudo leer "${file.name}" (¿está dañada o en un formato no soportado, como HEIC?). Prueba con JPG, PNG o WEBP.`
     );
   }
   const side = Math.min(bitmap.width, bitmap.height);

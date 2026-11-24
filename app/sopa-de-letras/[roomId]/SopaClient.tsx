@@ -233,7 +233,7 @@ function Board({
       </div>
       {playing && (
         <p className="text-center text-xs text-slate-500">
-          {start === null ? "Tocá la primera letra de una palabra…" : "…y ahora la última."}
+          {start === null ? "Toca la primera letra de una palabra…" : "…y ahora la última."}
         </p>
       )}
     </div>
@@ -283,7 +283,7 @@ function Sidebar({
           {rows.map((id) => (
             <li key={id} className={`flex items-center gap-2 ${id in presence ? "" : "opacity-40"}`}>
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: state.players[id]?.color }} />
-              <span className="flex-1 truncate text-slate-200">{id === myId ? "Vos" : (state.players[id]?.name ?? "?")}</span>
+              <span className="flex-1 truncate text-slate-200">{id === myId ? "Tú" : (state.players[id]?.name ?? "?")}</span>
               {(state.wins[id] ?? 0) > 0 && <span className="text-xs text-slate-500">{state.wins[id]} 🏆</span>}
               <span className="w-6 text-right font-mono text-slate-200">{counts[id] ?? 0}</span>
             </li>
@@ -297,7 +297,7 @@ function Sidebar({
 function ResultBanner({ state, myId, onAgain }: { state: SopaState; myId: string; onAgain: () => void }) {
   const top = leaders(state.found);
   const iWon = top.length === 1 && top[0] === myId;
-  const name = (id: string) => (id === myId ? "vos" : (state.players[id]?.name ?? "?"));
+  const name = (id: string) => (id === myId ? "tú" : (state.players[id]?.name ?? "?"));
   const title =
     top.length > 1 ? `🤝 ¡Empate entre ${top.map(name).join(" y ")}!` : iWon ? "🎉 ¡Encontraste más que nadie!" : `🏆 ¡Ganó ${name(top[0] ?? "")}!`;
   return (

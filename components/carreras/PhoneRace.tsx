@@ -538,7 +538,7 @@ export default function PhoneRace({
       </div>
 
       <p className="pointer-events-none absolute inset-x-0 top-20 hidden items-center justify-center gap-1.5 text-xs text-white/90 drop-shadow portrait:flex">
-        <RotateCw className="h-3.5 w-3.5" /> Girá el teléfono para ver mejor la pista
+        <RotateCw className="h-3.5 w-3.5" /> Gira el teléfono para ver mejor la pista
       </p>
 
       {(counting || go) && (
@@ -557,7 +557,7 @@ export default function PhoneRace({
         <div className="pointer-events-none absolute inset-x-0 top-1/4 flex justify-center px-4">
           <div className="animate-celebration-in rounded-2xl bg-red-600/85 px-5 py-2 text-center text-white backdrop-blur">
             <p className="font-display text-3xl font-bold">¡Contramano!</p>
-            <p className="text-sm text-red-100">Pegá la vuelta</p>
+            <p className="text-sm text-red-100">Pega la vuelta</p>
           </div>
         </div>
       )}

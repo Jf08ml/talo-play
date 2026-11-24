@@ -307,11 +307,11 @@ function StepOptions({
 
   const hint: ReactNode =
     field === "filling" && cake.layers < 2
-      ? "El relleno va entre los pisos: elegí 2 pisos o más."
+      ? "El relleno va entre los pisos: elige 2 pisos o más."
       : field === "decorations"
         ? decorationCount > 1
-          ? `Elegí ${decorationCount} decoraciones (tocá de nuevo para sacar una).`
-          : "Elegí una decoración (tocá otra para cambiarla)."
+          ? `Elige ${decorationCount} decoraciones (toca de nuevo para sacar una).`
+          : "Elige una decoración (toca otra para cambiarla)."
         : null;
 
   const content = (v: string | number): { label: string; visual: ReactNode } => {
@@ -421,7 +421,7 @@ export function OrderCard({
       {hidden ? (
         <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1.5 text-center">
           <p className="flex items-center gap-1.5 text-xs font-semibold text-violet-700">
-            <EyeOff className="h-4 w-4" /> ¿Te acordás de lo que pidió?
+            <EyeOff className="h-4 w-4" /> ¿Te acuerdas de lo que pidió?
           </p>
           {onPeek && (
             <button
@@ -438,7 +438,7 @@ export function OrderCard({
             {!compact && <p className="mb-1 text-xs italic text-slate-500">«Quiero una torta {occasion}».</p>}
             {hideIn !== null && (
               <p className="mb-1 flex items-center gap-1 text-[11px] font-bold text-amber-700">
-                <Eye className="h-3.5 w-3.5" /> ¡Memorizalo! Se esconde en {Math.max(1, Math.ceil(hideIn))} s
+                <Eye className="h-3.5 w-3.5" /> ¡Memorízalo! Se esconde en {Math.max(1, Math.ceil(hideIn))} s
               </p>
             )}
             {/* On a phone on its side the chips wrap at their own width, so the card stays short and the cake big. */}

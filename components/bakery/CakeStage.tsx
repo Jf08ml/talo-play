@@ -94,7 +94,7 @@ export default function CakeStage({
     return (
       <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-b from-pink-100 via-violet-100 to-amber-50 p-4">
         <CakeArt cake={cake} className="h-full max-h-80 w-full" label="Tu torta" />
-        <p className="text-xs text-violet-700">Tu dispositivo no muestra 3D: jugás con la torta dibujada.</p>
+        <p className="text-xs text-violet-700">Tu dispositivo no muestra 3D: juegas con la torta dibujada.</p>
       </div>
     );
   }
@@ -103,7 +103,7 @@ export default function CakeStage({
     <canvas
       ref={canvasRef}
       className="block h-full w-full touch-none select-none"
-      aria-label="Tu torta en 3D. Arrastrá para girarla."
+      aria-label="Tu torta en 3D. Arrastra para girarla."
       role="img"
       onPointerDown={(e) => {
         drag.current = { x: e.clientX, id: e.pointerId };

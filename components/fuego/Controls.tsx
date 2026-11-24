@@ -307,7 +307,7 @@ export function TouchControls({
             }`}
           >
             <Crosshair className="h-10 w-10" />
-            {fireOnRelease && <span className="absolute -top-6 whitespace-nowrap rounded bg-slate-950/70 px-1.5 text-[10px]">soltá para disparar</span>}
+            {fireOnRelease && <span className="absolute -top-6 whitespace-nowrap rounded bg-slate-950/70 px-1.5 text-[10px]">suelta para disparar</span>}
           </button>
         </div>
         <div className="flex flex-col items-center gap-2.5">

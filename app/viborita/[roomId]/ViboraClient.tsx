@@ -118,7 +118,7 @@ export default function ViboraClient({ roomId }: { roomId: string }) {
           >
             <div className="flex gap-2.5 rounded-xl bg-lime-500/10 p-3 text-sm text-lime-100 ring-1 ring-lime-400/20">
               <Smartphone className="mt-0.5 h-5 w-5 shrink-0" />
-              <p>Cada uno juega desde su teléfono o su compu. Comé bolitas para crecer y cruzate delante de los demás para cortarles la cola.</p>
+              <p>Cada uno juega desde su teléfono o su computadora. Come bolitas para crecer y crúzate delante de los demás para cortarles la cola.</p>
             </div>
           </WaitingRoom>
         </main>
@@ -158,7 +158,7 @@ function Results({
     <GameResults
       ranking={ranking}
       myId={myId}
-      subtitle={wins > 1 ? `Llevás ${wins} partidas ganadas` : undefined}
+      subtitle={wins > 1 ? `Llevas ${wins} partidas ganadas` : undefined}
       actions={
         <button
           disabled={busy}

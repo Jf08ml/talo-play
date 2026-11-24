@@ -31,7 +31,7 @@ export type LadriMode = "carrera" | "ataque" | "duelo" | "coop";
 
 export const MODES: { id: LadriMode; label: string; sub: string }[] = [
   { id: "carrera", label: "Carrera", sub: "Mismo nivel, gana el más rápido" },
-  { id: "ataque", label: "Ataque", sub: "Mandale ladrillos a los demás" },
+  { id: "ataque", label: "Ataque", sub: "Mándale ladrillos a los demás" },
   { id: "duelo", label: "Duelo", sub: "Cara a cara, en la misma cancha" },
   { id: "coop", label: "En equipo", sub: "Todos juntos contra un nivel" },
 ];

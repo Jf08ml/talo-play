@@ -124,7 +124,7 @@ export default function GolpeClient({ roomId }: { roomId: string }) {
             {meta.mode === "equipos" && <TeamPicker roomId={roomId} state={state} myId={myId} connected={connected} presenceLoaded={presenceLoaded} />}
             <div className="flex gap-2.5 rounded-xl bg-cyan-500/10 p-3 text-sm text-cyan-50 ring-1 ring-cyan-400/20">
               <Gem className="mt-0.5 h-5 w-5 shrink-0" />
-              <p>Cada uno juega desde su teléfono o su compu. Esquivá las luces de los guardias y las cámaras, no toques los láseres y llevá los diamantes a la salida.</p>
+              <p>Cada uno juega desde su teléfono o su computadora. Esquiva las luces de los guardias y las cámaras, no toques los láseres y lleva los diamantes a la salida.</p>
             </div>
           </WaitingRoom>
         </main>
@@ -172,7 +172,7 @@ function TeamPicker({
               </p>
               {list.map((id) => (
                 <p key={id} className="truncate rounded-lg bg-white/5 px-2 py-1.5 text-center text-sm text-white">
-                  {id === myId ? "Vos" : state.players[id]?.name}
+                  {id === myId ? "Tú" : state.players[id]?.name}
                 </p>
               ))}
               {mine !== t.id && (
@@ -200,7 +200,7 @@ function TeamPicker({
       </div>
       <p className="text-center text-xs text-white/50">
         {loose.length
-          ? `Sin equipo: ${loose.map((id) => (id === myId ? "vos" : state.players[id]?.name)).join(", ")}. Al empezar van al equipo más chico, y los bots emparejan.`
+          ? `Sin equipo: ${loose.map((id) => (id === myId ? "tú" : state.players[id]?.name)).join(", ")}. Al empezar van al equipo más chico, y los bots emparejan.`
           : "Al empezar, los bots completan el equipo más chico."}
       </p>
     </div>
@@ -238,7 +238,7 @@ function Results({
         teams
           ? `Rojo ${totals.red} · Azul ${totals.blue} diamantes a salvo`
           : wins > 1
-            ? `Llevás ${wins} golpes ganados`
+            ? `Llevas ${wins} golpes ganados`
             : undefined
       }
       celebrate={teams ? !!win && myTeam === win.id : undefined}

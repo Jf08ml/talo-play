@@ -40,11 +40,11 @@ export default function PlazaCallButton({ game, roomId, count, me }: { game: Gam
   const ask = () => {
     if (!me) return;
     const wait = waitToPost();
-    if (wait > 0) return setError(`Esperá ${Math.ceil(wait / 1000)} s.`);
+    if (wait > 0) return setError(`Espera ${Math.ceil(wait / 1000)} s.`);
     setError(null);
     sendCall(me, game, roomId, count)
       .then(() => trackEvent("plaza_call", { game }))
-      .catch(() => setError("No se pudo publicar. Probá de nuevo en unos segundos."));
+      .catch(() => setError("No se pudo publicar. Prueba de nuevo en unos segundos."));
   };
 
   const minutes = call ? Math.max(0, Math.floor((now - call.at) / 60000)) : 0;
@@ -60,7 +60,7 @@ export default function PlazaCallButton({ game, roomId, count, me }: { game: Gam
             </p>
           ) : (
             <p>
-              <b className="text-white">¿Faltan jugadores?</b> Publicá la sala en{" "}
+              <b className="text-white">¿Faltan jugadores?</b> Publica la sala en{" "}
               <button onClick={() => show("sala")} className="font-semibold text-talo-hero underline underline-offset-4">
                 la Plaza
               </button>{" "}

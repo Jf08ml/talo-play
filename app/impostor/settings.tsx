@@ -40,7 +40,7 @@ export const SETTINGS: GameSettings<Settings> = {
     },
     { kind: "toggle", key: "impostorHint", label: "El impostor sabe la categoría", hint: "Más fácil para él." },
   ],
-  problem: (v) => (v.categories.length === 0 ? "Elegí al menos una categoría." : null),
+  problem: (v) => (v.categories.length === 0 ? "Elige al menos una categoría." : null),
   create: (v, hostId) => createImpostorRoom(v, hostId),
   save: (roomId, v) => saveRoomSettings(roomId, "impostor/state", v),
   fromMeta: (meta) => normalizeMeta(meta),

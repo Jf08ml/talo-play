@@ -314,7 +314,7 @@ function BoardView({ roomId, state, myId }: { roomId: string; state: TriquiState
           : vanish >= 0
             ? `La ${SEAT_STYLE[turn].mark} que titila se borra con la próxima jugada de ${SEAT_STYLE[turn].label.toLowerCase()}.`
             : myTurn
-              ? "Tocá una casilla libre."
+              ? "Toca una casilla libre."
               : ""}
       </p>
     </div>
@@ -330,7 +330,7 @@ function ResignButton({ roomId, myId }: { roomId: string; myId: string }) {
       className="mx-auto flex items-center gap-1.5 rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-400 transition hover:text-slate-200"
     >
       <Flag className="h-4 w-4" />
-      {confirm ? "¿Seguro? Tocá de nuevo" : "Rendirme"}
+      {confirm ? "¿Seguro? Toca de nuevo" : "Rendirme"}
     </button>
   );
 }

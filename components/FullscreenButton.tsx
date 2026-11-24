@@ -58,7 +58,7 @@ function InstallHint({ onClose }: { onClose: () => void }) {
         </button>
         <p className="pr-8 font-display text-[22px] leading-tight">Pantalla completa en iPhone</p>
         <p className="mt-2 text-[15px] text-talo-text-2">
-          El iPhone no deja poner páginas en pantalla completa, pero si agregás Talo a tu inicio se abre como una app, sin las barras de Safari.
+          El iPhone no deja poner páginas en pantalla completa, pero si agregas Talo a tu inicio se abre como una app, sin las barras de Safari.
         </p>
         <ol className="mt-4 flex flex-col gap-3 text-[15px]">
           <li className="flex items-center gap-3">
@@ -66,7 +66,7 @@ function InstallHint({ onClose }: { onClose: () => void }) {
               <Share className="h-5 w-5" />
             </span>
             <span>
-              Tocá <b>Compartir</b> en la barra de Safari.
+              Toca <b>Compartir</b> en la barra de Safari.
             </span>
           </li>
           <li className="flex items-center gap-3">
@@ -74,15 +74,15 @@ function InstallHint({ onClose }: { onClose: () => void }) {
               <SquarePlus className="h-5 w-5" />
             </span>
             <span>
-              Elegí <b>Agregar a inicio</b> y después <b>Agregar</b>.
+              Elige <b>Agregar a inicio</b> y después <b>Agregar</b>.
             </span>
           </li>
           <li className="flex items-center gap-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-talo-hero font-display">t</span>
-            <span>Abrí Talo desde el ícono de tu pantalla de inicio.</span>
+            <span>Abre Talo desde el ícono de tu pantalla de inicio.</span>
           </li>
         </ol>
-        <p className="mt-4 text-xs text-talo-text-3">Girá el teléfono para jugar en horizontal.</p>
+        <p className="mt-4 text-xs text-talo-text-3">Gira el teléfono para jugar en horizontal.</p>
       </div>
     </div>,
     document.body

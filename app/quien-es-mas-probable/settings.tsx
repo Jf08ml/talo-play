@@ -55,7 +55,7 @@ export const SETTINGS: GameSettings<Settings> = {
   ],
   problem: (v) =>
     v.decks.length === 0 && parsePrompts(v.promptsText).length < 3
-      ? "Elegí al menos un grupo de frases o escribí 3 propias."
+      ? "Elige al menos un grupo de frases o escribe 3 propias."
       : null,
   create: (v, hostId) => createProbableRoom(toParams(v), hostId),
   save: (roomId, v) => saveRoomSettings(roomId, "probable/state", toParams(v)),

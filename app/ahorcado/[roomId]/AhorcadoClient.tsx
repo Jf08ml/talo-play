@@ -148,7 +148,7 @@ export default function AhorcadoClient({ roomId }: { roomId: string }) {
 }
 
 function nameOf(state: AhorcadoState, id: string, myId: string): string {
-  return id === myId ? "vos" : (state.players[id]?.name ?? "?");
+  return id === myId ? "tú" : (state.players[id]?.name ?? "?");
 }
 
 function ChoosePanel({
@@ -299,7 +299,7 @@ function GuessPanel({
       <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
         <span>
           Ronda {state.round + 1} de {state.order.length} ·{" "}
-          {state.fromApp ? "palabra de la app" : `palabra de ${nameOf(state, setter, myId)}`}
+          {state.fromApp ? "palabra de la app" : setter === myId ? "tu palabra" : `palabra de ${nameOf(state, setter, myId)}`}
         </span>
         <span className={m >= MAX_MISSES - 1 ? "font-semibold text-rose-300" : ""}>
           Errores: {m} / {MAX_MISSES}
@@ -374,7 +374,7 @@ function GuessPanel({
                 value={wordText}
                 onChange={(e) => setWordText(e.target.value)}
                 maxLength={MAX_WORD}
-                placeholder="¿Ya sabés? Arriesgá la palabra"
+                placeholder="¿Ya sabes? Arriesga la palabra"
                 className={`min-w-0 flex-1 ${TEXT_INPUT}`}
               />
               <button type="submit" disabled={!wordText.trim()} className={`px-4 text-sm ${SECONDARY_BUTTON}`}>
@@ -385,11 +385,11 @@ function GuessPanel({
           <div className="flex flex-col items-center gap-2 text-center text-sm">
             <p className={myTurn ? "font-semibold text-fuchsia-300" : "text-slate-400"}>
               {myTurn ? (
-                "¡Te toca! Elegí una letra."
+                "¡Te toca! Elige una letra."
               ) : (
                 <>
                   Turno de <span style={{ color: state.players[guesser]?.color }}>{nameOf(state, guesser, myId)}</span>
-                  {knowsWord && " · vos elegiste la palabra: mirá cómo sufren"}
+                  {knowsWord && " · tú elegiste la palabra: mira cómo sufren"}
                 </>
               )}
             </p>
@@ -399,7 +399,7 @@ function GuessPanel({
               </button>
             )}
             {!guessersOf(state).includes(myId) && setter !== myId && (
-              <p className="text-xs text-slate-500">Entraste con la partida empezada: mirás hasta la próxima.</p>
+              <p className="text-xs text-slate-500">Entraste con la partida empezada: miras hasta la próxima.</p>
             )}
           </div>
         </>
@@ -469,7 +469,7 @@ function Scoreboard({ state, presence, myId }: { state: AhorcadoState; presence:
         {rows.map((id) => (
           <li key={id} className={`flex items-center gap-2 ${id in presence ? "" : "opacity-40"}`}>
             <span className="flex-1 truncate" style={{ color: state.players[id]?.color }}>
-              {id === myId ? "Vos" : (state.players[id]?.name ?? "?")}
+              {id === myId ? "Tú" : (state.players[id]?.name ?? "?")}
             </span>
             {!state.order.includes(id) && <span className="text-xs text-slate-500">mirando</span>}
             <span className="w-8 text-right font-mono text-slate-200">{state.scores[id] ?? 0}</span>

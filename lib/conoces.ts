@@ -7,7 +7,7 @@ import { transactState } from "./transact";
 import { CONOCES_QUESTIONS, type ConocesQuestion } from "./conocesQuestions";
 
 /**
- * ¿Cuánto me conocés? By turns, one player (the protagonist) gets a question
+ * ¿Cuánto me conoces? By turns, one player (the protagonist) gets a question
  * about themselves and secretly picks their answer while everyone else picks
  * what they think it was. Each right guess is a point for the guesser and
  * one for the protagonist (being predictable pays).

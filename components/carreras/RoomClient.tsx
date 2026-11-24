@@ -197,7 +197,7 @@ function ModeHint({ roomId, meta }: { roomId: string; meta: CarrerasMeta }) {
     <div className="flex gap-2.5 rounded-xl bg-cyan-500/10 p-3 text-sm text-cyan-100 ring-1 ring-cyan-400/20">
       <MonitorPlay className="mt-0.5 h-5 w-5 shrink-0" />
       <p>
-        La carrera se ve en una pantalla grande. Si todavía no está abierta, entrá desde la compu a{" "}
+        La carrera se ve en una pantalla grande. Si todavía no está abierta, entra desde la computadora a{" "}
         <Link href={`${roomPath(meta.game, roomId)}/pantalla`} className="font-semibold underline">
           la pista de esta sala
         </Link>
@@ -283,13 +283,13 @@ function SeatPicker({
       <p className="text-center text-xs text-slate-500">
         {seated < 2
           ? state.botCount > 0
-            ? "Hasta 4 pilotos: mandales el link. Los autos que queden libres los manejan bots."
-            : "Hasta 4 pilotos: mandales el link (o largá solo para practicar contra el reloj)."
+            ? "Hasta 4 pilotos: mándales el link. Los autos que queden libres los manejan bots."
+            : "Hasta 4 pilotos: mándales el link (o suelta solo para practicar contra el reloj)."
           : mySeat
             ? "Cuando larguen, tu teléfono es el volante."
             : seated === SEATS.length
               ? "Los cuatro autos tienen piloto: vas a mirar la carrera."
-              : "Elegí un auto libre para correr."}
+              : "Elige un auto libre para correr."}
       </p>
     </div>
   );
@@ -364,7 +364,7 @@ function Spectator({
     <div className="flex flex-col gap-3">
       <p className="rounded-xl bg-slate-900/70 p-4 text-center text-slate-300 ring-1 ring-slate-700">
         <MonitorPlay className="mx-auto mb-2 h-8 w-8 text-cyan-300" />
-        Mirá la carrera en la pantalla grande. Vas a poder manejar en la próxima.
+        Mira la carrera en la pantalla grande. Vas a poder manejar en la próxima.
       </p>
       {SEATS.map((seat) => {
         const id = state.seats[seat];

@@ -397,14 +397,14 @@ function StartScreen({ record, onPlay, onFriends }: { record: number; onPlay: ()
         <div className="flex flex-col items-center gap-3 landscape:gap-2">
           <p className="font-display text-4xl font-black text-pink-500 drop-shadow-sm landscape:text-3xl">Pastelería</p>
           <p className="text-sm text-slate-600 landscape:text-xs">
-            Los clientes te piden tortas: armalas igual a su pedido eligiendo forma, bizcocho, pisos, relleno, cobertura y
-            decoración, y entregalas antes de que se acabe el tiempo.
+            Los clientes te piden tortas: ármalas igual a su pedido eligiendo forma, bizcocho, pisos, relleno, cobertura y
+            decoración, y entrégalas antes de que se acabe el tiempo.
           </p>
           <ul className="w-full space-y-1 rounded-2xl bg-pink-50 p-3 text-left text-xs text-slate-600 landscape:p-2 landscape:text-[11px]">
             <li>⏱️ {LEVELS.length} niveles con reloj: {LEVELS.map((l) => l.name).join(", ")}.</li>
-            <li>🧠 En los últimos, el pedido viene sin dibujo… y en Chef estrella se esconde: ¡memorizalo!</li>
-            <li>⭐ Acertar de una suma más; si le errás, a veces podés arreglarla una vez.</li>
-            <li>👆 Arrastrá la torta para girarla. En la compu: números para elegir, flechas para cambiar de paso, Enter para entregar.</li>
+            <li>🧠 En los últimos, el pedido viene sin dibujo… y en Chef estrella se esconde: ¡memorízalo!</li>
+            <li>⭐ Acertar de una suma más; si le fallas, a veces puedes arreglarla una vez.</li>
+            <li>👆 Arrastra la torta para girarla. En la computadora: números para elegir, flechas para cambiar de paso, Enter para entregar.</li>
           </ul>
         </div>
         <div className="flex w-full flex-col items-center gap-3 landscape:gap-2">
@@ -572,7 +572,7 @@ function FinalCard({ game, record, onAgain }: { game: ReturnType<typeof initialG
   const stars = game.history.reduce((n, h) => n + h.stars, 0);
   return (
     <div className={CARD}>
-      <p className="font-display text-3xl font-black text-pink-500">¡Sos Chef estrella! 👩‍🍳</p>
+      <p className="font-display text-3xl font-black text-pink-500">¡Eres Chef estrella! 👩‍🍳</p>
       <p className="text-4xl font-black text-violet-600">{game.score} pts</p>
       {game.score >= record && game.score > 0 && <p className="text-sm font-bold text-amber-600">¡Nuevo récord!</p>}
       <div className="grid w-full grid-cols-3 gap-2 text-sm">

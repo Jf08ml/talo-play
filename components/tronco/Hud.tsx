@@ -68,7 +68,7 @@ export function paintMeter(
     log.style.opacity = cue.ttc > SPAN ? "0.35" : "1";
   }
   const label = el.querySelector("[data-label]");
-  const text = busy ? "" : cue.kick ? "¡Ahora!" : cue.jump ? "¡Saltá!" : cue.ttc < SPAN ? (fromName ? `Viene de ${fromName}` : side < 0 ? "← Viene" : "Viene →") : "";
+  const text = busy ? "" : cue.kick ? "¡Ahora!" : cue.jump ? "¡Salta!" : cue.ttc < SPAN ? (fromName ? `Viene de ${fromName}` : side < 0 ? "← Viene" : "Viene →") : "";
   if (label && label.textContent !== text) label.textContent = text;
 }
 

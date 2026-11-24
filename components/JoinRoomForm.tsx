@@ -25,7 +25,7 @@ export default function JoinRoomForm({ id = "join-code" }: { id?: string }) {
   return (
     <form onSubmit={submit} className="flex flex-col gap-2.5 sm:gap-3">
       <label htmlFor={id} className="text-[15px] font-bold text-talo-ink">
-        ¿Te invitaron? Escribí el código
+        ¿Te invitaron? Escribe el código
       </label>
       <div className="flex items-center gap-2 sm:gap-3">
         {/* Boxes 39.6/44 px wide with 6/8 px gaps; JetBrains Mono advances 0.6em. */}

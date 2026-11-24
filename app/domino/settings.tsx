@@ -14,7 +14,7 @@ export const SETTINGS: GameSettings<Settings> = {
     {
       kind: "note",
       only: "create",
-      text: "Dominó doble seis. De a cuatro se juega en parejas (los de enfrente son compañeros); de a dos o tres, se roba del pozo cuando no tenés ficha. La app cuenta los puntos y detecta el tranque.",
+      text: "Dominó doble seis. De a cuatro se juega en parejas (los de enfrente son compañeros); de a dos o tres, se roba del pozo cuando no tienes ficha. La app cuenta los puntos y detecta el tranque.",
     },
   ],
   create: (v, hostId) => createDominoRoom(v.target, hostId),

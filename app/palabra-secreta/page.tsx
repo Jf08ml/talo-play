@@ -25,7 +25,7 @@ export default function PalabraHome() {
       router.push(roomPath("palabra", roomId));
     } catch (err) {
       console.error(err);
-      setCreateError("No se pudo crear la sala. Probá de nuevo.");
+      setCreateError("No se pudo crear la sala. Prueba de nuevo.");
       setCreating(false);
     }
   };
@@ -35,7 +35,7 @@ export default function PalabraHome() {
       <form onSubmit={handleCreate} className={`${CARD} flex flex-col gap-4`}>
         <h2 className="font-display text-lg font-semibold text-slate-100">Crear una sala nueva</h2>
         <p className="text-sm text-slate-400">
-          No hay nada que configurar: creá la sala y mandá el link. Podés jugar solo o con quien quieras; cada
+          No hay nada que configurar: crea la sala y manda el link. Puedes jugar solo o con quien quieras; cada
           carrera es una palabra nueva.
         </p>
         {createError && <p className="text-sm text-red-400">{createError}</p>}

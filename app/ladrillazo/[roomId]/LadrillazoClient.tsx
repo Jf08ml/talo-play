@@ -143,7 +143,7 @@ export default function LadrillazoClient({ roomId }: { roomId: string }) {
           >
             <div className="flex gap-2.5 rounded-xl bg-white/[0.06] p-3 text-sm text-white/80 ring-1 ring-white/10">
               <Smartphone className="mt-0.5 h-5 w-5 shrink-0" />
-              <p>Cada uno juega desde su teléfono o su compu: mové la paleta con el dedo o el mouse y rompé ladrillos.</p>
+              <p>Cada uno juega desde su teléfono o su computadora: mueve la paleta con el dedo o el mouse y rompe ladrillos.</p>
             </div>
           </WaitingRoom>
         </main>
@@ -255,16 +255,16 @@ function Results({ state, myId }: { state: LadriState; myId: string }) {
         <p className="font-display text-3xl text-white">{title}</p>
         {state.mode === "duelo" && (
           <p className="mt-1 text-sm text-white/60">
-            {state.roster.map((id) => `${id === myId ? "Vos" : playerInfo(state, id).name} ${state.goals[id] ?? 0}`).join(" · ")}
+            {state.roster.map((id) => `${id === myId ? "Tú" : playerInfo(state, id).name} ${state.goals[id] ?? 0}`).join(" · ")}
           </p>
         )}
-        {wins > 1 && <p className="mt-1 text-xs text-white/50">Llevás {wins} ganadas</p>}
+        {wins > 1 && <p className="mt-1 text-xs text-white/50">Llevas {wins} ganadas</p>}
       </div>
       {coop ? (
         <ul className="flex flex-wrap justify-center gap-2">
           {state.roster.map((id) => (
             <li key={id} className="rounded-full bg-white/[0.06] px-3 py-1 text-sm font-bold" style={{ color: playerInfo(state, id).color }}>
-              {id === myId ? "Vos" : playerInfo(state, id).name}
+              {id === myId ? "Tú" : playerInfo(state, id).name}
             </li>
           ))}
         </ul>
@@ -277,7 +277,7 @@ function Results({ state, myId }: { state: LadriState; myId: string }) {
                 <span className="w-6 font-display text-lg text-white/70">{i + 1}</span>
                 <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: info.color }} />
                 <span className="min-w-0 flex-1 truncate text-sm font-bold text-white">
-                  {id === myId ? "Vos" : info.name}
+                  {id === myId ? "Tú" : info.name}
                 </span>
                 {state.mode === "carrera" && state.results[id] !== undefined && <Flag className="h-3.5 w-3.5 text-talo-hero" />}
                 {state.mode === "ataque" && state.out[id] && <Skull className="h-3.5 w-3.5 text-white/40" />}

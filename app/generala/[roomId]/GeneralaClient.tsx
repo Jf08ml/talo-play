@@ -144,7 +144,7 @@ export default function GeneralaClient({ roomId }: { roomId: string }) {
 }
 
 function nameOf(state: GeneralaState, id: string, myId: string): string {
-  return id === myId ? "Vos" : (state.players[id]?.name ?? "?");
+  return id === myId ? "Tú" : (state.players[id]?.name ?? "?");
 }
 
 const PIPS: Record<number, number[]> = {
@@ -244,10 +244,10 @@ function DiceTray({
           </button>
           <p className="text-center text-xs text-slate-500">
             {state.rolls === 0
-              ? "Tirá para empezar tu turno."
+              ? "Tira para empezar tu turno."
               : canHold
-                ? "Tocá los dados que quieras guardar. Cuando quieras, anotá en tu planilla."
-                : "Elegí un casillero de tu planilla para anotar."}
+                ? "Toca los dados que quieras guardar. Cuando quieras, anota en tu planilla."
+                : "Elige un casillero de tu planilla para anotar."}
           </p>
         </>
       ) : (
@@ -408,7 +408,7 @@ function ScoreSheet({
       )}
       {canScore && !selected && (
         <p className="text-center text-xs text-slate-500">
-          Tocá un casillero libre de tu columna: en verde lo que sumarías, «—» lo tacha.
+          Toca un casillero libre de tu columna: en verde lo que sumarías, «—» lo tacha.
         </p>
       )}
     </div>
@@ -465,8 +465,8 @@ function Watching({ state, presence, myId }: { state: GeneralaState; presence: P
   if (watching.length === 0) return null;
   return (
     <p className="text-center text-xs text-slate-500">
-      Mirando: {watching.map((id) => (id === myId ? "vos" : (presence[id]?.name ?? "?"))).join(", ")}
-      {watching.includes(myId) && " · entrás en la próxima partida"}
+      Mirando: {watching.map((id) => (id === myId ? "tú" : (presence[id]?.name ?? "?"))).join(", ")}
+      {watching.includes(myId) && " · entras en la próxima partida"}
     </p>
   );
 }

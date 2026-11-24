@@ -21,7 +21,7 @@ export const SETTINGS: GameSettings<Settings> = {
       ],
       hint: (v) =>
         v.dice === 2
-          ? "Como el original: más rápido, y si en la primera tirada sacás 6 y 3 o 4 y 5, saltás a los dados."
+          ? "Como el original: más rápido, y si en la primera tirada sacas 6 y 3 o 4 y 5, saltas a los dados."
           : "Partidas más largas y tranquilas, ideal con chicos.",
     },
     {

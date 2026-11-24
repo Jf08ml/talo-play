@@ -156,7 +156,7 @@ export default function DominoClient({ roomId }: { roomId: string }) {
 
 function nameOf(state: DominoState, seat: Seat, myId: string): string {
   const id = state.seats[seat];
-  if (id === myId) return "Vos";
+  if (id === myId) return "Tú";
   return state.players[id]?.name ?? "?";
 }
 
@@ -212,7 +212,7 @@ function SeatPicker({
       </div>
       <p className="text-center text-xs text-slate-500">
         {seated < 2
-          ? "Hacen falta al menos 2 jugadores: mandá el link."
+          ? "Hacen falta al menos 2 jugadores: manda el link."
           : seated === 4
             ? "Cuatro jugadores: juegan en parejas (pareja 1 contra pareja 2), sin pozo."
             : `${seated} jugadores, cada uno por su cuenta y con pozo para robar.`}
@@ -382,18 +382,18 @@ function Game({
       <div className="relative flex min-h-48 flex-1 flex-col items-center justify-center gap-3 rounded-2xl border-4 border-emerald-950 bg-[radial-gradient(circle_at_50%_40%,#166534,#052e16)] p-3 shadow-[inset_0_0_40px_rgba(0,0,0,0.5)]">
         {state.line ? (
           <div className="flex flex-wrap items-center justify-center gap-1">
-            {chosen && fits(state.line, chosen).includes("l") && <EndButton onClick={() => playOn("l")} label="Acá" />}
+            {chosen && fits(state.line, chosen).includes("l") && <EndButton onClick={() => playOn("l")} label="Aquí" />}
             {splitTiles(state.line).map((t, i, all) => {
               const isNew =
                 state.last.action === "play" && ((state.last.side === "l" && i === 0) || (state.last.side === "r" && i === all.length - 1) || all.length === 1);
               return <Tile key={`${i}-${t}`} tile={t} vertical={isDouble(t)} size={20} className={isNew ? "animate-pop-in ring-2 ring-amber-300" : ""} />;
             })}
-            {chosen && fits(state.line, chosen).includes("r") && <EndButton onClick={() => playOn("r")} label="Acá" />}
+            {chosen && fits(state.line, chosen).includes("r") && <EndButton onClick={() => playOn("r")} label="Aquí" />}
           </div>
         ) : (
           <p className="text-sm text-emerald-100/70">
             {state.phase === "play" &&
-              `${state.seats[state.opener] === myId ? "Salís vos" : `Sale ${nameOf(state, state.opener, myId)}`}${
+              `${state.seats[state.opener] === myId ? "Sales tú" : `Sale ${nameOf(state, state.opener, myId)}`}${
                 state.mustOpen ? ` con el ${state.mustOpen[0]}-${state.mustOpen[1]}` : ""
               }.`}
           </p>
@@ -413,12 +413,12 @@ function Game({
               ? "Tus fichas"
               : myTurn
                 ? mustPass
-                  ? "No tenés ficha para jugar: pasás."
+                  ? "No tienes ficha para jugar: pasas."
                   : canPlay.length === 0
-                    ? "No tenés ficha que entre: robá del pozo."
+                    ? "No tienes ficha que entre: roba del pozo."
                     : chosen
-                      ? "¿De qué lado? Tocá «Acá» en una punta."
-                      : "¡Te toca! Tocá una ficha que entre."
+                      ? "¿De qué lado? Toca «Aquí» en una punta."
+                      : "¡Te toca! Toca una ficha que entre."
                 : `Juega ${nameOf(state, state.turn, myId)}…`}
           </p>
           <div className="flex flex-wrap justify-center gap-1.5">
@@ -456,7 +456,7 @@ function Game({
           Mirando:{" "}
           {Object.keys(presence)
             .filter((id) => !seatOf(state, id))
-            .map((id) => (id === myId ? "vos" : presence[id]?.name))
+            .map((id) => (id === myId ? "tú" : presence[id]?.name))
             .join(", ")}
         </p>
       )}
@@ -495,7 +495,7 @@ function HandOver({ roomId, state, myId }: { roomId: string; state: DominoState;
     ? "Tranque empatado: nadie suma."
     : state.result.blocked
       ? `¡Tranque! ${iWon ? "Ganaron ustedes" : `Gana${pairs ? "n" : ""} ${who}`} con menos puntos`
-      : `${iWon ? "🎉 " : ""}¡${who === "Vos" ? "Dominaste" : `Dominó ${who}`}!`;
+      : `${iWon ? "🎉 " : ""}¡${who === "Tú" ? "Dominaste" : `Dominó ${who}`}!`;
 
   return (
     <div className="animate-celebration-in flex w-full max-w-lg flex-col items-center gap-2 rounded-2xl bg-slate-950/80 p-4 text-center">

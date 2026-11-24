@@ -12,7 +12,7 @@ export default function Reveal({ pz }: { pz: Puzzle }) {
       <p className="text-center text-xs leading-snug text-white/70">
         {pz.impossible
           ? `No tenía solución: ${odd} islas tienen una cantidad impar de puentes (en rojo). Un recorrido así solo existe si hay 0 o 2.`
-          : "Una forma de hacerlo: seguí los números en orden."}
+          : "Una forma de hacerlo: sigue los números en orden."}
       </p>
     </div>
   );

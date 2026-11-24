@@ -21,7 +21,7 @@ export default function PlayerBadges({
       {shown.map(([id, info]) => (
         <div
           key={id}
-          title={id === myClientId ? `${info.name} (vos)` : info.name}
+          title={id === myClientId ? `${info.name} (tú)` : info.name}
           className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-slate-900 text-xs font-semibold text-white shadow sm:h-8 sm:w-8"
           style={{ backgroundColor: info.color, boxShadow: `0 0 10px 0 ${info.color}88` }}
         >

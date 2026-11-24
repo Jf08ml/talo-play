@@ -122,7 +122,7 @@ export default function SoloGame({ start, onExit }: { start: SoloStart; onExit: 
           <p className="text-xs text-white/60">
             {!finished && `Par ${hole.par} · `}
             {label}
-            {card.length && !finished ? ` · llevás ${total} (${toPar(total, parSoFar)})` : ""}
+            {card.length && !finished ? ` · llevas ${total} (${toPar(total, parSoFar)})` : ""}
           </p>
         </div>
         {!finished && (
@@ -144,7 +144,7 @@ export default function SoloGame({ start, onExit }: { start: SoloStart; onExit: 
             </p>
             {record && <p className="mt-1 text-sm font-bold text-[#5fe0a0]">¡Tu mejor recorrido en {label?.toLowerCase()}!</p>}
           </div>
-          <Scorecard pars={pars} rows={[{ id: "me", name: identity.name ?? "Vos", color: identity.color, card }]} myId="me" />
+          <Scorecard pars={pars} rows={[{ id: "me", name: identity.name ?? "Tú", color: identity.color, card }]} myId="me" />
           {daily && top && (
             <div className="rounded-xl bg-white/[0.05] p-3 ring-1 ring-white/10">
               <p className="mb-1.5 text-xs font-bold uppercase tracking-wide text-white/60">Los mejores de hoy</p>
@@ -209,7 +209,7 @@ export default function SoloGame({ start, onExit }: { start: SoloStart; onExit: 
             )}
           </GolfField>
           {idx === 0 && strokes === 0 && (
-            <p className="text-center text-xs text-white/60">Arrastrá hacia atrás para apuntar (como una gomera) y soltá para tirar.</p>
+            <p className="text-center text-xs text-white/60">Arrastra hacia atrás para apuntar (como una gomera) y suelta para tirar.</p>
           )}
           {!daily && (
             <button onClick={again} className={`self-center text-xs ${SECONDARY_BUTTON} !min-h-0 !py-1.5`}>

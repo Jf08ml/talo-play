@@ -73,15 +73,15 @@ export default function ImageDropzone({
           <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/30">
             <ImagePlus className="h-6 w-6" />
           </span>
-          <p className="text-sm font-semibold text-slate-200">Elegí una foto</p>
+          <p className="text-sm font-semibold text-slate-200">Elige una foto</p>
           <p className="text-xs text-slate-500">
-            Tocá para buscarla en la galería<span className="hidden sm:inline"> o arrastrala acá</span>
+            Toca para buscarla en la galería<span className="hidden sm:inline"> o arrástrala aquí</span>
           </p>
         </div>
       )}
       {file && (
         <p className="mt-2 flex max-w-full items-center gap-1.5 truncate text-xs text-slate-500">
-          <RefreshCw className="h-3 w-3 shrink-0" /> Tocá para cambiarla
+          <RefreshCw className="h-3 w-3 shrink-0" /> Toca para cambiarla
         </p>
       )}
     </div>

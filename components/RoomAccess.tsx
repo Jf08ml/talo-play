@@ -104,7 +104,7 @@ const OPTIONS: { id: RoomAccess; title: string; text: string; Icon: typeof Lock 
   {
     id: "privada",
     title: "Privada",
-    text: "Entran con el link o el código. Si faltan jugadores, la podés publicar un rato en la Plaza.",
+    text: "Entran con el link o el código. Si faltan jugadores, la puedes publicar un rato en la Plaza.",
     Icon: Lock,
   },
   {

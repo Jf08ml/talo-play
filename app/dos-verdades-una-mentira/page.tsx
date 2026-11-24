@@ -25,7 +25,7 @@ export default function VerdadesHome() {
       router.push(roomPath("verdades", roomId));
     } catch (err) {
       console.error(err);
-      setCreateError("No se pudo crear la sala. Probá de nuevo.");
+      setCreateError("No se pudo crear la sala. Prueba de nuevo.");
       setCreating(false);
     }
   };
@@ -35,7 +35,7 @@ export default function VerdadesHome() {
       <form onSubmit={handleCreate} className={`${CARD} flex flex-col gap-4`}>
         <h2 className="font-display text-lg font-semibold text-slate-100">Crear una sala nueva</h2>
         <p className="text-sm text-slate-400">
-          No hay nada que configurar: creá la sala y mandá el link. Al empezar, cada uno escribe sus tres frases en
+          No hay nada que configurar: crea la sala y manda el link. Al empezar, cada uno escribe sus tres frases en
           su celular. Cuanto más creíble la mentira (y más increíbles las verdades), mejor.
         </p>
         {createError && <p className="text-sm text-red-400">{createError}</p>}

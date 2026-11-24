@@ -150,7 +150,7 @@ export default function LudoClient({ roomId }: { roomId: string }) {
 }
 
 function playerName(state: LudoState, id: string, myId: string): string {
-  if (id === myId) return "Vos";
+  if (id === myId) return "Tú";
   return state.players[id]?.name ?? "?";
 }
 
@@ -205,7 +205,7 @@ function SeatPicker({
         })}
       </div>
       <p className="text-center text-xs text-slate-500">
-        {seated < 2 ? "Hacen falta al menos 2 jugadores: mandá el link." : `${seated} jugadores listos.`}
+        {seated < 2 ? "Hacen falta al menos 2 jugadores: manda el link." : `${seated} jugadores listos.`}
       </p>
     </div>
   );
@@ -215,16 +215,16 @@ function SeatPicker({
 function moveHint(state: LudoState, moves: LudoMove[]): string {
   if (isBonus(state)) {
     return state.last.captured
-      ? `¡Comiste! Contá ${state.steps} con la ficha que quieras.`
-      : `¡Llegaste! Contá ${state.steps} con otra ficha.`;
+      ? `¡Comiste! Cuenta ${state.steps} con la ficha que quieras.`
+      : `¡Llegaste! Cuenta ${state.steps} con otra ficha.`;
   }
   if (state.rules === "parchis") {
-    if (state.steps === RULES.parchis.exitRoll && moves.every((m) => m.from < 0)) return "Con un 5 sacás una ficha: es obligatorio.";
+    if (state.steps === RULES.parchis.exitRoll && moves.every((m) => m.from < 0)) return "Con un 5 sacas una ficha: es obligatorio.";
     const mine = parseTokens(state.tokens[state.turn]);
     const opening = moves.every((m) => mine.some((p, j) => j !== m.token && p === m.from && p >= 0));
-    if ((state.steps === 6 || state.steps === 7) && opening) return "Con un 6 tenés que abrir tu barrera.";
+    if ((state.steps === 6 || state.steps === 7) && opening) return "Con un 6 tienes que abrir tu barrera.";
   }
-  return "Tocá una ficha que titila.";
+  return "Toca una ficha que titila.";
 }
 
 function Game({
@@ -285,7 +285,7 @@ function Game({
             </div>
             {myTurn && state.phase === "roll" && (
               <>
-                {state.sixes > 0 && <p className="text-sm text-amber-200">Sacaste 6: ¡tirá de nuevo!</p>}
+                {state.sixes > 0 && <p className="text-sm text-amber-200">Sacaste 6: ¡tira de nuevo!</p>}
                 <button onClick={() => rollDie(roomId, myId, state.moveNo)} className={`w-full ${PRIMARY_BUTTON}`}>
                   Tirar el dado
                 </button>
@@ -327,7 +327,7 @@ function Game({
               Mirando:{" "}
               {Object.keys(presence)
                 .filter((id) => !seatOf(state, id))
-                .map((id) => (id === myId ? "vos" : presence[id]?.name))
+                .map((id) => (id === myId ? "tú" : presence[id]?.name))
                 .join(", ")}
             </p>
           )}
@@ -337,10 +337,10 @@ function Game({
           <details className="rounded-2xl border border-slate-800 bg-slate-900/60 p-3 text-xs text-slate-400">
             <summary className="cursor-pointer text-sm font-medium text-slate-300">Reglas del parchís</summary>
             <ul className="mt-2 list-disc space-y-1 pl-4">
-              <li>Con un 5 sacás una ficha (si podés, es obligatorio).</li>
-              <li>Con un 6 volvés a tirar; si no te quedan fichas en casa, cuenta 7. Tres 6 seguidos: la última ficha que moviste vuelve a casa.</li>
-              <li>Dos fichas del mismo color forman una barrera: nadie puede pasar. Con un 6 tenés que abrirla.</li>
-              <li>En las casillas con círculo (seguros y salidas) no se come. Si comés, contás 20; si llegás a la meta, contás 10.</li>
+              <li>Con un 5 sacas una ficha (si puedes, es obligatorio).</li>
+              <li>Con un 6 vuelves a tirar; si no te quedan fichas en casa, cuenta 7. Tres 6 seguidos: la última ficha que moviste vuelve a casa.</li>
+              <li>Dos fichas del mismo color forman una barrera: nadie puede pasar. Con un 6 tienes que abrirla.</li>
+              <li>En las casillas con círculo (seguros y salidas) no se come. Si comes, cuentas 20; si llegas a la meta, cuentas 10.</li>
               <li>Para entrar a la meta hace falta el número justo.</li>
             </ul>
           </details>

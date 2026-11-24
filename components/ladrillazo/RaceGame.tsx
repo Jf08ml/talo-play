@@ -442,13 +442,13 @@ export default function RaceGame({
               <Overlay>
                 <p className="font-display text-3xl text-white">¡Quedaste afuera!</p>
                 <p className="text-sm text-white/70">Quedaste {outPlace}º · {hud.score} puntos</p>
-                <p className="text-xs text-white/50">Mirá cómo sigue arriba.</p>
+                <p className="text-xs text-white/50">Mira cómo sigue arriba.</p>
               </Overlay>
             )}
           </Field>
         </div>
       ) : (
-        <p className="px-4 pb-4 text-center text-sm text-white/60">Estás mirando: en la próxima partida jugás vos también.</p>
+        <p className="px-4 pb-4 text-center text-sm text-white/60">Estás mirando: en la próxima partida juegas tú también.</p>
       )}
     </div>
   );

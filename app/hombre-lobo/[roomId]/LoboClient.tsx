@@ -136,7 +136,7 @@ export default function LoboClient({ roomId }: { roomId: string }) {
           phase === "night"
             ? "De noche el pueblo duerme: el chat vuelve al amanecer."
             : omniscient && state?.status !== "waiting" && state?.status !== "finished"
-              ? "Ves todos los roles, así que no podés escribir hasta que termine la partida."
+              ? "Ves todos los roles, así que no puedes escribir hasta que termine la partida."
               : false
         }
         right={status === "ready" && <PlayerBadges presence={presence} myClientId={myId} />}
@@ -178,7 +178,7 @@ export default function LoboClient({ roomId }: { roomId: string }) {
               )}
               {!inGame && state.status !== "finished" && (
                 <p className={`${CARD} !p-3 text-center text-sm text-slate-400`}>
-                  La partida ya empezó: mirás en silencio y jugás la próxima. 🤫
+                  La partida ya empezó: miras en silencio y juegas la próxima. 🤫
                 </p>
               )}
               {timed && <TimeBar left={Math.max(0, deadline - now)} total={seconds} night={state.status === "night"} />}
@@ -200,7 +200,7 @@ export default function LoboClient({ roomId }: { roomId: string }) {
 }
 
 function nameOf(state: LoboState, id: string, myId: string): string {
-  return id === myId ? "Vos" : (state.players[id]?.name ?? "?");
+  return id === myId ? "Tú" : (state.players[id]?.name ?? "?");
 }
 
 function RoleCard({ role, dead, shown, onToggle }: { role: Role; dead: boolean; shown: boolean; onToggle: () => void }) {
@@ -217,7 +217,7 @@ function RoleCard({ role, dead, shown, onToggle }: { role: Role; dead: boolean; 
         <span className="block text-xs uppercase tracking-wide text-slate-500">
           Tu rol {dead && "· estás eliminado/a"}
         </span>
-        <span className="block font-display text-lg font-semibold text-slate-100">{shown ? info.label : "Tocá para verlo (que nadie mire)"}</span>
+        <span className="block font-display text-lg font-semibold text-slate-100">{shown ? info.label : "Toca para verlo (que nadie mire)"}</span>
         {shown && <span className="block text-sm text-slate-400">{info.goal}</span>}
       </span>
       {shown ? <EyeOff className="h-5 w-5 text-slate-500" /> : <Eye className="h-5 w-5 text-slate-500" />}
@@ -378,7 +378,9 @@ function DayPanel({ roomId, state, myId, livingHere }: { roomId: string; state: 
         <p className="font-display text-2xl font-semibold text-amber-100">☀️ Amanece en el pueblo</p>
         <p className="mt-2 text-lg text-slate-200">
           {state.dawn.killed
-            ? `Los lobos atacaron a ${nameOf(state, state.dawn.killed, myId)}. ${state.dawn.killed === myId ? "Quedaste fuera 💀" : "💀"}`
+            ? state.dawn.killed === myId
+              ? "Los lobos te atacaron. Quedaste fuera 💀"
+              : `Los lobos atacaron a ${nameOf(state, state.dawn.killed, myId)}. 💀`
             : state.dawn.saved
               ? "Los lobos atacaron… ¡pero el médico llegó a tiempo! Nadie murió. 🩺"
               : "Nadie murió esta noche."}
@@ -387,7 +389,7 @@ function DayPanel({ roomId, state, myId, livingHere }: { roomId: string; state: 
 
       <div className={`${CARD} flex flex-col gap-3`}>
         <p className="text-center text-sm text-slate-300">
-          {alive ? "Discutan y voten a quién eliminar. Podés cambiar el voto hasta que voten todos." : "Los vivos están votando…"}
+          {alive ? "Discutan y voten a quién eliminar. Puedes cambiar el voto hasta que voten todos." : "Los vivos están votando…"}
         </p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {living(state).map((id) => (
@@ -426,7 +428,7 @@ function DuskPanel({ roomId, state, myId }: { roomId: string; state: LoboState; 
       <p className="font-display text-2xl font-semibold text-slate-100">🌇 El pueblo decidió</p>
       {id && role ? (
         <p className="text-lg text-slate-200">
-          Eliminaron a {nameOf(state, id, myId)}, que era… <strong>{ROLES[role].emoji} {ROLES[role].label}</strong>
+          {id === myId ? "Te eliminaron. Eras…" : `Eliminaron a ${nameOf(state, id, myId)}, que era…`} <strong>{ROLES[role].emoji} {ROLES[role].label}</strong>
         </p>
       ) : (
         <p className="text-lg text-slate-300">{state.lynch.tie ? "Hubo empate: nadie fue eliminado." : "Decidieron no eliminar a nadie."}</p>

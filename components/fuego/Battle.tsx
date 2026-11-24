@@ -960,7 +960,7 @@ export default function Battle({
           grenades: arms.grenades,
           alive: !!me && !myDead,
           respawnIn: myDead && s.deadAt[myId] ? Math.max(0, Math.ceil((s.deadAt[myId] + RESPAWN_MS - now) / 1000)) : 0,
-          killer: killerId && killerId !== myId ? fighterName(s, killerId) : killerId === myId ? "vos mismo" : "",
+          killer: killerId && killerId !== myId ? fighterName(s, killerId) : killerId === myId ? "tú mismo" : "",
           near,
           zoomed,
           reloading: arms.reloading > 0,
@@ -1159,9 +1159,9 @@ export default function Battle({
               {WEAPONS[hud.weapon].label}
               {hud.reloading && <span className="ml-1 text-amber-300">recargando…</span>}
             </p>
-            {!hud.reloading && hud.mag === 0 && hud.reserve === 0 && <p className="text-xs font-bold text-red-400">Sin munición: cambiá de arma</p>}
+            {!hud.reloading && hud.mag === 0 && hud.reserve === 0 && <p className="text-xs font-bold text-red-400">Sin munición: cambia de arma</p>}
             {!hud.reloading && hud.reserve > 0 && hud.mag <= Math.max(1, Math.floor(WEAPONS[hud.weapon].mag / 4)) && (
-              <p className="animate-pulse text-xs font-bold text-amber-300">{fine ? "R: recargá" : "Recargá"}</p>
+              <p className="animate-pulse text-xs font-bold text-amber-300">{fine ? "R: recarga" : "Recarga"}</p>
             )}
             <p className="text-[11px] text-slate-400">
               {hud.other ? `${WEAPONS[hud.other].label} · ` : ""}💣 {hud.grenades}
@@ -1175,14 +1175,14 @@ export default function Battle({
         <div className="pointer-events-none absolute inset-x-0 bottom-24 z-20 flex justify-center">
           <p className="flex max-w-xl items-center gap-2 rounded-xl bg-slate-950/75 px-4 py-2 text-sm text-white backdrop-blur">
             <MousePointerClick className="h-4 w-4 shrink-0" />
-            Hacé clic para jugar · WASD moverte · clic disparar · clic derecho apuntar · R recargar · Q cambiar arma · G granada · F golpe · E agarrar · espacio saltar · Esc soltar el mouse
+            Haz clic para jugar · WASD moverte · clic disparar · clic derecho apuntar · R recargar · Q cambiar arma · G granada · F golpe · E agarrar · espacio saltar · Esc soltar el mouse
           </p>
         </div>
       )}
 
       {!fine && (
         <p className="pointer-events-none absolute inset-x-0 top-28 z-20 hidden items-center justify-center gap-1.5 text-xs text-white drop-shadow portrait:flex">
-          <RotateCw className="h-3.5 w-3.5" /> Girá el teléfono para jugar mejor
+          <RotateCw className="h-3.5 w-3.5" /> Gira el teléfono para jugar mejor
         </p>
       )}
 
@@ -1204,14 +1204,14 @@ export default function Battle({
       {inRoster && hud && !hud.alive && state.status === "playing" && !counting && (
         <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-red-950/20">
           <p className="font-display text-3xl font-bold text-white drop-shadow">{hud.killer ? `Te eliminó ${hud.killer}` : "Te eliminaron"}</p>
-          <p className="rounded-xl bg-slate-950/60 px-4 py-1.5 text-white backdrop-blur">Reaparecés en {hud.respawnIn}…</p>
+          <p className="rounded-xl bg-slate-950/60 px-4 py-1.5 text-white backdrop-blur">Reapareces en {hud.respawnIn}…</p>
         </div>
       )}
 
       {!inRoster && hud?.watching && state.status === "playing" && (
         <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center">
           <p className="rounded-xl bg-slate-950/75 px-4 py-2 text-sm text-white backdrop-blur">
-            Mirando a <b>{hud.watching}</b> · jugás la próxima partida
+            Mirando a <b>{hud.watching}</b> · juegas la próxima partida
           </p>
         </div>
       )}

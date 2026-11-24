@@ -7,7 +7,7 @@ import { CARD } from "@/components/ui";
 
 /**
  * The end of a match: who lasted longest first (the winner, then by when each
- * one fell). `big` is the TV version (bigger type, no "Vos").
+ * one fell). `big` is the TV version (bigger type, no "Tú").
  */
 export default function TroncoResults({ state, myId, big = false }: { state: TroncoState; myId: string; big?: boolean }) {
   const order = [...state.roster].sort((a, b) => {
@@ -26,7 +26,7 @@ export default function TroncoResults({ state, myId, big = false }: { state: Tro
         <p className={`font-display text-white ${big ? "text-6xl" : "text-3xl"}`}>
           {iWon ? "¡Quedaste en pie!" : state.winner ? `¡Ganó ${winner.name}!` : "¡Terminó!"}
         </p>
-        {wins > 1 && <p className="mt-1 text-xs text-white/50">Llevás {wins} ganadas</p>}
+        {wins > 1 && <p className="mt-1 text-xs text-white/50">Llevas {wins} ganadas</p>}
       </div>
       <ol className={`flex flex-col ${big ? "gap-2" : "gap-1.5"}`}>
         {order.map((id, i) => {
@@ -37,7 +37,7 @@ export default function TroncoResults({ state, myId, big = false }: { state: Tro
               <span className={`w-8 font-display text-white/70 ${big ? "text-3xl" : "text-lg"}`}>{i + 1}</span>
               <span className={`shrink-0 rounded-full ${big ? "h-5 w-5" : "h-3 w-3"}`} style={{ background: info.color }} />
               <span className={`min-w-0 flex-1 truncate font-bold text-white ${big ? "text-2xl" : "text-sm"}`}>
-                {id === myId ? "Vos" : info.name}
+                {id === myId ? "Tú" : info.name}
                 {big && w > 0 && <span className="ml-2 text-base font-normal text-white/50">{w === 1 ? "1 ganada" : `${w} ganadas`}</span>}
               </span>
               {id === state.winner ? (

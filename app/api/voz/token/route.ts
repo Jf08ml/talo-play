@@ -36,7 +36,7 @@ export async function POST(request: Request) {
       readRtdb(`rooms/${roomId}/meta/online`),
     ]);
     if (online === true) return Response.json({ error: "Los mundos públicos no tienen voz." }, { status: 403 });
-    if (!presence) return Response.json({ error: "Entrá a la sala primero." }, { status: 403 });
+    if (!presence) return Response.json({ error: "Entra a la sala primero." }, { status: 403 });
   } catch {
     return Response.json({ error: "No se pudo comprobar la sala." }, { status: 502 });
   }

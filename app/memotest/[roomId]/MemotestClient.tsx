@@ -345,7 +345,7 @@ function TurnBanner({
       const s = scores(state);
       const best = Math.max(...Object.values(s));
       const winners = state.order.filter((id) => s[id] === best);
-      const names = winners.map((id) => (id === myClientId ? "vos" : state.players[id]?.name ?? "?"));
+      const names = winners.map((id) => (id === myClientId ? "tú" : state.players[id]?.name ?? "?"));
       celebrate = winners.includes(myClientId);
       title = celebrate ? "🎉 ¡Ganaste!" : "🏁 ¡Terminó la partida!";
       detail = `${winners.length > 1 ? `Empate entre ${names.join(" y ")}` : `Ganó ${names[0]}`} con ${best} ${
@@ -447,7 +447,7 @@ function Scoreboard({
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: p?.color }} />
               <span className="flex-1 truncate text-sm text-slate-200">
                 {p?.name ?? "?"}
-                {id === myClientId && <span className="text-slate-500"> (vos)</span>}
+                {id === myClientId && <span className="text-slate-500"> (tú)</span>}
               </span>
               <span className="font-mono text-sm font-semibold text-slate-100">{s[id] ?? 0}</span>
             </li>

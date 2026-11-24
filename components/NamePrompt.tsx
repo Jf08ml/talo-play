@@ -57,7 +57,7 @@ export default function NamePrompt({
           </div>
         )}
         <div className="p-6">
-          <h2 className="font-display text-[28px] leading-tight">¿Cómo te llamás?</h2>
+          <h2 className="font-display text-[28px] leading-tight">¿Cómo te llamas?</h2>
           <p className="mt-1.5 text-[15px] text-talo-text-2">
             Así te van a ver los demás jugadores. No hace falta registrarse.
           </p>

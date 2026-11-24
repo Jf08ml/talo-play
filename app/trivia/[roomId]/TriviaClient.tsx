@@ -351,7 +351,7 @@ function Scoreboard({ state, presence, myId }: { state: TriviaState; presence: P
             <li key={id} className={`flex items-center gap-2 ${id in presence ? "" : "opacity-40"}`}>
               <span className="w-5 text-slate-500">{i + 1}.</span>
               <span className="flex-1 truncate" style={{ color: state.players[id]?.color }}>
-                {id === myId ? "Vos" : (state.players[id]?.name ?? "?")}
+                {id === myId ? "Tú" : (state.players[id]?.name ?? "?")}
               </span>
               {state.status === "question" && a && <span className="text-xs text-slate-500">✓ respondió</span>}
               {state.status === "reveal" && a && a.points > 0 && (

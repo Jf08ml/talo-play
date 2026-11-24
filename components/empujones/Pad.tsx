@@ -231,7 +231,7 @@ export default function Pad({ roomId, clientId, color, locked = false }: { roomI
         ) : (
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-center text-white/40">
             <span className="h-24 w-24 rounded-full border-2 border-dashed border-white/25" />
-            <span className="px-3 text-sm font-bold">Apoyá el dedo y movelo para caminar</span>
+            <span className="px-3 text-sm font-bold">Apoya el dedo y muévelo para caminar</span>
           </div>
         )}
       </div>

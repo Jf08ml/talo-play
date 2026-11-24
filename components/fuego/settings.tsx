@@ -56,7 +56,7 @@ export const SETTINGS: GameSettings<FuegoSettings> = {
       key: "bots",
       icon: Bot,
       label: "Completar con bots",
-      hint: "Los lugares libres los ocupan soldados de la compu. Sirve para practicar solo.",
+      hint: "Los lugares libres los ocupan soldados de la computadora. Sirve para practicar solo.",
     },
     {
       kind: "choice",

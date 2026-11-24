@@ -365,7 +365,7 @@ function WritingView({
           );
         })}
         <button type="submit" disabled={!complete} className={`mt-2 text-lg ${PRIMARY_BUTTON}`}>
-          {complete ? "✋ ¡Basta!" : `Completá todo para decir ¡Basta! (${filled}/${config.categories.length})`}
+          {complete ? "✋ ¡Basta!" : `Completa todo para decir ¡Basta! (${filled}/${config.categories.length})`}
         </button>
       </form>
     </div>
@@ -396,7 +396,9 @@ function ReviewView({
   const endedBy =
     state.endedBy === "tiempo"
       ? "⏰ ¡Se acabó el tiempo!"
-      : `✋ ¡Basta! de ${state.endedBy === myId ? "vos" : state.players[state.endedBy]?.name ?? "alguien"}`;
+      : state.endedBy === myId
+        ? "✋ ¡Dijiste basta!"
+        : `✋ ¡Basta! de ${state.players[state.endedBy]?.name ?? "alguien"}`;
   const iAmReady = !!state.ready[myId];
   const online = state.order.filter((id) => id in presence);
 
@@ -410,7 +412,7 @@ function ReviewView({
           </p>
           <p className="font-display text-lg font-semibold text-slate-100">{endedBy}</p>
           <p className="text-sm text-slate-400">
-            Revisá las respuestas y marcá 👎 las que no valen. Se anula la que rechaza más de la mitad.
+            Revisa las respuestas y marca 👎 las que no valen. Se anula la que rechaza más de la mitad.
           </p>
         </div>
       </div>
@@ -428,7 +430,7 @@ function ReviewView({
                 <li key={id} className="flex items-center gap-2 rounded-md px-1 py-1">
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: state.players[id]?.color }} />
                   <span className="w-20 shrink-0 truncate text-xs text-slate-400 sm:w-28">
-                    {mine ? "Vos" : state.players[id]?.name}
+                    {mine ? "Tú" : state.players[id]?.name}
                   </span>
                   <span
                     className={`min-w-0 flex-1 truncate text-sm ${
@@ -474,7 +476,7 @@ function ReviewView({
           onClick={() => onReady(!iAmReady)}
           className={`w-full max-w-xs ${iAmReady ? SECONDARY_BUTTON : PRIMARY_BUTTON}`}
         >
-          {iAmReady ? "Esperando a los demás… (tocá para seguir revisando)" : "✓ Listo, siguiente ronda"}
+          {iAmReady ? "Esperando a los demás… (toca para seguir revisando)" : "✓ Listo, siguiente ronda"}
         </button>
         <p className="text-xs text-slate-500">
           Listos: {online.filter((id) => state.ready[id]).length}/{online.length}
@@ -541,7 +543,7 @@ function Scoreboard({
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: p?.color }} />
               <span className="flex-1 truncate text-sm text-slate-200">
                 {p?.name ?? "?"}
-                {id === myId && <span className="text-slate-500"> (vos)</span>}
+                {id === myId && <span className="text-slate-500"> (tú)</span>}
                 {state.status === "reviewing" && state.ready[id] && <span className="text-emerald-400"> ✓</span>}
               </span>
               {roundPts !== null && <span className="font-mono text-xs text-cyan-300">+{roundPts}</span>}

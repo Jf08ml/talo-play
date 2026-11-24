@@ -158,7 +158,7 @@ export default function CajasClient({ roomId }: { roomId: string }) {
 }
 
 function nameOf(state: CajasState, id: string, myId: string): string {
-  return id === myId ? "Vos" : (state.players[id]?.name ?? "?");
+  return id === myId ? "Tú" : (state.players[id]?.name ?? "?");
 }
 
 function PlayersBar({
@@ -327,12 +327,12 @@ function Board({ roomId, state, myId, size }: { roomId: string; state: CajasStat
         <p className="text-center text-xs text-slate-500">
           {myTurn ? (
             <>
-              Tocá entre dos puntos para trazar tu línea{" "}
+              Toca entre dos puntos para trazar tu línea{" "}
               <span className="inline-block h-2 w-4 rounded-full align-middle" style={{ backgroundColor: myColor }} />.
-              Si cerrás un cuadrado, jugás de nuevo.
+              Si cierras un cuadrado, juegas de nuevo.
             </>
           ) : (
-            "Esperá tu turno…"
+            "Espera tu turno…"
           )}
         </p>
       )}
@@ -384,8 +384,8 @@ function Watching({ state, presence, myId }: { state: CajasState; presence: Pres
   if (watching.length === 0) return null;
   return (
     <p className="text-center text-xs text-slate-500">
-      Mirando: {watching.map((id) => (id === myId ? "vos" : (presence[id]?.name ?? "?"))).join(", ")}
-      {watching.includes(myId) && " · entrás en la próxima partida"}
+      Mirando: {watching.map((id) => (id === myId ? "tú" : (presence[id]?.name ?? "?"))).join(", ")}
+      {watching.includes(myId) && " · entras en la próxima partida"}
     </p>
   );
 }

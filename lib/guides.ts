@@ -56,9 +56,9 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Cómo se arma",
         text: [
-          "Arrastrá una pieza con el dedo o el mouse. Cuando queda cerca de su lugar, encaja sola y ya no se mueve.",
-          "Pellizcá o usá la rueda del mouse para hacer zoom, y arrastrá la mesa vacía para moverte.",
-          "Una pieza que está moviendo otro jugador se ve marcada: no la podés agarrar hasta que la suelte.",
+          "Arrastra una pieza con el dedo o el mouse. Cuando queda cerca de su lugar, encaja sola y ya no se mueve.",
+          "Pellizca o usa la rueda del mouse para hacer zoom, y arrastra la mesa vacía para moverte.",
+          "Una pieza que está moviendo otro jugador se ve marcada: no la puedes agarrar hasta que la suelte.",
         ],
       },
       { title: "Competencia", text: ["En modo competencia cada equipo arma su propia copia. Gana el equipo que coloca su última pieza primero."] },
@@ -71,14 +71,14 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Cómo se mueve",
         text: [
-          "Falta una ficha: ese hueco es lo único que permite moverse. Tocá una ficha que esté en la misma fila o columna que el hueco y se desliza hacia él (si hay varias en el medio, se corren todas).",
-          "En la compu también podés usar las flechas del teclado.",
+          "Falta una ficha: ese hueco es lo único que permite moverse. Toca una ficha que esté en la misma fila o columna que el hueco y se desliza hacia él (si hay varias en el medio, se corren todas).",
+          "En la computadora también puedes usar las flechas del teclado.",
         ],
         art: "deslizante",
       },
       { title: "La carrera", text: ["Todos arrancan con la misma mezcla después de la cuenta regresiva. Ves el avance de los demás en miniatura. Gana el primero que deja la imagen completa."] },
     ],
-    tips: ["Resolvé primero la fila de arriba y la columna de la izquierda; después el tablero que queda es más chico.", "Los números en las fichas indican su orden: 1 va arriba a la izquierda."],
+    tips: ["Resuelve primero la fila de arriba y la columna de la izquierda; después el tablero que queda es más chico.", "Los números en las fichas indican su orden: 1 va arriba a la izquierda."],
   },
   puentes: {
     goal: "Cruzar todos los puentes del mapa sin pasar dos veces por el mismo, o darse cuenta de que no se puede.",
@@ -86,8 +86,8 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Cómo se juega",
         text: [
-          "Tocá una isla para pararte ahí y empezar. Después tocá los puentes que salen de donde estás: tu talo los cruza y quedan marcados. Los que podés cruzar ahora brillan.",
-          "Cada puente se cruza una sola vez. Si te quedás en una isla sin puentes libres, te trabaste: deshacé los últimos pasos o empezá de nuevo desde otra isla.",
+          "Toca una isla para pararte ahí y empezar. Después toca los puentes que salen de donde estás: tu talo los cruza y quedan marcados. Los que puedes cruzar ahora brillan.",
+          "Cada puente se cruza una sola vez. Si te quedas en una isla sin puentes libres, te trabaste: deshaz los últimos pasos o empieza de nuevo desde otra isla.",
         ],
         art: "puentes",
       },
@@ -98,21 +98,21 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "El truco",
         text: [
-          "Contá cuántos puentes tiene cada isla. Si todas tienen una cantidad par, podés empezar en cualquiera y vas a terminar donde empezaste. Si exactamente dos tienen una cantidad impar, tenés que salir de una de esas dos y vas a terminar en la otra.",
+          "Cuenta cuántos puentes tiene cada isla. Si todas tienen una cantidad par, puedes empezar en cualquiera y vas a terminar donde empezaste. Si exactamente dos tienen una cantidad impar, tienes que salir de una de esas dos y vas a terminar en la otra.",
           "Si hay más de dos islas con una cantidad impar de puentes, no existe ningún recorrido: es imposible.",
         ],
       },
       {
         title: "Las trampas",
         text: [
-          "A medida que subís de nivel aparecen: puentes de una mano (solo se cruzan hacia donde marca la flecha), puentes dobles (con un número: hay que cruzarlos dos veces), una isla de salida o de llegada obligatoria (las banderas) y mapas sin solución.",
-          "Cuando puede tocarte un mapa sin solución aparece el botón «No se puede». Si tenías razón, ganás; si sí se podía, perdés ese mapa (o esa ronda).",
+          "A medida que subes de nivel aparecen: puentes de una mano (solo se cruzan hacia donde marca la flecha), puentes dobles (con un número: hay que cruzarlos dos veces), una isla de salida o de llegada obligatoria (las banderas) y mapas sin solución.",
+          "Cuando puede tocarte un mapa sin solución aparece el botón «No se puede». Si tenías razón, ganas; si sí se podía, pierdes ese mapa (o esa ronda).",
         ],
       },
       {
         title: "Solo",
         text: [
-          "«Niveles sin fin»: cada nivel es un poco más grande que el anterior. Ganás hasta tres estrellas según cuántas veces deshiciste o empezaste de nuevo.",
+          "«Niveles sin fin»: cada nivel es un poco más grande que el anterior. Ganas hasta tres estrellas según cuántas veces deshiciste o empezaste de nuevo.",
           "«Reto del día»: el mismo mapa para todo el mundo, con un solo intento. Los más rápidos quedan en el ranking del día.",
         ],
       },
@@ -125,8 +125,8 @@ export const GUIDES: Record<GameId, Guide> = {
       },
     ],
     tips: [
-      "Antes de tocar nada, contá los puentes de cada isla: te dice dónde empezar y si es posible.",
-      "Dejá para el final los puentes que te encierran: si cruzás el único camino de vuelta a una zona demasiado pronto, no podés volver.",
+      "Antes de tocar nada, cuenta los puentes de cada isla: te dice dónde empezar y si es posible.",
+      "Deja para el final los puentes que te encierran: si cruzas el único camino de vuelta a una zona demasiado pronto, no puedes volver.",
     ],
   },
   minigolf: {
@@ -135,8 +135,8 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Cómo se tira",
         text: [
-          "Apoyá el dedo (o el mouse) en cualquier parte de la cancha y arrastrá hacia atrás, como si estiraras una gomera: la pelota sale para el lado contrario. Cuanto más arrastrás, más fuerte le pegás; los puntos te muestran para dónde va y qué tan fuerte.",
-          "Soltá para pegarle. Si te arrepentís, volvé el dedo cerca de donde empezaste y soltá: no cuenta.",
+          "Apoya el dedo (o el mouse) en cualquier parte de la cancha y arrastra hacia atrás, como si estiraras una gomera: la pelota sale para el lado contrario. Cuanto más arrastras, más fuerte le pegas; los puntos te muestran para dónde va y qué tan fuerte.",
+          "Suelta para pegarle. Si te arrepientes, vuelve el dedo cerca de donde empezaste y suelta: no cuenta.",
           "La pelota rebota en las paredes y en los bordes blancos. Si llega al hoyo muy rápido, pega en el borde y sigue de largo: hay que llegar con la fuerza justa.",
         ],
       },
@@ -146,7 +146,7 @@ export const GUIDES: Record<GameId, Guide> = {
           "Pendientes: las flechas marcan para dónde cae la pelota.",
           "Arena: frena mucho.",
           "Agua: te cuesta un golpe extra y la pelota vuelve a donde le pegaste.",
-          "Molinos: giran sin parar; pasá cuando dejan el hueco.",
+          "Molinos: giran sin parar; pasa cuando dejan el hueco.",
           "Bumpers: los talos rosas te devuelven la pelota con más fuerza.",
         ],
       },
@@ -154,13 +154,13 @@ export const GUIDES: Record<GameId, Guide> = {
         title: "Los golpes",
         text: [
           "Cada hoyo tiene un par: los golpes que debería llevarte. Menos es un birdie (uno menos) o un águila (dos menos); más es un bogey. En un golpe, ¡hoyo en uno!",
-          "Como máximo son 8 golpes por hoyo: si no entra antes, anotás 8 y pasás al siguiente.",
+          "Como máximo son 8 golpes por hoyo: si no entra antes, anotas 8 y pasas al siguiente.",
         ],
       },
       {
         title: "Solo",
         text: [
-          "«Recorrido de 9 hoyos»: elegís la dificultad y cada recorrido se inventa en el momento. Se guarda tu mejor resultado contra el par.",
+          "«Recorrido de 9 hoyos»: eliges la dificultad y cada recorrido se inventa en el momento. Se guarda tu mejor resultado contra el par.",
           "«Hoyos del día»: los mismos 3 hoyos para todo el mundo, con un solo intento. Los de menos golpes quedan en el ranking del día.",
         ],
       },
@@ -173,8 +173,8 @@ export const GUIDES: Record<GameId, Guide> = {
       },
     ],
     tips: [
-      "En los tiros largos, apuntá a dejarla cerca del hoyo antes que a meterla: un tiro fácil después vale más que un rebote loco.",
-      "Usá las paredes: un tiro en diagonal que rebota puede doblar una curva en un solo golpe.",
+      "En los tiros largos, apunta a dejarla cerca del hoyo antes que a meterla: un tiro fácil después vale más que un rebote loco.",
+      "Usa las paredes: un tiro en diagonal que rebota puede doblar una curva en un solo golpe.",
     ],
   },
   memotest: {
@@ -183,8 +183,8 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Tu turno",
         text: [
-          "Tocá dos cartas para darlas vuelta. Si forman pareja, quedan boca arriba y son tuyas.",
-          "Si no son pareja, quedan visibles un momento y se vuelven a tapar: ¡memorizá dónde estaban!",
+          "Toca dos cartas para darlas vuelta. Si forman pareja, quedan boca arriba y son tuyas.",
+          "Si no son pareja, quedan visibles un momento y se vuelven a tapar: ¡memoriza dónde estaban!",
         ],
         art: "memotest",
       },
@@ -204,20 +204,20 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "La ronda",
         text: [
-          "Sale una letra al azar. Escribí una palabra para cada categoría que empiece con esa letra (por ejemplo, con la M: país «México», color «Marrón»).",
-          "Cuando completás todo tocá «¡Basta!»: la ronda se cierra para todos. Si la sala tiene tiempo, también se cierra al terminar el reloj.",
+          "Sale una letra al azar. Escribe una palabra para cada categoría que empiece con esa letra (por ejemplo, con la M: país «México», color «Marrón»).",
+          "Cuando completas todo toca «¡Basta!»: la ronda se cierra para todos. Si la sala tiene tiempo, también se cierra al terminar el reloj.",
         ],
       },
       {
         title: "La revisión",
         text: [
-          "Se muestran las respuestas de todos. Si una no vale (no existe, no empieza con la letra, no es de la categoría), tocala para votarla en contra.",
+          "Se muestran las respuestas de todos. Si una no vale (no existe, no empieza con la letra, no es de la categoría), tócala para votarla en contra.",
           "Una respuesta queda anulada si la rechaza más de la mitad de los demás.",
         ],
       },
       {
         title: "Puntos",
-        text: ["20 puntos si sos el único con respuesta válida en esa categoría; 10 si tu palabra es única; 5 si alguien más puso la misma. Al final de todas las rondas gana el que más sumó."],
+        text: ["20 puntos si eres el único con respuesta válida en esa categoría; 10 si tu palabra es única; 5 si alguien más puso la misma. Al final de todas las rondas gana el que más sumó."],
       },
     ],
     tips: ["No hace falta completar todo para tocar ¡Basta!: a veces conviene cortar rápido.", "Las tildes y mayúsculas no importan al comparar."],
@@ -228,18 +228,18 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Si te toca dibujar",
         text: [
-          "Elegí una de las palabras que te ofrece la app (tenés unos segundos). Solo vos la ves.",
-          "Dibujala con el dedo o el mouse. Podés cambiar el color y el grosor, borrar o deshacer. No vale escribir letras.",
+          "Elige una de las palabras que te ofrece la app (tienes unos segundos). Solo tú la ves.",
+          "Dibújala con el dedo o el mouse. Puedes cambiar el color y el grosor, borrar o deshacer. No vale escribir letras.",
         ],
       },
       {
         title: "Si te toca adivinar",
         text: [
-          "Escribí en el chat lo que creés que es. Si acertás, la app te avisa a vos y los demás solo ven que adivinaste (no la palabra).",
+          "Escribe en el chat lo que crees que es. Si aciertas, la app te avisa a ti y los demás solo ven que adivinaste (no la palabra).",
           "Si estás a una letra de distancia te dice «¡Casi!».",
         ],
       },
-      { title: "Puntos", text: ["Cuanto antes adivines, más sumás. El que dibuja suma por cada uno que adivina. Al final gana el que más puntos tiene."] },
+      { title: "Puntos", text: ["Cuanto antes adivines, más sumas. El que dibuja suma por cada uno que adivina. Al final gana el que más puntos tiene."] },
     ],
   },
   codigo: {
@@ -262,7 +262,7 @@ export const GUIDES: Record<GameId, Guide> = {
       },
       { title: "Cómo termina", text: ["Gana el equipo que destapa todas sus palabras (aunque la última la destape el rival). Quien toca la bomba pierde en el acto."] },
     ],
-    tips: ["Una pista que une 3 palabras es genial, pero arriesgada: fijate que no se parezca a la bomba."],
+    tips: ["Una pista que une 3 palabras es genial, pero arriesgada: fíjate que no se parezca a la bomba."],
   },
   cuatro: {
     goal: "Alinear cuatro fichas de tu color antes que el rival.",
@@ -270,13 +270,13 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Cómo se juega",
         text: [
-          "Por turnos, tocá una columna: tu ficha cae hasta la posición más baja libre.",
+          "Por turnos, toca una columna: tu ficha cae hasta la posición más baja libre.",
           "Gana quien junta cuatro seguidas en horizontal, vertical o diagonal. Si se llena el tablero sin línea, es empate.",
         ],
         art: "cuatro",
       },
     ],
-    tips: ["Las columnas del centro sirven para más líneas: arrancá por ahí.", "Mirá dónde puede ganar el rival en su próximo turno y tapalo."],
+    tips: ["Las columnas del centro sirven para más líneas: empieza por ahí.", "Mira dónde puede ganar el rival en su próximo turno y tápalo."],
   },
   palabra: {
     goal: "Adivinar la palabra secreta de cinco letras en seis intentos o menos, antes que los demás.",
@@ -284,24 +284,24 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Los colores",
         text: [
-          "Escribí cualquier palabra de cinco letras y mandala. Cada letra se pinta:",
+          "Escribe cualquier palabra de cinco letras y mandala. Cada letra se pinta:",
           "Verde: la letra está en la palabra y en ese lugar. Amarillo: está, pero en otro lugar. Gris: no está.",
         ],
         art: "palabra",
       },
       { title: "La carrera", text: ["Todos tienen la misma palabra. Ves los colores de los demás (no sus letras). Gana el primero que la adivina."] },
     ],
-    tips: ["Arrancá con palabras de muchas vocales distintas, como «AUREO» o «OSCAR»."],
+    tips: ["Empieza con palabras de muchas vocales distintas, como «AUREO» o «OSCAR»."],
   },
   trivia: {
     goal: "Contestar bien y rápido para sumar más puntos que los demás.",
     sections: [
-      { title: "Cada pregunta", text: ["Sale una pregunta con cuatro opciones para todos a la vez. Tocá una antes de que se termine el tiempo: no se puede cambiar."] },
-      { title: "Puntos", text: ["Acertar da entre 500 y 1000 puntos: más cuanto más rápido contestás. Errar o no contestar da 0. Cuando contestan todos, se revela la respuesta."] },
+      { title: "Cada pregunta", text: ["Sale una pregunta con cuatro opciones para todos a la vez. Toca una antes de que se termine el tiempo: no se puede cambiar."] },
+      { title: "Puntos", text: ["Acertar da entre 500 y 1000 puntos: más cuanto más rápido contestas. Errar o no contestar da 0. Cuando contestan todos, se revela la respuesta."] },
     ],
   },
   impostor: {
-    goal: "Si sos del grupo: descubrir al impostor. Si sos el impostor: que no te descubran (o adivinar la palabra).",
+    goal: "Si eres del grupo: descubrir al impostor. Si eres el impostor: que no te descubran (o adivinar la palabra).",
     sections: [
       {
         title: "Las cartas",
@@ -312,7 +312,7 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Las pistas",
         text: [
-          "Por turnos, cada uno dice una pista sobre la palabra: que demuestre que la sabés, pero sin regalársela al impostor.",
+          "Por turnos, cada uno dice una pista sobre la palabra: que demuestre que la sabes, pero sin regalársela al impostor.",
           "El impostor tiene que inventar una pista creíble escuchando a los demás. Según la sala, las pistas se escriben en la app o se dicen en voz alta.",
         ],
       },
@@ -330,27 +330,27 @@ export const GUIDES: Record<GameId, Guide> = {
     sections: [
       {
         title: "Preparación",
-        text: ["Ubicá tus barcos en tu mapa de 10 × 10: tocá un barco, después la casilla, y giralo si querés. No se pueden superponer. También podés mezclarlos al azar. Cuando estés, tocá «Listo»."],
+        text: ["Ubica tus barcos en tu mapa de 10 × 10: toca un barco, después la casilla, y gíralo si quieres. No se pueden superponer. También puedes mezclarlos al azar. Cuando estés, toca «Listo»."],
       },
       {
         title: "La batalla",
         text: [
-          "Por turnos, tocá una casilla del mapa rival para disparar. Agua: pasa el turno. Tocado: le diste a un barco y tirás de nuevo. Hundido: completaste todas sus casillas.",
+          "Por turnos, toca una casilla del mapa rival para disparar. Agua: pasa el turno. Tocado: le diste a un barco y tiras de nuevo. Hundido: completaste todas sus casillas.",
         ],
         art: "naval",
       },
     ],
-    tips: ["Cuando tocás un barco, probá las casillas de al lado para seguirlo."],
+    tips: ["Cuando tocas un barco, prueba las casillas de al lado para seguirlo."],
   },
   probable: {
     goal: "Votar con la mayoría y ver a quién le cuelga cada título.",
     sections: [
       { title: "Cada ronda", text: ["Sale una frase: «¿Quién es más probable que…?». Cada uno vota en secreto a alguien de la sala (vale votarse)."] },
-      { title: "La revelación", text: ["Cuando votan todos se ve quién se llevó más votos. Si votaste a ese (o a uno de los empatados), sumás un punto. El más votado se lleva el título."] },
+      { title: "La revelación", text: ["Cuando votan todos se ve quién se llevó más votos. Si votaste a ese (o a uno de los empatados), sumas un punto. El más votado se lleva el título."] },
     ],
   },
   conoces: {
-    goal: "Adivinar lo que contestan los demás sobre sí mismos (y que te adivinen a vos).",
+    goal: "Adivinar lo que contestan los demás sobre sí mismos (y que te adivinen a ti).",
     sections: [
       { title: "El turno", text: ["A uno le toca una pregunta sobre sí mismo y elige su respuesta en secreto. Al mismo tiempo, los demás eligen lo que creen que contestó."] },
       { title: "Puntos", text: ["Cada acierto suma un punto para quien adivinó y otro para el protagonista. Al final se ve quién conoce mejor a quién."] },
@@ -362,8 +362,8 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Tu turno",
         text: [
-          "Tirás los cinco dados hasta tres veces. Entre tiro y tiro, tocá los dados que querés guardar; el resto se vuelve a tirar.",
-          "Al final anotá el resultado en un casillero libre de tu planilla. Si no te sirve ninguno, tachá uno (vale 0).",
+          "Tiras los cinco dados hasta tres veces. Entre tiro y tiro, toca los dados que quieres guardar; el resto se vuelve a tirar.",
+          "Al final anota el resultado en un casillero libre de tu planilla. Si no te sirve ninguno, tacha uno (vale 0).",
         ],
       },
       {
@@ -375,7 +375,7 @@ export const GUIDES: Record<GameId, Guide> = {
         art: "generala",
       },
     ],
-    tips: ["Tachá la generala doble o el 1 cuando no tengas nada: son los que menos perdés."],
+    tips: ["Tacha la generala doble o el 1 cuando no tengas nada: son los que menos pierdes."],
   },
   emojis: {
     goal: "Adivinar qué película, serie, dicho o lugar esconden los emojis, más rápido que los demás.",
@@ -383,7 +383,7 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Cómo se juega",
         text: [
-          "Aparecen unos emojis y la categoría. Escribí lo que creés que es: podés probar todas las veces que quieras, y la app te avisa si estás cerca.",
+          "Aparecen unos emojis y la categoría. Escribe lo que crees que es: puedes probar todas las veces que quieras, y la app te avisa si estás cerca.",
           "A la mitad del tiempo aparece una pista con la primera letra de cada palabra.",
         ],
       },
@@ -393,8 +393,8 @@ export const GUIDES: Record<GameId, Guide> = {
   verdades: {
     goal: "Descubrir las mentiras de los demás y engañarlos con la tuya.",
     sections: [
-      { title: "Escribir", text: ["Escribí tres frases sobre vos: dos verdaderas y una inventada, y marcá cuál es la mentira. Que la mentira sea creíble y las verdades, sorprendentes."] },
-      { title: "Votar", text: ["Por turnos se muestran las tres frases de cada uno y los demás votan cuál es la mentira. Si acertás, sumás 1. Por cada uno que se la cree, el autor suma 1."] },
+      { title: "Escribir", text: ["Escribe tres frases sobre ti: dos verdaderas y una inventada, y marca cuál es la mentira. Que la mentira sea creíble y las verdades, sorprendentes."] },
+      { title: "Votar", text: ["Por turnos se muestran las tres frases de cada uno y los demás votan cuál es la mentira. Si aciertas, sumas 1. Por cada uno que se la cree, el autor suma 1."] },
     ],
   },
   damas: {
@@ -423,14 +423,14 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Cómo se juega",
         text: [
-          "Por turnos, tocá el espacio entre dos puntos vecinos para trazar una línea.",
-          "Si tu línea cierra el cuarto lado de un cuadrado, ese cuadrado es tuyo y volvés a jugar.",
+          "Por turnos, toca el espacio entre dos puntos vecinos para trazar una línea.",
+          "Si tu línea cierra el cuarto lado de un cuadrado, ese cuadrado es tuyo y vuelves a jugar.",
         ],
         art: "cajas",
       },
       { title: "Final", text: ["Cuando no quedan líneas, gana quien tiene más cuadrados."] },
     ],
-    tips: ["Evitá trazar el tercer lado de un cuadrado: le regalás el cuarto al siguiente."],
+    tips: ["Evita trazar el tercer lado de un cuadrado: le regalas el cuarto al siguiente."],
   },
   reto: {
     goal: "Animarse a todo: contestar con la verdad o cumplir el reto.",
@@ -447,7 +447,7 @@ export const GUIDES: Record<GameId, Guide> = {
         title: "Actuar",
         text: [
           "Al que le toca actuar toca «Empezar» y ve la palabra. La representa con gestos, sin hablar, sin hacer sonidos ni señalar cosas.",
-          "Su equipo grita lo que cree que es. Si aciertan, tocá «¡Adivinaron!» y sale otra palabra. Si es muy difícil, pasala. El equipo rival también ve la palabra y controla.",
+          "Su equipo grita lo que cree que es. Si aciertan, toca «¡Adivinaron!» y sale otra palabra. Si es muy difícil, pásala. El equipo rival también ve la palabra y controla.",
         ],
       },
       { title: "Puntos", text: ["Cada palabra adivinada suma 1. Después de los turnos elegidos, gana el equipo con más puntos."] },
@@ -471,7 +471,7 @@ export const GUIDES: Record<GameId, Guide> = {
     sections: [
       {
         title: "Marcar una palabra",
-        text: ["Las palabras están en línea recta: horizontal, vertical o diagonal (en los niveles difíciles, también al revés). Tocá la primera letra y después la última."],
+        text: ["Las palabras están en línea recta: horizontal, vertical o diagonal (en los niveles difíciles, también al revés). Toca la primera letra y después la última."],
         art: "sopa",
       },
       { title: "Puntos", text: ["Cada palabra es de quien la marca primero. Cuando se encuentran todas, gana quien tiene más."] },
@@ -483,44 +483,44 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "En línea o con amigos",
         text: [
-          "«Jugar en línea» te mete en un mapa abierto con gente de todos lados. No hay tiempo: entrás y salís cuando quieras, y el ranking de arriba muestra quién es más grande ahora. Los más grandes del día quedan en «Récords de hoy».",
-          "«Solo con amigos» arma una sala privada: elegís la duración y si querés bots que completen el mapa. Cuando se acaba el tiempo, gana la víbora más larga.",
+          "«Jugar en línea» te mete en un mapa abierto con gente de todos lados. No hay tiempo: entras y sales cuando quieras, y el ranking de arriba muestra quién es más grande ahora. Los más grandes del día quedan en «Récords de hoy».",
+          "«Solo con amigos» arma una sala privada: eliges la duración y si quieres bots que completen el mapa. Cuando se acaba el tiempo, gana la víbora más larga.",
         ],
       },
       {
         title: "Moverse",
         text: [
-          "Tu víbora avanza sola. En el teléfono, apoyá el dedo en cualquier parte y arrastralo hacia donde querés ir; en la compu, apuntá con el mouse (o usá las flechas).",
-          "Mantené el botón del rayo, el click o la barra espaciadora para acelerar. Acelerar gasta puntos: usalo para escapar o para cerrarle el paso a alguien.",
+          "Tu víbora avanza sola. En el teléfono, apoya el dedo en cualquier parte y arrástralo hacia donde quieres ir; en la computadora, apunta con el mouse (o usa las flechas).",
+          "Mantén el botón del rayo, el click o la barra espaciadora para acelerar. Acelerar gasta puntos: úsalo para escapar o para cerrarle el paso a alguien.",
         ],
       },
-      { title: "Crecer", text: ["Cada bolita que comés te da puntos y te alarga. Las más grandes y brillantes valen más."] },
+      { title: "Crecer", text: ["Cada bolita que comes te da puntos y te alarga. Las más grandes y brillantes valen más."] },
       {
         title: "Cortar colas",
         text: [
-          "Si tu cabeza choca el cuerpo de otra víbora, se lo cortás justo ahí: ella se queda con la parte de adelante y vos te comés los puntos de lo que cortaste.",
+          "Si tu cabeza choca el cuerpo de otra víbora, se lo cortas justo ahí: ella se queda con la parte de adelante y tú te comes los puntos de lo que cortaste.",
           "La cabeza y el cuello no se pueden cortar, y una víbora recién cortada o recién aparecida tiene unos segundos de protección (se ve titilando).",
-          "A vos también te pueden cortar: cuanto más larga es tu cola, más fácil es que alguien se la cruce.",
+          "A ti también te pueden cortar: cuanto más larga es tu cola, más fácil es que alguien se la cruce.",
         ],
       },
       {
         title: "Perder (en línea)",
         text: [
-          "En línea la cabeza y el cuello son duros: si tu cabeza choca contra la cabeza o el cuello de otra víbora, perdés (si chocan de frente, pierde la más chica). Tocar el borde del mapa también te elimina.",
-          "Cuando una víbora pierde, su cuerpo queda en el piso como restos brillantes que cualquiera puede comer. Al cortar una cola en línea, te comés la mitad al instante y la otra mitad cae como restos: ¡apurate antes de que te los roben!",
-          "Después de perder ves hasta dónde llegaste y podés volver a empezar al toque.",
+          "En línea la cabeza y el cuello son duros: si tu cabeza choca contra la cabeza o el cuello de otra víbora, pierdes (si chocan de frente, pierde la más chica). Tocar el borde del mapa también te elimina.",
+          "Cuando una víbora pierde, su cuerpo queda en el piso como restos brillantes que cualquiera puede comer. Al cortar una cola en línea, te comes la mitad al instante y la otra mitad cae como restos: ¡apúrate antes de que te los roben!",
+          "Después de perder ves hasta dónde llegaste y puedes volver a empezar al toque.",
         ],
       },
       {
         title: "Con amigos",
-        text: ["En la sala con amigos nadie pierde: el borde quema y te saca puntos mientras lo tocás, y al cortar te comés toda la cola. Cuando se acaba el tiempo, gana la más larga."],
+        text: ["En la sala con amigos nadie pierde: el borde quema y te saca puntos mientras lo tocas, y al cortar te comes toda la cola. Cuando se acaba el tiempo, gana la más larga."],
       },
     ],
     tips: [
       "Cortar cerca de la cabeza se lleva casi toda la víbora.",
       "En línea, una víbora grande puede cruzarte su cabeza por delante: ¡no le pegues de frente!",
-      "Si tu víbora es muy larga, enroscala para proteger la cola.",
-      "Acelerá para cruzarte justo delante de otra víbora y cortarla antes de que se escape.",
+      "Si tu víbora es muy larga, enróscala para proteger la cola.",
+      "Acelera para cruzarte justo delante de otra víbora y cortarla antes de que se escape.",
     ],
   },
   tronco: {
@@ -531,16 +531,16 @@ export const GUIDES: Record<GameId, Guide> = {
         text: [
           "Todos están parados en ronda y en el medio gira un tronco que barre a cada uno. Tu talo es el de la etiqueta amarilla, y la cámara siempre está detrás tuyo.",
           "Arranca uno de la ronda: el tronco descansa a sus pies y lo patea para el lado que quiera. Todos ven para dónde sale y arranca a girar un momento después.",
-          "Abajo de todo hay una barra: el tronco aparece del lado del que viene y se acerca a tu círculo. Cuando entra en la parte amarilla se ilumina «Saltar»; cuando entra en la verde (más cerca) se iluminan los dos. El círculo que tenés en el piso se pinta igual.",
+          "Abajo de todo hay una barra: el tronco aparece del lado del que viene y se acerca a tu círculo. Cuando entra en la parte amarilla se ilumina «Saltar»; cuando entra en la verde (más cerca) se iluminan los dos. El círculo que tienes en el piso se pinta igual.",
         ],
         art: "tronco",
       },
       {
         title: "Saltar o patear",
         text: [
-          "«Saltar» (o espacio / flecha arriba): el tronco pasa por abajo tuyo y sigue para el mismo lado, hacia el siguiente. Hay que saltar un poquito antes de que llegue; mientras estás en el aire no podés hacer otra cosa, pero apenas tocás el piso ya podés de nuevo.",
-          "«Patear» (o K / flecha abajo): si lo pateás cuando se pone verde, el tronco cambia de sentido y vuelve hacia el que te lo mandó. Si lo pateás muy temprano, pateás el aire y perdés un instante.",
-          "Si el tronco te toca con los pies en el piso, te tumba y quedás afuera. Seguís mirando hasta que termine.",
+          "«Saltar» (o espacio / flecha arriba): el tronco pasa por abajo tuyo y sigue para el mismo lado, hacia el siguiente. Hay que saltar un poquito antes de que llegue; mientras estás en el aire no puedes hacer otra cosa, pero apenas tocas el piso ya puedes de nuevo.",
+          "«Patear» (o K / flecha abajo): si lo pateas cuando se pone verde, el tronco cambia de sentido y vuelve hacia el que te lo mandó. Si lo pateas muy temprano, pateas el aire y pierdes un instante.",
+          "Si el tronco te toca con los pies en el piso, te tumba y quedas afuera. Sigues mirando hasta que termine.",
           "Si te tumba, te dice por qué: si llegaste tarde, si saltaste demasiado temprano (ya estabas bajando) o si pateaste antes de que se pusiera verde.",
         ],
       },
@@ -548,22 +548,22 @@ export const GUIDES: Record<GameId, Guide> = {
         title: "Cada vez más difícil",
         text: [
           "El tronco acelera con el tiempo, y solo cambia de sentido cuando alguien lo patea.",
-          "Ojo con saltar si tu vecino puede patearlo: te lo devuelve enseguida y tenés que estar listo para saltar otra vez.",
+          "Ojo con saltar si tu vecino puede patearlo: te lo devuelve enseguida y tienes que estar listo para saltar otra vez.",
         ],
       },
       {
         title: "Para jugar",
         text: [
           "¿Primera vez? En el lobby está «Practicar»: un minuto con el tronco lento que te enseña a saltar y a patear sin quedar afuera.",
-          "Con una tele: en «Amigos» elegí «En una pantalla grande» y creá la sala desde la compu conectada a la tele o al proyector. La ronda se ve ahí, con un anillo bajo cada talo que se pone amarillo (saltá) o verde (pateá), y los celulares son el control: dos botones grandes que vibran cuando el tronco llega. Para arrancar, el que patea elige hacia quién lo manda.",
-          "«Contra bots»: vos y la compu, al toque. «En línea»: rondas una atrás de la otra con gente de todos lados (y bots si hay poca). «Amigos»: una sala con link, y bots si quieren completar la ronda.",
+          "Con una tele: en «Amigos» elige «En una pantalla grande» y crea la sala desde la computadora conectada a la tele o al proyector. La ronda se ve ahí, con un anillo bajo cada talo que se pone amarillo (salta) o verde (patea), y los celulares son el control: dos botones grandes que vibran cuando el tronco llega. Para arrancar, el que patea elige hacia quién lo manda.",
+          "«Contra bots»: tú y la computadora, al toque. «En línea»: rondas una atrás de la otra con gente de todos lados (y bots si hay poca). «Amigos»: una sala con link, y bots si quieren completar la ronda.",
         ],
       },
     ],
     tips: [
-      "Patear es arriesgado pero le complica la vida al otro: se lo mandás rápido y quizás no lo espera.",
-      "Si el que está al lado tuyo acaba de saltar, pateáselo de vuelta: con el tronco rápido le va a costar saltar de nuevo a tiempo.",
-      "Si arrancás vos, mandalo para el lado del que esté más distraído.",
+      "Patear es arriesgado pero le complica la vida al otro: se lo mandas rápido y quizás no lo espera.",
+      "Si el que está al lado tuyo acaba de saltar, patéaselo de vuelta: con el tronco rápido le va a costar saltar de nuevo a tiempo.",
+      "Si empiezas tú, mándalo para el lado del que esté más distraído.",
     ],
   },
   empujones: {
@@ -572,7 +572,7 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "La pantalla y los celulares",
         text: [
-          "La isla se ve en una pantalla grande: una compu conectada a la tele o al proyector. El que crea la sala lo hace desde esa compu, y ahí se abre la isla con el código.",
+          "La isla se ve en una pantalla grande: una computadora conectada a la tele o al proyector. El que crea la sala lo hace desde esa computadora, y ahí se abre la isla con el código.",
           "Cada uno entra desde su celular con el código o el link: el celular es el control. Tu talo es el de tu color, con tu nombre arriba.",
           "Mientras esperan, ya pueden caminar y empujarse para probar: el que se cae vuelve enseguida.",
         ],
@@ -580,26 +580,26 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Los controles",
         text: [
-          "A la izquierda: apoyá el dedo en cualquier lado y movelo para caminar. Arriba en el celular es arriba en la pantalla.",
+          "A la izquierda: apoya el dedo en cualquier lado y muévelo para caminar. Arriba en el celular es arriba en la pantalla.",
           "«Empujar»: tu talo sale disparado para donde estás apuntando. Si choca a alguien, lo manda lejos y lo deja mareado un momento. Después hay que esperar un poquito para volver a usarlo (el botón se va llenando).",
-          "«Aguantar» (mantenelo apretado): tu talo se planta y pesa mucho más, así que cuesta moverlo. Mientras aguantás caminás lento y no podés empujar, y la barra se gasta: cuando se vacía, soltás.",
-          "En la compu: WASD o las flechas para caminar, espacio para empujar y Shift para aguantar.",
+          "«Aguantar» (mantenlo apretado): tu talo se planta y pesa mucho más, así que cuesta moverlo. Mientras aguantas caminas lento y no puedes empujar, y la barra se gasta: cuando se vacía, sueltas.",
+          "En la computadora: WASD o las flechas para caminar, espacio para empujar y Shift para aguantar.",
         ],
       },
       {
         title: "Las rondas",
         text: [
-          "Si el centro de tu talo sale de la isla, te caés al agua y quedás afuera hasta la próxima ronda.",
+          "Si el centro de tu talo sale de la isla, te caes al agua y quedas afuera hasta la próxima ronda.",
           "Al rato de empezar, la isla se empieza a achicar; si la ronda dura mucho, se termina hundiendo. Gana la ronda el último que queda arriba (si se caen todos juntos, no la gana nadie).",
           "Gana la partida el primero en ganar las rondas pedidas (2, 3 o 5). Los bots completan la isla si son pocos, hasta 8 en total.",
         ],
       },
     ],
     tips: [
-      "No empujes desde el costado: ponete entre el otro y el centro de la isla, así el empujón lo manda derecho al agua.",
-      "Si alguien viene embistiendo, apretá «Aguantar» justo antes del choque: rebota él.",
-      "Cerca del borde no te quedes quieto: un empujón y estás afuera. Volvé al medio.",
-      "Un empujón que no le pega a nadie te puede tirar solo al agua: apuntá bien cerca del borde.",
+      "No empujes desde el costado: ponte entre el otro y el centro de la isla, así el empujón lo manda derecho al agua.",
+      "Si alguien viene embistiendo, aprieta «Aguantar» justo antes del choque: rebota él.",
+      "Cerca del borde no te quedes quieto: un empujón y estás afuera. Vuelve al medio.",
+      "Un empujón que no le pega a nadie te puede tirar solo al agua: apunta bien cerca del borde.",
     ],
   },
   golpe: {
@@ -610,30 +610,30 @@ export const GUIDES: Record<GameId, Guide> = {
         text: [
           "Cada partida es un museo distinto, armado con salas y puertas. Cada ladrón arranca en una salida, en las esquinas: son las zonas a rayas que dicen «SALIDA».",
           "En las salas hay diamantes celestes (valen 1). En la bóveda, la sala del medio con alfombra, están los rosas (valen 3), pero es la más vigilada. Cuando alguien agarra uno, al rato aparece otro en la misma sala.",
-          "Arriba a la izquierda tenés el mapa: ahí ves las salidas, la bóveda y dónde estás.",
+          "Arriba a la izquierda tienes el mapa: ahí ves las salidas, la bóveda y dónde estás.",
         ],
       },
       {
         title: "La seguridad",
         text: [
-          "Guardias: hacen siempre la misma ronda y en cada esquina se frenan a mirar. Lo que alumbra su linterna (la luz amarilla) lo ven. Si te ven, se llena una barra sobre tu cabeza: salí de la luz antes de que se complete. Si te chocás con un guardia, te atrapa al toque, aunque no te esté mirando.",
+          "Guardias: hacen siempre la misma ronda y en cada esquina se frenan a mirar. Lo que alumbra su linterna (la luz amarilla) lo ven. Si te ven, se llena una barra sobre tu cabeza: sal de la luz antes de que se complete. Si te chocas con un guardia, te atrapa al toque, aunque no te esté mirando.",
           "Cámaras: están en las esquinas y van girando de un lado a otro. Su luz es roja y tardan un poco más que un guardia en darse cuenta.",
-          "Láseres: cruzan algunas puertas y se prenden y apagan solos. Antes de prenderse titilan. Si tocás uno prendido, te atrapa en el acto.",
-          "Ni las paredes ni las puertas dejan ver a través: escondete detrás de una pared y esperá a que pase la luz.",
+          "Láseres: cruzan algunas puertas y se prenden y apagan solos. Antes de prenderse titilan. Si tocas uno prendido, te atrapa en el acto.",
+          "Ni las paredes ni las puertas dejan ver a través: escóndete detrás de una pared y espera a que pase la luz.",
         ],
       },
       {
         title: "La mochila y la salida",
         text: [
-          "Lo que agarrás va a la mochila (entran 10). Cuanto más cargás, más lento caminás.",
-          "Los diamantes recién cuentan cuando entrás con ellos a una salida: ahí se vacía la mochila y quedan a salvo. Lo que todavía tengas en la mochila cuando se termina el tiempo no cuenta.",
-          "Si te atrapan, te esposan unos segundos y se te cae la mitad de la mochila al piso (cualquiera la puede levantar). Después volvés a tu salida y por un momento nadie te ve.",
+          "Lo que agarras va a la mochila (entran 10). Cuanto más cargas, más lento caminas.",
+          "Los diamantes recién cuentan cuando entras con ellos a una salida: ahí se vacía la mochila y quedan a salvo. Lo que todavía tengas en la mochila cuando se termina el tiempo no cuenta.",
+          "Si te atrapan, te esposan unos segundos y se te cae la mitad de la mochila al piso (cualquiera la puede levantar). Después vuelves a tu salida y por un momento nadie te ve.",
         ],
       },
       {
         title: "Robar",
         text: [
-          "Pegate a un rival que tenga diamantes en la mochila y tocá «Robar» (espacio o E en la compu): le sacás hasta 2. Después tenés que esperar unos segundos para volver a robar, y al que robaste no se le puede robar de nuevo enseguida.",
+          "Pégate a un rival que tenga diamantes en la mochila y toca «Robar» (espacio o E en la computadora): le sacas hasta 2. Después tienes que esperar unos segundos para volver a robar, y al que robaste no se le puede robar de nuevo enseguida.",
           "Lo que ya está a salvo en la salida no se puede robar.",
         ],
       },
@@ -647,16 +647,16 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Los controles",
         text: [
-          "En el celular: apoyá el dedo en cualquier lado y movelo para caminar, como un joystick. El botón «Robar» se prende cuando tenés a alguien a tiro.",
-          "En la compu: WASD o las flechas para caminar, espacio o E para robar.",
+          "En el celular: apoya el dedo en cualquier lado y muévelo para caminar, como un joystick. El botón «Robar» se prende cuando tienes a alguien a tiro.",
+          "En la computadora: WASD o las flechas para caminar, espacio o E para robar.",
         ],
       },
     ],
     tips: [
-      "Antes de entrar a una sala, mirá desde la puerta para qué lado va el guardia: entrá cuando te da la espalda.",
-      "No vayas a la salida con un diamante solo: juntá unos cuantos, pero no tantos que te pongan lento justo cuando hay que escapar.",
-      "Si alguien vuelve cargado hacia su salida, esperalo en el camino y robale.",
-      "En el último minuto volvé a la salida: lo que quede en la mochila se pierde.",
+      "Antes de entrar a una sala, mira desde la puerta para qué lado va el guardia: entra cuando te da la espalda.",
+      "No vayas a la salida con un diamante solo: junta unos cuantos, pero no tantos que te pongan lento justo cuando hay que escapar.",
+      "Si alguien vuelve cargado hacia su salida, espéralo en el camino y róbale.",
+      "En el último minuto vuelve a la salida: lo que quede en la mochila se pierde.",
     ],
   },
   ladrillazo: {
@@ -665,7 +665,7 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "La paleta",
         text: [
-          "Abajo tenés una paleta. En el teléfono, apoyá el dedo en cualquier parte y arrastralo; en la compu, mové el mouse o usá las flechas. Para sacar, tocá la pantalla, hacé click o apretá la barra espaciadora.",
+          "Abajo tienes una paleta. En el teléfono, apoya el dedo en cualquier parte y arrástralo; en la computadora, mueve el mouse o usa las flechas. Para sacar, toca la pantalla, haz click o aprieta la barra espaciadora.",
           "Donde pega la pelota en la paleta decide para dónde sale: en el centro sale derecha para arriba y en las puntas sale abierta. Así se apunta.",
         ],
         art: "ladrillazo",
@@ -674,42 +674,42 @@ export const GUIDES: Record<GameId, Guide> = {
         title: "Los ladrillos",
         text: [
           "Los de color se rompen de un golpe; los blancos con el centro gris son duros y necesitan dos. Los muros grises no se rompen nunca: hay que rodearlos o meter la pelota por los huecos.",
-          "Las bombas negras rompen todo lo que tienen alrededor (y otras bombas que toquen, en cadena). Los ladrillos blancos con dibujo sueltan un premio que cae: agarralo con la paleta. Azul: tres pelotas. Verde: paleta larga por un rato. Rosa: una vida más.",
+          "Las bombas negras rompen todo lo que tienen alrededor (y otras bombas que toquen, en cadena). Los ladrillos blancos con dibujo sueltan un premio que cae: agárralo con la paleta. Azul: tres pelotas. Verde: paleta larga por un rato. Rosa: una vida más.",
         ],
       },
       {
         title: "El objetivo de cada nivel",
         text: [
           "Arriba de la cancha dice qué hay que hacer. En algunos niveles hay que romper todos los ladrillos; en otros alcanza con los objetivos rojos, que suelen estar escondidos detrás de muros, adentro de tubos o arriba de torres.",
-          "Si se te cae la pelota perdés una vida. Sin vidas, perdés el nivel.",
+          "Si se te cae la pelota pierdes una vida. Sin vidas, pierdes el nivel.",
         ],
       },
       {
         title: "Solo",
         text: [
-          "La campaña tiene niveles cada vez más difíciles: pasá uno para abrir el siguiente. Cada nivel da hasta tres estrellas: una por pasarlo, otra si perdiste una vida como mucho y otra si lo hiciste rápido.",
-          "En «Infinito» los niveles se inventan solos y nunca se terminan: cada uno que pasás te da una vida más y los puntos se acumulan hasta que te quedes sin vidas.",
+          "La campaña tiene niveles cada vez más difíciles: pasa uno para abrir el siguiente. Cada nivel da hasta tres estrellas: una por pasarlo, otra si perdiste una vida como mucho y otra si lo hiciste rápido.",
+          "En «Infinito» los niveles se inventan solos y nunca se terminan: cada uno que pasas te da una vida más y los puntos se acumulan hasta que te quedes sin vidas.",
         ],
       },
       {
         title: "Carrera",
         text: [
-          "Todos juegan el mismo nivel, cada uno en su pantalla, y arriba ven los tableros de los demás en vivo. Gana el que lo termina primero. Si te quedás sin pelotas, el nivel vuelve a empezar desde cero, pero el reloj sigue.",
+          "Todos juegan el mismo nivel, cada uno en su pantalla, y arriba ven los tableros de los demás en vivo. Gana el que lo termina primero. Si te quedas sin pelotas, el nivel vuelve a empezar desde cero, pero el reloj sigue.",
           "Cuando alguien termina, el resto tiene 30 segundos más. Si nadie llega, gana el que avanzó más.",
         ],
       },
       {
         title: "Ataque",
         text: [
-          "Cada uno en su tablero, y la pared de ladrillos baja sola cada tantos segundos (cada vez más rápido). Si un ladrillo llega a la línea roja, o te quedás sin pelotas, quedás afuera.",
-          "Romper muchos ladrillos entre dos toques de la paleta es un combo: con 4 le mandás una fila de ladrillos duros a otro jugador, con 8 dos filas y con 12 tres. Gana el último que queda en pie.",
+          "Cada uno en su tablero, y la pared de ladrillos baja sola cada tantos segundos (cada vez más rápido). Si un ladrillo llega a la línea roja, o te quedas sin pelotas, quedas afuera.",
+          "Romper muchos ladrillos entre dos toques de la paleta es un combo: con 4 le mandas una fila de ladrillos duros a otro jugador, con 8 dos filas y con 12 tres. Gana el último que queda en pie.",
         ],
       },
       {
         title: "Duelo",
         text: [
           "Dos jugadores en la misma cancha: uno abajo y otro arriba (cada uno se ve abajo en su pantalla), con ladrillos en el medio. Si la pelota pasa por detrás de tu rival, es gol tuyo. Gana el primero que llega a los goles elegidos.",
-          "Si en la sala estás solo, jugás contra la compu.",
+          "Si en la sala estás solo, juegas contra la computadora.",
         ],
       },
       {
@@ -718,13 +718,13 @@ export const GUIDES: Record<GameId, Guide> = {
       },
       {
         title: "En línea",
-        text: ["«Jugar en línea» te mete en rondas cortas con gente de todos lados, una atrás de la otra: casi siempre carreras y, cada tanto, un ataque. Si llegás en medio de una ronda, mirás y entrás en la siguiente. Si hay poca gente, completan unos bots."],
+        text: ["«Jugar en línea» te mete en rondas cortas con gente de todos lados, una atrás de la otra: casi siempre carreras y, cada tanto, un ataque. Si llegas en medio de una ronda, miras y entras en la siguiente. Si hay poca gente, completan unos bots."],
       },
     ],
     tips: [
-      "Para llegar a un objetivo escondido, buscá el hueco del muro y pegale a la pelota con la punta de la paleta para que salga en diagonal.",
-      "Una pelota que entra detrás de los ladrillos rebota sola un buen rato rompiendo todo: abrí un camino hacia arriba.",
-      "En el ataque, no rompas de a uno: esperá a tener la pelota arriba y dejá que haga combo.",
+      "Para llegar a un objetivo escondido, busca el hueco del muro y pégale a la pelota con la punta de la paleta para que salga en diagonal.",
+      "Una pelota que entra detrás de los ladrillos rebota sola un buen rato rompiendo todo: abre un camino hacia arriba.",
+      "En el ataque, no rompas de a uno: espera a tener la pelota arriba y deja que haga combo.",
     ],
   },
   carreras: {
@@ -733,25 +733,25 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "La pantalla y los volantes",
         text: [
-          "Abrí la sala en una compu conectada a la tele o al proyector: ahí se ve la pista desde arriba.",
+          "Abre la sala en una computadora conectada a la tele o al proyector: ahí se ve la pista desde arriba.",
           "Cada piloto entra desde su teléfono con el código y elige un auto: el teléfono es su volante.",
         ],
       },
       {
         title: "Manejar",
         text: [
-          "El auto acelera solo. Doblá con los botones de izquierda y derecha, o activá «inclinar» y girá el teléfono como un volante. El botón de freno frena y da marcha atrás.",
+          "El auto acelera solo. Dobla con los botones de izquierda y derecha, o activa «inclinar» y gira el teléfono como un volante. El botón de freno frena y da marcha atrás.",
           "Las flechas de la pista te impulsan y las rampas te hacen volar. Chocar contra las paredes o los demás te frena.",
         ],
       },
       {
         title: "Bots",
         text: [
-          "Si la sala tiene bots, los autos que nadie eligió los maneja la compu. Se elige cuántos (hasta 3) y cómo manejan: fácil, normal o difícil.",
+          "Si la sala tiene bots, los autos que nadie eligió los maneja la computadora. Se elige cuántos (hasta 3) y cómo manejan: fácil, normal o difícil.",
         ],
       },
     ],
-    tips: ["Frená un poco antes de las curvas cerradas: salís más rápido."],
+    tips: ["Frena un poco antes de las curvas cerradas: sales más rápido."],
   },
   carreras3d: {
     goal: "Completar las vueltas antes que los demás pilotos.",
@@ -766,28 +766,28 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Manejar",
         text: [
-          "El auto acelera solo. Doblá con los botones o inclinando el teléfono; el freno frena y da marcha atrás. En la compu, con las flechas (o A y D) y la flecha abajo o la barra espaciadora para frenar.",
-          "Podés cambiar la cámara: detrás del auto o desde la cabina. Las flechas del piso te impulsan y las rampas te hacen volar.",
+          "El auto acelera solo. Dobla con los botones o inclinando el teléfono; el freno frena y da marcha atrás. En la computadora, con las flechas (o A y D) y la flecha abajo o la barra espaciadora para frenar.",
+          "Puedes cambiar la cámara: detrás del auto o desde la cabina. Las flechas del piso te impulsan y las rampas te hacen volar.",
         ],
       },
       {
         title: "Pistas",
         text: [
           "Hay pistas cortas para empezar y tres largas, solo en 3D: Gran Premio (un ocho con puente), Cañón (subidas y saltos en el desierto) y Nocturna (una ciudad de noche con autopista). También hay pistas armadas al azar.",
-          "Los carteles con flechas rojas avisan las curvas cerradas: frená un poco antes.",
+          "Los carteles con flechas rojas avisan las curvas cerradas: frena un poco antes.",
         ],
       },
       {
         title: "Bots y tiempos",
         text: [
-          "Con bots, los autos que nadie eligió los maneja la compu: elegí cuántos (hasta 3) y cómo manejan (fácil, normal o difícil). Así se puede correr solo o completar la grilla.",
+          "Con bots, los autos que nadie eligió los maneja la computadora: elige cuántos (hasta 3) y cómo manejan (fácil, normal o difícil). Así se puede correr solo o completar la grilla.",
           "Cada vuelta te muestra su tiempo, y al final se ve la mejor vuelta de cada uno; la más rápida de la carrera queda marcada. Si das la vuelta al revés, aparece «¡Contramano!».",
         ],
       },
     ],
     tips: [
-      "Si el juego va lento, bajá la calidad gráfica desde el botón de la pantalla.",
-      "Pasá por las flechas naranjas del piso: el turbo te da una buena ventaja en las rectas largas.",
+      "Si el juego va lento, baja la calidad gráfica desde el botón de la pantalla.",
+      "Pasa por las flechas naranjas del piso: el turbo te da una buena ventaja en las rectas largas.",
     ],
   },
   arena: {
@@ -796,22 +796,22 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Armas",
         text: [
-          "Arrancás con una daga. Por la arena hay espadas, hachas, mazas, lanzas, arcos y escudos: acercate y agarralos. Cada arma tiene su alcance y velocidad.",
+          "Empiezas con una daga. Por la arena hay espadas, hachas, mazas, lanzas, arcos y escudos: acércate y agárralos. Cada arma tiene su alcance y velocidad.",
           "Si la sala tiene pociones, las del piso te curan.",
         ],
       },
       {
         title: "Pelear",
         text: [
-          "Atacá en el momento justo y volvé a atacar durante el golpe para encadenar un combo. Bloqueá de frente para frenar golpes (no los de atrás) y esquivá para escapar.",
-          "Correr, bloquear y esquivar gastan aguante: si se vacía, quedás expuesto.",
+          "Ataca en el momento justo y vuelve a atacar durante el golpe para encadenar un combo. Bloquea de frente para frenar golpes (no los de atrás) y esquiva para escapar.",
+          "Correr, bloquear y esquivar gastan aguante: si se vacía, quedas expuesto.",
         ],
       },
       {
         title: "Controles",
         text: [
-          "Celular: joystick a la izquierda para moverte, arrastrá la pantalla para mirar, y botones para atacar, bloquear, esquivar, saltar y agarrar.",
-          "Compu: hacé clic en la arena. WASD para moverte, mouse para mirar, Shift para correr, clic para atacar, clic derecho o F para bloquear, Q para esquivar, espacio para saltar, E para agarrar y V para cambiar la cámara.",
+          "Celular: joystick a la izquierda para moverte, arrastra la pantalla para mirar, y botones para atacar, bloquear, esquivar, saltar y agarrar.",
+          "Computadora: haz clic en la arena. WASD para moverte, mouse para mirar, Shift para correr, clic para atacar, clic derecho o F para bloquear, Q para esquivar, espacio para saltar, E para agarrar y V para cambiar la cámara.",
         ],
       },
     ],
@@ -838,7 +838,7 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Adivinar",
         text: [
-          "Los demás mueven la aguja del dial: arrastrándola, con los botones − y + para afinar, o con las flechas del teclado en la compu.",
+          "Los demás mueven la aguja del dial: arrastrándola, con los botones − y + para afinar, o con las flechas del teclado en la computadora.",
           "Cuanto más cerca del objetivo, más puntos: 4 en el centro (la zona amarilla), 3 al lado y 2 un poco más lejos.",
           "Al revelar se abre la tapa del dial y se ve dónde estaba el objetivo.",
         ],
@@ -860,8 +860,8 @@ export const GUIDES: Record<GameId, Guide> = {
       },
     ],
     tips: [
-      "Pensá en qué piensan los demás, no solo vos: una pista muy personal puede despistar.",
-      "Si el objetivo está en un extremo, buscá algo bien exagerado; si está en el medio, algo bien neutro.",
+      "Piensa en qué piensan los demás, no solo tú: una pista muy personal puede despistar.",
+      "Si el objetivo está en un extremo, busca algo bien exagerado; si está en el medio, algo bien neutro.",
       "Se pueden escribir escalas propias al crear la sala: «Plan aburrido | Plan ideal».",
     ],
   },
@@ -893,15 +893,15 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Tu turno (Parchís)",
         text: [
-          "Tirás el dado y movés una ficha esa cantidad. Con un 5 sacás una ficha de casa (si podés, es obligatorio). Con un 6 volvés a tirar; si ya no tenés fichas en casa, el 6 cuenta 7. Tres 6 seguidos: la última ficha que moviste vuelve a casa.",
-          "Dos fichas de tu color en la misma casilla forman una barrera: nadie puede pasar, ni siquiera vos. Con un 6 estás obligado a abrirla.",
+          "Tiras el dado y mueves una ficha esa cantidad. Con un 5 sacas una ficha de casa (si puedes, es obligatorio). Con un 6 vuelves a tirar; si ya no tienes fichas en casa, el 6 cuenta 7. Tres 6 seguidos: la última ficha que moviste vuelve a casa.",
+          "Dos fichas de tu color en la misma casilla forman una barrera: nadie puede pasar, ni siquiera tú. Con un 6 estás obligado a abrirla.",
         ],
       },
       {
         title: "Comer y llegar",
         text: [
-          "Si caés en la casilla de una ficha rival que está sola y no es un seguro, te la comés: vuelve a su casa y vos contás 20 con la ficha que quieras.",
-          "Para entrar a la meta necesitás el número justo. Cada ficha que llega te da 10 casillas de premio para otra ficha.",
+          "Si caes en la casilla de una ficha rival que está sola y no es un seguro, te la comes: vuelve a su casa y tú cuentas 20 con la ficha que quieras.",
+          "Para entrar a la meta necesitas el número justo. Cada ficha que llega te da 10 casillas de premio para otra ficha.",
         ],
       },
       {
@@ -910,7 +910,7 @@ export const GUIDES: Record<GameId, Guide> = {
         art: "ludo",
       },
     ],
-    tips: ["Una barrera justo delante de la salida de un rival lo deja trabado.", "Antes de mover, fijate qué fichas rivales tenés a menos de 6 casillas detrás."],
+    tips: ["Una barrera justo delante de la salida de un rival lo deja trabado.", "Antes de mover, fíjate qué fichas rivales tienes a menos de 6 casillas detrás."],
   },
   lobo: {
     goal: "Pueblo: eliminar a todos los lobos. Lobos: quedar en igual número que el resto.",
@@ -934,7 +934,7 @@ export const GUIDES: Record<GameId, Guide> = {
         ],
       },
     ],
-    tips: ["Si sos la vidente, cuidado con revelar lo que sabés demasiado pronto: los lobos te van a buscar."],
+    tips: ["Si eres la vidente, cuidado con revelar lo que sabes demasiado pronto: los lobos te van a buscar."],
   },
   ajedrez: {
     goal: "Dar jaque mate: atacar al rey rival sin que tenga escapatoria.",
@@ -958,33 +958,33 @@ export const GUIDES: Record<GameId, Guide> = {
         text: ["Jaque mate gana. Si el que mueve no tiene jugadas y no está en jaque, es tablas (ahogado); también por material insuficiente, 50 jugadas sin capturas ni movimientos de peón, o si se acuerdan tablas."],
       },
     ],
-    tips: ["En la app, tocá una pieza para ver sus casillas posibles: no te deja hacer jugadas ilegales."],
+    tips: ["En la app, toca una pieza para ver sus casillas posibles: no te deja hacer jugadas ilegales."],
   },
   chinchon: {
     goal: "No pasarte del límite de puntos: el último que queda adentro gana.",
     sections: [
       {
         title: "Tu turno",
-        text: ["Tenés 7 cartas. Agarrá una del mazo o la de arriba del pozo, y después tirá una al pozo (no la misma que levantaste del pozo)."],
+        text: ["Tienes 7 cartas. Agarra una del mazo o la de arriba del pozo, y después tira una al pozo (no la misma que levantaste del pozo)."],
       },
       {
         title: "Ligar",
         text: [
-          "Juntá piernas (3 o 4 cartas del mismo número) y escaleras (3 o más seguidas del mismo palo). Los comodines reemplazan cualquier carta.",
+          "Junta piernas (3 o 4 cartas del mismo número) y escaleras (3 o más seguidas del mismo palo). Los comodines reemplazan cualquier carta.",
         ],
         art: "chinchon",
       },
       {
         title: "Cortar",
         text: [
-          "Podés cortar cuando tenés todo ligado salvo, como mucho, una carta de 5 o menos. Las cartas sueltas de cada uno suman puntos (sus números). Cortar con todo ligado resta 10.",
+          "Puedes cortar cuando tienes todo ligado salvo, como mucho, una carta de 5 o menos. Las cartas sueltas de cada uno suman puntos (sus números). Cortar con todo ligado resta 10.",
           "Un chinchón (siete cartas seguidas del mismo palo, sin comodines) gana la partida en el acto. Quien pasa el límite queda afuera.",
         ],
       },
     ],
   },
   truco: {
-    goal: "Llegar primero a los porotos pedidos (15 o 30), ganando manos, envidos y trucos.",
+    goal: "Llegar primero a los puntos pedidos (15 o 30), ganando manos, envidos y trucos.",
     sections: [
       {
         title: "Las cartas",
@@ -994,19 +994,19 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "El envido",
         text: [
-          "Solo en la primera baza, antes de tirar tu carta, podés cantar envido, real envido o falta envido. Se compara el envido de cada uno:",
-          "Con dos cartas del mismo palo: 20 + la suma de las dos (las figuras 10, 11 y 12 valen 0). Si no, vale la carta más alta. La app lo calcula por vos.",
+          "Solo en la primera baza, antes de tirar tu carta, puedes cantar envido, real envido o falta envido. Se compara el envido de cada uno:",
+          "Con dos cartas del mismo palo: 20 + la suma de las dos (las figuras 10, 11 y 12 valen 0). Si no, vale la carta más alta. La app lo calcula por ti.",
         ],
       },
       {
         title: "El truco",
         text: [
-          "En cualquier momento de tu turno podés cantar truco (la mano vale 2). El rival contesta quiero, no quiero (y vos sumás 1) o sube a retruco (3); y después vale cuatro (4).",
-          "Si no te conviene seguir, podés irte al mazo: el rival gana lo que valía la mano.",
+          "En cualquier momento de tu turno puedes cantar truco (la mano vale 2). El rival contesta quiero, no quiero (y tú sumas 1) o sube a retruco (3); y después vale cuatro (4).",
+          "Si no te conviene seguir, puedes irte al mazo: el rival gana lo que valía la mano.",
         ],
       },
     ],
-    tips: ["El 1 de espada y el 1 de basto son las cartas más fuertes: si los tenés, cantá truco con confianza."],
+    tips: ["El 1 de espada y el 1 de basto son las cartas más fuertes: si los tienes, canta truco con confianza."],
   },
   fuego: {
     goal: "Llegar primero a las bajas pedidas (o tener más cuando se acaba el tiempo).",
@@ -1014,19 +1014,19 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Armas y escudo",
         text: [
-          "Arrancás con fusil, pistola y granadas. Por el mapa hay escopeta, francotirador y lanzacohetes; llevás dos armas a la vez (agarrar una cambia la que tenés en la mano).",
+          "Empiezas con fusil, pistola y granadas. Por el mapa hay escopeta, francotirador y lanzacohetes; llevas dos armas a la vez (agarrar una cambia la que tienes en la mano).",
           "El escudo absorbe los primeros daños y se recarga solo si dejan de pegarte. La vida, en cambio, solo vuelve con botiquines.",
         ],
       },
       {
         title: "Controles",
         text: [
-          "Compu: hacé clic en el juego. WASD para moverte, mouse para mirar, clic para disparar, clic derecho para apuntar, R recarga, Q / 1 / 2 o la rueda cambian de arma, G tira una granada, F o V golpea, E agarra, espacio salta y Tab muestra el puntaje.",
-          "Celular: joystick para moverte, arrastrá para mirar, botón de disparo (si lo arrastrás, también mirás), y botones para apuntar, saltar, recargar y granadas. El francotirador apunta mientras mantenés y dispara al soltar.",
+          "Computadora: haz clic en el juego. WASD para moverte, mouse para mirar, clic para disparar, clic derecho para apuntar, R recarga, Q / 1 / 2 o la rueda cambian de arma, G tira una granada, F o V golpea, E agarra, espacio salta y Tab muestra el puntaje.",
+          "Celular: joystick para moverte, arrastra para mirar, botón de disparo (si lo arrastras, también miras), y botones para apuntar, saltar, recargar y granadas. El francotirador apunta mientras mantienes y dispara al soltar.",
         ],
       },
     ],
-    tips: ["Si te quedás sin escudo, cubrite unos segundos antes de volver a pelear."],
+    tips: ["Si te quedas sin escudo, cúbrete unos segundos antes de volver a pelear."],
   },
   otelo: {
     goal: "Terminar con más fichas de tu color en el tablero.",
@@ -1034,14 +1034,14 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Jugar una ficha",
         text: [
-          "En tu turno ponés una ficha que encierre, en línea recta o diagonal, una o más fichas rivales entre la nueva y otra tuya. Todas las encerradas se dan vuelta y pasan a ser tuyas.",
-          "Solo podés jugar donde encerrás al menos una: la app te marca esas casillas.",
+          "En tu turno pones una ficha que encierre, en línea recta o diagonal, una o más fichas rivales entre la nueva y otra tuya. Todas las encerradas se dan vuelta y pasan a ser tuyas.",
+          "Solo puedes jugar donde encierras al menos una: la app te marca esas casillas.",
         ],
         art: "otelo",
       },
-      { title: "Final", text: ["Si no tenés jugada, pasás. Cuando ninguno puede jugar (o se llena el tablero), gana quien tiene más fichas."] },
+      { title: "Final", text: ["Si no tienes jugada, pasas. Cuando ninguno puede jugar (o se llena el tablero), gana quien tiene más fichas."] },
     ],
-    tips: ["Las esquinas nunca se pueden dar vuelta: son las casillas más valiosas.", "Evitá jugar en las casillas pegadas a una esquina vacía: le abrís la esquina al rival."],
+    tips: ["Las esquinas nunca se pueden dar vuelta: son las casillas más valiosas.", "Evita jugar en las casillas pegadas a una esquina vacía: le abres la esquina al rival."],
   },
   triqui: {
     goal: "Hacer tres en línea con tu marca antes que el rival.",
@@ -1049,7 +1049,7 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Tu turno",
         text: [
-          "Uno juega con X y el otro con O; empieza la X. En tu turno ponés tu marca en cualquier casilla libre.",
+          "Uno juega con X y el otro con O; empieza la X. En tu turno pones tu marca en cualquier casilla libre.",
           "Gana el primero que completa una fila, una columna o una diagonal con tres de las suyas.",
         ],
       },
@@ -1057,7 +1057,7 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Modo infinito",
         text: [
-          "Cada uno tiene como mucho tres marcas en el tablero: cuando ponés la cuarta, se borra tu marca más vieja. Así nunca se llena y no hay empates.",
+          "Cada uno tiene como mucho tres marcas en el tablero: cuando pones la cuarta, se borra tu marca más vieja. Así nunca se llena y no hay empates.",
           "La marca que vas a perder con tu próxima jugada titila, para que la tengas en cuenta.",
         ],
         art: "triqui",
@@ -1065,9 +1065,9 @@ export const GUIDES: Record<GameId, Guide> = {
       { title: "Revancha", text: ["En cada revancha se cambian X y O, así arranca uno y después el otro. La app lleva la cuenta de ganadas."] },
     ],
     tips: [
-      "Si empezás, el centro o una esquina son las mejores primeras jugadas.",
-      "Buscá armar dos amenazas a la vez: el rival solo puede tapar una.",
-      "En el infinito, fijate cuál marca te va a desaparecer antes de contar con ella para la línea.",
+      "Si empiezas, el centro o una esquina son las mejores primeras jugadas.",
+      "Busca armar dos amenazas a la vez: el rival solo puede tapar una.",
+      "En el infinito, fíjate cuál marca te va a desaparecer antes de contar con ella para la línea.",
     ],
   },
   backgammon: {
@@ -1076,53 +1076,53 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Hacia dónde se mueve",
         text: [
-          "Cada uno mueve en sentido contrario. Vos movés de los puntos altos (24) a los bajos (1): tu casa son los puntos 1 a 6, abajo a la derecha. El tablero siempre se ve desde tu lado.",
+          "Cada uno mueve en sentido contrario. Tú mueves de los puntos altos (24) a los bajos (1): tu casa son los puntos 1 a 6, abajo a la derecha. El tablero siempre se ve desde tu lado.",
         ],
         art: "backgammon",
       },
       {
         title: "Tu turno",
         text: [
-          "Tirás dos dados y movés una ficha por cada dado (puede ser la misma dos veces). Los dobles valen cuatro movimientos.",
-          "No podés caer en un punto con dos o más fichas rivales. Tenés que usar todos los dados que puedas; si solo podés usar uno, tiene que ser el mayor.",
-          "En la app: tocá una ficha (se marcan en celeste las que se pueden mover) y después el punto verde a donde va. Podés deshacer antes de tocar «Listo».",
+          "Tiras dos dados y mueves una ficha por cada dado (puede ser la misma dos veces). Los dobles valen cuatro movimientos.",
+          "No puedes caer en un punto con dos o más fichas rivales. Tienes que usar todos los dados que puedas; si solo puedes usar uno, tiene que ser el mayor.",
+          "En la app: toca una ficha (se marcan en celeste las que se pueden mover) y después el punto verde a donde va. Puedes deshacer antes de tocar «Listo».",
         ],
       },
       {
         title: "Comer y la barra",
         text: [
-          "Si caés en un punto con una sola ficha rival, la comés: va a la barra del medio. Quien tiene fichas en la barra tiene que hacerlas entrar por la casa del rival antes de mover cualquier otra.",
+          "Si caes en un punto con una sola ficha rival, la comes: va a la barra del medio. Quien tiene fichas en la barra tiene que hacerlas entrar por la casa del rival antes de mover cualquier otra.",
         ],
       },
       {
         title: "Sacar fichas y ganar",
         text: [
-          "Cuando tus 15 fichas están en tu casa, empezás a sacarlas con el número exacto del punto (o con uno más alto si no hay fichas más atrás).",
+          "Cuando tus 15 fichas están en tu casa, empiezas a sacarlas con el número exacto del punto (o con uno más alto si no hay fichas más atrás).",
           "Ganar vale 1 punto; 2 (gammon) si el rival no sacó ninguna; 3 (backgammon) si además le queda alguna en la barra o en tu casa.",
         ],
       },
       {
         title: "El cubo de doblaje",
-        text: ["Antes de tirar, podés ofrecer doblar lo que vale la partida. El rival acepta (y el cubo pasa a ser suyo: solo él puede volver a doblar) o se rinde y pierde lo que valía hasta ahí."],
+        text: ["Antes de tirar, puedes ofrecer doblar lo que vale la partida. El rival acepta (y el cubo pasa a ser suyo: solo él puede volver a doblar) o se rinde y pierde lo que valía hasta ahí."],
       },
     ],
-    tips: ["Dos fichas juntas en un punto lo bloquean: armá varios puntos seguidos para encerrar al rival."],
+    tips: ["Dos fichas juntas en un punto lo bloquean: arma varios puntos seguidos para encerrar al rival."],
   },
   oca: {
     goal: "Llegar primero al jardín de la Oca, la casilla 63.",
     sections: [
-      { title: "Tu turno", text: ["Tirá los dados y tu ficha avanza sola. Si caés en una casilla especial, pasa lo que dice."] },
+      { title: "Tu turno", text: ["Tira los dados y tu ficha avanza sola. Si caes en una casilla especial, pasa lo que dice."] },
       {
         title: "Las casillas",
         text: [
-          "🪿 Oca: «de oca a oca y tiro porque me toca»: saltás a la próxima oca y volvés a tirar.",
-          "🌉 Puentes (6 y 12) y 🎲 dados (26 y 53): vas al otro y volvés a tirar.",
-          "🏨 Posada (19): perdés un turno. ⛓️ Cárcel (52): perdés dos. 🕳️ Pozo (31): quedás ahí hasta que caiga otro y te rescate.",
-          "🌀 Laberinto (42): volvés a la 30. 💀 Calavera (58): volvés al principio.",
+          "🪿 Oca: «de oca a oca y tiro porque me toca»: saltas a la próxima oca y vuelves a tirar.",
+          "🌉 Puentes (6 y 12) y 🎲 dados (26 y 53): vas al otro y vuelves a tirar.",
+          "🏨 Posada (19): pierdes un turno. ⛓️ Cárcel (52): pierdes dos. 🕳️ Pozo (31): quedas ahí hasta que caiga otro y te rescate.",
+          "🌀 Laberinto (42): vuelves a la 30. 💀 Calavera (58): vuelves al principio.",
         ],
         art: "oca",
       },
-      { title: "Llegar", text: ["Para entrar al jardín (63) hace falta el número justo: lo que sobra, retrocede. Con dos dados, si en tu primera tirada sacás 6 y 3 vas directo a la 26, y con 4 y 5, a la 53."] },
+      { title: "Llegar", text: ["Para entrar al jardín (63) hace falta el número justo: lo que sobra, retrocede. Con dos dados, si en tu primera tirada sacas 6 y 3 vas directo a la 26, y con 4 y 5, a la 53."] },
     ],
   },
   pasteleria: {
@@ -1131,23 +1131,23 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "El pedido",
         text: [
-          "Arriba (o a la derecha en la compu) está el pedido: quién lo pide, un dibujo de la torta y la lista de lo que quiere: forma, bizcocho, pisos, relleno, cobertura y decoración.",
-          "En los niveles altos el pedido viene sin dibujo, solo la lista. En Chef estrella, además, se esconde a los 8 segundos: memorizalo. Podés volver a mirarlo un momento, pero cada vistazo le resta 20 puntos a esa torta.",
+          "Arriba (o a la derecha en la computadora) está el pedido: quién lo pide, un dibujo de la torta y la lista de lo que quiere: forma, bizcocho, pisos, relleno, cobertura y decoración.",
+          "En los niveles altos el pedido viene sin dibujo, solo la lista. En Chef estrella, además, se esconde a los 8 segundos: memorízalo. Puedes volver a mirarlo un momento, pero cada vistazo le resta 20 puntos a esa torta.",
         ],
       },
       {
         title: "Armar la torta",
         text: [
-          "Elegí cada paso en las pestañas de abajo: la torta en 3D cambia con cada elección. Arrastrala para girarla y ver los pisos.",
+          "Elige cada paso en las pestañas de abajo: la torta en 3D cambia con cada elección. Arrástrala para girarla y ver los pisos.",
           "El relleno va entre los pisos, así que solo aparece con 2 pisos o más. En los dos últimos niveles se piden dos decoraciones.",
-          "En la compu: los números eligen una opción, las flechas cambian de paso, Enter entrega y Esc pausa.",
+          "En la computadora: los números eligen una opción, las flechas cambian de paso, Enter entrega y Esc pausa.",
         ],
       },
       {
         title: "Entregar",
         text: [
-          "Cuando está todo, tocá «Entregar la torta». Si es igual al pedido sumás 100 puntos, más un extra por racha de tortas perfectas y por los segundos que te sobran del reloj.",
-          "Si algo no coincide, la app te dice qué. Hasta el nivel Maestro podés arreglarla una vez (vale 40) o pasar al siguiente pedido; en Chef estrella no hay segunda oportunidad. Si se acaba el tiempo, el pedido se pierde.",
+          "Cuando está todo, toca «Entregar la torta». Si es igual al pedido sumas 100 puntos, más un extra por racha de tortas perfectas y por los segundos que te sobran del reloj.",
+          "Si algo no coincide, la app te dice qué. Hasta el nivel Maestro puedes arreglarla una vez (vale 40) o pasar al siguiente pedido; en Chef estrella no hay segunda oportunidad. Si se acaba el tiempo, el pedido se pierde.",
         ],
       },
       {
@@ -1160,14 +1160,14 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Duelo con amigos",
         text: [
-          "Desde el inicio, «Duelo con amigos» crea una sala: elegís la dificultad (la de uno de los niveles) y cuánto dura el turno (2, 3 o 5 minutos), y mandás el link.",
-          "Todos reciben los mismos pedidos en el mismo orden y arrancan juntos después de una cuenta regresiva. No hay reloj por torta: el reloj es el del turno. Cada torta bien suma como en el juego solo; cada torta mal resta 25 y pasás al pedido siguiente igual.",
+          "Desde el inicio, «Duelo con amigos» crea una sala: eliges la dificultad (la de uno de los niveles) y cuánto dura el turno (2, 3 o 5 minutos), y mandas el link.",
+          "Todos reciben los mismos pedidos en el mismo orden y arrancan juntos después de una cuenta regresiva. No hay reloj por torta: el reloj es el del turno. Cada torta bien suma como en el juego solo; cada torta mal resta 25 y pasas al pedido siguiente igual.",
           "Arriba ves los puntos de todos y la torta que cada uno tiene en la mesada. Cuando suena la campana gana quien sumó más.",
         ],
       },
     ],
     tips: [
-      "Antes de entregar, girá la torta y compará con el pedido.",
+      "Antes de entregar, gira la torta y compara con el pedido.",
       "En el duelo, apurarse con una torta mal cuesta más que tardar unos segundos en revisarla.",
       "La música, el volumen y la calidad gráfica se cambian en la pausa.",
     ],
@@ -1182,8 +1182,8 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Tu turno",
         text: [
-          "Poné una ficha que tenga el mismo número que una de las dos puntas de la mesa. Si entra en las dos puntas, la app te pregunta en cuál.",
-          "Si no tenés ficha que entre: de a 2 o 3 robás del pozo hasta que te salga una; si el pozo está vacío (o juegan de a 4), pasás.",
+          "Pon una ficha que tenga el mismo número que una de las dos puntas de la mesa. Si entra en las dos puntas, la app te pregunta en cuál.",
+          "Si no tienes ficha que entre: de a 2 o 3 robas del pozo hasta que te salga una; si el pozo está vacío (o juegan de a 4), pasas.",
         ],
         art: "domino",
       },
@@ -1195,6 +1195,6 @@ export const GUIDES: Record<GameId, Guide> = {
         ],
       },
     ],
-    tips: ["Sacate de encima primero las fichas con números altos: si se tranca, pesan menos.", "Fijate qué números va pasando el rival: no los tiene."],
+    tips: ["Sácate de encima primero las fichas con números altos: si se tranca, pesan menos.", "Fíjate qué números va pasando el rival: no los tiene."],
   },
 };

@@ -199,7 +199,7 @@ export default function ProbableClient({ roomId }: { roomId: string }) {
 }
 
 function nameOf(state: ProbableState, id: string, myId: string): string {
-  return id === myId ? "vos" : (state.players[id]?.name ?? "?");
+  return id === myId ? "tú" : (state.players[id]?.name ?? "?");
 }
 
 function Avatar({ state, id, size = "h-7 w-7 text-xs" }: { state: ProbableState; id: string; size?: string }) {
@@ -262,7 +262,7 @@ function VotePanel({
   return (
     <div className={`${CARD} flex flex-col gap-3`}>
       <div className="flex items-baseline justify-between gap-2">
-        <p className="text-sm text-slate-300">{myVote ? "Votaste. Podés cambiarlo hasta que voten todos." : "Tocá a quien elijas (vale votarte)."}</p>
+        <p className="text-sm text-slate-300">{myVote ? "Votaste. Puedes cambiarlo hasta que voten todos." : "Toca a quien elijas (vale votarte)."}</p>
         <span className="shrink-0 text-xs text-slate-500">
           Votaron {voted} de {candidates.length}
         </span>
@@ -328,7 +328,7 @@ function RevealPanel({
             <Crown className="h-6 w-6 text-amber-300" />
             {top.length === 1
               ? top[0] === myId
-                ? "¡Sos vos!"
+                ? "¡Eres tú!"
                 : `¡${nameOf(state, top[0], myId)}!`
               : `Empate: ${top.map((id) => nameOf(state, id, myId)).join(" y ")}`}
           </p>
@@ -346,7 +346,7 @@ function RevealPanel({
               <Avatar state={state} id={target} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="truncate text-slate-200">{target === myId ? "Vos" : nameOf(state, target, myId)}</span>
+                  <span className="truncate text-slate-200">{target === myId ? "Tú" : nameOf(state, target, myId)}</span>
                   <span className="font-mono text-xs text-slate-400">{n}</span>
                 </div>
                 <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-800">
@@ -400,8 +400,8 @@ function FinalPanel({
         <p className="font-display text-2xl font-semibold text-slate-100">🏁 ¡Terminó!</p>
         {champion && (
           <p className="mt-1 text-slate-300">
-            {champion === myId ? "Vos" : nameOf(state, champion, myId)} se llevó más títulos ({state.titles[champion]}). El grupo ya
-            sabe todo de {champion === myId ? "vos" : "esa persona"}…
+            {champion === myId ? "Tú" : nameOf(state, champion, myId)} se llevó más títulos ({state.titles[champion]}). El grupo ya
+            sabe todo de {champion === myId ? "tú" : "esa persona"}…
           </p>
         )}
       </div>
@@ -414,7 +414,7 @@ function FinalPanel({
               <span className="font-semibold text-slate-100">
                 {state.history[`q${q}`]
                   .split(",")
-                  .map((id) => (id === myId ? "vos" : nameOf(state, id, myId)))
+                  .map((id) => (id === myId ? "tú" : nameOf(state, id, myId)))
                   .join(" y ")}
               </span>
             </li>
@@ -440,7 +440,7 @@ function Scoreboard({ state, presence, myId }: { state: ProbableState; presence:
         {rows.map((id) => (
           <li key={id} className={`flex items-center gap-2 ${id in presence ? "" : "opacity-40"}`}>
             <span className="flex-1 truncate" style={{ color: state.players[id]?.color }}>
-              {id === myId ? "Vos" : (state.players[id]?.name ?? "?")}
+              {id === myId ? "Tú" : (state.players[id]?.name ?? "?")}
             </span>
             {(state.titles[id] ?? 0) > 0 && (
               <span className="flex items-center gap-0.5 text-xs text-amber-300/80" title="Títulos">
@@ -453,7 +453,7 @@ function Scoreboard({ state, presence, myId }: { state: ProbableState; presence:
         ))}
       </ol>
       <p className="mt-3 border-t border-slate-800 pt-2 text-xs text-slate-500">
-        Sumás 1 punto cada vez que votás a quien termina más votado.
+        Sumas 1 punto cada vez que votas a quien termina más votado.
       </p>
     </aside>
   );

@@ -177,7 +177,7 @@ export default function YoNuncaClient({ roomId }: { roomId: string }) {
 }
 
 function nameOf(state: YoNuncaState, id: string, myId: string): string {
-  return id === myId ? "Vos" : (state.players[id]?.name ?? "?");
+  return id === myId ? "Tú" : (state.players[id]?.name ?? "?");
 }
 
 function Avatar({ state, id, size = "h-8 w-8 text-sm" }: { state: YoNuncaState; id: string; size?: string }) {
@@ -225,7 +225,7 @@ function AnswerPanel({
   return (
     <div className={`${CARD} flex flex-col items-center gap-4 text-center`}>
       <p className="text-sm text-slate-300">
-        {mine === undefined ? "¿Lo hiciste alguna vez? Nadie ve tu respuesta hasta el final." : "Listo. Podés cambiarla hasta que contesten todos."}
+        {mine === undefined ? "¿Lo hiciste alguna vez? Nadie ve tu respuesta hasta el final." : "Listo. Puedes cambiarla hasta que contesten todos."}
       </p>
       <div className="grid w-full max-w-sm grid-cols-2 gap-3">
         <button
@@ -337,12 +337,12 @@ function FinalPanel({ state, myId, onAgain }: { state: YoNuncaState; myId: strin
       <p className="font-display text-2xl font-semibold text-slate-100">🏁 ¡Terminó!</p>
       {top && (state.counts[top] ?? 0) > 0 && (
         <p className="text-slate-300">
-          😈 {top === myId ? "Vos sos" : `${nameOf(state, top, myId)} es`} quien más vivió ({state.counts[top]}).
+          😈 {top === myId ? "Tú eres" : `${nameOf(state, top, myId)} es`} quien más vivió ({state.counts[top]}).
         </p>
       )}
       {saint && saint !== top && (
         <p className="text-slate-400">
-          😇 {saint === myId ? "Vos sos" : `${nameOf(state, saint, myId)} es`} el/la más santo/a ({state.counts[saint] ?? 0}).
+          😇 {saint === myId ? "Tú eres" : `${nameOf(state, saint, myId)} es`} el/la más santo/a ({state.counts[saint] ?? 0}).
         </p>
       )}
       <button onClick={onAgain} className={`w-full max-w-xs ${SECONDARY_BUTTON}`}>

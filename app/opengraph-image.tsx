@@ -43,7 +43,7 @@ export default function Image() {
             <span>jugar juntos.</span>
           </div>
           <div style={{ marginTop: 28, fontSize: 32, fontWeight: 600, maxWidth: 430 }}>
-            Mandá el link por WhatsApp y en un minuto están jugando.
+            Manda el link por WhatsApp y en un minuto están jugando.
           </div>
         </div>
 

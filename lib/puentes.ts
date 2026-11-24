@@ -320,9 +320,9 @@ export function isStuck(pz: Puzzle, p: Play): boolean {
   return pz.bridges.every((_, i) => crossTarget(pz, p, i) < 0);
 }
 
-/** Today in Argentina (UTC−3), as yyyymmdd. */
+/** Today (UTC), as yyyymmdd: the same day for everyone. */
 export function dayKey(now: number): string {
-  return new Date(now - 3 * 3600_000).toISOString().slice(0, 10).replace(/-/g, "");
+  return new Date(now).toISOString().slice(0, 10).replace(/-/g, "");
 }
 
 /** The daily challenge: the same map for everyone today. */
@@ -335,8 +335,8 @@ export function tricksOf(pz: Puzzle): string[] {
   const out: string[] = [];
   if (pz.bridges.some((b) => b.oneWay)) out.push("Puentes de una mano: solo se cruzan hacia donde marca la flecha");
   if (pz.bridges.some((b) => b.times === 2)) out.push("Puentes dobles: hay que cruzarlos dos veces");
-  if (pz.start >= 0) out.push("Salida fija: empezá en la bandera verde");
-  if (pz.end >= 0) out.push("Llegada fija: terminá en la bandera a cuadros");
+  if (pz.start >= 0) out.push("Salida fija: empieza en la bandera verde");
+  if (pz.end >= 0) out.push("Llegada fija: termina en la bandera a cuadros");
   return out;
 }
 

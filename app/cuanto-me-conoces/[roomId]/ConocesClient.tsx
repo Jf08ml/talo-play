@@ -187,7 +187,7 @@ export default function ConocesClient({ roomId }: { roomId: string }) {
 }
 
 function nameOf(state: ConocesState, id: string, myId: string): string {
-  return id === myId ? "vos" : (state.players[id]?.name ?? "?");
+  return id === myId ? "tú" : (state.players[id]?.name ?? "?");
 }
 
 function Avatar({ state, id }: { state: ConocesState; id: string }) {
@@ -240,7 +240,7 @@ function TurnPanel({
         </span>
         <span className="flex items-center gap-1.5">
           <Avatar state={state} id={protagonist} />
-          <span style={{ color: state.players[protagonist]?.color }}>{isProtagonist ? "Te toca a vos" : `Le toca a ${protName}`}</span>
+          <span style={{ color: state.players[protagonist]?.color }}>{isProtagonist ? "Te toca a ti" : `Le toca a ${protName}`}</span>
         </span>
       </div>
 
@@ -252,8 +252,8 @@ function TurnPanel({
         {!revealing && (
           <p className="mt-1 text-sm text-slate-400">
             {isProtagonist
-              ? "Elegí tu respuesta. Nadie la ve hasta el final."
-              : `¿Qué creés que eligió ${protName}?`}
+              ? "Elige tu respuesta. Nadie la ve hasta el final."
+              : `¿Qué crees que eligió ${protName}?`}
           </p>
         )}
       </div>
@@ -342,12 +342,12 @@ function RevealFooter({
       ? `${nameOf(state, protagonist, myId)} no llegó a contestar.`
       : protagonist === myId
         ? right.length === 0
-          ? "Nadie te adivinó. ¡Sos un misterio!"
-          : `Te adivinaron ${right.length}: +${right.length} para vos.`
+          ? "Nadie te adivinó. ¡Eres un misterio!"
+          : `Te adivinaron ${right.length}: +${right.length} para ti.`
         : myGuess === undefined
           ? `${right.length} ${right.length === 1 ? "adivinó" : "adivinaron"}.`
           : myGuess === state.answer
-            ? "¡Adivinaste! +1 para vos y +1 para quien contestó."
+            ? "¡Adivinaste! +1 para ti y +1 para quien contestó."
             : "Esta vez no le acertaste.";
   return (
     <div className="flex flex-col items-center gap-3 text-center">
@@ -407,9 +407,9 @@ function FinalPanel({
             {bestFriends.map(({ p, best, n }) => (
               <li key={p}>
                 <span className="font-semibold" style={{ color: state.players[best]?.color }}>
-                  {best === myId ? "Vos" : nameOf(state, best, myId)}
+                  {best === myId ? "Tú" : nameOf(state, best, myId)}
                 </span>{" "}
-                {best === myId ? "conocés" : "conoce"} a{" "}
+                {best === myId ? "conoces" : "conoce"} a{" "}
                 <span className="font-semibold" style={{ color: state.players[p]?.color }}>
                   {nameOf(state, p, myId)}
                 </span>{" "}
@@ -434,7 +434,7 @@ function Scoreboard({ state, presence, myId }: { state: ConocesState; presence: 
         {rows.map((id) => (
           <li key={id} className={`flex items-center gap-2 ${id in presence ? "" : "opacity-40"}`}>
             <span className="flex-1 truncate" style={{ color: state.players[id]?.color }}>
-              {id === myId ? "Vos" : (state.players[id]?.name ?? "?")}
+              {id === myId ? "Tú" : (state.players[id]?.name ?? "?")}
             </span>
             <span className="w-8 text-right font-mono text-slate-200">{state.scores[id] ?? 0}</span>
           </li>

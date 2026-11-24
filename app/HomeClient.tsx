@@ -79,8 +79,8 @@ export default function HomeClient() {
               Juegos para jugar juntos.
             </h1>
             <p className="max-w-[500px] text-[17px] font-medium leading-[1.4] sm:text-[22px]">
-              <span className="hidden sm:inline">Elegí un juego, mandá el link por WhatsApp y en un minuto están jugando. Gratis y sin registrarse.</span>
-              <span className="sm:hidden">Mandá el link por WhatsApp y en un minuto están jugando.</span>
+              <span className="hidden sm:inline">Elige un juego, manda el link por WhatsApp y en un minuto están jugando. Gratis y sin registrarse.</span>
+              <span className="sm:hidden">Manda el link por WhatsApp y en un minuto están jugando.</span>
             </p>
             <div className="mt-2 hidden self-start rounded-[20px] bg-white p-5 sm:block">
               <JoinRoomForm id="code-desk" />
@@ -112,7 +112,7 @@ export default function HomeClient() {
         <section className="mx-auto flex max-w-[1360px] flex-col gap-6 px-5 pt-14 sm:gap-8 sm:px-10 sm:pt-24">
           <div className="flex flex-col gap-1.5">
             <h2 className="font-display text-[32px] leading-[1.05] tracking-[-0.01em] sm:text-[44px]">Juegos nuevos</h2>
-            <p className="text-[17px] text-talo-text-2">Lo último que sumamos a Talo. ¡Probalos!</p>
+            <p className="text-[17px] text-talo-text-2">Lo último que sumamos a Talo. ¡Pruébalos!</p>
           </div>
           <div className="-mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-5 px-5 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-[repeat(auto-fill,minmax(280px,1fr))] sm:gap-5 sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden">
             {fresh.slice(0, 4).map((id) => {
@@ -172,7 +172,7 @@ export default function HomeClient() {
           <h2 className="font-display text-[32px] leading-[1.05] tracking-[-0.01em] sm:text-[44px]">Todos los juegos</h2>
           <div
             role="group"
-            aria-label="¿Con quién jugás?"
+            aria-label="¿Con quién juegas?"
             className="-mx-5 flex max-w-[calc(100%+40px)] items-center gap-1 overflow-x-auto px-5 text-base [scrollbar-width:none] sm:mx-0 sm:max-w-full sm:flex-wrap sm:px-0 [&::-webkit-scrollbar]:hidden"
           >
             <span className="mr-1.5 shrink-0 font-medium text-talo-text-3">Para jugar</span>

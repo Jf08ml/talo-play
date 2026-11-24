@@ -205,7 +205,7 @@ export default function OndaClient({ roomId }: { roomId: string }) {
 }
 
 function nameOf(state: OndaState, id: string, myId: string): string {
-  return id === myId ? "Vos" : (state.players[id]?.name ?? "?");
+  return id === myId ? "Tú" : (state.players[id]?.name ?? "?");
 }
 
 /** Ticks while a phase has a clock; null when it doesn't. */
@@ -425,7 +425,7 @@ function TurnPanel({
           </span>
         )}
         <p className="font-display text-xl text-white sm:text-2xl">
-          {iAmPsychic ? "Vos das la pista" : `Da la pista: ${nameOf(state, psychic, myId)}`}
+          {iAmPsychic ? "Tú das la pista" : `Da la pista: ${nameOf(state, psychic, myId)}`}
         </p>
       </div>
 
@@ -440,7 +440,7 @@ function TurnPanel({
         (iAmPsychic ? (
           <form onSubmit={sendClue} className="flex w-full max-w-md flex-col gap-2">
             <p className="text-sm text-white/65">
-              La zona amarilla es el objetivo. Escribí una pista que lleve {state.mode === "equipos" ? "a tu equipo" : "a los demás"} justo ahí: una
+              La zona amarilla es el objetivo. Escribe una pista que lleve {state.mode === "equipos" ? "a tu equipo" : "a los demás"} justo ahí: una
               palabra, una cosa, un personaje…
             </p>
             <div className="flex gap-2">
@@ -475,7 +475,7 @@ function TurnPanel({
       {/* ---- Guessing, each on their own ---- */}
       {state.status === "guessing" && state.mode === "cada" && !iAmPsychic && myGuess === undefined && (
         <div className="flex w-full max-w-md flex-col gap-2">
-          <p className="text-sm text-white/65">Mové la aguja hasta donde creés que apunta la pista.</p>
+          <p className="text-sm text-white/65">Mueve la aguja hasta donde crees que apunta la pista.</p>
           <button onClick={() => submitGuess(roomId, myId, state.turnNo, needle, Math.max(1, guessers.length))} className={PRIMARY_BUTTON}>
             Confirmar
           </button>
@@ -505,11 +505,11 @@ function TurnPanel({
                   : "La aguja es de tu equipo: discútanla y cualquiera confirma."}
               </p>
               <button onClick={() => lockNeedle(roomId, myId, state.turnNo, needle)} className={PRIMARY_BUTTON}>
-                Confirmar acá
+                Confirmar aquí
               </button>
             </>
           ) : iAmPsychic ? (
-            <p className="text-sm text-white/65">Mirá cómo la mueven… ¡sin ayudar!</p>
+            <p className="text-sm text-white/65">Mira cómo la mueven… ¡sin ayudar!</p>
           ) : (
             <p className="text-sm text-white/65">El {turnTeam?.label} está ubicando la aguja. Después les toca apostar a ustedes.</p>
           )}
@@ -743,7 +743,7 @@ function TeamPicker({ roomId, state, myId, connected }: { roomId: string; state:
               </p>
               {list.map((id) => (
                 <p key={id} className={`truncate rounded-lg bg-white/5 px-2 py-1.5 text-center text-sm ${state.teams[id] ? "text-white" : "text-white/50"}`}>
-                  {id === myId ? "Vos" : state.players[id]?.name}
+                  {id === myId ? "Tú" : state.players[id]?.name}
                 </p>
               ))}
               {state.teams[myId] !== t.id && (

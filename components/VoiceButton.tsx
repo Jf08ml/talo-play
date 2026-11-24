@@ -105,7 +105,7 @@ export default function VoiceButton({ roomId }: { roomId: string }) {
           onClick={startVoiceAudio}
           className={`${PILL} animate-pulse bg-amber-500/20 text-amber-100 ring-amber-400/50`}
         >
-          <Volume2 className="h-3.5 w-3.5" /> Tocá para escuchar
+          <Volume2 className="h-3.5 w-3.5" /> Toca para escuchar
         </button>
       )}
 
@@ -128,7 +128,7 @@ export default function VoiceButton({ roomId }: { roomId: string }) {
                 />
                 <span className="min-w-0 flex-1 truncate">
                   {p.name}
-                  {p.me && <span className="text-slate-500"> (vos)</span>}
+                  {p.me && <span className="text-slate-500"> (tú)</span>}
                 </span>
                 {!p.micOn && <MicOff className="h-3.5 w-3.5 text-slate-500" aria-label="Micrófono apagado" />}
                 {!p.me && (

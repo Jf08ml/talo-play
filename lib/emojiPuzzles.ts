@@ -1,5 +1,5 @@
 /**
- * Puzzles for Adiviná con emojis. Rooms pick them by index, so the list is
+ * Puzzles for Adivina con emojis. Rooms pick them by index, so the list is
  * append-only: reordering or removing changes the puzzles of rooms already
  * created. `alt` are other accepted answers (titles as known in other
  * countries, the original name…).
@@ -97,7 +97,7 @@ export const EMOJI_PUZZLES: EmojiPuzzle[] = [
   { e: "🔨🏠🔪🪵", a: "En casa de herrero cuchillo de palo", cat: "dichos" },
   { e: "🌊🎣💰", a: "A río revuelto ganancia de pescadores", cat: "dichos" },
   { e: "🌙🐈🐈🐈", a: "De noche todos los gatos son pardos", cat: "dichos" },
-  { e: "👔🐢⏰", a: "Vísteme despacio que estoy apurado", alt: ["vistete despacio que estoy apurado", "visteme despacio que tengo prisa"], cat: "dichos" },
+  { e: "👔🐢⏰", a: "Vísteme despacio que estoy apurado", alt: ["vístete despacio que estoy apurado", "visteme despacio que tengo prisa"], cat: "dichos" },
   { e: "⏰🐢✅", a: "Más vale tarde que nunca", cat: "dichos" },
   { e: "😞➡️😊", a: "No hay mal que por bien no venga", cat: "dichos" },
   { e: "🍞🧅❤️", a: "Contigo pan y cebolla", cat: "dichos" },

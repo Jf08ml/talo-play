@@ -29,8 +29,8 @@ export default function InviteCard({ game, roomId }: { game: GameId; roomId: str
   return (
     <div className="flex flex-col gap-3.5">
       <div className="flex flex-col gap-1">
-        <h3 className="text-xl font-extrabold text-white">Sumá a los que faltan</h3>
-        <p className="text-[15px] text-white/70">Pasales el link o este código para que entren con su nombre.</p>
+        <h3 className="text-xl font-extrabold text-white">Suma a los que faltan</h3>
+        <p className="text-[15px] text-white/70">Pásales el link o este código para que entren con su nombre.</p>
       </div>
       <div role="img" aria-label={`Código de la sala: ${roomId.split("").join(" ")}`} className="flex gap-1.5">
         {roomId.split("").map((c, i) => (
@@ -77,7 +77,7 @@ export default function InviteCard({ game, roomId }: { game: GameId; roomId: str
         )}
       </div>
       <div className="flex flex-col gap-2 border-t border-white/10 pt-3.5">
-        <h4 className="text-[15px] font-bold text-white/80">O invitá a tus amigos de Talo</h4>
+        <h4 className="text-[15px] font-bold text-white/80">O invita a tus amigos de Talo</h4>
         <FriendInviteList game={game} roomId={roomId} />
       </div>
     </div>

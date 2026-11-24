@@ -22,7 +22,7 @@ export function Lives({ lives }: { lives: number }) {
 }
 
 export function goalText(goal: Goal): string {
-  return goal === "objetivos" ? "Rompé los objetivos rojos" : goal === "limpiar" ? "Rompé todos los ladrillos" : "Aguantá más que los demás";
+  return goal === "objetivos" ? "Rompe los objetivos rojos" : goal === "limpiar" ? "Rompe todos los ladrillos" : "Aguanta más que los demás";
 }
 
 export function GoalPill({ goal }: { goal: Goal }) {

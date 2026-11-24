@@ -94,7 +94,7 @@ export default function SoloGame({ start, onExit }: { start: SoloStart; onExit: 
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold">{daily ? "Reto del día" : `Nivel ${level}`}</p>
           <p className="text-xs text-white/60">
-            Cruzá los {totalCrossings(pz) === pz.bridges.length ? `${pz.bridges.length} puentes` : `${pz.bridges.length} puentes (${totalCrossings(pz)} cruces)`} sin repetir
+            Cruza los {totalCrossings(pz) === pz.bridges.length ? `${pz.bridges.length} puentes` : `${pz.bridges.length} puentes (${totalCrossings(pz)} cruces)`} sin repetir
           </p>
         </div>
         <span className="font-mono text-lg">{formatTime(elapsed / 1000)}</span>

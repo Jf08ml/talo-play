@@ -20,7 +20,7 @@ export const SETTINGS: GameSettings<Settings> = {
     {
       kind: "note",
       only: "create",
-      text: "Reglas completas: comer y entrar desde la barra, sacar fichas, cubo de doblaje, gammon y backgammon. La app solo deja hacer jugadas válidas y podés deshacer antes de terminar el turno.",
+      text: "Reglas completas: comer y entrar desde la barra, sacar fichas, cubo de doblaje, gammon y backgammon. La app solo deja hacer jugadas válidas y puedes deshacer antes de terminar el turno.",
     },
   ],
   create: (v, hostId) => createBackgammonRoom(v.matchTo, hostId),

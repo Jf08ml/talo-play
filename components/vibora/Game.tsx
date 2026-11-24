@@ -382,11 +382,12 @@ export default function ViboraGame({
     /** Announces a new cut (everyone) and sends its pieces flying to the cutter. */
     const announce = (victim: string, cut: ViboraCut, views: View[]) => {
       const st = stateRef.current;
-      const by = cut.by === myId ? "Vos" : snakeInfo(st, cut.by).name;
-      const who = victim === myId ? "a vos" : `a ${snakeInfo(st, victim).name}`;
+      const by = cut.by === myId ? "Tú" : snakeInfo(st, cut.by).name;
+      const who = victim === myId ? "a ti" : `a ${snakeInfo(st, victim).name}`;
       const tone = cut.by === myId ? "good" : victim === myId ? "bad" : null;
       const verb = cut.by === myId ? "le cortaste la cola" : "le cortó la cola";
-      pendingFeed.push({ key: ++feedKey, text: `${by} ${verb} ${who} · +${Math.floor(cut.gain)}`, tone, kind: "cut" });
+      const text = victim === myId ? `${by} te cortó la cola` : `${by} ${verb} ${who}`;
+      pendingFeed.push({ key: ++feedKey, text: `${text} · +${Math.floor(cut.gain)}`, tone, kind: "cut" });
       const v = views.find((x) => x.id === victim);
       if (!v) return;
       let acc = 0;
@@ -583,7 +584,7 @@ export default function ViboraGame({
           if (d.n <= (crashSeen.get(id) ?? 0)) continue;
           crashSeen.set(id, d.n);
           if (id === myId) continue;
-          const text = !d.by ? `${d.name} chocó contra el borde` : d.by === myId ? `${d.name} chocó contra vos` : `${d.name} chocó contra ${d.byName}`;
+          const text = !d.by ? `${d.name} chocó contra el borde` : d.by === myId ? `${d.name} chocó contra ti` : `${d.name} chocó contra ${d.byName}`;
           pendingFeed.push({ key: ++feedKey, text, tone: d.by === myId ? "good" : null, kind: "crash" });
         }
       }
@@ -843,7 +844,7 @@ export default function ViboraGame({
           mass: Math.floor(me?.mass ?? 0),
           rank,
           total: ranked.length,
-          top: ranked.slice(0, 5).map((v) => ({ id: v.id, name: v.id === myId ? "Vos" : v.name, color: v.color, mass: Math.floor(v.mass) })),
+          top: ranked.slice(0, 5).map((v) => ({ id: v.id, name: v.id === myId ? "Tú" : v.name, color: v.color, mass: Math.floor(v.mass) })),
           leaderId: ranked[0]?.id ?? null,
           gap: me && rank > 1 ? Math.floor(ranked[rank - 2].mass - me.mass) + 1 : null,
           secondsLeft: st.online ? null : Math.max(0, Math.ceil((st.endsAt - now) / 1000)),

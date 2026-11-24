@@ -73,7 +73,7 @@ function SoloCard({ onStart }: { onStart: (s: SoloStart) => void }) {
             </button>
           ))}
         </div>
-        {record !== undefined && <p className="text-xs text-slate-400">Tu mejor recorrido acá: {toPar(record, 0)} al par.</p>}
+        {record !== undefined && <p className="text-xs text-slate-400">Tu mejor recorrido aquí: {toPar(record, 0)} al par.</p>}
         <button onClick={() => onStart({ kind: "course", difficulty })} className={PRIMARY_BUTTON}>
           Jugar
         </button>
@@ -130,7 +130,7 @@ function OnlineCard() {
       router.push(`/minigolf/${id}`);
     } catch (err) {
       console.error(err);
-      setError("No se pudo entrar. Probá de nuevo.");
+      setError("No se pudo entrar. Prueba de nuevo.");
       setEntering(false);
     }
   };

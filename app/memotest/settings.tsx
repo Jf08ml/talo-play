@@ -87,7 +87,7 @@ export const SETTINGS: GameSettings<Settings> = {
         <div className="flex flex-col gap-2">
           {v.images.length > 0 && v.files.length === 0 && (
             <p className="text-xs text-slate-400">
-              La sala tiene {v.images.length} fotos. Si subís otras, reemplazan a esas.
+              La sala tiene {v.images.length} fotos. Si subes otras, reemplazan a esas.
             </p>
           )}
           <PhotoPicker files={v.files} onChange={(files) => set({ files })} max={MAX_PAIRS} />
@@ -134,10 +134,10 @@ export const SETTINGS: GameSettings<Settings> = {
             {v.rules.mode === "turnos" && (
               <>
                 <div>
-                  <p className={SECTION_LABEL}>Si acertás un par…</p>
+                  <p className={SECTION_LABEL}>Si aciertas un par…</p>
                   <div className="grid grid-cols-2 gap-1.5">
                     <button type="button" onClick={() => setRule({ extraTurn: true })} className={chipClass(v.rules.extraTurn)}>
-                      Seguís jugando
+                      Sigues jugando
                     </button>
                     <button type="button" onClick={() => setRule({ extraTurn: false })} className={chipClass(!v.rules.extraTurn)}>
                       Pasa el turno igual
@@ -168,10 +168,10 @@ export const SETTINGS: GameSettings<Settings> = {
   ],
   problem: (v) => {
     const photos = v.files.length || v.images.length;
-    if (v.kind === "fotos" && photos < MIN_PAIRS) return `Subí al menos ${MIN_PAIRS} fotos (tenés ${photos}).`;
+    if (v.kind === "fotos" && photos < MIN_PAIRS) return `Sube al menos ${MIN_PAIRS} fotos (tienes ${photos}).`;
     const filled = filledText(v).length;
-    if (v.kind === "texto" && filled < MIN_PAIRS) return `Completá al menos ${MIN_PAIRS} pares (tenés ${filled}).`;
-    if (v.kind === "texto" && filled < v.textPairs.length) return "Hay pares con un lado vacío: completalos o quitalos.";
+    if (v.kind === "texto" && filled < MIN_PAIRS) return `Completa al menos ${MIN_PAIRS} pares (tienes ${filled}).`;
+    if (v.kind === "texto" && filled < v.textPairs.length) return "Hay pares con un lado vacío: complétalos o quítalos.";
     return null;
   },
   create: (v, hostId) => createMemotestRoom(params(v), hostId),

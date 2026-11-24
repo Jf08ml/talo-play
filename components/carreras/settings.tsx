@@ -13,7 +13,7 @@ type Settings = { mode: CarrerasMode; track: TrackId; laps: number; bots: number
 
 const MODE_HINT: Record<CarrerasMode, string> = {
   pantalla:
-    "La carrera se ve en la compu conectada a la tele o al proyector, en 3D y dividida (una vista por piloto); los teléfonos son los volantes.",
+    "La carrera se ve en la computadora conectada a la tele o al proyector, en 3D y dividida (una vista por piloto); los teléfonos son los volantes.",
   telefono: "Sin proyector: cada uno ve la carrera en 3D en su teléfono y maneja desde ahí. Sirve también para jugar a distancia.",
 };
 
@@ -35,7 +35,7 @@ export function carrerasSettings(game: CarrerasGame): GameSettings<Settings> {
         kind: "note",
         show: () => !is3d,
         only: "create",
-        text: "Creá la sala desde la compu conectada a la tele o al proyector: esa pantalla muestra la pista desde arriba. Los pilotos entran desde el teléfono con el código.",
+        text: "Crea la sala desde la computadora conectada a la tele o al proyector: esa pantalla muestra la pista desde arriba. Los pilotos entran desde el teléfono con el código.",
       },
       {
         kind: "choice",
@@ -98,8 +98,8 @@ export function carrerasSettings(game: CarrerasGame): GameSettings<Settings> {
           v.bots === 0
             ? "Solo corren personas."
             : v.bots === 1
-              ? "Si queda un auto libre, lo maneja la compu. Si entra alguien más, se lo deja."
-              : `Hasta ${v.bots} autos libres los maneja la compu. Si entra más gente, les dejan el lugar.`,
+              ? "Si queda un auto libre, lo maneja la computadora. Si entra alguien más, se lo deja."
+              : `Hasta ${v.bots} autos libres los maneja la computadora. Si entra más gente, les dejan el lugar.`,
       },
       {
         kind: "choice",

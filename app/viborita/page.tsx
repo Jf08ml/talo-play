@@ -53,7 +53,7 @@ function OnlineCard() {
       router.push(`/viborita/${id}`);
     } catch (err) {
       console.error(err);
-      setError("No se pudo entrar. Probá de nuevo.");
+      setError("No se pudo entrar. Prueba de nuevo.");
       setEntering(false);
     }
   };
@@ -63,8 +63,8 @@ function OnlineCard() {
       <div>
         <h2 className="font-display text-lg font-semibold text-slate-100">Un mapa con gente de todos lados</h2>
         <p className="mt-1 text-sm text-slate-400">
-          No hay tiempo: crecé todo lo que puedas y llegá al primer puesto. Pero cuidado: si chocás contra la cabeza de otra víbora o
-          contra el borde, perdés y tu cuerpo queda para que se lo coman los demás.
+          No hay tiempo: crece todo lo que puedas y llega al primer puesto. Pero cuidado: si chocas contra la cabeza de otra víbora o
+          contra el borde, pierdes y tu cuerpo queda para que se lo coman los demás.
         </p>
       </div>
       {count !== null && count > 0 && (

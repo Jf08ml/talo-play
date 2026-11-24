@@ -119,7 +119,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
           // (rare, but possible before prepareImage started rejecting those)
           // would otherwise build a 0x0 layout and crash the canvas per-piece.
           throw new Error(
-            "La imagen de esta sala está dañada o en un formato no soportado. Creá una sala nueva con otra imagen."
+            "La imagen de esta sala está dañada o en un formato no soportado. Crea una sala nueva con otra imagen."
           );
         }
 

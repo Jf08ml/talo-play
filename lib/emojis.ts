@@ -8,7 +8,7 @@ import { levenshtein, normalizeText } from "./text";
 import { EMOJI_CATEGORIES, EMOJI_PUZZLES, type EmojiCategory, type EmojiPuzzle } from "./emojiPuzzles";
 
 /**
- * Adiviná con emojis. Same flow as Trivia (question → reveal → … →
+ * Adivina con emojis. Same flow as Trivia (question → reveal → … →
  * finished, in `rooms/{id}/emojis/state`), but answers are typed: each
  * player tries as many times as they want, checked locally with
  * `checkAnswer`, and only a right answer is recorded (`submitSolved`).

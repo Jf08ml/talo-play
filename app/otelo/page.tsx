@@ -25,7 +25,7 @@ export default function OteloHome() {
       router.push(roomPath("otelo", roomId));
     } catch (err) {
       console.error(err);
-      setCreateError("No se pudo crear la sala. Probá de nuevo.");
+      setCreateError("No se pudo crear la sala. Prueba de nuevo.");
       setCreating(false);
     }
   };
@@ -35,8 +35,8 @@ export default function OteloHome() {
       <form onSubmit={handleCreate} className={`${CARD} flex flex-col gap-4`}>
         <h2 className="font-display text-lg font-semibold text-slate-100">Crear una sala nueva</h2>
         <p className="text-sm text-slate-400">
-          Tablero de 8 × 8 con las reglas de siempre. La app te marca dónde podés jugar y da vuelta las fichas sola. Creá la
-          sala y mandale el link a tu rival.
+          Tablero de 8 × 8 con las reglas de siempre. La app te marca dónde puedes jugar y da vuelta las fichas sola. Crea la
+          sala y mándale el link a tu rival.
         </p>
         {createError && <p className="text-sm text-red-400">{createError}</p>}
         <button type="submit" disabled={creating} className={`mt-auto ${PRIMARY_BUTTON}`}>

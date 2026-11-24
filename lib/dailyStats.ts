@@ -2,7 +2,7 @@
 // (lib/roomCleanup.ts deletes idle rooms, and with them any trace of the day
 // they were played). Read by the internal page `/estadisticas`.
 //
-// `rooms/_stats/days/d{yyyymmdd}` (Argentina's day, like Viborita's and
+// `rooms/_stats/days/d{yyyymmdd}` (the UTC day, like Viborita's and
 // Puentes' daily tops):
 //   visits       browsers that opened Talo that day (once per browser and day)
 //   new          of those, browsers never seen before
@@ -32,9 +32,9 @@ const WEEK_KEY = "talo.visita.semana";
 const MONTH_KEY = "talo.visita.mes";
 const CLIENT_ID_KEY = "salon.clientId";
 
-/** Today in Argentina (UTC−3), as yyyymmdd. */
+/** Today (UTC), as yyyymmdd: the same day for everyone. */
 export function statsDay(now = Date.now()): string {
-  return new Date(now - 3 * 3600_000).toISOString().slice(0, 10).replace(/-/g, "");
+  return new Date(now).toISOString().slice(0, 10).replace(/-/g, "");
 }
 
 /** The Monday of `day`'s week (yyyymmdd): the key of its week. */

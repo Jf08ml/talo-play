@@ -248,7 +248,7 @@ export default function PalabraClient({ roomId }: { roomId: string }) {
               <div className={`${CARD} !p-4`}>
                 <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-slate-500">Rivales</h2>
                 {others.length === 0 ? (
-                  <p className="text-sm text-slate-500">Compartí el enlace para que se sumen otros.</p>
+                  <p className="text-sm text-slate-500">Comparte el enlace para que se sumen otros.</p>
                 ) : (
                   <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
                     {others.map((id) => (
@@ -378,7 +378,7 @@ function TopBar({
   const mine = state.results[myId];
   if (state.winner || allDone) {
     const w = state.winner ? state.results[state.winner] : null;
-    const name = state.winner === myId ? "Vos" : (state.players[state.winner]?.name ?? "?");
+    const name = state.winner === myId ? "Tú" : (state.players[state.winner]?.name ?? "?");
     return (
       <div
         className={`animate-celebration-in flex w-full flex-col items-center gap-2 rounded-2xl border bg-slate-900 p-4 text-center ${
@@ -396,7 +396,7 @@ function TopBar({
         {w && (
           <p className="text-sm text-slate-400">
             {formatClock(w.ms)} · {w.tries} {w.tries === 1 ? "intento" : "intentos"}
-            {!mine && " · Podés terminar la tuya igual."}
+            {!mine && " · Puedes terminar la tuya igual."}
           </p>
         )}
         {mine && (
@@ -436,7 +436,7 @@ function Ranking({ state, myId }: { state: PalabraState; myId: string }) {
           <li key={id} className={`flex items-center gap-2 ${r.solved ? "" : "opacity-60"}`}>
             <span className="w-6">{r.solved ? (medals[i] ?? `${i + 1}.`) : "✗"}</span>
             <span className="flex-1 truncate" style={{ color: state.players[id]?.color }}>
-              {id === myId ? "Vos" : (state.players[id]?.name ?? "?")}
+              {id === myId ? "Tú" : (state.players[id]?.name ?? "?")}
             </span>
             <span className="font-mono text-slate-200">{r.solved ? formatClock(r.ms) : "—"}</span>
             <span className="w-16 text-right text-xs text-slate-500">
@@ -498,7 +498,7 @@ function WinsTally({ state, myId }: { state: PalabraState; myId: string }) {
   return (
     <p className="text-center text-sm text-slate-400">
       Ganadas:{" "}
-      {rows.map(([id, n]) => `${id === myId ? "vos" : (state.players[id]?.name ?? "?")} ${n}`).join(" · ")}
+      {rows.map(([id, n]) => `${id === myId ? "tú" : (state.players[id]?.name ?? "?")} ${n}`).join(" · ")}
     </p>
   );
 }

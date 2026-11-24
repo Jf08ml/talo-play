@@ -108,17 +108,17 @@ export function stepSeconds(step: number, drawSeconds: number): number {
 
 /** Ideas for the first phrase, for whoever goes blank. */
 export const PHRASE_IDEAS = [
-  "Un gato manejando un colectivo",
+  "Un gato manejando un autobús",
   "Mi abuela haciendo paracaidismo",
   "Un dinosaurio tomando mate",
   "Un pingüino en la playa con sombrilla",
   "El presidente bailando cumbia",
-  "Un robot enamorado de una heladera",
+  "Un robot enamorado de una refrigerador",
   "Una vaca en patineta",
   "Un fantasma con miedo a la oscuridad",
   "Un perro cocinando un asado",
   "Un astronauta perdido en el supermercado",
-  "Una sirena en el subte",
+  "Una sirena en el metro",
   "Un caracol ganando una carrera",
   "Un oso haciendo yoga",
   "Un pirata con celular",
@@ -127,7 +127,7 @@ export const PHRASE_IDEAS = [
   "Un elefante escondido detrás de un árbol",
   "Un superhéroe lavando los platos",
   "Una jirafa con bufanda",
-  "Un tiburón en una pileta de lona",
+  "Un tiburón en una piscina inflable",
 ];
 
 // ---- Firebase ------------------------------------------------------------

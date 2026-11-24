@@ -119,7 +119,7 @@ export default function CodigoClient({ roomId }: { roomId: string }) {
                 <StatusBar roomId={roomId} state={state} board={board} myId={myId} />
                 {state.status === "playing" && myself && !myself.team && (
                   <div className={`${CARD} !p-3 flex flex-wrap items-center justify-center gap-2 text-sm`}>
-                    <span className="text-slate-300">Llegaste con la partida empezada. Sumate como agente:</span>
+                    <span className="text-slate-300">Llegaste con la partida empezada. Únete como agente:</span>
                     {TEAMS.map((t) => (
                       <button
                         key={t.id}
@@ -186,7 +186,7 @@ function TeamSetup({
                     <span>{p.spymaster ? "🕵️" : "👤"}</span>
                     <span className="text-slate-200">
                       {p.name}
-                      {id === myId && <span className="text-slate-500"> (vos)</span>}
+                      {id === myId && <span className="text-slate-500"> (tú)</span>}
                       {id === hostId && <span title="Anfitrión"> 👑</span>}
                     </span>
                     {p.spymaster && <span className="text-xs text-slate-500">jefe de espías</span>}
@@ -220,7 +220,7 @@ function TeamSetup({
 
       {unassigned.length > 0 && (
         <p className="text-center text-sm text-slate-500">
-          Sin equipo: {unassigned.map(([id, p]) => (id === myId ? "vos" : p.name)).join(", ")}
+          Sin equipo: {unassigned.map(([id, p]) => (id === myId ? "tú" : p.name)).join(", ")}
         </p>
       )}
 
@@ -428,7 +428,7 @@ function SidePanel({ state, presence, myId }: { state: CodigoState; presence: Pr
               .map(([id, p]) => (
                 <li key={id} className={id in presence ? "" : "opacity-40"}>
                   {p.spymaster ? "🕵️" : "👤"} <span className="text-slate-200">{p.name}</span>
-                  {id === myId && <span className="text-slate-500"> (vos)</span>}
+                  {id === myId && <span className="text-slate-500"> (tú)</span>}
                 </li>
               ))}
           </ul>

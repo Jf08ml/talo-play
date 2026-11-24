@@ -87,7 +87,7 @@ export function SiteFooter() {
           ))}
         </p>
         <Link href="/ideas" className="w-fit text-[17px] font-semibold text-talo-hero underline-offset-4 hover:underline">
-          ¿Qué juego sumamos? Dejanos tu idea
+          ¿Qué juego sumamos? Déjanos tu idea
         </Link>
         <p
           aria-hidden="true"

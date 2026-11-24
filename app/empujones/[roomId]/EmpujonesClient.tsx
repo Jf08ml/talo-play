@@ -154,9 +154,9 @@ function TryPad({ roomId, myId, state, color }: { roomId: string; myId: string; 
     <div className="flex flex-col gap-3 rounded-[20px] border border-white/[0.08] bg-[#1c1c1c] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-bold text-white">{watching ? "Vas a mirar" : "Probá el control"}</p>
+          <p className="font-bold text-white">{watching ? "Vas a mirar" : "Prueba el control"}</p>
           <p className="mt-0.5 text-sm text-white/60">
-            {watching ? "No vas a tener talo en la isla. Podés cambiarlo hasta que empiece." : "Tu talo ya está en la isla de la pantalla: caminá y empujá mientras esperan."}
+            {watching ? "No vas a tener talo en la isla. Puedes cambiarlo hasta que empiece." : "Tu talo ya está en la isla de la pantalla: camina y empuja mientras esperan."}
           </p>
         </div>
         <button
@@ -203,20 +203,20 @@ function Playing({ roomId, state, live, myId }: { roomId: string; state: Empujon
     return (
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
         <MonitorPlay className="h-10 w-10 text-talo-hero" />
-        <p className="font-display text-2xl text-white">Mirá la isla en la pantalla</p>
-        <p className="text-sm text-white/60">Esta partida ya empezó: entrás en la próxima.</p>
+        <p className="font-display text-2xl text-white">Mira la isla en la pantalla</p>
+        <p className="text-sm text-white/60">Esta partida ya empezó: entras en la próxima.</p>
       </main>
     );
   }
 
-  const lastWinner = state.lastWinner ? (state.lastWinner === myId ? "¡La ganaste vos!" : `Ganó ${playerInfo(state, state.lastWinner).name}`) : "Se cayeron todos";
+  const lastWinner = state.lastWinner ? (state.lastWinner === myId ? "¡La ganaste tú!" : `Ganó ${playerInfo(state, state.lastWinner).name}`) : "Se cayeron todos";
   const line = between
     ? `Ronda ${state.lastRound + 1}: ${lastWinner}`
     : counting
       ? `Ronda ${state.round + 1} en ${left}…`
       : out
-        ? "¡Al agua! Esperá la próxima ronda"
-        : "¡Empujá a los demás al agua!";
+        ? "¡Al agua! Espera la próxima ronda"
+        : "¡Empuja a los demás al agua!";
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-3 p-3">
@@ -224,7 +224,7 @@ function Playing({ roomId, state, live, myId }: { roomId: string; state: Empujon
         <span className="h-9 w-9 shrink-0 rounded-full border-[3px] border-talo-ink" style={{ background: info.color }} />
         <div className="min-w-0 flex-1">
           <p className={`truncate font-bold ${out ? "text-[#FF5FA2]" : "text-white"}`}>{line}</p>
-          <p className="text-xs text-white/50">Mirá tu talo en la pantalla: es el de este color.</p>
+          <p className="text-xs text-white/50">Mira tu talo en la pantalla: es el de este color.</p>
         </div>
         <div className="flex shrink-0 flex-col items-end">
           <span className="flex gap-1">
@@ -254,7 +254,7 @@ function ScreenCard({ roomId }: { roomId: string }) {
         <MonitorPlay className="mt-0.5 h-6 w-6 shrink-0 text-talo-hero" />
         <div>
           <p className="font-bold text-white">La isla se ve en una pantalla grande</p>
-          <p className="mt-1 text-sm text-white/60">Si todavía no está abierta, abrí este link en la compu conectada a la tele o al proyector. Tu celular es el control.</p>
+          <p className="mt-1 text-sm text-white/60">Si todavía no está abierta, abre este link en la computadora conectada a la tele o al proyector. Tu celular es el control.</p>
         </div>
       </div>
       <p className="break-all rounded-xl bg-black/40 px-3 py-2 font-code text-sm text-white/80">

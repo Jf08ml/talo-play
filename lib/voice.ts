@@ -71,7 +71,7 @@ function refresh() {
   if (!room) return;
   const local = room.localParticipant;
   const people: VoicePerson[] = [
-    { id: local.identity, name: local.name || "Vos", me: true, speaking: local.isSpeaking, micOn: local.isMicrophoneEnabled, silenced: false },
+    { id: local.identity, name: local.name || "Tú", me: true, speaking: local.isSpeaking, micOn: local.isMicrophoneEnabled, silenced: false },
     ...[...room.remoteParticipants.values()].map((p) => ({
       id: p.identity,
       name: p.name || "Jugador",
@@ -137,7 +137,7 @@ export async function joinVoice(roomId: string, clientId: string, name: string):
     try {
       await r.localParticipant.setMicrophoneEnabled(true);
     } catch {
-      set({ error: "Sin permiso de micrófono: escuchás, pero no te escuchan." });
+      set({ error: "Sin permiso de micrófono: escuchas, pero no te escuchan." });
     }
     refresh();
   } catch (err) {
@@ -163,7 +163,7 @@ export async function toggleMic(): Promise<void> {
     await room.localParticipant.setMicrophoneEnabled(!room.localParticipant.isMicrophoneEnabled);
     set({ error: null });
   } catch {
-    set({ error: "Sin permiso de micrófono: escuchás, pero no te escuchan." });
+    set({ error: "Sin permiso de micrófono: escuchas, pero no te escuchan." });
   }
   refresh();
 }

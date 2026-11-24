@@ -3,7 +3,7 @@ import AmigosClient from "./AmigosClient";
 
 export const metadata: Metadata = {
   title: "Amigos",
-  description: "Agregá a tus amigos en Talo con su código e invitalos a jugar directo, sin mandar links.",
+  description: "Agrega a tus amigos en Talo con su código e invítalos a jugar directo, sin mandar links.",
   robots: { index: false },
 };
 

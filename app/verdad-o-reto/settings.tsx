@@ -25,7 +25,7 @@ export const SETTINGS: GameSettings<Settings> = {
     },
     { kind: "note", only: "edit", text: "No tiene final, así que el nivel se puede cambiar también en medio de la partida." },
   ],
-  problem: (v) => (v.levels.length === 0 ? "Elegí al menos un nivel." : null),
+  problem: (v) => (v.levels.length === 0 ? "Elige al menos un nivel." : null),
   create: (v, hostId) => createRetoRoom(v, hostId),
   // Endless: the next cards use the new levels.
   save: (roomId, v) => saveRoomSettings(roomId, "reto/state", v, {}, { anyStatus: true }),

@@ -59,7 +59,7 @@ function SoloCard({ onStart }: { onStart: (s: SoloStart) => void }) {
         <div>
           <h2 className="font-display text-lg text-slate-100">Niveles sin fin</h2>
           <p className="mt-1 text-sm text-slate-400">
-            Cada mapa se inventa en el momento: nunca vas a ver dos iguales. A medida que subís aparecen puentes de una mano, puentes dobles y mapas que no
+            Cada mapa se inventa en el momento: nunca vas a ver dos iguales. A medida que subes aparecen puentes de una mano, puentes dobles y mapas que no
             tienen solución.
           </p>
         </div>
@@ -78,7 +78,7 @@ function SoloCard({ onStart }: { onStart: (s: SoloStart) => void }) {
           <CalendarDays className="h-5 w-5 text-talo-hero" />
           <h2 className="font-display text-lg text-slate-100">Reto del día</h2>
         </div>
-        <p className="text-sm text-slate-400">El mismo mapa para todos, uno nuevo cada día. Tenés un solo intento: gana el más rápido.</p>
+        <p className="text-sm text-slate-400">El mismo mapa para todos, uno nuevo cada día. Tienes un solo intento: gana el más rápido.</p>
         {top.length > 0 && (
           <ol className="flex flex-col gap-1 text-sm">
             {top.slice(0, 3).map((e, i) => (
@@ -123,7 +123,7 @@ function OnlineCard() {
       router.push(`/puentes/${id}`);
     } catch (err) {
       console.error(err);
-      setError("No se pudo entrar. Probá de nuevo.");
+      setError("No se pudo entrar. Prueba de nuevo.");
       setEntering(false);
     }
   };

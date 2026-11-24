@@ -7,15 +7,15 @@ export default function FirebaseSetupNotice() {
         </h1>
         <p className="mt-2 text-sm">
           Esta app necesita un proyecto de Firebase (Realtime Database + Storage + Auth
-          anónimo) para sincronizar las piezas en vivo. Completá{" "}
+          anónimo) para sincronizar las piezas en vivo. Completa{" "}
           <code className="rounded bg-amber-500/20 px-1 py-0.5 text-xs text-amber-200">
             .env.local
           </code>{" "}
-          con las credenciales de tu proyecto — mirá el{" "}
+          con las credenciales de tu proyecto — mira el{" "}
           <code className="rounded bg-amber-500/20 px-1 py-0.5 text-xs text-amber-200">
             README.md
           </code>{" "}
-          para el paso a paso, y después reiniciá{" "}
+          para el paso a paso, y después reinicia{" "}
           <code className="rounded bg-amber-500/20 px-1 py-0.5 text-xs text-amber-200">
             npm run dev
           </code>

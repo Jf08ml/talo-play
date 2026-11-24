@@ -263,7 +263,7 @@ function TurnBar({
   drawSeconds: number;
   totalTurns: number;
 }) {
-  const drawerName = state.drawer === myId ? "Vos" : state.players[state.drawer]?.name ?? "?";
+  const drawerName = state.drawer === myId ? "Tú" : state.players[state.drawer]?.name ?? "?";
   const secondsLeft = now ? Math.max(0, Math.ceil((deadline - now) / 1000)) : null;
   const iKnow = state.drawer === myId || !!state.guessed[myId] || state.status === "reveal";
   const elapsed = now ? 1 - (deadline - now) / (drawSeconds * 1000) : 0;
@@ -361,7 +361,7 @@ function Board({
 
         {state.status === "choosing" && isDrawer && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-xl bg-slate-950/80 p-4 backdrop-blur-sm">
-            <p className="font-display text-lg font-semibold text-slate-100">Elegí una palabra para dibujar</p>
+            <p className="font-display text-lg font-semibold text-slate-100">Elige una palabra para dibujar</p>
             <div className="flex flex-wrap justify-center gap-2">
               {options.map((w) => (
                 <button
@@ -393,7 +393,7 @@ function Board({
                 ? "Nadie la adivinó 😅"
                 : Object.entries(state.guessed)
                     .sort((a, b) => a[1].at - b[1].at)
-                    .map(([id, g]) => `${id === myId ? "Vos" : state.players[id]?.name ?? "?"} +${g.points}`)
+                    .map(([id, g]) => `${id === myId ? "Tú" : state.players[id]?.name ?? "?"} +${g.points}`)
                     .join(" · ")}
             </p>
           </div>
@@ -518,10 +518,10 @@ function Chat({
   return (
     <div className={`${CARD} !p-3 flex h-80 flex-col gap-2 lg:h-[26rem]`}>
       <div ref={listRef} className="flex-1 space-y-1 overflow-y-auto pr-1 text-sm">
-        {lines.length === 0 && <p className="text-slate-600">Escribí acá lo que creés que es.</p>}
+        {lines.length === 0 && <p className="text-slate-600">Escribe aquí lo que crees que es.</p>}
         {lines.map((l) => {
           const p = state.players[l.by];
-          const name = l.by === myId ? "Vos" : p?.name ?? "?";
+          const name = l.by === myId ? "Tú" : p?.name ?? "?";
           if (l.points !== undefined) {
             return (
               <p key={l.key} className="rounded-md bg-emerald-500/10 px-2 py-0.5 font-medium text-emerald-300">
@@ -541,7 +541,7 @@ function Chat({
       </div>
       {close && (
         <p className="rounded-md bg-amber-500/10 px-2 py-1 text-xs text-amber-300">
-          ¡Casi! &quot;{close}&quot; está muy cerca. Revisá cómo lo escribiste.
+          ¡Casi! &quot;{close}&quot; está muy cerca. Revisa cómo lo escribiste.
         </p>
       )}
       <form onSubmit={submit} className="flex gap-1.5">
@@ -554,10 +554,10 @@ function Chat({
             isDrawer && state.status === "drawing"
               ? "Estás dibujando 🎨"
               : state.guessed[myId] && state.status === "drawing"
-                ? "¡Ya adivinaste! Esperá a los demás"
+                ? "¡Ya adivinaste! Espera a los demás"
                 : guessing
                   ? "¿Qué es?"
-                  : "Escribí algo…"
+                  : "Escribe algo…"
           }
           className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-violet-500 disabled:opacity-50"
         />
@@ -595,7 +595,7 @@ function Scoreboard({ state, presence, myId }: { state: DibujoState; presence: P
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: p?.color }} />
               <span className="flex-1 truncate text-sm text-slate-200">
                 {p?.name ?? "?"}
-                {id === myId && <span className="text-slate-500"> (vos)</span>}
+                {id === myId && <span className="text-slate-500"> (tú)</span>}
               </span>
               {inTurn && id === state.drawer && <span title="Dibuja">✏️</span>}
               {inTurn && state.guessed[id] && <span className="text-emerald-400">✓</span>}

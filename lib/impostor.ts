@@ -131,7 +131,7 @@ export function guessMatches(guess: string, word: string): boolean {
 /** A clue can't be (or contain) the secret word. */
 export function clueProblem(clue: string, word: string): string | null {
   const c = normalizeText(clue);
-  if (!c) return "Escribí una pista.";
+  if (!c) return "Escribe una pista.";
   const w = normalizeText(word);
   if (c === w || (w.length >= 4 && c.includes(w))) return "¡No vale decir la palabra!";
   return null;

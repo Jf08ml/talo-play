@@ -13,7 +13,7 @@ export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://taloplay.c
 export const SITE_NAME = "Talo";
 
 export const SITE_DESCRIPTION =
-  "Juegos online gratis para jugar juntos desde el celular: en pareja, con amigos, en grupo o solo. Elegí un juego, mandá el link por WhatsApp y ya están jugando. Sin registrarse ni descargar nada.";
+  "Juegos online gratis para jugar juntos desde el celular: en pareja, con amigos, en grupo o solo. Elige un juego, manda el link por WhatsApp y ya están jugando. Sin registrarse ni descargar nada.";
 
 const CONTEXT_PHRASE: Record<PlayContext, string> = {
   pareja: "en pareja",
@@ -45,8 +45,8 @@ function gameTitle(game: GameId): string {
 function gameDescription(game: GameId): string {
   const info = GAMES[game];
   // Most taglines already say where it's played: don't say "desde el celular" twice.
-  const where = /celular|teléfono|compu/i.test(info.tagline) ? "" : " desde el celular o la compu";
-  return `${info.tagline} Jugá ${contextsText(info.contexts)}${where}: ${playersText(game)}, ${info.duration}. Gratis y sin registrarse.`;
+  const where = /celular|teléfono|computadora/i.test(info.tagline) ? "" : " desde el celular o la computadora";
+  return `${info.tagline} Juega ${contextsText(info.contexts)}${where}: ${playersText(game)}, ${info.duration}. Gratis y sin registrarse.`;
 }
 
 /** The game's preview image (`app/og/[game]`): its scene on its shelf's color. */
@@ -63,7 +63,7 @@ export function gameFaq(game: GameId): { q: string; a: string }[] {
     },
     {
       q: "¿Hay que pagar, descargar algo o registrarse?",
-      a: `No. ${info.title} es gratis y se juega desde el navegador del celular o la compu, sin instalar nada ni crear una cuenta: solo ponés un nombre.`,
+      a: `No. ${info.title} es gratis y se juega desde el navegador del celular o la computadora, sin instalar nada ni crear una cuenta: solo pones un nombre.`,
     },
   ];
   if (info.maxPlayers > 1) {
@@ -197,19 +197,19 @@ export function landingJsonLd(slug: string) {
 export const HOME_FAQ: { q: string; a: string }[] = [
   {
     q: "¿Qué es Talo?",
-    a: `Talo es una colección de ${GAME_ORDER.length} juegos sociales online para jugar juntos desde el celular o la compu: trivia, El impostor, Tutti Frutti, Dibujá y adiviná, Memotest, 4 en línea, Batalla naval, Generala y más.`,
+    a: `Talo es una colección de ${GAME_ORDER.length} juegos sociales online para jugar juntos desde el celular o la computadora: trivia, El impostor, Tutti Frutti, Dibuja y adivina, Memotest, 4 en línea, Batalla naval, Generala y más.`,
   },
   {
     q: "¿Es gratis? ¿Hay que registrarse o descargar algo?",
-    a: "Es gratis y no hace falta registrarse ni instalar nada: se juega desde el navegador. Solo ponés un nombre para que los demás te reconozcan.",
+    a: "Es gratis y no hace falta registrarse ni instalar nada: se juega desde el navegador. Solo pones un nombre para que los demás te reconozcan.",
   },
   {
     q: "¿Cómo invito a mis amigos?",
-    a: "Elegí un juego y creá una sala. Mandá el link por WhatsApp (o pasá el código de 6 letras): tocan el link, escriben su nombre y entran a jugar.",
+    a: "Elige un juego y crea una sala. Manda el link por WhatsApp (o pasa el código de 6 letras): tocan el link, escriben su nombre y entran a jugar.",
   },
   {
     q: "¿Y si no tengo con quién jugar?",
-    a: "Abrí la Plaza (el botón negro de abajo a la izquierda): ahí ves cuánta gente está jugando, podés saludar y sumarte a las salas que buscan jugadores. Si tu sala necesita más gente, tocá «Buscar gente en la Plaza» en la sala de espera.",
+    a: "Abre la Plaza (el botón negro de abajo a la izquierda): ahí ves cuánta gente está jugando, puedes saludar y sumarte a las salas que buscan jugadores. Si tu sala necesita más gente, toca «Buscar gente en la Plaza» en la sala de espera.",
   },
   {
     q: "¿Qué juegos hay para jugar en pareja?",
@@ -293,7 +293,7 @@ export function llmsText(): string {
     "",
     `> ${SITE_DESCRIPTION}`,
     "",
-    "Talo es una web app en español (Argentina) con juegos sociales multijugador en tiempo real. Cómo se usa: elegís un juego, creás una sala, mandás el link (o el código de 6 letras) por WhatsApp y los demás entran poniendo solo un nombre. No hay cuentas, descargas ni pagos.",
+    "Talo es una web app en español con juegos sociales multijugador en tiempo real. Cómo se usa: eliges un juego, creas una sala, mandas el link (o el código de 6 letras) por WhatsApp y los demás entran poniendo solo un nombre. No hay cuentas, descargas ni pagos.",
     "",
     "## Preguntas frecuentes",
     "",

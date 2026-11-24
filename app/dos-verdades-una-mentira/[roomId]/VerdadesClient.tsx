@@ -169,7 +169,7 @@ export default function VerdadesClient({ roomId }: { roomId: string }) {
 }
 
 function nameOf(state: VerdadesState, id: string, myId: string): string {
-  return id === myId ? "vos" : (state.players[id]?.name ?? "?");
+  return id === myId ? "tú" : (state.players[id]?.name ?? "?");
 }
 
 function Avatar({ state, id }: { state: VerdadesState; id: string }) {
@@ -241,8 +241,8 @@ function WritingPanel({
       ) : (
         <form onSubmit={submit} className="flex flex-col gap-3">
           <div className="text-center">
-            <p className="font-display text-lg font-semibold text-slate-100">Escribí tres cosas sobre vos</p>
-            <p className="text-sm text-slate-400">Dos verdaderas y una mentira. Tocá «mentira» en la inventada.</p>
+            <p className="font-display text-lg font-semibold text-slate-100">Escribe tres cosas sobre ti</p>
+            <p className="text-sm text-slate-400">Dos verdaderas y una mentira. Toca «mentira» en la inventada.</p>
           </div>
           {texts.map((t, i) => (
             <div key={i} className="flex items-center gap-2">
@@ -271,7 +271,7 @@ function WritingPanel({
             Listo
           </button>
           {!complete && texts.every((x) => x.trim()) && (
-            <p className="text-center text-xs text-amber-300/90">Marcá cuál de las tres es la mentira.</p>
+            <p className="text-center text-xs text-amber-300/90">Marca cuál de las tres es la mentira.</p>
           )}
         </form>
       )}
@@ -311,7 +311,7 @@ function VotingPanel({
     : isAuthor
       ? fooled === 0
         ? "Nadie se la creyó. 😅"
-        : `Engañaste a ${fooled}: +${fooled} para vos.`
+        : `Engañaste a ${fooled}: +${fooled} para ti.`
       : myVote === undefined
         ? `${right} ${right === 1 ? "acertó" : "acertaron"}.`
         : myVote === st.lie
@@ -389,7 +389,7 @@ function VotingPanel({
       </div>
       {!revealing && !isAuthor && (
         <p className="text-center text-sm text-slate-400">
-          {myVote === undefined ? "Tocá la que creas que es mentira." : "Votaste. Podés cambiarlo hasta que voten todos."}
+          {myVote === undefined ? "Toca la que creas que es mentira." : "Votaste. Puedes cambiarlo hasta que voten todos."}
         </p>
       )}
       {revealing && (
@@ -432,7 +432,7 @@ function Scoreboard({ state, presence, myId }: { state: VerdadesState; presence:
         {rows.map((id) => (
           <li key={id} className={`flex items-center gap-2 ${id in presence ? "" : "opacity-40"}`}>
             <span className="flex-1 truncate" style={{ color: state.players[id]?.color }}>
-              {id === myId ? "Vos" : (state.players[id]?.name ?? "?")}
+              {id === myId ? "Tú" : (state.players[id]?.name ?? "?")}
             </span>
             {state.status === "writing" && state.statements[id] && <span className="text-xs text-emerald-400">✓</span>}
             <span className="w-8 text-right font-mono text-slate-200">{state.scores[id] ?? 0}</span>

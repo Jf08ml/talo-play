@@ -37,7 +37,7 @@ export default function RompecabezasHome() {
     } catch (err) {
       console.error(err);
       setCreateError(
-        err instanceof Error ? err.message : "No se pudo crear la sala. Probá de nuevo."
+        err instanceof Error ? err.message : "No se pudo crear la sala. Prueba de nuevo."
       );
       setCreating(false);
     }

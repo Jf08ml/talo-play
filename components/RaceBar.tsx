@@ -40,7 +40,7 @@ function TeamProgress({
     <div className="flex flex-1 items-center gap-2">
       <span className="w-24 shrink-0 truncate text-xs font-medium text-slate-300">
         {label}
-        {isMine ? " (vos)" : ""}
+        {isMine ? " (tú)" : ""}
       </span>
       <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-800">
         <div

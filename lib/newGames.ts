@@ -9,8 +9,8 @@ import { GAME_ORDER, GAMES, type GameId } from "./games";
 export const NEW_DAYS = 21;
 const DAY_MS = 86_400_000;
 
-/** Midnight of the release day in Argentina (UTC−3). */
-const releaseMs = (day: string) => Date.parse(`${day}T00:00:00-03:00`);
+/** Midnight (UTC) of the release day. */
+const releaseMs = (day: string) => Date.parse(`${day}T00:00:00Z`);
 
 export function isNew(game: GameId, now = Date.now()): boolean {
   const day = GAMES[game].addedAt;

@@ -159,10 +159,10 @@ export function fallReason(jumpAt: number, kickAt: number, c: number): FallReaso
 }
 
 export const FALL_TEXT: Record<FallReason, string> = {
-  late: "Llegaste tarde: apretá apenas se ilumina el botón",
+  late: "Llegaste tarde: aprieta apenas se ilumina el botón",
   early: "Saltaste muy temprano: ya estabas bajando cuando pasó",
-  kickEarly: "Pateaste antes de tiempo: esperá a que se ponga verde",
-  nothing: "No saltaste ni pateaste: cuando llegue, apretá el botón que se ilumina",
+  kickEarly: "Pateaste antes de tiempo: espera a que se ponga verde",
+  nothing: "No saltaste ni pateaste: cuando llegue, aprieta el botón que se ilumina",
 };
 
 // ---- Bots ------------------------------------------------------------------

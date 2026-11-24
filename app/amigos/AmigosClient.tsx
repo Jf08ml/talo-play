@@ -52,7 +52,7 @@ const ADD_MESSAGES: Record<AddResult, string> = {
   friends: "Ya son amigos.",
   already: "Ya le mandaste una solicitud; falta que la acepte.",
   self: "Ese es tu propio código.",
-  unknown: "No encontramos a nadie con ese código. Revisalo.",
+  unknown: "No encontramos a nadie con ese código. Revísalo.",
 };
 
 /** The friends page: sign in, your friend code, add by code, requests, friends and the account. */
@@ -71,7 +71,7 @@ export default function AmigosClient({ initialCode }: { initialCode: string }) {
         <div className="mx-auto flex max-w-[1360px] flex-col gap-3 px-5 pb-10 pt-2 sm:px-10 sm:pb-14 sm:pt-6">
           <h1 className="font-display text-[44px] leading-none tracking-[-0.02em] sm:text-[clamp(56px,6vw,88px)]">Amigos</h1>
           <p className="max-w-xl text-[17px] font-medium leading-[1.4] sm:text-[22px]">
-            Agregá a tus amigos con su código y invitalos a jugar directo, sin mandar links.
+            Agrega a tus amigos con su código y invítalos a jugar directo, sin mandar links.
           </p>
         </div>
       </section>
@@ -93,12 +93,12 @@ export default function AmigosClient({ initialCode }: { initialCode: string }) {
 function SignedOut() {
   return (
     <div className={`${CARD} mx-auto flex max-w-xl flex-col gap-4`}>
-      <h2 className={H2}>Entrá a tu cuenta</h2>
+      <h2 className={H2}>Entra a tu cuenta</h2>
       <ul className="flex flex-col gap-2 text-[17px] text-talo-text-2">
-        <li>· Tu talo y tu nombre te siguen en el celu y en la compu.</li>
-        <li>· Agregás amigos con un código y ves quién está conectado y a qué juega.</li>
-        <li>· Los invitás a tu sala con un toque: les aparece la invitación en Talo.</li>
-        <li>· Chateás con tus amigos y podés escribir en la Plaza.</li>
+        <li>· Tu talo y tu nombre te siguen en el celular y en la computadora.</li>
+        <li>· Agregas amigos con un código y ves quién está conectado y a qué juega.</li>
+        <li>· Los invitas a tu sala con un toque: les aparece la invitación en Talo.</li>
+        <li>· Chateas con tus amigos y puedes escribir en la Plaza.</li>
       </ul>
       <p className="text-[15px] text-talo-text-3">Para jugar no hace falta: la cuenta es solo para tener amigos.</p>
       <SignInButton light />
@@ -142,7 +142,7 @@ function SignedIn({
           <h2 className={H2}>Tus amigos{friends.length > 0 && ` (${friends.length})`}</h2>
           {friends.length === 0 ? (
             <p className="mt-3 text-[17px] text-talo-text-2">
-              Todavía no agregaste a nadie. Pasales tu código o agregalos con el suyo.
+              Todavía no agregaste a nadie. Pásales tu código o agrégalos con el suyo.
             </p>
           ) : (
             <ul className="mt-4 flex flex-col divide-y divide-talo-line">
@@ -279,7 +279,7 @@ function AddFriend({ uid, initialCode }: { uid: string; initialCode: string }) {
       </form>
       {result && (
         <p className={`mt-3 text-[15px] font-semibold ${good ? "text-talo-green" : "text-talo-text-2"}`}>
-          {result === "error" ? "No se pudo. Probá de nuevo en un rato." : ADD_MESSAGES[result]}
+          {result === "error" ? "No se pudo. Prueba de nuevo en un rato." : ADD_MESSAGES[result]}
         </p>
       )}
     </section>
@@ -426,7 +426,7 @@ function AccountActions({ profile }: { profile: Profile }) {
                 await deleteAccount(user, profile);
               } catch (err) {
                 console.error(err);
-                setError("No se pudo borrar. Probá de nuevo.");
+                setError("No se pudo borrar. Prueba de nuevo.");
                 setBusy(false);
               }
             }}

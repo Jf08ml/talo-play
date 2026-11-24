@@ -186,7 +186,7 @@ export default function PlazaDrawer({ onClose }: { onClose: () => void }) {
                 onJoin={onClose}
                 empty={
                   <p className="text-[13px] leading-snug text-black/60">
-                    Ninguna ahora. Creá una sala y dejala <b>abierta</b>, o tocá <b>«Buscar gente en la Plaza»</b> en la sala de espera.
+                    Ninguna ahora. Crea una sala y déjala <b>abierta</b>, o toca <b>«Buscar gente en la Plaza»</b> en la sala de espera.
                   </p>
                 }
               />
@@ -308,7 +308,7 @@ function Chat({
         aria-live="polite"
       >
         {visible.length === 0 && (
-          <p className="m-auto max-w-xs text-center text-[15px] text-black/55">Todavía no hay mensajes. ¡Saludá y arrancá la ronda!</p>
+          <p className="m-auto max-w-xs text-center text-[15px] text-black/55">Todavía no hay mensajes. ¡Saluda y empieza la ronda!</p>
         )}
         {visible.map((m) => (
           <MessageRow
@@ -328,7 +328,7 @@ function Chat({
       </div>
 
       <Composer me={me} uid={uid} signedIn={signedIn} admin={admin} banned={!!uid && bans.has(uid)} onSetName={onSetName} />
-      <p className="bg-[#f6f6f6] px-4 pb-2 text-[11px] text-black/50">Sé amable · sin datos personales ni links · reportá con la banderita.</p>
+      <p className="bg-[#f6f6f6] px-4 pb-2 text-[11px] text-black/50">Sé amable · sin datos personales ni links · reporta con la banderita.</p>
     </section>
   );
 }
@@ -375,7 +375,7 @@ function MessageRow({
               <BadgeCheck className="h-3 w-3" /> Admin · Talo
             </span>
           )}
-          {mine && <span className="text-black/45">(vos)</span>}
+          {mine && <span className="text-black/45">(tú)</span>}
           <span className="text-black/40">{clock(m.at)}</span>
           {admin && reportCount > 0 && <span className="font-bold text-red-600">{reportCount} reportes</span>}
           {admin && banned && <span className="font-bold text-red-600">baneado</span>}
@@ -452,7 +452,7 @@ function Composer({
 
   const tooSoon = () => {
     const wait = waitToPost();
-    if (wait > 0) setNote(`Esperá ${Math.ceil(wait / 1000)} s para mandar otro.`);
+    if (wait > 0) setNote(`Espera ${Math.ceil(wait / 1000)} s para mandar otro.`);
     return wait > 0;
   };
 
@@ -461,7 +461,7 @@ function Composer({
     setNote(null);
     sendQuick(me, q)
       .then(() => trackEvent("plaza_message", { kind: "frase" }))
-      .catch(() => setNote("No se pudo mandar. Probá de nuevo en unos segundos."));
+      .catch(() => setNote("No se pudo mandar. Prueba de nuevo en unos segundos."));
   };
 
   const submit = (e: FormEvent) => {
@@ -480,7 +480,7 @@ function Composer({
         setText("");
         trackEvent("plaza_message", { kind: "texto" });
       })
-      .catch(() => setNote("No se pudo mandar. Probá de nuevo en unos segundos."))
+      .catch(() => setNote("No se pudo mandar. Prueba de nuevo en unos segundos."))
       .finally(() => setBusy(false));
   };
 
@@ -496,7 +496,7 @@ function Composer({
         className="flex flex-col gap-2 border-t-2 border-talo-ink bg-[#f6f6f6] px-3 py-3 sm:px-4"
       >
         <label htmlFor="plaza-name" className="text-sm font-bold">
-          Poné tu nombre para participar
+          Pon tu nombre para participar
         </label>
         <div className="flex gap-2">
           <input
@@ -529,13 +529,13 @@ function Composer({
         ))}
       </div>
       {banned ? (
-        <p className="text-sm font-semibold text-red-700">Tu cuenta no puede escribir en la Plaza. Podés seguir usando las frases rápidas.</p>
+        <p className="text-sm font-semibold text-red-700">Tu cuenta no puede escribir en la Plaza. Puedes seguir usando las frases rápidas.</p>
       ) : signedIn ? (
         <form onSubmit={submit} className="flex items-center gap-2">
           <input
             value={text}
             onChange={(e) => setText(e.target.value.slice(0, PLAZA_MAX_CHARS))}
-            placeholder={admin ? "Escribí como Admin · Talo…" : "Escribí un mensaje…"}
+            placeholder={admin ? "Escribe como Admin · Talo…" : "Escribe un mensaje…"}
             aria-label="Mensaje"
             enterKeyHint="send"
             className="min-h-11 min-w-0 flex-1 rounded-xl border-2 border-talo-ink bg-white px-3 text-[15px] outline-none focus:ring-2 focus:ring-talo-hero"
@@ -547,11 +547,11 @@ function Composer({
         </form>
       ) : (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <button onClick={() => signInWithGoogle().catch(() => setNote("No se pudo entrar. Probá de nuevo."))} className="rounded-xl bg-talo-ink px-4 py-2.5 font-bold text-talo-hero">
-            Entrá con Google para escribir
+          <button onClick={() => signInWithGoogle().catch(() => setNote("No se pudo entrar. Prueba de nuevo."))} className="rounded-xl bg-talo-ink px-4 py-2.5 font-bold text-talo-hero">
+            Entra con Google para escribir
           </button>
-          <span className="text-black/60">Sin cuenta podés usar las frases rápidas.</span>
-          {inApp && <span className="w-full text-xs text-black/60">Desde TikTok o Instagram, abrí Talo en tu navegador para entrar con Google.</span>}
+          <span className="text-black/60">Sin cuenta puedes usar las frases rápidas.</span>
+          {inApp && <span className="w-full text-xs text-black/60">Desde TikTok o Instagram, abre Talo en tu navegador para entrar con Google.</span>}
         </div>
       )}
       {note && <p className="text-sm font-semibold text-red-700">{note}</p>}
@@ -595,9 +595,9 @@ function Rules() {
       <h2 className={H2}>Para que la Plaza esté buena</h2>
       <ul className="list-disc space-y-1 pl-5 text-[15px] leading-snug">
         <li>Sé amable: es un lugar para encontrar con quién jugar.</li>
-        <li>No compartas datos personales: teléfono, dirección, redes ni dónde estudiás o trabajás.</li>
+        <li>No compartas datos personales: teléfono, dirección, redes ni dónde estudias o trabajas.</li>
         <li>No se pueden mandar links ni números de contacto.</li>
-        <li>Si algo está mal, reportalo con la banderita: con {HIDE_AT} reportes se oculta. También podés silenciar a alguien.</li>
+        <li>Si algo está mal, repórtalo con la banderita: con {HIDE_AT} reportes se oculta. También puedes silenciar a alguien.</li>
       </ul>
     </section>
   );
@@ -626,7 +626,7 @@ function AdminPanel({ pinned, bans, messages, name }: { pinned: Pinned | null; b
           value={text}
           onChange={(e) => setText(e.target.value.slice(0, PLAZA_MAX_CHARS))}
           rows={2}
-          placeholder="Ej.: ¡Nuevo juego! Probá Minigolf con amigos."
+          placeholder="Ej.: ¡Nuevo juego! Prueba Minigolf con amigos."
           className="rounded-xl border-2 border-talo-ink px-3 py-2 text-[15px]"
         />
         <div className="flex gap-2">
@@ -657,7 +657,7 @@ function AdminPanel({ pinned, bans, messages, name }: { pinned: Pinned | null; b
           </ul>
         )}
       </div>
-      <p className="text-xs text-black/55">Pasá el mouse (o tocá) un mensaje para borrarlo, banear a su cuenta o restaurarlo si fue reportado.</p>
+      <p className="text-xs text-black/55">Pasa el mouse (o toca) un mensaje para borrarlo, banear a su cuenta o restaurarlo si fue reportado.</p>
     </section>
   );
 }

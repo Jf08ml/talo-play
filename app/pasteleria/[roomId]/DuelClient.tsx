@@ -291,7 +291,7 @@ function DuelPlay({
   const ids = [...new Set([...Object.keys(boards), ...Object.keys(state.players).filter((id) => id in presence)])];
   const scoreOf = (id: string) => (state.status === "finished" ? (state.final[id] ?? boards[id]?.score ?? 0) : id === myId ? shift.score : (boards[id]?.score ?? 0));
   const ranked = ids.sort((a, b) => scoreOf(b) - scoreOf(a));
-  const nameOf = (id: string) => (id === myId ? "Vos" : (state.players[id]?.name ?? "?"));
+  const nameOf = (id: string) => (id === myId ? "Tú" : (state.players[id]?.name ?? "?"));
   const rivals = { ids: ranked, myId, myCake: shift.cake, boards, scoreOf, nameOf, colorOf: (id: string) => state.players[id]?.color };
 
   return (
@@ -447,7 +447,7 @@ function Rivals({
   if (ids.length < 2) {
     return (
       <p className={`${className} shrink-0 items-center justify-center text-center text-xs text-violet-700 landscape:truncate`}>
-        Estás solo en la cocina: invitá a alguien con «Invitar» para competir.
+        Estás solo en la cocina: invita a alguien con «Invitar» para competir.
       </p>
     );
   }
@@ -459,7 +459,7 @@ function Rivals({
           className={`flex shrink-0 items-center gap-1.5 rounded-2xl py-1 pl-1 pr-2.5 text-xs shadow-sm ring-1 ${id === myId ? "bg-pink-100 ring-pink-300" : "bg-white/85 ring-pink-100"}`}
         >
           <span className="w-4 text-center font-bold text-slate-500">{i + 1}</span>
-          <CakeArt cake={id === myId ? myCake : (boards[id]?.cake ?? myCake)} className="h-8 w-9" label={`La torta de ${nameOf(id)}`} />
+          <CakeArt cake={id === myId ? myCake : (boards[id]?.cake ?? myCake)} className="h-8 w-9" label={id === myId ? "Tu torta" : `La torta de ${nameOf(id)}`} />
           <span className="flex flex-col leading-tight">
             <span className="max-w-[6rem] truncate font-semibold" style={{ color: colorOf(id) }}>
               {nameOf(id)}
@@ -477,7 +477,7 @@ function WinsTally({ state, myId, light = false }: { state: DuelState; myId: str
   if (rows.length === 0) return null;
   return (
     <p className={`text-center text-sm ${light ? "text-slate-500" : "text-slate-400"}`}>
-      Duelos ganados: {rows.map(([id, n]) => `${id === myId ? "vos" : (state.players[id]?.name ?? "?")} ${n}`).join(" · ")}
+      Duelos ganados: {rows.map(([id, n]) => `${id === myId ? "tú" : (state.players[id]?.name ?? "?")} ${n}`).join(" · ")}
     </p>
   );
 }

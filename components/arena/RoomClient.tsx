@@ -126,8 +126,8 @@ export default function RoomClient({ roomId }: { roomId: string }) {
               <div className="flex gap-2.5 rounded-xl bg-amber-500/10 p-3 text-sm text-amber-100 ring-1 ring-amber-400/20">
                 <Smartphone className="mt-0.5 h-5 w-5 shrink-0" />
                 <p>
-                  Cada uno pelea desde su teléfono (horizontal) o su compu con mouse y teclado. Las armas están tiradas por la arena:
-                  ¡corré a buscarlas!
+                  Cada uno pelea desde su teléfono (horizontal) o su computadora con mouse y teclado. Las armas están tiradas por la arena:
+                  ¡corre a buscarlas!
                 </p>
               </div>
               <TeamPicker roomId={roomId} meta={meta} state={state} myId={myId} connected={connected} presenceLoaded={presenceLoaded} />
@@ -178,7 +178,7 @@ function TeamPicker({
                 return (
                   <p key={i} className={`flex items-center justify-center gap-1 rounded-lg bg-slate-900/70 px-2 py-1.5 text-center text-sm ${id ? "text-slate-100" : "text-slate-500"}`}>
                     {id ? (
-                      id === myId ? "Vos" : state.players[id]?.name
+                      id === myId ? "Tú" : state.players[id]?.name
                     ) : meta.bots ? (
                       <>
                         <Bot className="h-3.5 w-3.5" /> bot
@@ -217,7 +217,7 @@ function TeamPicker({
       </div>
       {watchers.length > 0 && (
         <p className="text-center text-xs text-slate-500">
-          Mirando: {watchers.map((id) => (id === myId ? "vos" : state.players[id]?.name)).join(", ")}
+          Mirando: {watchers.map((id) => (id === myId ? "tú" : state.players[id]?.name)).join(", ")}
         </p>
       )}
       <p className="text-center text-xs text-slate-500">
@@ -226,7 +226,7 @@ function TeamPicker({
             ? "Los lugares libres los ocupan bots."
             : "¡Listos para la batalla!"
           : meta.bots
-            ? "Elegí un equipo para pelear."
+            ? "Elige un equipo para pelear."
             : `Hace falta al menos uno en cada equipo (${teamInfo("red").label.toLowerCase()} y ${teamInfo("blue").label.toLowerCase()}).`}
       </p>
     </div>

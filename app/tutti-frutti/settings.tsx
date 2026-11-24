@@ -87,7 +87,7 @@ export const SETTINGS: GameSettings<Settings> = {
     },
     { kind: "toggle", key: "hardLetters", label: `Incluir letras difíciles (${HARD_LETTERS.split("").join(", ")})` },
   ],
-  problem: (v) => (v.categories.length < MIN_CATEGORIES ? `Elegí al menos ${MIN_CATEGORIES} categorías.` : null),
+  problem: (v) => (v.categories.length < MIN_CATEGORIES ? `Elige al menos ${MIN_CATEGORIES} categorías.` : null),
   create: (v, hostId) =>
     createTuttiRoom({ categories: v.categories, rounds: v.rounds, roundSeconds: v.roundSeconds, letters: lettersOf(v) }, hostId),
   save: (roomId, v) =>

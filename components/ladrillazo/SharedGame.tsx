@@ -440,7 +440,7 @@ function ScoreSide({ state, id, myId }: { state: LadriState; id: string | undefi
   return (
     <div className="flex items-center gap-2">
       <span className="h-3 w-3 rounded-full" style={{ background: info.color }} />
-      <span className="max-w-[90px] truncate text-sm font-bold">{id === myId ? "Vos" : info.name}</span>
+      <span className="max-w-[90px] truncate text-sm font-bold">{id === myId ? "Tú" : info.name}</span>
       <span className="font-display text-2xl">{state.goals[id] ?? 0}</span>
     </div>
   );

@@ -56,16 +56,16 @@ interface Step {
 
 const STEPS: Step[] = [
   {
-    title: "Saltá",
-    text: "Mirá la barra de abajo: cuando el tronco entra en lo amarillo, el botón «Saltar» se ilumina. ¡Ahí apretalo!",
+    title: "Salta",
+    text: "Mira la barra de abajo: cuando el tronco entra en lo amarillo, el botón «Saltar» se ilumina. ¡Ahí apriétalo!",
     goal: 3,
     pace: 0.8,
     jump: true,
     kick: false,
   },
   {
-    title: "Pateá",
-    text: "Ahora esperá que llegue a lo verde (más cerca) y apretá «Patear»: el tronco se da vuelta y vuelve para el otro lado.",
+    title: "Patea",
+    text: "Ahora espera que llegue a lo verde (más cerca) y aprieta «Patear»: el tronco se da vuelta y vuelve para el otro lado.",
     goal: 3,
     pace: 0.8,
     jump: false,
@@ -73,7 +73,7 @@ const STEPS: Step[] = [
   },
   {
     title: "Las dos, cada vez más rápido",
-    text: "Saltá o pateá, como quieras. El tronco acelera: aguantá 6 pasadas seguidas.",
+    text: "Salta o patea, como quieras. El tronco acelera: aguanta 6 pasadas seguidas.",
     goal: 6,
     pace: 1.05,
     jump: true,
@@ -167,7 +167,7 @@ export default function TroncoPractice({ onClose, onPlay }: { onClose: () => voi
     s.me.busy = now + (works ? KICK_RECOVER : KICK_MISS_RECOVER) * 1000;
     if (!works) {
       playSound("tick");
-      setFlash({ text: "¡Al aire! Esperá lo verde", key: now, bad: true });
+      setFlash({ text: "¡Al aire! Espera lo verde", key: now, bad: true });
       return;
     }
     s.tl = { ...s.tl, kicks: [...s.tl.kicks, now] };
@@ -261,7 +261,7 @@ export default function TroncoPractice({ onClose, onPlay }: { onClose: () => voi
       const players: PlayerView[] = [
         {
           id: "me",
-          name: "Vos",
+          name: "Tú",
           color: s.color,
           angle: myTheta,
           me: true,
@@ -365,8 +365,8 @@ export default function TroncoPractice({ onClose, onPlay }: { onClose: () => voi
         {done && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/40 p-4">
             <div className="flex w-full max-w-sm flex-col gap-3 rounded-[20px] bg-[#1c1c1c] p-5 text-center">
-              <p className="font-display text-3xl text-white">¡Ya sabés jugar!</p>
-              <p className="text-sm text-white/70">En la ronda de verdad, si el tronco te toca con los pies en el piso quedás afuera. Gana el último que queda parado.</p>
+              <p className="font-display text-3xl text-white">¡Ya sabes jugar!</p>
+              <p className="text-sm text-white/70">En la ronda de verdad, si el tronco te toca con los pies en el piso quedas afuera. Gana el último que queda parado.</p>
               <button onClick={onPlay} className={PRIMARY_BUTTON}>
                 Jugar contra bots
               </button>

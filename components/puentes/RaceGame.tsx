@@ -156,13 +156,13 @@ export default function RaceGame({
             {mine && (
               <div className="pointer-events-none absolute inset-x-0 top-1/3 flex justify-center">
                 <span className={`animate-celebration-in rounded-full px-4 py-2 text-sm font-bold text-white ${mine.ok ? "bg-[#00B26B]" : "bg-[#FF3B30]"}`}>
-                  {mine.ok ? (mine.claim ? "¡Bien! No se podía" : `¡Listo en ${formatTime(mine.ms / 1000)}!`) : "Era posible: esta ronda no sumás"}
+                  {mine.ok ? (mine.claim ? "¡Bien! No se podía" : `¡Listo en ${formatTime(mine.ms / 1000)}!`) : "Era posible: esta ronda no sumas"}
                 </span>
               </div>
             )}
           </div>
         ) : (
-          <p className="rounded-xl bg-white/[0.05] p-4 text-center text-sm text-white/60">Estás mirando: entrás en la próxima partida.</p>
+          <p className="rounded-xl bg-white/[0.05] p-4 text-center text-sm text-white/60">Estás mirando: entras en la próxima partida.</p>
         )}
       </div>
 
@@ -178,7 +178,7 @@ export default function RaceGame({
               <li key={id} className={`flex flex-col gap-1 ${away ? "opacity-40" : ""}`}>
                 <div className="flex items-center gap-2 text-sm">
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: info.color }} />
-                  <span className="min-w-0 flex-1 truncate font-bold text-white">{id === myId ? "Vos" : info.name}</span>
+                  <span className="min-w-0 flex-1 truncate font-bold text-white">{id === myId ? "Tú" : info.name}</span>
                   {r ? (
                     r.ok ? (
                       <span className="inline-flex items-center gap-1 text-xs text-[#5fe0a0]">

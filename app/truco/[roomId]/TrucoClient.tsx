@@ -166,7 +166,7 @@ export default function TrucoClient({ roomId }: { roomId: string }) {
 
 function playerName(state: TrucoState, seat: Seat, myId: string): string {
   const id = state.seats[seat];
-  if (id === myId) return "Vos";
+  if (id === myId) return "Tú";
   return state.players[id]?.name ?? "?";
 }
 
@@ -320,7 +320,7 @@ function Game({
                 <Naipe key={c} code={c} size="lg" onClick={myTurn ? () => playCard(roomId, myId, c, mv) : undefined} />
               ))}
             </div>
-            <p className="text-xs text-slate-400">Tenés {myEnvido} de envido.</p>
+            <p className="text-xs text-slate-400">Tienes {myEnvido} de envido.</p>
 
             {iAnswer && <AnswerBar roomId={roomId} state={state} myId={myId} mySeat={mySeat!} />}
 
@@ -382,7 +382,7 @@ function Game({
             Mirando:{" "}
             {Object.keys(presence)
               .filter((id) => !seatOf(state, id) || !state.active.includes(seatOf(state, id)!))
-              .map((id) => (id === myId ? "vos" : presence[id]?.name))
+              .map((id) => (id === myId ? "tú" : presence[id]?.name))
               .join(", ")}
           </p>
         )}

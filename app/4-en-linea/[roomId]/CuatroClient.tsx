@@ -161,7 +161,7 @@ export default function CuatroClient({ roomId }: { roomId: string }) {
 }
 
 function playerName(state: CuatroState, id: string, myId: string): string {
-  if (id === myId) return "Vos";
+  if (id === myId) return "Tú";
   return state.players[id]?.name ?? "?";
 }
 
@@ -237,7 +237,7 @@ function SeatPicker({
       </div>
       <p className="text-center text-xs text-slate-500">
         {!ready
-          ? "Falta un jugador: mandale el link a tu rival."
+          ? "Falta un jugador: mándale el link a tu rival."
           : mySeat
             ? `Empiezan las ${DISCS[state.starter].label.toLowerCase()}.`
             : "Las dos sillas están ocupadas: vas a mirar la partida."}
@@ -393,7 +393,7 @@ function BoardView({ state, canPlay, onDrop }: { state: CuatroState; canPlay: bo
           );
         })}
       </div>
-      {canPlay && <p className="mt-2 text-center text-xs text-slate-500">Tocá una columna (o usá las teclas 1–7).</p>}
+      {canPlay && <p className="mt-2 text-center text-xs text-slate-500">Toca una columna (o usa las teclas 1–7).</p>}
     </div>
   );
 }
@@ -403,7 +403,7 @@ function Spectators({ state, presence, myId }: { state: CuatroState; presence: P
   if (watching.length === 0) return null;
   return (
     <p className="text-center text-xs text-slate-500">
-      Mirando: {watching.map((id) => (id === myId ? "vos" : presence[id]?.name ?? "?")).join(", ")}
+      Mirando: {watching.map((id) => (id === myId ? "tú" : presence[id]?.name ?? "?")).join(", ")}
     </p>
   );
 }

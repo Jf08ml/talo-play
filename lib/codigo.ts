@@ -130,7 +130,7 @@ export function setupProblem(players: Record<string, CodigoPlayer>): string | nu
 /** A clue can't be one of the visible board words. */
 export function clueProblem(clue: string, board: Board, revealed: Record<string, boolean>): string | null {
   const c = normalizeText(clue);
-  if (!c) return "Escribí una pista.";
+  if (!c) return "Escribe una pista.";
   if (c.includes(" ")) return "La pista tiene que ser una sola palabra.";
   const clash = board.words.some((w, i) => !revealed[cardKey(i)] && normalizeText(w) === c);
   return clash ? "No vale usar una palabra del tablero." : null;

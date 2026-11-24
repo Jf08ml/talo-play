@@ -148,7 +148,7 @@ export default function AjedrezClient({ roomId }: { roomId: string }) {
 }
 
 function playerName(state: AjedrezState, id: string, myId: string): string {
-  if (id === myId) return "Vos";
+  if (id === myId) return "Tú";
   return state.players[id]?.name ?? "?";
 }
 
@@ -227,7 +227,7 @@ function SeatPicker({
         })}
       </div>
       <p className="text-center text-xs text-slate-500">
-        {!ready ? "Falta un jugador: mandale el link a tu rival." : "Empiezan las blancas."}
+        {!ready ? "Falta un jugador: mándale el link a tu rival." : "Empiezan las blancas."}
       </p>
     </div>
   );
@@ -395,7 +395,7 @@ function Game({
             Mirando:{" "}
             {Object.keys(presence)
               .filter((id) => !seatOf(state, id))
-              .map((id) => (id === myId ? "vos" : presence[id]?.name))
+              .map((id) => (id === myId ? "tú" : presence[id]?.name))
               .join(", ")}
           </p>
         )}

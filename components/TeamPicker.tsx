@@ -19,7 +19,7 @@ export default function TeamPicker({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-2xl border border-violet-500/20 bg-slate-900 p-6 shadow-[0_0_40px_rgba(139,92,246,0.2)]">
         <h2 className="text-center font-display text-lg font-semibold text-slate-100">
-          ⚔️ Elegí tu equipo
+          ⚔️ Elige tu equipo
         </h2>
         <p className="mt-1 text-center text-sm text-slate-400">
           Cada equipo arma su propia copia del rompecabezas. ¡Gana el más rápido!

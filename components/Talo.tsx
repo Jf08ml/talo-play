@@ -31,7 +31,7 @@ export interface TaloProps {
   blinkDelay?: string;
   className?: string;
   style?: CSSProperties;
-  /** Si el talo representa a un jugador, pasá su nombre para lectores de pantalla */
+  /** Si el talo representa a un jugador, pasa su nombre para lectores de pantalla */
   label?: string;
 }
 

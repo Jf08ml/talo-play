@@ -181,7 +181,7 @@ export default function ImpostorClient({ roomId }: { roomId: string }) {
             <div className="flex min-w-0 flex-1 flex-col gap-4">
               {!inRound && state.status !== "result" && (
                 <p className={`${CARD} !p-3 text-center text-sm text-slate-300`}>
-                  Llegaste con la ronda empezada: mirá cómo juegan y entrás en la próxima.
+                  Llegaste con la ronda empezada: mira cómo juegan y entras en la próxima.
                 </p>
               )}
 
@@ -246,7 +246,7 @@ export default function ImpostorClient({ roomId }: { roomId: string }) {
 }
 
 function nameOf(state: ImpostorState, id: string, myId: string): string {
-  return id === myId ? "vos" : (state.players[id]?.name ?? "?");
+  return id === myId ? "tú" : (state.players[id]?.name ?? "?");
 }
 
 function TimeBar({ left, total }: { left: number; total: number }) {
@@ -285,9 +285,9 @@ function SecretCard({
       {shown ? (
         isImpostor ? (
           <>
-            <span className="font-display text-2xl font-bold text-rose-300">🤫 Sos el impostor</span>
+            <span className="font-display text-2xl font-bold text-rose-300">🤫 Eres el impostor</span>
             <span className="text-sm text-slate-400">
-              {hint ? `La palabra es de: ${category}. ` : ""}Disimulá y descubrí cuál es.
+              {hint ? `La palabra es de: ${category}. ` : ""}Disimula y descubrí cuál es.
             </span>
           </>
         ) : (
@@ -298,11 +298,11 @@ function SecretCard({
           </>
         )
       ) : (
-        <span className="font-display text-lg font-semibold text-slate-200">Tocá para ver tu carta</span>
+        <span className="font-display text-lg font-semibold text-slate-200">Toca para ver tu carta</span>
       )}
       <span className="mt-1 flex items-center gap-1 text-xs text-slate-500">
         {shown ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-        {shown ? "Tocá para esconderla" : "Que nadie mire tu pantalla"}
+        {shown ? "Toca para esconderla" : "Que nadie mire tu pantalla"}
       </span>
     </button>
   );
@@ -352,7 +352,7 @@ function CluesPanel({
       <TimeBar left={left} total={CLUE_SECONDS} />
       {myTurn ? (
         <form onSubmit={submit} className="flex flex-col gap-1.5">
-          <p className="text-sm font-medium text-fuchsia-300">¡Te toca! Decí una palabra relacionada.</p>
+          <p className="text-sm font-medium text-fuchsia-300">¡Te toca! Di una palabra relacionada.</p>
           <div className="flex gap-2">
             <input
               autoFocus
@@ -496,8 +496,8 @@ function VotePanel({
         {!canVote
           ? "Están votando…"
           : myVote
-            ? "Votaste. Podés cambiar tu voto hasta que voten todos."
-            : "Tocá a quien creas que es el impostor."}
+            ? "Votaste. Puedes cambiar tu voto hasta que voten todos."
+            : "Toca a quien creas que es el impostor."}
       </p>
     </div>
   );
@@ -532,7 +532,7 @@ function GuessPanel({
       </p>
       <p className="text-sm text-slate-400">
         {iAmImpostor
-          ? "Última chance: si adivinás la palabra, ganás igual."
+          ? "Última chance: si adivinas la palabra, ganas igual."
           : "Pero todavía puede ganar si adivina la palabra…"}
       </p>
       <TimeBar left={left} total={GUESS_SECONDS} />
@@ -578,7 +578,9 @@ function ResultPanel({
         ? `Lo descubrieron, pero adivinó la palabra («${state.guess}»).`
         : state.endReason === "tie"
           ? "La votación quedó empatada."
-          : `Votaron a ${nameOf(state, state.accused, myId)}, que era inocente.`;
+          : state.accused === myId
+            ? "Te votaron a ti, y eras inocente."
+            : `Votaron a ${nameOf(state, state.accused, myId)}, que era inocente.`;
 
   return (
     <div
@@ -634,7 +636,7 @@ function Scoreboard({ state, presence, myId }: { state: ImpostorState; presence:
         {rows.map((id) => (
           <li key={id} className={`flex items-center gap-2 ${id in presence ? "" : "opacity-40"}`}>
             <span className="flex-1 truncate" style={{ color: state.players[id]?.color }}>
-              {id === myId ? "Vos" : (state.players[id]?.name ?? "?")}
+              {id === myId ? "Tú" : (state.players[id]?.name ?? "?")}
               {state.status === "result" && id === state.impostor && " 🤫"}
             </span>
             {!state.order.includes(id) && state.status !== "result" && (

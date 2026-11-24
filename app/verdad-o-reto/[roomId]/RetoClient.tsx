@@ -157,7 +157,7 @@ export default function RetoClient({ roomId }: { roomId: string }) {
 }
 
 function nameOf(state: RetoState, id: string, myId: string): string {
-  return id === myId ? "vos" : (state.players[id]?.name ?? "?");
+  return id === myId ? "tú" : (state.players[id]?.name ?? "?");
 }
 
 function TurnPanel({
@@ -285,7 +285,7 @@ function Scoreboard({ state, presence, myId }: { state: RetoState; presence: Pre
         {rows.map((id) => (
           <li key={id} className={`flex items-center gap-2 ${id in presence ? "" : "opacity-40"}`}>
             <span className="flex-1 truncate" style={{ color: state.players[id]?.color }}>
-              {id === myId ? "Vos" : (state.players[id]?.name ?? "?")}
+              {id === myId ? "Tú" : (state.players[id]?.name ?? "?")}
               {id === state.current && " 👈"}
             </span>
             {(state.chickens[id] ?? 0) > 0 && (

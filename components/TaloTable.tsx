@@ -73,7 +73,7 @@ export default function TaloTable({
               className="max-w-[9rem] truncate rounded-md px-2 py-0.5 text-sm font-bold"
               style={host ? { background: "#111111", color: "#FFFFFF" } : { color: tagInk }}
             >
-              {p.id === myId ? "Vos" : p.name}
+              {p.id === myId ? "Tú" : p.name}
               {host && " · anfitrión"}
             </span>
             <span className={reaction?.newcomer === p.id ? "talo-hop" : "inline-block"}>

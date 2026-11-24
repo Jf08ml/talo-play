@@ -60,7 +60,7 @@ export default function PlayArea({
     const p = startAt(pz, cell);
     if (!p) {
       playSound("bad");
-      say("Tenés que salir de la isla con la bandera verde");
+      say("Tienes que salir de la isla con la bandera verde");
       return;
     }
     playSound("flip");
@@ -70,7 +70,7 @@ export default function PlayArea({
   const tapBridge = (i: number) => {
     if (disabled) return;
     if (play.cell < 0) {
-      say("Primero tocá la isla donde querés empezar");
+      say("Primero toca la isla donde quieres empezar");
       return;
     }
     const next = cross(pz, play, i);
@@ -114,12 +114,12 @@ export default function PlayArea({
         )}
         {play.cell < 0 && !disabled && (
           <p className="pointer-events-none absolute inset-x-3 bottom-3 rounded-lg bg-black/70 px-3 py-1.5 text-center text-xs font-bold text-white">
-            {pz.start >= 0 ? "Tocá la isla de la bandera verde para empezar" : "Tocá la isla donde querés empezar"}
+            {pz.start >= 0 ? "Toca la isla de la bandera verde para empezar" : "Toca la isla donde quieres empezar"}
           </p>
         )}
         {stuck && !disabled && (
           <p className="pointer-events-none absolute inset-x-3 bottom-3 rounded-lg bg-[#FF3B30]/90 px-3 py-1.5 text-center text-xs font-bold text-white">
-            {allCrossed ? "Cruzaste todo, pero tenías que terminar en la bandera a cuadros" : "Te trabaste: no queda ningún puente para cruzar desde acá"}
+            {allCrossed ? "Cruzaste todo, pero tenías que terminar en la bandera a cuadros" : "Te trabaste: no queda ningún puente para cruzar desde aquí"}
           </p>
         )}
       </div>

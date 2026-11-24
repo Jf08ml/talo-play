@@ -19,7 +19,7 @@ export const SETTINGS: GameSettings<EmpujonesSettings> = {
     {
       kind: "note",
       only: "create",
-      text: "Creá la sala desde la compu conectada a la tele o al proyector: esa pantalla muestra la isla. Cada uno entra desde su celular con el código, y el celular es el control.",
+      text: "Crea la sala desde la computadora conectada a la tele o al proyector: esa pantalla muestra la isla. Cada uno entra desde su celular con el código, y el celular es el control.",
     },
     {
       kind: "choice",

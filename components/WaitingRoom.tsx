@@ -34,9 +34,9 @@ export function startPermission(
   // Presence starts empty: until I see myself in it, assume the host is here.
   const loaded = myId in presence;
   if (!hostId) return { canStart: true, message: "Cuando estén todos, cualquiera puede empezar." };
-  if (hostId === myId) return { canStart: true, message: "Sos el anfitrión: cuando estén todos, empezá la partida." };
+  if (hostId === myId) return { canStart: true, message: "Eres el anfitrión: cuando estén todos, empieza la partida." };
   if (loaded && !(hostId in presence)) {
-    return { canStart: true, message: `${hostName ?? "El anfitrión"} no está conectado: podés empezar vos.` };
+    return { canStart: true, message: `${hostName ?? "El anfitrión"} no está conectado: puedes empezar tú.` };
   }
   return { canStart: false, message: `Esperando a que ${hostName ?? "el anfitrión"} empiece la partida…` };
 }
@@ -158,7 +158,7 @@ export default function WaitingRoom({
           )}
           {missing > 0 ? (
             <p className="text-sm font-bold text-talo-hero">
-              {missing === 1 ? "Falta 1 jugador" : `Faltan ${missing} jugadores`} para empezar: ¡mandá el link!
+              {missing === 1 ? "Falta 1 jugador" : `Faltan ${missing} jugadores`} para empezar: ¡manda el link!
             </p>
           ) : blocked ? (
             <p className="text-sm font-bold text-talo-hero">{blocked}</p>
@@ -166,7 +166,7 @@ export default function WaitingRoom({
             <p className="text-sm text-white/70">{message}</p>
           )}
           {fewPlayers && (
-            <p className="text-sm text-white/70">Se juega mejor con {info.minPlayers} o más: ¡invitá a alguien!</p>
+            <p className="text-sm text-white/70">Se juega mejor con {info.minPlayers} o más: ¡invita a alguien!</p>
           )}
         </div>
 

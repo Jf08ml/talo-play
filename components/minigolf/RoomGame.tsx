@@ -223,12 +223,12 @@ export default function RoomGame({
               </div>
             )}
             {!playing && (
-              <p className="pointer-events-none absolute inset-x-0 bottom-2 text-center text-xs text-white/80">Estás mirando: entrás en la próxima partida.</p>
+              <p className="pointer-events-none absolute inset-x-0 bottom-2 text-center text-xs text-white/80">Estás mirando: entras en la próxima partida.</p>
             )}
           </GolfField>
         )}
         {playing && !between && (mine?.n ?? 0) === 0 && holeNo === 0 && (
-          <p className="text-center text-xs text-white/60">Arrastrá hacia atrás para apuntar (como una gomera) y soltá para tirar.</p>
+          <p className="text-center text-xs text-white/60">Arrastra hacia atrás para apuntar (como una gomera) y suelta para tirar.</p>
         )}
       </div>
 
@@ -247,7 +247,7 @@ export default function RoomGame({
                 className={`flex shrink-0 items-center gap-2 rounded-xl bg-white/[0.05] px-2.5 py-1.5 text-sm text-white ring-1 ring-white/10 ${away ? "opacity-40" : ""}`}
               >
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: info.color }} />
-                <span className="max-w-[6rem] truncate font-bold lg:flex-1">{id === myId ? "Vos" : info.name}</span>
+                <span className="max-w-[6rem] truncate font-bold lg:flex-1">{id === myId ? "Tú" : info.name}</span>
                 {done !== undefined ? (
                   <span className="inline-flex items-center gap-0.5 text-xs text-[#5fe0a0]">
                     <Check className="h-3.5 w-3.5" /> {done}

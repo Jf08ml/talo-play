@@ -25,7 +25,7 @@ export default function AjedrezHome() {
       router.push(roomPath("ajedrez", roomId));
     } catch (err) {
       console.error(err);
-      setCreateError("No se pudo crear la sala. Probá de nuevo.");
+      setCreateError("No se pudo crear la sala. Prueba de nuevo.");
       setCreating(false);
     }
   };
@@ -35,7 +35,7 @@ export default function AjedrezHome() {
       <form onSubmit={handleCreate} className={`${CARD} flex flex-col gap-4`}>
         <h2 className="font-display text-lg font-semibold text-slate-100">Crear una sala nueva</h2>
         <p className="text-sm text-slate-400">
-          No hay nada que configurar: creá la sala y mandale el link a tu rival. Si entra más gente, mira la
+          No hay nada que configurar: crea la sala y mándale el link a tu rival. Si entra más gente, mira la
           partida y puede jugar la próxima.
         </p>
         {createError && <p className="text-sm text-red-400">{createError}</p>}

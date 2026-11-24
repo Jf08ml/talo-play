@@ -351,7 +351,7 @@ export class TroncoScene {
     shadow.rotation.x = -Math.PI / 2;
     shadow.position.y = 0.018;
     root.add(shadow);
-    const label = labelSprite(p.me ? "Vos" : p.name, p.me);
+    const label = labelSprite(p.me ? "Tú" : p.name, p.me);
     label.position.y = this.tv ? 2.2 : 1.85;
     if (this.tv) label.scale.multiplyScalar(1.7);
     root.add(label);

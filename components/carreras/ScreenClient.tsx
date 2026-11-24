@@ -587,7 +587,7 @@ function ViewTags({
                       {f!.best && " · tu mejor vuelta"}
                     </p>
                   )}
-                  {isWrong && <p className="text-sm text-red-100">Pegá la vuelta</p>}
+                  {isWrong && <p className="text-sm text-red-100">Pega la vuelta</p>}
                 </div>
               </div>
             )}
@@ -621,7 +621,7 @@ function JoinCard({
     <div className="flex w-full max-w-3xl flex-col items-center gap-5 rounded-3xl bg-slate-950/85 p-8 text-center shadow-2xl backdrop-blur">
       <div className="flex items-center gap-3 text-slate-300">
         <Smartphone className="h-7 w-7 text-cyan-300" />
-        <p className="text-xl">Entrá desde tu teléfono</p>
+        <p className="text-xl">Entra desde tu teléfono</p>
       </div>
       <div>
         <p className="break-all font-mono text-sm text-slate-300 sm:text-2xl">

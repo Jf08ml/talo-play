@@ -17,7 +17,7 @@ export const SETTINGS: GameSettings<ArenaSettings> = {
       key: "bots",
       icon: Bot,
       label: "Completar con bots",
-      hint: "Los lugares vacíos los ocupan caballeros de la compu. Sirve para practicar solo.",
+      hint: "Los lugares vacíos los ocupan caballeros de la computadora. Sirve para practicar solo.",
     },
     {
       kind: "toggle",

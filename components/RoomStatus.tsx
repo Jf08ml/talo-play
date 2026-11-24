@@ -17,9 +17,9 @@ export function RoomNotFound() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-slate-400">
       <p className="text-lg font-medium text-slate-200">No encontramos esa sala.</p>
-      <p>Revisá el código o pedile a quien la creó que te comparta el enlace de nuevo.</p>
+      <p>Revisa el código o pídele a quien la creó que te comparta el enlace de nuevo.</p>
       <p className="max-w-sm text-sm text-slate-500">
-        Las salas se borran solas después de {MAX_IDLE_DAYS} días sin uso. Si era una sala vieja, creá una nueva: es un minuto.
+        Las salas se borran solas después de {MAX_IDLE_DAYS} días sin uso. Si era una sala vieja, crea una nueva: es un minuto.
       </p>
       <Link href="/" className="mt-3 text-violet-400 hover:underline">
         Volver al inicio

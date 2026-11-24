@@ -223,16 +223,16 @@ export default function GolpeGame({
     const seen = new Map<string, Loot>();
     const unsubLoot = subscribeLoot(roomId, gameNo, (l) => {
       const st = stateRef.current;
-      const name = (id: string) => (id === myId ? "vos" : thiefInfo(st, id).name);
+      const name = (id: string) => (id === myId ? "tú" : thiefInfo(st, id).name);
       for (const [id, now] of Object.entries(l)) {
         const before = seen.get(id) ?? normalizeLoot(null);
         seen.set(id, now);
         if (!lootLoaded) continue;
         if (now.sn > before.sn) {
-          const by = now.by === myId ? "Vos" : thiefInfo(st, now.by).name;
+          const by = now.by === myId ? "Tú" : thiefInfo(st, now.by).name;
           const verb = now.by === myId ? "le robaste" : "le robó";
           const tone = now.by === myId ? "good" : id === myId ? "bad" : null;
-          pendingFeed.push({ key: ++feedKey, text: `${by} ${verb} ${now.k} a ${name(id)}`, tone });
+          pendingFeed.push({ key: ++feedKey, text: id === myId ? `${by} te robó ${now.k}` : `${by} ${verb} ${now.k} a ${name(id)}`, tone });
           if (id === myId) {
             popups.push({ id: myId, text: `-${now.k}`, color: "#fda4af", life: 1 });
             playSound("bad");

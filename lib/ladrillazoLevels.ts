@@ -187,7 +187,7 @@ export const CAMPAIGN: Level[] = [
     ],
   },
   {
-    name: "Multiplicate",
+    name: "Multiplícate",
     goal: "limpiar",
     balls: 3,
     par: 180,

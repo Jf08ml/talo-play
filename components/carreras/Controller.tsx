@@ -272,7 +272,7 @@ export default function Controller({
   const switchMode = async (next: ControlMode) => {
     setTiltError(null);
     if (next === "inclinacion" && !(await enableTilt())) {
-      setTiltError("No pudimos leer la inclinación del teléfono. Revisá los permisos o usá los botones.");
+      setTiltError("No pudimos leer la inclinación del teléfono. Revisa los permisos o usa los botones.");
       return;
     }
     if (next === "inclinacion") setTiltReady(true);
@@ -351,7 +351,7 @@ export default function Controller({
       className="flex flex-1 flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed border-violet-400/60 bg-slate-950/50 p-4 text-violet-100"
     >
       <Smartphone className="h-10 w-10" />
-      Tocá para activar la inclinación
+      Toca para activar la inclinación
     </button>
   );
 
@@ -424,7 +424,7 @@ export default function Controller({
         <div className="flex min-h-56 flex-1 flex-col gap-3">
           <div className="flex flex-col items-center gap-2 py-2">
             {wheel("h-24 w-24")}
-            <p className="text-xs text-slate-400">Inclinalo como un volante, con la pantalla hacia vos.</p>
+            <p className="text-xs text-slate-400">Inclínalo como un volante, con la pantalla hacia tú.</p>
           </div>
           {brake(true)}
         </div>
@@ -432,7 +432,7 @@ export default function Controller({
 
       {fine && <div className="rounded-xl bg-slate-900/80 p-2 ring-1 ring-slate-700">{keysHint}</div>}
       <p className="text-center text-xs text-slate-500">
-        {locked ? "Preparate: el auto acelera solo cuando largan." : "El auto acelera solo. Frená para doblar cerrado o ir marcha atrás."}
+        {locked ? "Prepárate: el auto acelera solo cuando largan." : "El auto acelera solo. Frena para doblar cerrado o ir marcha atrás."}
       </p>
     </div>
   );

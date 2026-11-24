@@ -62,7 +62,7 @@ export default function NewGameBubble() {
           onClick={() => markAnnounced(game)}
           className="mt-1 inline-flex min-h-9 items-center self-start rounded-xl bg-talo-ink px-3 text-[14px] font-bold text-white hover:bg-black"
         >
-          Probalo
+          Pruébalo
         </Link>
       </span>
     </div>

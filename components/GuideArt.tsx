@@ -51,7 +51,7 @@ function Parchis() {
       <text x={cells[2] + 14} y="30" textAnchor="middle" {...TXT}>barrera</text>
       <text x={cells[4] + 14} y="30" textAnchor="middle" {...TXT}>seguro</text>
       <text x={cells[7] + 14} y="30" textAnchor="middle" {...TXT}>sola: se come</text>
-      <text x={cells[6]} y="140" textAnchor="middle" {...TXT} fill="#fca5a5">¡comés y contás 20!</text>
+      <text x={cells[6]} y="140" textAnchor="middle" {...TXT} fill="#fca5a5">¡comes y cuentas 20!</text>
     </Frame>
   );
 }
@@ -108,7 +108,7 @@ function Otelo() {
       <Disc x={20 + 3 * 28 + 13} y={63} fill="#111827" r={10} stroke="#fbbf24" />
       <Arrow d="M145 63 L 175 63" />
       {row(["n", "n", "n", "n"], 50, 185)}
-      <text x="75" y="105" textAnchor="middle" {...TXT}>ponés una negra…</text>
+      <text x="75" y="105" textAnchor="middle" {...TXT}>pones una negra…</text>
       <text x="240" y="105" textAnchor="middle" {...TXT}>…y las blancas encerradas</text>
       <text x="240" y="120" textAnchor="middle" {...TXT}>pasan a ser negras</text>
     </Frame>
@@ -129,8 +129,8 @@ function Damas() {
       <Disc x={sq(1, 2).x + 15} y={sq(1, 2).y + 15} fill="#1f2937" r={11} stroke="#64748b" />
       <circle cx={sq(2, 1).x + 15} cy={sq(2, 1).y + 15} r="6" fill="#34d399" />
       <Arrow d={`M${sq(0, 3).x + 22} ${sq(0, 3).y + 8} L ${sq(2, 1).x + 10} ${sq(2, 1).y + 20}`} />
-      <text x="232" y="60" {...TXT}>saltás la ficha</text>
-      <text x="232" y="75" {...TXT}>rival y la comés</text>
+      <text x="232" y="60" {...TXT}>saltas la ficha</text>
+      <text x="232" y="75" {...TXT}>rival y la comes</text>
       <text x="232" y="100" {...TXT} fill="#fbbf24">¡obligatorio!</text>
     </Frame>
   );
@@ -328,10 +328,10 @@ function Cajas() {
       <line x1={p(1, 0).x} y1={p(1, 0).y} x2={p(1, 1).x} y2={p(1, 1).y} stroke="#22d3ee" strokeWidth="4" strokeDasharray="6 4" />
       {[0, 1, 2].map((c) => [0, 1, 2].map((r) => <circle key={`${c}${r}`} cx={p(c, r).x} cy={p(c, r).y} r="5" fill="#f8fafc" />))}
       <text x={p(0, 0).x + 25} y={p(0, 0).y + 30} textAnchor="middle" fontSize="16" fill="#22d3ee">A</text>
-      <text x="20" y="60" {...TXT}>trazás el</text>
+      <text x="20" y="60" {...TXT}>trazas el</text>
       <text x="20" y="75" {...TXT}>cuarto lado:</text>
       <text x="20" y="90" {...TXT}>es tuyo y</text>
-      <text x="20" y="105" {...TXT}>jugás de nuevo</text>
+      <text x="20" y="105" {...TXT}>juegas de nuevo</text>
     </Frame>
   );
 }
@@ -349,7 +349,7 @@ function Naval() {
       <text x={144} y={69} textAnchor="middle" fontSize="13">💥</text>
       <text x={174} y={69} textAnchor="middle" fontSize="13">💥</text>
       <text x={24} y={125} textAnchor="middle" {...TXT}>agua</text>
-      <text x={174} y={125} textAnchor="middle" {...TXT}>tocado: seguís tirando</text>
+      <text x={174} y={125} textAnchor="middle" {...TXT}>tocado: sigues tirando</text>
     </Frame>
   );
 }
@@ -364,7 +364,7 @@ function Codigo() {
       <text x="198" y="40" {...TXT} fill="#fca5a5">rojo / azul: equipos</text>
       <text x="198" y="58" {...TXT}>gris: neutral</text>
       <text x="198" y="76" {...TXT} fill="#94a3b8">negro: ¡la bomba!</text>
-      <text x="20" y="120" {...TXT}>Pista del jefe: «Fruta 2» → tocá dos palabras rojas</text>
+      <text x="20" y="120" {...TXT}>Pista del jefe: «Fruta 2» → toca dos palabras rojas</text>
     </Frame>
   );
 }
@@ -463,9 +463,9 @@ function Sopa() {
       <rect x={88} y={14} width={102} height="22" rx="11" fill="#22d3ee33" stroke="#22d3ee" />
       <circle cx="100" cy="25" r="12" fill="none" stroke="#fbbf24" strokeWidth="2.5" />
       <circle cx="178" cy="25" r="12" fill="none" stroke="#fbbf24" strokeWidth="2.5" />
-      <text x="240" y="60" {...TXT}>1. tocá la</text>
+      <text x="240" y="60" {...TXT}>1. toca la</text>
       <text x="240" y="75" {...TXT}>primera letra</text>
-      <text x="240" y="95" {...TXT}>2. tocá la</text>
+      <text x="240" y="95" {...TXT}>2. toca la</text>
       <text x="240" y="110" {...TXT}>última</text>
     </Frame>
   );
@@ -488,7 +488,7 @@ function Deslizante() {
         );
       })}
       <Arrow d="M159 92 L 159 70" />
-      <text x="20" y="60" {...TXT}>tocá una ficha</text>
+      <text x="20" y="60" {...TXT}>toca una ficha</text>
       <text x="20" y="75" {...TXT}>junto al hueco</text>
       <text x="220" y="65" {...TXT}>y se desliza</text>
     </Frame>
@@ -503,7 +503,7 @@ function Memotest() {
       ))}
       <text x="67" y="74" textAnchor="middle" fontSize="28">🐶</text>
       <text x="195" y="74" textAnchor="middle" fontSize="28">🐶</text>
-      <text x="160" y="128" textAnchor="middle" {...TXT}>¡pareja! te las quedás</text>
+      <text x="160" y="128" textAnchor="middle" {...TXT}>¡pareja! te las quedas</text>
     </Frame>
   );
 }
@@ -586,8 +586,8 @@ function Puentes() {
           </text>
         </g>
       ))}
-      <text x="55" y="122" textAnchor="middle" {...TXT}>salís de acá</text>
-      <text x="265" y="122" textAnchor="middle" {...TXT}>…y llegás acá</text>
+      <text x="55" y="122" textAnchor="middle" {...TXT}>sales de aquí</text>
+      <text x="265" y="122" textAnchor="middle" {...TXT}>…y llegas aquí</text>
     </Frame>
   );
 }
@@ -595,7 +595,7 @@ function Puentes() {
 function Tronco() {
   // Seen from above: the log sweeps toward you; jump it or kick it back.
   return (
-    <Frame label="El tronco gira hacia vos: saltalo o pateálo para que vuelva">
+    <Frame label="El tronco gira hacia tú: sáltalo o patéalo para que vuelva">
       <circle cx="90" cy="75" r="58" fill="#EAD39C" opacity="0.35" />
       <circle cx="90" cy="75" r="9" fill="#8A5A2B" />
       <g transform="rotate(-35 90 75)">

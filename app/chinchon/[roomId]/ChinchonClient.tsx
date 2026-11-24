@@ -153,7 +153,7 @@ export default function ChinchonClient({ roomId }: { roomId: string }) {
 }
 
 function nameOf(state: ChinchonState, id: string, myId: string): string {
-  return id === myId ? "Vos" : (state.players[id]?.name ?? "?");
+  return id === myId ? "Tú" : (state.players[id]?.name ?? "?");
 }
 
 function Table({
@@ -229,11 +229,11 @@ function Table({
         {!playing
           ? `Juega ${nameOf(state, state.turn, myId)}`
           : canDraw
-            ? "¡Te toca! Agarrá del mazo o del pozo."
+            ? "¡Te toca! Agarra del mazo o del pozo."
             : canThrow
               ? selected
                 ? `Vas a tirar el ${cardName(selected)}`
-                : "Elegí qué carta tirar."
+                : "Elige qué carta tirar."
               : `Juega ${nameOf(state, state.turn, myId)}…`}
       </p>
 
@@ -281,7 +281,7 @@ function Table({
             </div>
           )}
           {canThrow && selected === state.tookDiscard && (
-            <p className="text-xs text-amber-300">No podés tirar la carta que acabás de levantar del pozo.</p>
+            <p className="text-xs text-amber-300">No puedes tirar la carta que acabas de levantar del pozo.</p>
           )}
         </div>
       )}
@@ -320,7 +320,7 @@ function HandEnd({ roomId, state, myId }: { roomId: string; state: ChinchonState
         {chinchon ? (
           <p className="font-display text-2xl font-bold text-amber-300">🎉 ¡CHINCHÓN{cutter === myId ? "!" : ` de ${nameOf(state, cutter, myId)}!`}</p>
         ) : (
-          <p className="font-display text-xl font-semibold text-slate-100">✂️ {cutter === myId ? "Cortaste vos" : `Cortó ${nameOf(state, cutter, myId)}`}</p>
+          <p className="font-display text-xl font-semibold text-slate-100">✂️ {cutter === myId ? "Cortaste tú" : `Cortó ${nameOf(state, cutter, myId)}`}</p>
         )}
         {finished && (
           <p className="mt-1 text-lg text-emerald-300">

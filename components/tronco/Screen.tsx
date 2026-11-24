@@ -318,10 +318,10 @@ export default function TroncoScreen({ roomId }: { roomId: string }) {
           {live && !countdown && (
             <div className="pointer-events-none absolute bottom-4 left-4 z-10 flex flex-col gap-1.5 rounded-2xl bg-black/55 px-4 py-3 text-base font-bold">
               <span className="flex items-center gap-2">
-                <span className="h-4 w-4 rounded-full border-[3px] border-talo-hero" /> Anillo amarillo: ¡saltá!
+                <span className="h-4 w-4 rounded-full border-[3px] border-talo-hero" /> Anillo amarillo: ¡salta!
               </span>
               <span className="flex items-center gap-2">
-                <span className="h-4 w-4 rounded-full border-[3px] border-emerald-400" /> Anillo verde: ¡pateá (o saltá)!
+                <span className="h-4 w-4 rounded-full border-[3px] border-emerald-400" /> Anillo verde: ¡patea (o salta)!
               </span>
             </div>
           )}
@@ -360,7 +360,7 @@ function JoinCard({ roomId, meta, state, presence }: { roomId: string; meta: Tro
       <div className="flex w-full flex-col gap-5 rounded-3xl bg-talo-ink/90 p-6 sm:p-8">
         <div className="flex items-center gap-3 text-white/80">
           <Smartphone className="h-7 w-7 text-talo-hero" />
-          <p className="text-xl font-bold">Entrá desde tu celular</p>
+          <p className="text-xl font-bold">Entra desde tu celular</p>
         </div>
         <div>
           <p className="break-all font-code text-base text-white/60 sm:text-xl">

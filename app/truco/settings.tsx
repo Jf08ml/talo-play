@@ -14,7 +14,7 @@ export const SETTINGS: GameSettings<Settings> = {
     {
       kind: "note",
       only: "create",
-      text: "Truco argentino sin flor, mano a mano o de a cuatro (dos contra dos). La app cuenta el envido y lleva los porotos.",
+      text: "Truco sin flor, mano a mano o de a cuatro (dos contra dos). La app cuenta el envido y lleva los puntos.",
     },
   ],
   create: (v, hostId) => createTrucoRoom(v, hostId),

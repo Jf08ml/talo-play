@@ -159,7 +159,7 @@ export default function MimicaClient({ roomId }: { roomId: string }) {
             <ScoreBar state={state} />
             {!myTeam && state.status !== "finished" && (
               <div className={`${CARD} !p-3 flex flex-col items-center gap-2 text-center text-sm text-slate-300`}>
-                Llegaste con la partida empezada. Sumate a un equipo:
+                Llegaste con la partida empezada. Únete a un equipo:
                 <TeamButtons roomId={roomId} myId={myId} />
               </div>
             )}
@@ -234,7 +234,7 @@ function TeamSetup({
               <ul className="flex min-h-10 flex-col gap-1 text-sm text-slate-200">
                 {members.map((id) => (
                   <li key={id} className="truncate text-center">
-                    {id === myId ? "Vos" : state.players[id]?.name}
+                    {id === myId ? "Tú" : state.players[id]?.name}
                   </li>
                 ))}
               </ul>
@@ -259,7 +259,7 @@ function TeamSetup({
       </button>
       {unassigned.length > 0 && (
         <p className="text-center text-xs text-slate-500">
-          Sin equipo: {unassigned.map((id) => (id === myId ? "vos" : state.players[id]?.name)).join(", ")}
+          Sin equipo: {unassigned.map((id) => (id === myId ? "tú" : state.players[id]?.name)).join(", ")}
         </p>
       )}
     </div>
@@ -318,7 +318,7 @@ function ReadyPanel({
       </p>
       {isActor ? (
         <>
-          <p className="text-slate-300">Actuás vos. Que tu equipo no vea tu pantalla.</p>
+          <p className="text-slate-300">Actúas tú. Que tu equipo no vea tu pantalla.</p>
           <button onClick={() => startActing(roomId, myId, state.turnNo)} className={`w-full max-w-xs ${PRIMARY_BUTTON}`}>
             ¡Empezar!
           </button>
@@ -371,14 +371,14 @@ function ActingPanel({
       {isActor || rival ? (
         <div key={state.wordNo} className="animate-celebration-in flex flex-col items-center gap-1">
           <span className="text-xs uppercase tracking-wide text-slate-500">
-            {rival ? "Controlá: la palabra es" : word.cat}
+            {rival ? "Controla: la palabra es" : word.cat}
           </span>
           <span className="font-display text-4xl font-bold text-slate-100">{word.w}</span>
           {rival && <span className="text-xs text-slate-500">{word.cat}</span>}
         </div>
       ) : (
         <p className="font-display text-3xl font-semibold" style={{ color: team.color }}>
-          {myTeam === state.team ? "¡Adivinen!" : "Mirá cómo actúan…"}
+          {myTeam === state.team ? "¡Adivinen!" : "Mira cómo actúan…"}
         </p>
       )}
 

@@ -25,7 +25,7 @@ export default function GeneralaHome() {
       router.push(roomPath("generala", roomId));
     } catch (err) {
       console.error(err);
-      setCreateError("No se pudo crear la sala. Probá de nuevo.");
+      setCreateError("No se pudo crear la sala. Prueba de nuevo.");
       setCreating(false);
     }
   };
@@ -36,7 +36,7 @@ export default function GeneralaHome() {
         <h2 className="font-display text-lg font-semibold text-slate-100">Crear una sala nueva</h2>
         <p className="text-sm text-slate-400">
           Se juega con las reglas de siempre: escalera, full y póker valen más servidos, la generala servida gana la
-          partida y la doble generala vale 100. Creá la sala y mandá el link.
+          partida y la doble generala vale 100. Crea la sala y manda el link.
         </p>
         {createError && <p className="text-sm text-red-400">{createError}</p>}
         <button type="submit" disabled={creating} className={`mt-auto ${PRIMARY_BUTTON}`}>

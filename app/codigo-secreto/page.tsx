@@ -25,7 +25,7 @@ export default function CodigoHome() {
       router.push(roomPath("codigo", roomId));
     } catch (err) {
       console.error(err);
-      setCreateError("No se pudo crear la sala. Probá de nuevo.");
+      setCreateError("No se pudo crear la sala. Prueba de nuevo.");
       setCreating(false);
     }
   };
@@ -35,7 +35,7 @@ export default function CodigoHome() {
       <form onSubmit={handleCreate} className={`${CARD} flex flex-col gap-4`}>
         <h2 className="font-display text-lg font-semibold text-slate-100">Crear una sala nueva</h2>
         <p className="text-sm text-slate-400">
-          No hay nada que configurar: creá la sala, invitá a los demás y armen los equipos adentro. Se necesitan al
+          No hay nada que configurar: crea la sala, invita a los demás y armen los equipos adentro. Se necesitan al
           menos 4 jugadores (un jefe de espías y un agente por equipo).
         </p>
         {createError && <p className="text-sm text-red-400">{createError}</p>}

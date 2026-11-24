@@ -14,7 +14,7 @@ export const PACE_OPTIONS = [
 const VIEW_HINT: Record<TroncoView, string> = {
   telefono: "Cada uno ve la ronda en 3D en su celular, desde atrás de su talo. Sirve también para jugar a distancia.",
   pantalla:
-    "La ronda se ve en una compu conectada a la tele o al proyector, y los celulares son el control: dos botones grandes y vibran cuando el tronco se acerca.",
+    "La ronda se ve en una computadora conectada a la tele o al proyector, y los celulares son el control: dos botones grandes y vibran cuando el tronco se acerca.",
 };
 
 export const SETTINGS: GameSettings<TroncoSettings> = {
