@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Gauge, Smartphone, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Gauge, Smartphone, Volume2, VolumeX } from "lucide-react";
 import FullscreenButton from "@/components/FullscreenButton";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import {
@@ -253,12 +253,15 @@ export default function TroncoScreen({ roomId }: { roomId: string }) {
 
       {status === "ready" && state && meta && (
         <>
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-3 p-4">
-            <div className="pointer-events-auto flex items-center gap-2 rounded-xl bg-black/60 px-3 py-2">
-              <Link href="/" aria-label="Volver a Talo">
+          {/* Over everything else (the join card and the results take the whole height). */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 p-4">
+            <div className="pointer-events-auto flex items-center gap-1 rounded-xl bg-black/60 p-1">
+              <Link href="/" className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-bold text-white hover:bg-white/10">
+                <ArrowLeft className="h-4 w-4" />
                 <TaloMark className="h-6 w-6" />
+                Inicio
               </Link>
-              <span className="font-code text-lg font-bold tracking-widest text-talo-hero">{roomId}</span>
+              <span className="px-2 font-code text-lg font-bold tracking-widest text-talo-hero">{roomId}</span>
             </div>
             {state.status !== "waiting" && (
               <div className="flex gap-2">
@@ -353,7 +356,7 @@ function JoinCard({ roomId, meta, state, presence }: { roomId: string; meta: Tro
   const ring = waitingRing(state, presence);
   const [busy, setBusy] = useState(false);
   return (
-    <div className="absolute inset-y-0 left-0 z-10 flex w-full items-center p-4 sm:p-8 lg:w-[46%]">
+    <div className="absolute inset-y-0 left-0 z-10 flex w-full items-center overflow-y-auto p-4 pt-20 sm:p-8 sm:pt-20 lg:w-[46%]">
       <div className="flex w-full flex-col gap-5 rounded-3xl bg-talo-ink/90 p-6 sm:p-8">
         <div className="flex items-center gap-3 text-white/80">
           <Smartphone className="h-7 w-7 text-talo-hero" />
