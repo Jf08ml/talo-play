@@ -1,4 +1,5 @@
 import {
+  Waves,
   Brain,
   Brush,
   Car,
@@ -102,6 +103,7 @@ const GAME_ICONS: Record<GameId, LucideIcon> = {
   puentes: Waypoints,
   tronco: RotateCw,
   minigolf: Flag,
+  empujones: Waves,
 };
 
 export const CONTEXT_ICONS: Record<PlayContext, LucideIcon> = {

@@ -280,6 +280,24 @@ const SCENES: Record<GameId, ReactNode> = {
       <T x={92} y={26} w={26} h={28} r={13} c={Y} look={[-0.4, 1]} expr="sorprendido" />
     </>
   ),
+  empujones: (
+    <>
+      {/* An island; one talo dashes into another, who flies off the edge into the water. */}
+      <ellipse cx={52} cy={84} rx={46} ry={24} fill="#C9A25B" />
+      <ellipse cx={52} cy={78} rx={46} ry={24} fill="#F4D58D" />
+      <ellipse cx={52} cy={77} rx={39} ry={19} fill={GR} />
+      <path d="M8 62h14M4 70h12M10 78h10" stroke={W} strokeWidth={3} strokeLinecap="round" opacity={0.7} />
+      <T x={14} y={50} w={30} h={32} r={15} c={Y} look={[1, 0]} />
+      <path d="M102 98a10 4 0 1 0 0.1 0M96 104a16 6 0 1 0 0.1 0" fill="none" stroke={W} strokeWidth={2.5} opacity={0.8} />
+      <g transform="rotate(24 92 60)">
+        <T x={78} y={40} w={28} h={30} r={14} c={PINK} expr="sorprendido" />
+      </g>
+      {[[70, 54], [74, 46], [66, 62]].map(([x, y], i) => (
+        <path key={i} d={`M${x} ${y - 4}l1.5 3 3 1.5-3 1.5-1.5 3-1.5-3-3-1.5 3-1.5z`} fill={W} />
+      ))}
+      <T x={44} y={88} w={20} h={22} r={10} c={OR} look={[0.6, -0.8]} />
+    </>
+  ),
   ladrillazo: (
     <>
       {[Y, PINK, OR, W].map((c, i) => (

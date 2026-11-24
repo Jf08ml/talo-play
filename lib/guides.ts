@@ -566,6 +566,42 @@ export const GUIDES: Record<GameId, Guide> = {
       "Si arrancás vos, mandalo para el lado del que esté más distraído.",
     ],
   },
+  empujones: {
+    goal: "Tirar a los demás al agua y ser el último talo que queda arriba de la isla.",
+    sections: [
+      {
+        title: "La pantalla y los celulares",
+        text: [
+          "La isla se ve en una pantalla grande: una compu conectada a la tele o al proyector. El que crea la sala lo hace desde esa compu, y ahí se abre la isla con el código.",
+          "Cada uno entra desde su celular con el código o el link: el celular es el control. Tu talo es el de tu color, con tu nombre arriba.",
+          "Mientras esperan, ya pueden caminar y empujarse para probar: el que se cae vuelve enseguida.",
+        ],
+      },
+      {
+        title: "Los controles",
+        text: [
+          "A la izquierda: apoyá el dedo en cualquier lado y movelo para caminar. Arriba en el celular es arriba en la pantalla.",
+          "«Empujar»: tu talo sale disparado para donde estás apuntando. Si choca a alguien, lo manda lejos y lo deja mareado un momento. Después hay que esperar un poquito para volver a usarlo (el botón se va llenando).",
+          "«Aguantar» (mantenelo apretado): tu talo se planta y pesa mucho más, así que cuesta moverlo. Mientras aguantás caminás lento y no podés empujar, y la barra se gasta: cuando se vacía, soltás.",
+          "En la compu: WASD o las flechas para caminar, espacio para empujar y Shift para aguantar.",
+        ],
+      },
+      {
+        title: "Las rondas",
+        text: [
+          "Si el centro de tu talo sale de la isla, te caés al agua y quedás afuera hasta la próxima ronda.",
+          "Al rato de empezar, la isla se empieza a achicar; si la ronda dura mucho, se termina hundiendo. Gana la ronda el último que queda arriba (si se caen todos juntos, no la gana nadie).",
+          "Gana la partida el primero en ganar las rondas pedidas (2, 3 o 5). Los bots completan la isla si son pocos, hasta 8 en total.",
+        ],
+      },
+    ],
+    tips: [
+      "No empujes desde el costado: ponete entre el otro y el centro de la isla, así el empujón lo manda derecho al agua.",
+      "Si alguien viene embistiendo, apretá «Aguantar» justo antes del choque: rebota él.",
+      "Cerca del borde no te quedes quieto: un empujón y estás afuera. Volvé al medio.",
+      "Un empujón que no le pega a nadie te puede tirar solo al agua: apuntá bien cerca del borde.",
+    ],
+  },
   ladrillazo: {
     goal: "Romper ladrillos con la pelota sin dejarla caer: los objetivos rojos o todo el nivel, según cuál toque.",
     sections: [
