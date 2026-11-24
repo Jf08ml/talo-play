@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, ChevronDown, Clock, Users } from "lucide-react";
 import SiteHeader, { SiteFooter } from "./SiteHeader";
 import GameArt from "./GameArt";
+import NewBadge from "./NewBadge";
 import JsonLd from "./JsonLd";
 import { GAMES, playersLabel } from "@/lib/games";
 import { gameColors } from "@/lib/talos";
@@ -55,6 +56,7 @@ export default function LandingPage({ slug }: { slug: string }) {
                   <GameArt game={id} className="h-24 w-24 shrink-0 self-center" />
                   <span className="flex min-w-0 flex-col gap-1.5">
                     <h3 className="font-display text-[24px] leading-none">{g.title}</h3>
+                    <NewBadge game={id} className="self-start" />
                     <span className="text-[15px] font-medium leading-snug">{g.tagline}</span>
                     <span className="mt-auto flex flex-wrap gap-x-3 text-[13px] font-bold opacity-80">
                       <span className="inline-flex items-center gap-1">

@@ -32,6 +32,8 @@ export interface GameInfo {
   contexts: PlayContext[];
   /** Three short steps, shown in the lobby and the waiting room. */
   howTo: string[];
+  /** Release day (YYYY-MM-DD, Argentina) for the "Nuevo" badge and the home's "Juegos nuevos" (lib/newGames.ts). Games from before it existed have none. */
+  addedAt?: string;
 }
 
 export const GAMES: Record<GameId, GameInfo> = {
@@ -54,6 +56,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     id: "minigolf",
     title: "Minigolf",
     path: "minigolf",
+    addedAt: "2026-11-19",
     tagline: "Hoyos que se inventan en el momento, con pendientes, arena, agua, molinos y bumpers. Todos juegan el mismo hoyo a la vez y ven las pelotas de los demás: gana el de menos golpes.",
     minPlayers: 1,
     maxPlayers: 8,
@@ -69,6 +72,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     id: "puentes",
     title: "Puentes",
     path: "puentes",
+    addedAt: "2026-11-03",
     tagline: "Cruzá todos los puentes sin pasar dos veces por el mismo. Cada mapa se inventa en el momento, así que nunca te lo aprendés: niveles sin fin, reto del día y carreras con amigos o en línea.",
     minPlayers: 1,
     maxPlayers: 8,
@@ -384,6 +388,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     id: "vibora",
     title: "Viborita",
     path: "viborita",
+    addedAt: "2026-10-21",
     tagline: "Comé bolitas, crecé y cortales la cola a los demás para quedarte con sus puntos. En línea con gente de todos lados o en una sala con amigos.",
     minPlayers: 1,
     maxPlayers: 10,
@@ -399,6 +404,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     id: "golpe",
     title: "El gran golpe",
     path: "el-gran-golpe",
+    addedAt: "2026-11-24",
     tagline: "Entrá al museo, robá los diamantes sin que te vean los guardias ni las cámaras y llevalos a la salida antes que los demás. Todos contra todos o rojo contra azul, con bots si son pocos.",
     minPlayers: 1,
     maxPlayers: 8,
@@ -414,6 +420,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     id: "ladrillazo",
     title: "Ladrillazo",
     path: "ladrillazo",
+    addedAt: "2026-11-03",
     tagline: "Rompé ladrillos con la pelota y la paleta: niveles con objetivos escondidos detrás de muros, carreras, ataques que le tiran ladrillos a los demás, duelos cara a cara y modo en equipo. Solo, en línea o con amigos.",
     minPlayers: 1,
     maxPlayers: 8,
@@ -429,6 +436,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     id: "tronco",
     title: "El tronco",
     path: "el-tronco",
+    addedAt: "2026-11-03",
     tagline: "En ronda, en 3D, con un tronco que gira en el medio cada vez más rápido. Cuando llega a vos: saltalo o pateálo para que vuelva para el otro lado. Si te toca, te tumba. Gana el último parado.",
     minPlayers: 1,
     maxPlayers: 8,
@@ -444,6 +452,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     id: "empujones",
     title: "Empujones",
     path: "empujones",
+    addedAt: "2026-11-24",
     tagline: "Una isla en la tele y cada uno con su talo desde el celular: empujá a los demás al agua antes de que te empujen. La isla se achica y gana el último que queda arriba.",
     minPlayers: 1,
     maxPlayers: 8,
@@ -594,6 +603,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     id: "triqui",
     title: "Triqui",
     path: "triqui",
+    addedAt: "2026-10-23",
     tagline: "El ta-te-ti de siempre, uno contra uno: hacé tres en línea antes que el otro. Con modo infinito, donde tu marca más vieja se borra y no hay empates.",
     minPlayers: 2,
     maxPlayers: 2,
@@ -654,6 +664,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     id: "pasteleria",
     title: "Pastelería",
     path: "pasteleria",
+    addedAt: "2026-10-18",
     tagline: "Armá en 3D las tortas que te piden los clientes antes de que se acabe el tiempo. Cuatro niveles solo, de aprendiz a chef estrella, o un duelo con amigos: mismos pedidos, gana quien hace más.",
     minPlayers: 1,
     maxPlayers: 8,

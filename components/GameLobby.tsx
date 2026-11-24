@@ -14,6 +14,7 @@ import PlayerIdentity from "./PlayerIdentity";
 import OpenRoomsList from "./OpenRoomsList";
 import SiteHeader, { SiteFooter } from "./SiteHeader";
 import GameArt from "./GameArt";
+import NewBadge from "./NewBadge";
 import { GuideBody } from "./HowToPlay";
 import { ArrowLeft, ArrowRight, ChevronDown, Clock, Users } from "lucide-react";
 
@@ -66,6 +67,7 @@ export default function GameLobby({ game, children }: { game: GameId; children: 
                 {shelfPage.label}
               </Link>
             </nav>
+            <NewBadge game={game} className="self-start" />
             <h1 className="text-balance font-display text-[44px] leading-none tracking-[-0.02em] sm:text-[clamp(56px,6vw,88px)]">
               {info.title}
             </h1>
@@ -168,6 +170,7 @@ export default function GameLobby({ game, children }: { game: GameId; children: 
                 >
                   <GameArt game={id} className="mx-auto h-24 w-24 sm:h-28 sm:w-28" />
                   <span className="px-3 pb-3 font-display text-[18px] leading-tight">{GAMES[id].title}</span>
+                  <NewBadge game={id} className="mx-3 mb-3 -mt-1 self-start" />
                 </Link>
               </li>
             ))}

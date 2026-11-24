@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Lightbulb, X } from "lucide-react";
+import { gameToAnnounce } from "@/lib/newGames";
 
 /** Set once the bubble was shown and closed (or the button used), so it never nags again. */
 const SEEN_KEY = "talo.ideas.visto";
@@ -36,7 +37,8 @@ export default function IdeasButton() {
   const [bubble, setBubble] = useState(false);
 
   useEffect(() => {
-    if (readSeen()) return;
+    // A new game is being announced this visit: one bubble at a time.
+    if (readSeen() || gameToAnnounce()) return;
     const t = setTimeout(() => setBubble(true), BUBBLE_DELAY_MS);
     return () => clearTimeout(t);
   }, []);

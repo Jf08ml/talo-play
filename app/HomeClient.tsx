@@ -17,6 +17,8 @@ import PlayerIdentity from "@/components/PlayerIdentity";
 import SiteHeader from "@/components/SiteHeader";
 import HeroCrowd from "@/components/HeroCrowd";
 import GameArt from "@/components/GameArt";
+import NewBadge, { useNewGames } from "@/components/NewBadge";
+import { arrivedText } from "@/lib/newGames";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 
 // "Los que más se juegan" picks these until there are enough real plays to
@@ -40,6 +42,7 @@ export default function HomeClient() {
   const [context, setContext] = useState<PlayContext | null>(null);
   const [cat, setCat] = useState(0);
   const [featured, setFeatured] = useState(CURATED);
+  const fresh = useNewGames();
 
   // Housekeeping: delete a few rooms nobody used in days (see lib/roomCleanup.ts).
   useEffect(() => {
@@ -104,6 +107,37 @@ export default function HomeClient() {
         <OpenRoomsList where="inicio" limit={6} title="Salas abiertas ahora" className="mt-6" />
       </div>
 
+      {/* JUEGOS NUEVOS: only while something came out in the last weeks (lib/newGames.ts). */}
+      {fresh.length > 0 && (
+        <section className="mx-auto flex max-w-[1360px] flex-col gap-6 px-5 pt-14 sm:gap-8 sm:px-10 sm:pt-24">
+          <div className="flex flex-col gap-1.5">
+            <h2 className="font-display text-[32px] leading-[1.05] tracking-[-0.01em] sm:text-[44px]">Juegos nuevos</h2>
+            <p className="text-[17px] text-talo-text-2">Lo último que sumamos a Talo. ¡Probalos!</p>
+          </div>
+          <div className="-mx-5 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-5 px-5 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-[repeat(auto-fill,minmax(280px,1fr))] sm:gap-5 sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden">
+            {fresh.slice(0, 4).map((id) => {
+              const { color, ink } = gameColors(id);
+              return (
+                <Link
+                  key={id}
+                  href={`/${GAMES[id].path}`}
+                  className="relative flex h-[300px] w-[80%] shrink-0 snap-start flex-col gap-2 overflow-hidden rounded-[28px] p-6 transition-transform duration-200 hover:-translate-y-1.5 sm:h-[320px] sm:w-auto"
+                  style={{ background: color, color: ink }}
+                >
+                  <span className="flex items-center gap-2">
+                    <NewBadge game={id} />
+                    <span className="text-[14px] font-bold opacity-80">{arrivedText(id)}</span>
+                  </span>
+                  <span className="font-display text-[30px] leading-none tracking-[-0.01em] sm:text-[34px]">{GAMES[id].title}</span>
+                  <span className="line-clamp-3 max-w-[280px] text-[15px] font-medium leading-[1.35]">{GAMES[id].tagline}</span>
+                  <GameArt game={id} className="absolute -bottom-4 right-2 h-[150px] w-[150px] sm:h-[170px] sm:w-[170px]" />
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {/* DESTACADOS */}
       <section className="mx-auto flex max-w-[1360px] flex-col gap-6 px-5 pt-14 sm:gap-8 sm:px-10 sm:pt-24">
         <div className="flex flex-wrap items-baseline justify-between gap-4">
@@ -122,6 +156,7 @@ export default function HomeClient() {
                 className="relative flex h-[380px] w-[80%] shrink-0 snap-start flex-col gap-2.5 overflow-hidden rounded-[28px] p-7 transition-transform duration-200 hover:-translate-y-1.5 sm:h-[420px] sm:w-auto"
                 style={{ background: color, color: ink }}
               >
+                <NewBadge game={id} className="self-start" />
                 <span className="font-display text-[34px] leading-none tracking-[-0.01em] sm:text-[38px]">{GAMES[id].title}</span>
                 <span className="line-clamp-4 max-w-[260px] text-[16px] font-medium leading-[1.35]">{GAMES[id].tagline}</span>
                 <GameArt game={id} className="absolute -bottom-3 left-1/2 h-[220px] w-[220px] -translate-x-1/2 sm:h-[240px] sm:w-[240px]" />
@@ -209,7 +244,10 @@ export default function HomeClient() {
                       <GameArt game={id} className="h-full w-full" />
                     </span>
                     <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="text-[17px] font-bold leading-tight sm:text-[19px]">{g.title}</span>
+                      <span className="flex items-center gap-2 text-[17px] font-bold leading-tight sm:text-[19px]">
+                        {g.title}
+                        <NewBadge game={id} />
+                      </span>
                       <span className="text-sm text-talo-text-3">
                         {playersLabel(g)} jugadores · {g.duration}
                       </span>

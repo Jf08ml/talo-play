@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import TaloLogo from "./TaloLogo";
 import FriendsLink from "./FriendsLink";
 import IdeasButton from "./IdeasButton";
+import NewGameBubble from "./NewGameBubble";
 import PlazaButton from "./PlazaButton";
 import { CATEGORIES, CONTEXTS, GAMES } from "@/lib/games";
 import { contextLanding, shelfLanding } from "@/lib/landings";
@@ -95,6 +96,7 @@ export function SiteFooter() {
           talo
         </p>
       </div>
+      <NewGameBubble />
       <IdeasButton />
       <PlazaButton />
     </footer>
