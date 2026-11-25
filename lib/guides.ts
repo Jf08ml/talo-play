@@ -671,6 +671,48 @@ export const GUIDES: Record<GameId, Guide> = {
       "En el último minuto vuelve a la salida: lo que quede en la mochila se pierde.",
     ],
   },
+  gravedad: {
+    goal: "Llegar a la bandera de cada nivel: caminando, saltando y, sobre todo, cambiando la gravedad para caminar por el techo y las paredes.",
+    sections: [
+      {
+        title: "Moverte",
+        text: [
+          "Caminas a la izquierda y a la derecha y saltas, como en cualquier juego de plataformas. «Izquierda» y «derecha» siempre son como las ves en la pantalla.",
+          "Celular: las flechas grandes abajo a la izquierda para caminar y «Saltar» abajo a la derecha. Computadora: ← → (o A D) para caminar y Espacio (o W, ↑) para saltar.",
+        ],
+      },
+      {
+        title: "Cambiar la gravedad",
+        text: [
+          "Con los tres botones de gravedad (o las teclas Q, S y E) la mandas a la pared de la izquierda, al techo o a la pared de la derecha. Caes hacia allá, la pantalla gira y esa superficie pasa a ser tu piso.",
+          "Cada cambio gasta tu carga (el puntito amarillo sobre tu talo y el cartel «Gravedad lista»). Se recarga en cuanto tocas cualquier superficie, así que no puedes cambiarla dos veces seguidas en el aire.",
+          "Si la mandas hacia una pared lejana, caes de costado: es la forma más rápida de cruzar un nivel… si sabes dónde vas a aterrizar.",
+        ],
+      },
+      {
+        title: "Lo que te vas a encontrar",
+        text: [
+          "Pinchos rojos: si los tocas, vuelves al último punto. Lo mismo si caes al vacío.",
+          "Banderitas: son puntos de control; al pasar por una, ahí vuelves si te caes. R (o el botón de la flecha circular) te lleva ahí cuando quieras.",
+          "Casillas azules con flecha: al cruzarlas, la gravedad cambia sola hacia donde apunta la flecha (y te recargan).",
+          "Bloques agrietados: se rompen un momento después de pisarlos y vuelven a los pocos segundos.",
+          "Plataformas verdes: se mueven; súbete y te llevan. En algunos niveles, además, la gravedad se da vuelta sola cada pocos segundos: un cartel te avisa justo antes.",
+        ],
+      },
+      {
+        title: "Solo y carreras",
+        text: [
+          "Solo: los niveles van en orden y cada uno enseña algo nuevo. Si llegas rápido te llevas hasta tres estrellas.",
+          "Carrera (con amigos o en línea): todos juegan el mismo nivel a la vez y ven a los demás como fantasmas, que no chocan. El primero en llegar suma 3 puntos, el segundo 2 y el resto que llega 1. Si son pocos, completan bots.",
+        ],
+      },
+    ],
+    tips: [
+      "Antes de cambiar la gravedad, mira hacia dónde vas a caer: la pared de enfrente pasa a ser el piso.",
+      "Salta y cambia la gravedad en el aire para pasar por encima de los pinchos.",
+      "En las carreras, los atajos existen: caer de costado de una pared a otra ahorra mucho tiempo.",
+    ],
+  },
   ladrillazo: {
     goal: "Romper ladrillos con la pelota sin dejarla caer: los objetivos rojos o todo el nivel, según cuál toque.",
     sections: [

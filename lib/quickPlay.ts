@@ -31,6 +31,7 @@ export const QUICK_GAMES: QuickGame[] = [
   { game: "triqui", kind: "duelo", queue: "triqui-clasico" },
   { game: "backgammon", kind: "duelo" },
   { game: "puentes", kind: "mundo" },
+  { game: "gravedad", kind: "mundo" },
 ];
 
 /** Makes a duel's room against `vs` (same settings as the lobby's «En línea»). */
@@ -70,6 +71,8 @@ export async function enterWorld(game: GameId): Promise<string> {
       return (await import("./puentesRoom")).enterOnline();
     case "tronco":
       return (await import("./troncoRoom")).enterOnline();
+    case "gravedad":
+      return (await import("./gravedadRoom")).enterOnline();
     default:
       throw new Error(`${game} has no online world`);
   }

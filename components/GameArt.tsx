@@ -317,6 +317,24 @@ const SCENES: Record<GameId, ReactNode> = {
       </g>
     </>
   ),
+  gravedad: (
+    <>
+      {/* A room: one talo walks on the floor, another upside down on the ceiling, a third on the wall; arrows show where gravity pulls. */}
+      <rect x={0} y={0} width={120} height={14} rx={3} fill={INK} />
+      <rect x={0} y={106} width={120} height={14} rx={3} fill={INK} />
+      <rect x={106} y={14} width={14} height={92} fill={INK} />
+      <path d="M54 106l5-9 5 9zM64 106l5-9 5 9zM74 106l5-9 5 9z" fill="#FF3B30" />
+      <T x={10} y={74} w={30} h={32} r={12} c={Y} look={[1, 0]} />
+      <g transform="rotate(180 64 30)">
+        <T x={50} y={16} w={28} h={30} r={12} c={PINK} look={[-1, 0]} />
+      </g>
+      <g transform="rotate(-90 92 66)">
+        <T x={78} y={52} w={26} h={28} r={11} c={GR} expr="sorprendido" />
+      </g>
+      <path d="M64 56v12m-5-5l5 5 5-5" stroke={W} strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" fill="none" transform="rotate(180 64 62)" />
+      <path d="M28 46v12m-5-5l5 5 5-5" stroke={W} strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </>
+  ),
   ladrillazo: (
     <>
       {[Y, PINK, OR, W].map((c, i) => (

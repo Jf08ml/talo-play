@@ -1,4 +1,5 @@
 import {
+  ArrowDownUp,
   Waves,
   Gem,
   Brain,
@@ -106,6 +107,7 @@ const GAME_ICONS: Record<GameId, LucideIcon> = {
   minigolf: Flag,
   empujones: Waves,
   golpe: Gem,
+  gravedad: ArrowDownUp,
 };
 
 export const CONTEXT_ICONS: Record<PlayContext, LucideIcon> = {
