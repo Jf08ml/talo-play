@@ -43,6 +43,9 @@ import { Flag } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
+import { useBotTurn } from "@/hooks/useBotTurn";
+import { BOT_ID, isBot } from "@/lib/boardBot";
+import { triquiBotMove } from "@/lib/triquiBot";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -96,15 +99,25 @@ export default function TriquiClient({ roomId }: { roomId: string }) {
     joinTriqui(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
 
+  const botTurn = !!state?.botLevel && state.status === "playing" && state.seats[turnOf(state.moves)] === BOT_ID;
+  useBotTurn(botTurn, `${state?.gameNo}:${state?.moves}`, () => {
+    if (!state?.botLevel) return;
+    const idx = triquiBotMove(state.moves, state.variant, state.botLevel);
+    return playSquare(roomId, BOT_ID, idx, state.moves.length);
+  });
+
   if (!configured) return <FirebaseSetupNotice />;
 
-  const isAway = (id: string) => presenceLoaded && !!id && !(id in presence);
+  // The computer is never in presence, but it never leaves either.
+  const isAway = (id: string) => presenceLoaded && !!id && !isBot(id) && !(id in presence);
+  const vsBot = !!state?.botLevel;
 
   return (
     <div className="flex min-h-dvh flex-col">
       <RoomHeader
         game="triqui"
         roomId={roomId}
+        social={!vsBot}
         right={status === "ready" && <PlayerBadges presence={presence} myClientId={myId} />}
       />
 
@@ -157,7 +170,7 @@ export default function TriquiClient({ roomId }: { roomId: string }) {
           </div>
         )}
 
-        {status === "ready" && state?.status === "finished" && (
+        {status === "ready" && state?.status === "finished" && !vsBot && (
           <div className="flex justify-center px-4 pb-6">
             <BackToRoomButton roomId={roomId} stateKey="triqui/state" hostId={hostId} presence={presence} myId={myId} />
           </div>

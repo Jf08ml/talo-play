@@ -101,6 +101,7 @@ Stack: Next.js 16 App Router + React 19, Tailwind v4, Konva/react-konva for the 
 
 - `rooms/{id}/cuatro/state` — `seats` (`a` red / `b` yellow → client id), `cells` (a 42-char string, row-major from the top: `.` empty, `a`/`b` a disc), `turn`, `starter` (alternates on each "Revancha"), `lastMove`, `winner` (`a`/`b`/`draw`) and `wins` per client id. Everyone else in the room watches.
 - Joining before the game auto-sits you in a free seat. A seat whose player left can be taken (`takeSeat`, guarded by the occupant you saw), also mid-game by a spectator. `dropDisc` is guarded by the move count so a double tap can't play twice; the win (`findWin`) is checked inside the transaction.
+- «Contra la app» (`lib/boardBot.ts`, `components/VsBotTabs.tsx`, `hooks/useBotTurn.ts`, shared with Triqui): the lobby creates a room with `botLevel` (fácil/normal/difícil, in meta and state) that starts at once, the creator in seat `a` and the computer as client id `BOT_ID` in `b` (in `players`, never in presence, so `isAway` skips it). Every client in the room plays the bot's turn after `botDelay` through the same `dropDisc`; the move-count guard lets one through. The brain is `lib/cuatroBot.ts` (negamax + alpha-beta, window heuristic; depth and random blunders by level). Bot rooms have `social={false}`.
 
 ### Palabra secreta (`app/palabra-secreta`, `lib/palabra.ts`)
 
@@ -229,7 +230,7 @@ Stack: Next.js 16 App Router + React 19, Tailwind v4, Konva/react-konva for the 
 
 ### Triqui (`app/triqui`, `lib/triqui.ts`)
 
-- Tic-tac-toe, seats via `lib/twoSeats.ts` (`a` X moves first, `b` O). The state stores only `moves` (squares played, one digit each, alternating from `a`); the board is `cellsOf(moves, variant)`. `meta.variant` (copied into the state): `clasico` (full board = draw) or `infinito` (each side keeps its last `INFINITE_KEEP` marks, so no draws; `nextToVanish` is shown blinking). `playSquare` is guarded by the move count; resign; rematch swaps marks like Otelo.
+- Tic-tac-toe, seats via `lib/twoSeats.ts` (`a` X moves first, `b` O). The state stores only `moves` (squares played, one digit each, alternating from `a`); the board is `cellsOf(moves, variant)`. `meta.variant` (copied into the state): `clasico` (full board = draw) or `infinito` (each side keeps its last `INFINITE_KEEP` marks, so no draws; `nextToVanish` is shown blinking). `playSquare` is guarded by the move count; resign; rematch swaps marks like Otelo. «Contra la app» works like 4 en línea's (rematch swaps marks, so the bot starts every other game); `lib/triquiBot.ts` searches clásico to the end on difícil (unbeatable) and infinito 7 moves deep; there's no `BackToRoomButton` in bot rooms.
 
 ### Backgammon (`app/backgammon`, `lib/backgammon.ts`, `lib/backgammonRules.ts`)
 

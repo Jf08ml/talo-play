@@ -275,6 +275,10 @@ export const GUIDES: Record<GameId, Guide> = {
         ],
         art: "cuatro",
       },
+      {
+        title: "Contra la app",
+        text: ["¿No hay nadie para jugar? Elige «Contra la app» y juegas al momento contra la computadora, en fácil, normal o difícil. En cada revancha empieza el otro."],
+      },
     ],
     tips: ["Las columnas del centro sirven para más líneas: empieza por ahí.", "Mira dónde puede ganar el rival en su próximo turno y tápalo."],
   },
@@ -1063,6 +1067,10 @@ export const GUIDES: Record<GameId, Guide> = {
         art: "triqui",
       },
       { title: "Revancha", text: ["En cada revancha se cambian X y O, así arranca uno y después el otro. La app lleva la cuenta de ganadas."] },
+      {
+        title: "Contra la app",
+        text: ["¿Estás solo? Elige «Contra la app» y juegas al momento contra la computadora, en fácil, normal o difícil. En difícil y modo clásico no pierde nunca: lo mejor que puedes sacarle es un empate."],
+      },
     ],
     tips: [
       "Si empiezas, el centro o una esquina son las mejores primeras jugadas.",

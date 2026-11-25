@@ -2,6 +2,7 @@ import { ref, get, onValue, serverTimestamp, update, type Unsubscribe } from "fi
 import { getDb } from "./firebase";
 import { generateRoomCode } from "./ids";
 import { transactState } from "./transact";
+import { BOT_ID, botPlayer, normalizeBotLevel, type BotLevel } from "./boardBot";
 
 /**
  * 4 en línea. Two seats (`a` red, `b` yellow); everyone else in the room
@@ -25,6 +26,8 @@ export interface CuatroMeta {
   game: "cuatro";
   /** Who created the room: starts the game (anyone can if they're away). */
   hostId?: string;
+  /** "Contra la app": the creator against the computer (`BOT_ID` in seat b). */
+  botLevel?: BotLevel;
   createdAt: number | object;
 }
 
@@ -48,6 +51,8 @@ export interface CuatroState {
   winner: Disc | "draw" | "";
   /** Games won per client id, across rematches. */
   wins: Record<string, number>;
+  /** Set in rooms against the computer; "" otherwise. */
+  botLevel: BotLevel | "";
 }
 
 export function emptyCells(): string {
@@ -67,6 +72,7 @@ function normalizeState(raw: Partial<CuatroState> | null): CuatroState | null {
     lastMove: raw.lastMove ?? -1,
     winner: raw.winner ?? "",
     wins: raw.wins ?? {},
+    botLevel: normalizeBotLevel(raw.botLevel),
   };
 }
 
@@ -134,10 +140,13 @@ function mutate(roomId: string, fn: (state: CuatroState) => CuatroState | null) 
   return transactState(statePath(roomId), normalizeState, fn);
 }
 
-export async function createCuatroRoom(hostId: string): Promise<string> {
+/** With `botLevel`, a room against the computer that starts at once (the creator plays red and starts). */
+export async function createCuatroRoom(hostId: string, botLevel?: BotLevel): Promise<string> {
   const roomId = generateRoomCode();
-  const meta: CuatroMeta = { game: "cuatro", hostId, createdAt: serverTimestamp() };
-  const state: Partial<CuatroState> = { status: "waiting", gameNo: 0, cells: emptyCells(), turn: "a", starter: "a" };
+  const meta: CuatroMeta = { game: "cuatro", hostId, createdAt: serverTimestamp(), ...(botLevel ? { botLevel } : {}) };
+  const state: Partial<CuatroState> = botLevel
+    ? { status: "playing", gameNo: 0, cells: emptyCells(), turn: "a", starter: "a", lastMove: -1, botLevel, seats: { a: hostId, b: BOT_ID }, players: { [BOT_ID]: botPlayer(botLevel) } }
+    : { status: "waiting", gameNo: 0, cells: emptyCells(), turn: "a", starter: "a" };
   await update(ref(getDb()), {
     [`rooms/${roomId}/meta`]: meta,
     [statePath(roomId)]: state,

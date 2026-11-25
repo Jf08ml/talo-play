@@ -152,7 +152,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     minPlayers: 2,
     maxPlayers: 2,
     duration: "5 min",
-    contexts: ["pareja", "amigos"],
+    contexts: ["pareja", "amigos", "solo"],
     howTo: [
       "Cada uno tiene un color; se juega por turnos.",
       "Toca una columna para tirar tu ficha: cae hasta abajo.",
@@ -608,7 +608,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     minPlayers: 2,
     maxPlayers: 2,
     duration: "1–5 min",
-    contexts: ["pareja", "amigos"],
+    contexts: ["pareja", "amigos", "solo"],
     howTo: [
       "Juegan X contra O, por turnos; empieza la X.",
       "Pon tu marca en una casilla libre: el primero que hace tres en línea (fila, columna o diagonal) gana.",
