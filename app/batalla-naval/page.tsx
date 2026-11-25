@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createNavalRoom } from "@/lib/naval";
 import { roomPath } from "@/lib/games";
 import GameLobby from "@/components/GameLobby";
+import OnlineTabs from "@/components/OnlineTabs";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 
@@ -32,17 +33,36 @@ export default function NavalHome() {
 
   return (
     <GameLobby game="naval">
-      <form onSubmit={handleCreate} className={`${CARD} flex flex-col gap-4`}>
-        <h2 className="font-display text-lg font-semibold text-slate-100">Crear una sala nueva</h2>
-        <p className="text-sm text-slate-400">
-          Cada flota tiene un portaaviones (5), un acorazado (4), un crucero (3), un submarino (3) y un destructor
-          (2). Crea la sala y mándale el link a tu rival; si entra más gente, mira la batalla.
-        </p>
-        {createError && <p className="text-sm text-red-400">{createError}</p>}
-        <button type="submit" disabled={creating} className={`mt-auto ${PRIMARY_BUTTON}`}>
-          {creating ? "Creando sala…" : "Crear sala"}
-        </button>
-      </form>
+      <OnlineTabs
+        game="naval"
+        text="Te emparejamos al momento con alguien que también quiere jugar. Cada uno arma su flota y a disparar; quién empieza se sortea."
+        create={(hostId, vs) => createNavalRoom(hostId, vs)}
+        friends={
+          <form
+            onSubmit={handleCreate}
+            className={`${CARD} flex flex-col gap-4`}
+          >
+            <h2 className="font-display text-lg font-semibold text-slate-100">
+              Crear una sala nueva
+            </h2>
+            <p className="text-sm text-slate-400">
+              Cada flota tiene un portaaviones (5), un acorazado (4), un crucero
+              (3), un submarino (3) y un destructor (2). Crea la sala y mándale
+              el link a tu rival; si entra más gente, mira la batalla.
+            </p>
+            {createError && (
+              <p className="text-sm text-red-400">{createError}</p>
+            )}
+            <button
+              type="submit"
+              disabled={creating}
+              className={`mt-auto ${PRIMARY_BUTTON}`}
+            >
+              {creating ? "Creando sala…" : "Crear sala"}
+            </button>
+          </form>
+        }
+      />
     </GameLobby>
   );
 }

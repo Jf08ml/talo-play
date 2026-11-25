@@ -343,6 +343,10 @@ export const GUIDES: Record<GameId, Guide> = {
         ],
         art: "naval",
       },
+      {
+        title: "En línea",
+        text: ["¿No tienes con quién jugar? Elige «En línea» y te emparejamos al momento con alguien que también quiere jugar. Quién dispara primero se sortea y en cada revancha empieza el otro."],
+      },
     ],
     tips: ["Cuando tocas un barco, prueba las casillas de al lado para seguirlo."],
   },
@@ -1125,6 +1129,10 @@ export const GUIDES: Record<GameId, Guide> = {
         title: "El cubo de doblaje",
         text: ["Antes de tirar, puedes ofrecer doblar lo que vale la partida. El rival acepta (y el cubo pasa a ser suyo: solo él puede volver a doblar) o se rinde y pierde lo que valía hasta ahí."],
       },
+      {
+        title: "En línea",
+        text: ["¿No tienes con quién jugar? Elige «En línea» y te emparejamos al momento con alguien que también quiere jugar, en un partido a 3 puntos. Los colores se sortean y en cada revancha se cambian."],
+      },
     ],
     tips: ["Dos fichas juntas en un punto lo bloquean: arma varios puntos seguidos para encerrar al rival."],
   },
@@ -1213,6 +1221,10 @@ export const GUIDES: Record<GameId, Guide> = {
           "Gana la mano quien se queda sin fichas («dominó») y suma los puntos de las fichas que les quedan a los rivales.",
           "Si nadie puede jugar, la mesa se tranca: gana quien tiene menos puntos en la mano. De a 4 se juega en parejas: los que se sientan enfrente suman juntos.",
         ],
+      },
+      {
+        title: "En línea",
+        text: ["¿No tienes con quién jugar? Elige «En línea» y te emparejamos al momento con alguien que también quiere jugar: mano a mano, con pozo, a 100 puntos."],
       },
     ],
     tips: ["Sácate de encima primero las fichas con números altos: si se tranca, pesan menos.", "Fíjate qué números va pasando el rival: no los tiene."],

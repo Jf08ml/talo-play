@@ -2,6 +2,7 @@ import { ref, get, onValue, serverTimestamp, update, type Unsubscribe } from "fi
 import { getDb } from "./firebase";
 import { generateRoomCode } from "./ids";
 import { transactState } from "./transact";
+import { normalizeBotFields, onlineSeats, type BotLevel, type Opponent } from "./boardBot";
 
 /**
  * Dominó (double six) for 2–4, as played in Latin America. Seats `a`–`d` go
@@ -37,6 +38,8 @@ export type Side = "l" | "r";
 
 export interface DominoMeta {
   game: "domino";
+  /** Made by «Jugar en línea» (against a person or, unknown to them, a bot). */
+  online?: boolean;
   target: number;
   hostId?: string;
   createdAt: number | object;
@@ -75,6 +78,10 @@ export interface DominoState {
   /** Match winner (one seat of the winning side). */
   winner: Seat | "";
   wins: Record<string, number>;
+  /** «Jugar en línea»: the bot's id and level ("" against a person); see lib/boardBot.ts. */
+  botId: string;
+  botLevel: BotLevel | "";
+  online: boolean;
 }
 
 const NO_LAST: DominoState["last"] = { seat: "", action: "", tile: "", side: "" };
@@ -105,6 +112,7 @@ function normalizeState(raw: Partial<DominoState> | null): DominoState | null {
     result: { ...NO_RESULT, ...raw.result },
     winner: raw.winner ?? "",
     wins: raw.wins ?? {},
+    ...normalizeBotFields(raw),
   };
 }
 
@@ -180,10 +188,21 @@ function mutate(roomId: string, fn: (state: DominoState) => DominoState | null) 
   return transactState(statePath(roomId), normalizeState, fn);
 }
 
-export async function createDominoRoom(target: number, hostId: string): Promise<string> {
+/**
+ * With `vs`, a «Jugar en línea» room: one on one, sitting opposite (a and c,
+ * at random) with the first hand dealt.
+ */
+export async function createDominoRoom(target: number, hostId: string, vs?: Opponent): Promise<string> {
   const roomId = generateRoomCode();
-  const meta: DominoMeta = { game: "domino", target, hostId, createdAt: serverTimestamp() };
-  const state: Partial<DominoState> = { status: "waiting", target, gameNo: 0 };
+  const meta: DominoMeta = { game: "domino", target, hostId, createdAt: serverTimestamp(), ...(vs ? { online: true } : {}) };
+  const waiting: Partial<DominoState> = { status: "waiting", target, gameNo: 0 };
+  let state = waiting;
+  if (vs) {
+    const online = onlineSeats(hostId, vs);
+    const seats = { a: online.seats.a, b: "", c: online.seats.b, d: "" };
+    const base = normalizeState({ ...waiting, ...online, seats })!;
+    state = deal({ ...base, active: "ac", handNo: 0, score: { a: 0, b: 0, c: 0, d: 0 }, winner: "" }, "");
+  }
   await update(ref(getDb()), {
     [`rooms/${roomId}/meta`]: meta,
     [statePath(roomId)]: state,

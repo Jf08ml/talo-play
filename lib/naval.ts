@@ -2,6 +2,7 @@ import { ref, get, onValue, serverTimestamp, update, type Unsubscribe } from "fi
 import { getDb } from "./firebase";
 import { generateRoomCode } from "./ids";
 import { transactState } from "./transact";
+import { normalizeBotFields, onlineSeats, type BotLevel, type Opponent } from "./boardBot";
 
 /**
  * Batalla naval. Two seats (`a`, `b`) like 4 en línea; everyone else watches.
@@ -37,6 +38,8 @@ export const SEAT_COLORS: Record<Seat, { label: string; color: string }> = {
 
 export interface NavalMeta {
   game: "naval";
+  /** Made by «Jugar en línea» (against a person or, unknown to them, a bot). */
+  online?: boolean;
   /** Who created the room: starts the game (anyone can if they're away). */
   hostId?: string;
   createdAt: number | object;
@@ -65,6 +68,10 @@ export interface NavalState {
   winner: Seat | "";
   /** Games won per client id, across rematches. */
   wins: Record<string, number>;
+  /** «Jugar en línea»: the bot's id and level ("" against a person); see lib/boardBot.ts. */
+  botId: string;
+  botLevel: BotLevel | "";
+  online: boolean;
 }
 
 export function emptyMap(): string {
@@ -88,6 +95,7 @@ function normalizeState(raw: Partial<NavalState> | null): NavalState | null {
     lastShot: { by: raw.lastShot?.by ?? "", idx: raw.lastShot?.idx ?? -1 },
     winner: raw.winner ?? "",
     wins: raw.wins ?? {},
+    ...normalizeBotFields(raw),
   };
 }
 
@@ -198,10 +206,13 @@ function mutate(roomId: string, fn: (state: NavalState) => NavalState | null) {
   return transactState(statePath(roomId), normalizeState, fn);
 }
 
-export async function createNavalRoom(hostId: string): Promise<string> {
+/** With `vs`, a «Jugar en línea» room: both seated (at random) and placing their fleets at once. */
+export async function createNavalRoom(hostId: string, vs?: Opponent): Promise<string> {
   const roomId = generateRoomCode();
-  const meta: NavalMeta = { game: "naval", hostId, createdAt: serverTimestamp() };
-  const state: Partial<NavalState> = { status: "waiting", gameNo: 0, turn: "a", starter: "a" };
+  const meta: NavalMeta = { game: "naval", hostId, createdAt: serverTimestamp(), ...(vs ? { online: true } : {}) };
+  const state: Partial<NavalState> = vs
+    ? { status: "placing", gameNo: 0, turn: "a", starter: "a", ...onlineSeats(hostId, vs) }
+    : { status: "waiting", gameNo: 0, turn: "a", starter: "a" };
   await update(ref(getDb()), {
     [`rooms/${roomId}/meta`]: meta,
     [statePath(roomId)]: state,

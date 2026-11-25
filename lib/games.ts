@@ -257,7 +257,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     minPlayers: 2,
     maxPlayers: 2,
     duration: "10 min",
-    contexts: ["pareja", "amigos"],
+    contexts: ["pareja", "amigos", "solo"],
     howTo: [
       "Ubica tus cinco barcos en el mapa (o mézclalos al azar) y toca «Listo».",
       "Por turnos, toca una casilla del mapa rival para disparar. Si le das, tiras de nuevo.",
@@ -623,7 +623,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     minPlayers: 2,
     maxPlayers: 2,
     duration: "10–30 min",
-    contexts: ["pareja", "amigos"],
+    contexts: ["pareja", "amigos", "solo"],
     howTo: [
       "Tira los dos dados y mueve una ficha por cada dado (los dobles valen cuatro movimientos). No puedes caer donde el rival tiene dos o más.",
       "Si caes sobre una ficha sola del rival, va a la barra y tiene que volver a entrar antes de mover otra.",
@@ -653,7 +653,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     minPlayers: 2,
     maxPlayers: 4,
     duration: "20–40 min",
-    contexts: ["pareja", "amigos"],
+    contexts: ["pareja", "amigos", "solo"],
     howTo: [
       "Cada uno recibe 7 fichas. Por turnos, pon una ficha que coincida con una de las dos puntas de la mesa.",
       "Si no tienes ficha que entre, robas del pozo (de a 2 o 3) o pasas (de a 4, en parejas: los de enfrente son compañeros).",

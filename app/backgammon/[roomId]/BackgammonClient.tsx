@@ -51,6 +51,8 @@ import { Flag, Undo2 } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
+import { useBotPresence, useBotTurn } from "@/hooks/useBotTurn";
+import { backgammonBotStep, backgammonBotTakes } from "@/lib/backgammonBot";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -104,15 +106,43 @@ export default function BackgammonClient({ roomId }: { roomId: string }) {
     joinBackgammon(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
 
+  // «Jugar en línea» against a bot: it plays from here and shows as connected while I play.
+  const botId = state?.botId ?? "";
+  useBotPresence(roomId, botId, botId ? state?.players[botId] : undefined, !!state && !!seatOf(state, myId));
+  const botSeat = state?.seats.a === botId ? "a" : "b";
+  // What the bot does now, and how long it "thinks" first.
+  const botAction = ((): [() => unknown, number] | null => {
+    if (!botId || !state?.botLevel || state.status !== "playing") return null;
+    const level = state.botLevel;
+    const mv = state.moveNo;
+    if (state.phase === "gameover") return [() => nextGame(roomId, state.gameInMatch), 1.5];
+    if (state.phase === "double") {
+      return state.turn !== botSeat ? [() => answerDouble(roomId, botId, backgammonBotTakes(positionOf(state), botSeat), mv), 1.5] : null;
+    }
+    if (state.turn !== botSeat) return null;
+    if (state.phase === "roll") return [() => rollDice(roomId, botId, mv), 0.6];
+    if (!currentSteps(state).length) return [() => endTurn(roomId, botId, mv), 0.4];
+    return [
+      () => {
+        const step = backgammonBotStep(positionOf(state), botSeat, parseDice(state.dice), level, state.turnStart + state.rolled);
+        return step ? moveChecker(roomId, botId, step.from, step.die, mv) : undefined;
+      },
+      0.5,
+    ];
+  })();
+  useBotTurn(!!botAction, `${state?.gameNo}:${state?.gameInMatch}:${state?.moveNo}:${state?.phase}`, () => botAction?.[0](), botAction?.[1] ?? 1);
+
   if (!configured) return <FirebaseSetupNotice />;
 
-  const isAway = (id: string) => presenceLoaded && !!id && !(id in presence);
+  // The bot never leaves (its presence goes when I do).
+  const isAway = (id: string) => presenceLoaded && !!id && id !== botId && !(id in presence);
 
   return (
     <div className="flex min-h-dvh flex-col">
       <RoomHeader
         game="backgammon"
         roomId={roomId}
+        social={!state?.online}
         right={status === "ready" && <PlayerBadges presence={presence} myClientId={myId} />}
       />
 
@@ -159,7 +189,7 @@ export default function BackgammonClient({ roomId }: { roomId: string }) {
           <Game roomId={roomId} state={state} myId={myId} isAway={isAway} presence={presence} />
         )}
 
-        {status === "ready" && state?.status === "finished" && (
+        {status === "ready" && state?.status === "finished" && !state.online && (
           <div className="flex justify-center px-4 pb-6">
             <BackToRoomButton roomId={roomId} stateKey="backgammon/state" hostId={hostId} presence={presence} myId={myId} />
           </div>

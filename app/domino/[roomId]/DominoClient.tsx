@@ -48,6 +48,8 @@ import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
+import { useBotPresence, useBotTurn } from "@/hooks/useBotTurn";
+import { dominoBotAction } from "@/lib/dominoBot";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -101,15 +103,34 @@ export default function DominoClient({ roomId }: { roomId: string }) {
     joinDomino(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
 
+  // «Jugar en línea» against a bot: it plays from here and shows as connected while I play.
+  const botId = state?.botId ?? "";
+  useBotPresence(roomId, botId, botId ? state?.players[botId] : undefined, !!state && !!seatOf(state, myId));
+  const botSeat = state ? seatOf(state, botId) : null;
+  // What the bot does now, and how long it "thinks" first (drawing is quick).
+  const botAction = ((): [() => unknown, number] | null => {
+    if (!botId || !botSeat || !state?.botLevel || state.status !== "playing") return null;
+    const mv = state.moveNo;
+    if (state.phase === "handover") return [() => nextHand(roomId, state.handNo), 1.5];
+    if (state.turn !== botSeat) return null;
+    const action = dominoBotAction(state, botSeat, state.botLevel);
+    if (action.kind === "draw") return [() => drawTile(roomId, botId, mv), 0.4];
+    if (action.kind === "pass") return [() => passTurn(roomId, botId, mv), 0.6];
+    return [() => playTile(roomId, botId, action.tile, action.side, mv), 1];
+  })();
+  useBotTurn(!!botAction, `${state?.gameNo}:${state?.handNo}:${state?.moveNo}:${state?.phase}`, () => botAction?.[0](), botAction?.[1] ?? 1);
+
   if (!configured) return <FirebaseSetupNotice />;
 
-  const isAway = (id: string) => presenceLoaded && !!id && !(id in presence);
+  // The bot never leaves (its presence goes when I do).
+  const isAway = (id: string) => presenceLoaded && !!id && id !== botId && !(id in presence);
 
   return (
     <div className="flex min-h-dvh flex-col">
       <RoomHeader
         game="domino"
         roomId={roomId}
+        social={!state?.online}
         right={status === "ready" && <PlayerBadges presence={presence} myClientId={myId} />}
       />
 
@@ -144,7 +165,7 @@ export default function DominoClient({ roomId }: { roomId: string }) {
           <Game roomId={roomId} state={state} myId={myId} isAway={isAway} presence={presence} />
         )}
 
-        {status === "ready" && state?.status === "finished" && (
+        {status === "ready" && state?.status === "finished" && !state.online && (
           <div className="flex justify-center px-4 pb-6">
             <BackToRoomButton roomId={roomId} stateKey="domino/state" hostId={hostId} presence={presence} myId={myId} />
           </div>

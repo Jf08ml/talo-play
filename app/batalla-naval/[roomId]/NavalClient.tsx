@@ -45,6 +45,8 @@ import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { RotateCw, Shuffle } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { useSoundOn } from "@/hooks/useSound";
+import { useBotPresence, useBotTurn } from "@/hooks/useBotTurn";
+import { navalBotShot } from "@/lib/navalBot";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -95,9 +97,29 @@ export default function NavalClient({ roomId }: { roomId: string }) {
     joinNaval(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
 
+  // «Jugar en línea» against a bot: it plays from here and shows as connected while I play.
+  const botId = state?.botId ?? "";
+  useBotPresence(roomId, botId, botId ? state?.players[botId] : undefined, !!state && !!seatOf(state, myId));
+  const botSeat = state?.seats.a === botId ? "a" : "b";
+  const botActive = !!botId && !!state?.botLevel;
+  // Placing: the bot sets a random fleet, taking about as long as a person would.
+  useBotTurn(botActive && state.status === "placing" && !state.ready[botSeat], `place:${state?.gameNo}`, () => submitFleet(roomId, botId, randomFleet()), 5);
+  const botShots = state ? shotCount(state.shots[botSeat]) : 0;
+  useBotTurn(
+    botActive && state.status === "playing" && state.turn === botSeat,
+    `fire:${state?.gameNo}:${state ? shotCount(state.shots.a) + shotCount(state.shots.b) : 0}`,
+    () => {
+      if (!state?.botLevel) return;
+      const idx = navalBotShot(state.fleets[otherSeat(botSeat)], state.shots[botSeat], state.botLevel);
+      return fire(roomId, botId, idx, botShots);
+    },
+    0.8
+  );
+
   if (!configured) return <FirebaseSetupNotice />;
 
-  const isAway = (id: string) => presenceLoaded && !!id && !(id in presence);
+  // The bot never leaves (its presence goes when I do).
+  const isAway = (id: string) => presenceLoaded && !!id && id !== botId && !(id in presence);
   const mySeat = state ? seatOf(state, myId) : null;
 
   return (
@@ -105,6 +127,7 @@ export default function NavalClient({ roomId }: { roomId: string }) {
       <RoomHeader
         game="naval"
         roomId={roomId}
+        social={!state?.online}
         right={status === "ready" && <PlayerBadges presence={presence} myClientId={myId} />}
       />
 

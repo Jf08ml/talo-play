@@ -2,6 +2,7 @@ import { ref, get, onValue, serverTimestamp, update, type Unsubscribe } from "fi
 import { getDb } from "./firebase";
 import { generateRoomCode } from "./ids";
 import { transactState } from "./transact";
+import { normalizeBotFields, onlineSeats, type BotLevel, type Opponent } from "./boardBot";
 import { joinSeats, leaveSeatIn, otherSeat, seatOf2, swapSeatsIn, takeSeatIn, type Seat2, type SeatPlayer } from "./twoSeats";
 import {
   CHECKERS,
@@ -43,6 +44,8 @@ export const SEAT_STYLE: Record<Seat, { label: string; fill: string; ring: strin
 
 export interface BgMeta {
   game: "backgammon";
+  /** Made by «Jugar en línea» (against a person or, unknown to them, a bot). */
+  online?: boolean;
   matchTo: number;
   hostId?: string;
   createdAt: number | object;
@@ -80,6 +83,10 @@ export interface BgState {
   result: { winner: Seat | ""; points: number; kind: ResultKind };
   /** Matches won per client id. */
   wins: Record<string, number>;
+  /** «Jugar en línea»: the bot's id and level ("" against a person); see lib/boardBot.ts. */
+  botId: string;
+  botLevel: BotLevel | "";
+  online: boolean;
 }
 
 const NO_RESULT = { winner: "" as const, points: 0, kind: "" as const };
@@ -109,6 +116,7 @@ function normalizeState(raw: Partial<BgState> | null): BgState | null {
     moveNo: raw.moveNo ?? 0,
     result: { ...NO_RESULT, ...raw.result },
     wins: raw.wins ?? {},
+    ...normalizeBotFields(raw),
   };
 }
 
@@ -140,10 +148,12 @@ function mutate(roomId: string, fn: (state: BgState) => BgState | null) {
   return transactState(statePath(roomId), normalizeState, fn);
 }
 
-export async function createBackgammonRoom(matchTo: number, hostId: string): Promise<string> {
+/** With `vs`, a «Jugar en línea» room: both seated (colors at random) and the match under way. */
+export async function createBackgammonRoom(matchTo: number, hostId: string, vs?: Opponent): Promise<string> {
   const roomId = generateRoomCode();
-  const meta: BgMeta = { game: "backgammon", matchTo, hostId, createdAt: serverTimestamp() };
-  const state: Partial<BgState> = { status: "waiting", matchTo, gameNo: 0 };
+  const meta: BgMeta = { game: "backgammon", matchTo, hostId, createdAt: serverTimestamp(), ...(vs ? { online: true } : {}) };
+  const waiting: Partial<BgState> = { status: "waiting", matchTo, gameNo: 0 };
+  const state: Partial<BgState> = vs ? newMatch(normalizeState({ ...waiting, ...onlineSeats(hostId, vs) })!) : waiting;
   await update(ref(getDb()), {
     [`rooms/${roomId}/meta`]: meta,
     [statePath(roomId)]: state,
