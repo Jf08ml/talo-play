@@ -135,6 +135,37 @@
         }
       }
     },
+    "rank": {
+      ".read": true,
+      "all": {
+        ".indexOn": ["p"],
+        "$cid": {
+          ".write": "!data.child('uid').exists() || (auth != null && auth.uid == data.child('uid').val())",
+          ".validate": "newData.hasChildren(['p', 'name', 'color', 'at']) && ((!data.exists() && newData.child('p').val() <= 120) || (data.exists() && newData.child('p').val() >= data.child('p').val() && newData.child('p').val() - data.child('p').val() <= 120)) && newData.child('at').val() <= now + 60000 && newData.child('at').val() >= now - 60000 && (!data.exists() || newData.child('at').val() - data.child('at').val() >= 14000)",
+          "p": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+          "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 24" },
+          "color": { ".validate": "newData.isString() && newData.val().length <= 9" },
+          "at": { ".validate": "newData.isNumber()" },
+          "uid": { ".validate": "auth != null && newData.val() == auth.uid && root.child('profiles').child(auth.uid).child('clientId').val() == $cid" },
+          "$other": { ".validate": false }
+        }
+      },
+      "weeks": {
+        "$week": {
+          ".indexOn": ["p"],
+          "$cid": {
+            ".write": "!data.child('uid').exists() || (auth != null && auth.uid == data.child('uid').val())",
+            ".validate": "newData.hasChildren(['p', 'name', 'color', 'at']) && ((!data.exists() && newData.child('p').val() <= 120) || (data.exists() && newData.child('p').val() >= data.child('p').val() && newData.child('p').val() - data.child('p').val() <= 120)) && newData.child('at').val() <= now + 60000 && newData.child('at').val() >= now - 60000 && (!data.exists() || newData.child('at').val() - data.child('at').val() >= 14000)",
+            "p": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 24" },
+            "color": { ".validate": "newData.isString() && newData.val().length <= 9" },
+            "at": { ".validate": "newData.isNumber()" },
+            "uid": { ".validate": "auth != null && newData.val() == auth.uid && root.child('profiles').child(auth.uid).child('clientId').val() == $cid" },
+            "$other": { ".validate": false }
+          }
+        }
+      }
+    },
     "push": {
       "$uid": {
         ".read": "auth != null && (auth.uid == $uid || root.child('friends').child($uid).child(auth.uid).exists() || root.child('requests').child($uid).child(auth.uid).exists())",

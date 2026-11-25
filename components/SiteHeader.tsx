@@ -11,6 +11,7 @@ import { contextLanding, shelfLanding } from "@/lib/landings";
 const NAV = [
   { href: "/#juegos", label: "Juegos" },
   { href: "/#como", label: "Cómo funciona" },
+  { href: "/ranking", label: "Ranking" },
   { href: "/#faq", label: "Ayuda" },
   { href: "/ideas", label: "Ideas" },
 ];

@@ -12,5 +12,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...LANDINGS.map((l) => ({ url: `${SITE_URL}/${l.slug}`, changeFrequency: "weekly" as const, priority: 0.9 })),
     ...GAME_ORDER.map((id) => ({ url: `${SITE_URL}/${GAMES[id].path}`, changeFrequency: "monthly" as const, priority: 0.8 })),
     { url: `${SITE_URL}/ideas`, changeFrequency: "weekly", priority: 0.4 },
+    { url: `${SITE_URL}/ranking`, changeFrequency: "daily", priority: 0.5 },
   ];
 }
