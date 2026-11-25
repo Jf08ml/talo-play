@@ -22,7 +22,7 @@ export const SETTINGS: GameSettings<ArenaSettings> = {
       ],
       hint: (v) =>
         v.view === "pantalla"
-          ? "El combate se ve en una computadora conectada a la tele o al proyector, y los celulares son el control: joystick y botones grandes, y vibran cuando te pegan."
+          ? "El combate se ve en una computadora conectada a la tele o al proyector, con la pantalla dividida (hasta 4 personas, cada una con su cámara detrás de su caballero). Los celulares son el control: joystick y botones grandes, y vibran cuando te pegan."
           : "Cada uno pelea en 3D desde su celular o computadora, en primera o tercera persona. Sirve también para jugar a distancia.",
     },
     { kind: "choice", key: "size", label: "Combate", options: choices(SIZE_OPTIONS, (n) => `${n} contra ${n}`) },

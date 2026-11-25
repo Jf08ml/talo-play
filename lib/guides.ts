@@ -872,7 +872,8 @@ export const GUIDES: Record<GameId, Guide> = {
         title: "En pantalla grande",
         text: [
           "Al crear la sala, elige «En una pantalla grande»: el combate se ve en una computadora conectada a la tele o al proyector, y cada uno entra desde su celular con el código.",
-          "El celular es el control: joystick para moverte (empujarlo a fondo es correr), «Atacar» y «Bloquear» se mantienen apretados, y «Esquivar», «Saltar» y «Agarrar» se tocan. Tu caballero mira solo al rival más cercano, y el celular vibra cuando te pegan.",
+          "La pantalla se divide: cada persona (hasta 4) tiene su parte, con la cámara detrás de su caballero; cuando tienes un rival cerca, la cámara y tu caballero se fijan en él. Con más de 4 personas, se ve toda la arena desde arriba.",
+          "El celular es el control: joystick para moverte (empujarlo a fondo es correr), «Atacar» y «Bloquear» se mantienen apretados, y «Esquivar», «Saltar» y «Agarrar» se tocan. El celular vibra cuando te pegan.",
         ],
       },
     ],

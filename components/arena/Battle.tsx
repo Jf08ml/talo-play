@@ -119,6 +119,25 @@ interface BotRun {
   remote?: { j: number; d: number; p: number };
 }
 
+/** Big screen, split: the views' rectangles (fractions, from the top-left) for 1–4 people. */
+export function splitRects(n: number): [number, number, number, number][] {
+  if (n <= 1) return [[0, 0, 1, 1]];
+  if (n === 2) return [[0, 0, 0.5, 1], [0.5, 0, 0.5, 1]];
+  if (n === 3) return [[0, 0, 0.5, 0.5], [0.5, 0, 0.5, 0.5], [0, 0.5, 1, 0.5]];
+  return [[0, 0, 0.5, 0.5], [0.5, 0, 0.5, 0.5], [0, 0.5, 0.5, 0.5], [0.5, 0.5, 0.5, 0.5]];
+}
+
+/** The people who get a view on the big screen (up to 4; more = the overview). */
+export function splitPeople(state: ArenaState): string[] {
+  const people = Object.keys(state.roster)
+    .filter((id) => !isBot(id))
+    .sort((a, b) => (state.roster[a] === state.roster[b] ? a.localeCompare(b) : state.roster[a] === "red" ? -1 : 1));
+  return people.length <= 4 ? people : [];
+}
+
+/** A rival this close is what the split camera looks at. */
+const LOCK_RANGE = 9;
+
 /** Big screen: what a pose sender looks like when nobody needs the poses. */
 const NO_SEND = { send: () => {}, close: () => {} } as unknown as ReturnType<typeof openPose>;
 
@@ -239,14 +258,16 @@ export default function Battle({
     const canvas = canvasRef.current;
     if (!canvas || !quality) return;
     const scene = new ArenaScene(canvas, { quality });
-    // On a TV the names are read from the couch.
-    if (screen) scene.setTagScale(1.8);
+    // On a TV the names are read from the couch (big over the whole arena, normal in a split view).
+    let tagScale = 0;
     const audio = audioRef.current;
     let poses: Record<string, ArenaPose> = {};
     let arrowsIn: Record<string, ArenaArrow> = {};
     const unsubPoses = subscribePoses(roomId, (p) => (poses = p));
     const unsubArrows = subscribeArrows(roomId, (a) => (arrowsIn = a));
     let pads: Record<string, ArenaPad> = {};
+    /** Split screen: each person's camera yaw (smoothed). */
+    const viewYaw = new Map<string, number>();
     const unsubPads = screen ? subscribePads(roomId, (p) => (pads = p)) : () => {};
 
     let frame = 0;
@@ -590,7 +611,7 @@ export default function Battle({
               });
             const items = Object.entries(s.items).map(([iid, it]) => ({ id: iid, ...it }));
             const { input, pick } = run.remote
-              ? padInput(run.f, run.remote, pads[id] ?? NO_PAD, gearOf(s, id), { enemies, items }, OVERVIEW_YAW, STEP)
+              ? padInput(run.f, run.remote, pads[id] ?? NO_PAD, gearOf(s, id), { enemies, items }, viewYaw.get(id) ?? OVERVIEW_YAW, STEP)
               : botInput(run.f, gearOf(s, id), s.hp[id] ?? 0, run.mind, { enemies, items }, STEP, Math.random);
             if (pick && performance.now() - run.pickAt > 800) {
               run.pickAt = performance.now();
@@ -821,8 +842,47 @@ export default function Battle({
         earZ = fv.z;
         earYaw = camLook.yaw;
       }
-      if (screen) scene.renderOverview(ids.filter((id) => alive(s, id)), dt);
-      else scene.render(follow, mode, camLook, dt);
+      if (screen) {
+        const views = splitPeople(s);
+        const wantTags = views.length ? 1 : 1.8;
+        if (tagScale !== wantTags) {
+          tagScale = wantTags;
+          scene.setTagScale(wantTags);
+        }
+        if (!views.length) {
+          for (const id of ids) viewYaw.delete(id);
+          scene.renderOverview(ids.filter((id) => alive(s, id)), dt);
+        } else {
+          const rects = splitRects(views.length);
+          scene.renderSplit(
+            views.map((id, i) => {
+              // Look at the nearest standing rival when there's one at hand (lock-on), else slowly behind where it faces.
+              const v = viewOf(s, id);
+              let target = v.yaw;
+              let rate = 1.8;
+              let best = LOCK_RANGE;
+              for (const o of ids) {
+                if (s.roster[o] === s.roster[id] || !alive(s, o)) continue;
+                const ov = viewOf(s, o);
+                const d = Math.hypot(ov.x - v.x, ov.z - v.z);
+                if (d < best && v.alive) {
+                  best = d;
+                  target = Math.atan2(-(ov.x - v.x), -(ov.z - v.z));
+                  rate = 6;
+                }
+              }
+              const cur = viewYaw.get(id) ?? v.yaw;
+              let diff = target - cur;
+              while (diff > Math.PI) diff -= Math.PI * 2;
+              while (diff < -Math.PI) diff += Math.PI * 2;
+              const yaw = cur + diff * (1 - Math.exp(-dt * rate));
+              viewYaw.set(id, yaw);
+              return { id, yaw, rect: rects[i] };
+            }),
+            dt
+          );
+        }
+      } else scene.render(follow, mode, camLook, dt);
 
       // HUD, ten times a second.
       if (t - hudAt > 100) {
@@ -873,6 +933,36 @@ export default function Battle({
     <div ref={wrapRef} className="fixed inset-0 z-40 select-none overflow-hidden bg-[#f2c48d]" style={{ touchAction: "none" }}>
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 
+      {/* Big screen, split: each person's name and health on their view, and the lines between views. */}
+      {screen && splitPeople(state).length > 0 && state.status !== "waiting" && (
+        <div className="pointer-events-none absolute inset-0 z-10">
+          {splitPeople(state).map((id, i, all) => {
+            const [x, y, w, h] = splitRects(all.length)[i];
+            const team = state.roster[id];
+            const hp = state.hp[id] ?? 0;
+            return (
+              <div
+                key={id}
+                className="absolute border border-black/70"
+                style={{ left: `${x * 100}%`, top: `${y * 100}%`, width: `${w * 100}%`, height: `${h * 100}%` }}
+              >
+                <div className={`absolute flex w-64 flex-col gap-1.5 rounded-2xl bg-slate-950/70 px-4 py-2.5 backdrop-blur ${y > 0 ? "left-4 top-4" : "bottom-4 left-4"}`}>
+                  <span className="truncate text-xl font-bold" style={{ color: teamInfo(team).color }}>
+                    {fighterName(state, id)}
+                  </span>
+                  <span className="h-2.5 overflow-hidden rounded-full bg-white/15">
+                    <span className="block h-full rounded-full transition-all" style={{ width: `${(hp / MAX_HP) * 100}%`, background: teamInfo(team).color }} />
+                  </span>
+                </div>
+                {state.status === "fighting" && hp <= 0 && (
+                  <p className="absolute inset-0 flex items-center justify-center font-display text-4xl text-white/80">Eliminado</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Being hit: a red flash at the edges. */}
       <div
         className="pointer-events-none absolute inset-0 transition-opacity duration-300"
@@ -905,7 +995,7 @@ export default function Battle({
           <Link href="/" aria-label="Volver a Talo" className="w-fit rounded-xl bg-slate-950/60 p-2 backdrop-blur">
             <TaloMark className="h-5 w-5" />
           </Link>
-          <TeamBars state={state} team="red" myId={myId} />
+          {!(screen && splitPeople(state).length) && <TeamBars state={state} team="red" myId={myId} />}
         </div>
 
         <div className="flex flex-col items-center gap-1">
@@ -933,7 +1023,7 @@ export default function Battle({
             )}
             <FullscreenButton className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur" />
           </div>
-          <TeamBars state={state} team="blue" myId={myId} />
+          {!(screen && splitPeople(state).length) && <TeamBars state={state} team="blue" myId={myId} />}
         </div>
       </div>
 

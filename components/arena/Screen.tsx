@@ -104,7 +104,7 @@ function Waiting({ roomId, meta, state, presence }: { roomId: string; meta: Aren
         </Link>
         <FullscreenButton className="rounded-xl p-2 text-white/80 hover:bg-white/10" />
       </div>
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col items-center justify-center gap-10 p-6 lg:flex-row lg:items-stretch">
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col items-center justify-center gap-10 p-6 lg:flex-row lg:items-start">
         <div className="flex w-full max-w-xl flex-col gap-5 rounded-3xl bg-white/[0.05] p-8">
           <div className="flex items-center gap-3 text-white/80">
             <Smartphone className="h-8 w-8 text-talo-hero" />
@@ -148,8 +148,8 @@ function Waiting({ roomId, meta, state, presence }: { roomId: string; meta: Aren
             {people.length ? "¡A pelear!" : "Esperando jugadores…"}
           </button>
           <p className="text-center text-sm text-white/50">
-            En el celular: joystick para moverte (a fondo, corres) y botones para atacar, bloquear, esquivar, saltar y agarrar. Tu caballero mira solo al rival más
-            cercano.
+            En el celular: joystick para moverte (a fondo, corres) y botones para atacar, bloquear, esquivar, saltar y agarrar. Cada uno tiene su parte de la pantalla (hasta
+            4) y la cámara se fija en el rival que tienes cerca.
           </p>
         </div>
       </div>

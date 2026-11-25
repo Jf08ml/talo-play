@@ -266,6 +266,8 @@ export class ArenaScene {
   private tagScale = 1;
   /** The big screen's camera: where it looks and how far it stands. */
   private overCam = new THREE.PerspectiveCamera(45, 1, 0.1, 400);
+  /** Split screen: one over-the-shoulder camera per followed fighter. */
+  private splitCams = new Map<string, { cam: THREE.PerspectiveCamera; pos: THREE.Vector3; ready: boolean }>();
   private overAt = new THREE.Vector3();
   private overDist = 0;
   /** Embers rising from the torches. */
@@ -1105,6 +1107,79 @@ export class ArenaScene {
     cam.lookAt(this.overAt);
     this.applyShake(cam, 0.5);
     this.draw(cam, view, dt);
+  }
+
+  /**
+   * Split screen for a big screen: each view (`rect` in fractions of the
+   * canvas, from the top-left) follows a fighter over its shoulder, looking
+   * along `yaw`. The scene advances once; no bloom (it works on the whole
+   * canvas), shadows and the rest as usual.
+   */
+  renderSplit(views: { id: string; yaw: number; rect: [number, number, number, number] }[], dt: number) {
+    const view = this.fit();
+    if (!view) return;
+    this.update(dt);
+    const { cw, ch, dpr } = view;
+    this.renderer.setScissorTest(true);
+    this.renderer.setViewport(0, 0, cw, ch);
+    this.renderer.setScissor(0, 0, cw, ch);
+    this.renderer.clear();
+    views.forEach((v, i) => {
+      const [fx0, fy0, fw, fh] = v.rect;
+      const x = Math.round(fx0 * cw);
+      const w = Math.round(fw * cw);
+      const h = Math.round(fh * ch);
+      const y = ch - Math.round(fy0 * ch) - h;
+      let slot = this.splitCams.get(v.id);
+      if (!slot) {
+        slot = { cam: new THREE.PerspectiveCamera(62, 1, 0.05, 400), pos: new THREE.Vector3(), ready: false };
+        this.splitCams.set(v.id, slot);
+      }
+      const cam = slot.cam;
+      if (Math.abs(cam.aspect - w / h) > 1e-3) {
+        cam.aspect = w / h;
+        cam.updateProjectionMatrix();
+      }
+      const p = this.knights.get(v.id)?.pose;
+      if (p) {
+        const back = p.alive ? 3.6 : 5;
+        const fx = -Math.sin(v.yaw);
+        const fz = -Math.cos(v.yaw);
+        const rx = Math.cos(v.yaw);
+        const rz = -Math.sin(v.yaw);
+        const eye = new THREE.Vector3(p.x, p.y + EYE_HEIGHT + 0.2, p.z);
+        const want = new THREE.Vector3(eye.x - fx * back + rx * 0.55, eye.y + 0.9, eye.z - fz * back + rz * 0.55);
+        const r = Math.hypot(want.x, want.z);
+        if (r > ARENA_RADIUS - 0.4) {
+          want.x *= (ARENA_RADIUS - 0.4) / r;
+          want.z *= (ARENA_RADIUS - 0.4) / r;
+        }
+        if (!slot.ready) slot.pos.copy(want);
+        else slot.pos.lerp(want, 1 - Math.exp(-dt * 10));
+        slot.ready = true;
+        cam.position.copy(slot.pos);
+        cam.lookAt(eye.x + fx * 5, eye.y - 0.35, eye.z + fz * 5);
+      } else {
+        cam.position.set(0, 12, 16);
+        cam.lookAt(0, 1, 0);
+      }
+      this.applyShake(cam, 0.6);
+      const scale = (h * dpr) / (2 * Math.tan((cam.fov * Math.PI) / 360));
+      this.sparks.setScale(scale);
+      this.dust.setScale(scale);
+      this.embers.setScale(scale);
+      this.impacts.update(i === 0 ? dt : 0, cam);
+      this.renderer.setViewport(x, y, w, h);
+      this.renderer.setScissor(x, y, w, h);
+      // Your own name would float right in front of your camera.
+      const own = this.knights.get(v.id);
+      const shown = own?.tag.visible ?? false;
+      if (own) own.tag.visible = false;
+      this.renderer.render(this.scene, cam);
+      if (own) own.tag.visible = shown;
+    });
+    this.renderer.setScissorTest(false);
+    this.renderer.setViewport(0, 0, cw, ch);
   }
 
   dispose() {
