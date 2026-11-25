@@ -19,6 +19,7 @@ import { countDailyRoom } from "./dailyStats";
  * - `plaza_message` / `plaza_call` / `plaza_join`: a message in the Plaza (`kind`: frase / texto), a waiting room asking it for players, someone joining a room from it.
  * - `open_room_join`: someone entered a room from a list of open rooms (`where`: inicio / lobby / plaza).
  * - `page_not_found`: a 404 (`path` = the broken URL).
+ * - `quick_play`: a game picked in the home's «Jugar ya» (`random` = from «Sorpréndeme»).
  *
  * `create_room` also counts the room in our own per-day stats (lib/dailyStats.ts).
  * Page views are sent by `PageViews` (components/PageViews.tsx), not here.
@@ -40,6 +41,7 @@ type Events = {
   open_room_join: { game: GameId; where: "inicio" | "lobby" | "plaza" };
   plaza_open: { where: "boton" | "inicio" | "sala" | "link" };
   page_not_found: { path: string };
+  quick_play: { game: GameId; random: boolean };
 };
 
 export function trackEvent<E extends keyof Events>(name: E, params: Events[E]): void {

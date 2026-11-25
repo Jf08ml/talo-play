@@ -11,6 +11,7 @@ import { getPlayStats, mostPlayed } from "@/lib/playStats";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import JoinRoomForm from "@/components/JoinRoomForm";
 import PlazaBanner from "@/components/PlazaBanner";
+import QuickPlay from "@/components/QuickPlay";
 import OpenRoomsList from "@/components/OpenRoomsList";
 import { shelfLanding } from "@/lib/landings";
 import PlayerIdentity from "@/components/PlayerIdentity";
@@ -82,6 +83,11 @@ export default function HomeClient() {
               <span className="hidden sm:inline">Elige un juego, manda el link por WhatsApp y en un minuto están jugando. Gratis y sin registrarse.</span>
               <span className="sm:hidden">Manda el link por WhatsApp y en un minuto están jugando.</span>
             </p>
+            {/* Alone? Straight into a game with someone (components/QuickPlay.tsx). */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+              <QuickPlay className="w-full sm:w-auto" />
+              <span className="text-[15px] font-semibold sm:max-w-[240px]">¿Solo? Te ponemos a jugar con alguien en segundos.</span>
+            </div>
             <div className="mt-2 hidden self-start rounded-[20px] bg-white p-5 sm:block">
               <JoinRoomForm id="code-desk" />
             </div>
