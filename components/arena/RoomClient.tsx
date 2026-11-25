@@ -28,6 +28,7 @@ import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { RoomSettingsEditor } from "@/components/RoomSettings";
 import { watchRoomMeta } from "@/lib/roomSettings";
 import Battle from "./Battle";
+import Pad from "./Pad";
 import { SETTINGS } from "./settings";
 import { Bot, Eye, Shuffle, Smartphone } from "lucide-react";
 
@@ -35,7 +36,8 @@ type Status = "loading" | "not-found" | "ready" | "error";
 
 export function settingsSummary(meta: ArenaMeta): string {
   const extras = [meta.bots && "con bots", meta.potions && "pociones", meta.regen && "regeneración"].filter(Boolean);
-  return `${meta.size} contra ${meta.size} · al mejor de ${meta.wins * 2 - 1} rondas${extras.map((e) => ` · ${e}`).join("")}`;
+  const where = meta.view === "pantalla" ? " · en pantalla grande" : "";
+  return `${meta.size} contra ${meta.size} · al mejor de ${meta.wins * 2 - 1} rondas${extras.map((e) => ` · ${e}`).join("")}${where}`;
 }
 
 /** An arena room: teams while waiting, then the battle full screen. */
@@ -87,6 +89,16 @@ export default function RoomClient({ roomId }: { roomId: string }) {
   }, [hasState, roomId, identity.clientId, identity.name, identity.color, size]);
 
   if (!configured) return <FirebaseSetupNotice />;
+
+  // Big screen: the fight is on the TV; this phone is the pad.
+  if (status === "ready" && state && meta && state.status !== "waiting" && meta.view === "pantalla") {
+    return (
+      <>
+        <OpenRoomBeacon roomId={roomId} game="arena" />
+        <Pad roomId={roomId} clientId={myId} state={state} />
+      </>
+    );
+  }
 
   if (status === "ready" && state && meta && state.status !== "waiting") {
     return (

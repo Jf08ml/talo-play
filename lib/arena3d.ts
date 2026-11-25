@@ -2,27 +2,46 @@ import * as THREE from "three";
 import { mulberry32 } from "./random";
 import { Bloom, aimShadow, glowColor, type Quality } from "./postfx";
 import type { TeamId } from "./teams";
+import { ARENA_RADIUS, EYE_HEIGHT, PILLARS, PILLAR_RADIUS, WEAPONS, type ArenaItem, type ItemKind } from "./arenaSim";
 import {
-  ARENA_RADIUS,
-  EYE_HEIGHT,
-  PILLARS,
-  PILLAR_RADIUS,
-  WEAPONS,
-  type Act,
-  type ArenaItem,
-  type Gear,
-  type ItemKind,
-  type WeaponId,
-} from "./arenaSim";
+  DARK_STEEL,
+  GOLD,
+  LEATHER,
+  TEAM_COLORS,
+  animateKnight,
+  arrowMesh,
+  clamp01,
+  disposeKnightGeos,
+  disposeTree,
+  ease,
+  easeOutBack,
+  equipKnight,
+  itemMesh,
+  knightGeos,
+  knightMesh,
+  lambert,
+  lerp,
+  phong,
+  shieldMesh,
+  swinging,
+  weaponMesh,
+  type Knight,
+  type KnightPose,
+} from "./arena3dKnight";
+import { Impacts, Particles, SwingTrail } from "./arena3dFx";
+
+export type { KnightPose } from "./arena3dKnight";
 
 /**
  * Arena medieval in 3D (three.js), browser only: a sand arena inside a
  * stone wall, stands full of people, pillars, torches and the team gates.
- * Knights are built from boxes and cylinders and animated from their poses
- * alone (walking, winding up, swinging, blocking, drawing the bow, falling),
- * so rivals and bots look the same as your own knight in third person. In
- * first person your knight is hidden and your hands (weapon, shield, bow)
- * are drawn on top, in their own pass.
+ * Knights (lib/arena3dKnight.ts) are rounded armored figures with elbows and
+ * knees, animated from their poses alone (walk cycle, wind-up, swing with
+ * follow-through, blocking, drawing the bow, staggering, falling), so rivals
+ * and bots look the same as your own knight in third person. In first
+ * person your knight is hidden and your hands (weapon, shield, bow) are
+ * drawn on top, in their own pass. `renderOverview` draws the whole fight
+ * from above for a big screen.
  *
  * World axes: the arena's x/z plane is the ground, y is up; a knight with
  * yaw 0 faces -z.
@@ -30,35 +49,23 @@ import {
 
 export type ArenaCamera = "primera" | "tercera";
 
-const TEAM_COLORS: Record<TeamId, number> = { red: 0xdc2646, blue: 0x1d9bd1 };
-const TEAM_LIGHT: Record<TeamId, string> = { red: "#fb3a5d", blue: "#22d3ee" };
-const STEEL = 0xb8c2cc;
-const DARK_STEEL = 0x5b6470;
-const WOOD = 0x8a5a2b;
-const LEATHER = 0x5c3b1e;
-const GOLD = 0xd4a72c;
+/**
+ * Which way the overview camera faces (in fighters' yaw terms: 0 faces -z).
+ * It never turns, so "up" on a phone's joystick is always away from it.
+ */
+export const OVERVIEW_YAW = 0.3;
+/** How far the overview camera looks down (radians, ~60°). */
+const OVERVIEW_PITCH = 1.05;
 
-export interface KnightPose {
-  x: number;
-  y: number;
-  z: number;
-  yaw: number;
-  pitch: number;
-  act: Act;
-  /** Seconds into the act, and how long it lasts (wind-up, recover, stagger). */
-  actT: number;
-  actLen: number;
-  blocking: boolean;
-  /** Bow draw 0–1. */
-  draw: number;
-  /** Walking speed (m/s), and whether running. */
-  speed: number;
-  running: boolean;
-  /** Swing number in the current combo (odd ones swing from the other side). */
-  combo: number;
-  alive: boolean;
-  gear: Gear;
-}
+const TEAM_LIGHT: Record<TeamId, string> = { red: "#fb3a5d", blue: "#22d3ee" };
+const DUST = new THREE.Color(0xe2c391);
+const DUST_LIGHT = new THREE.Color(0xf0dcb4);
+const HIT_SPARKS = [new THREE.Color(0xfff1c7), new THREE.Color(0xffb26b), new THREE.Color(0xff8a8a)];
+const BLOCK_SPARKS = [new THREE.Color(0xfde047), new THREE.Color(0xfffbeb), new THREE.Color(0xfb923c), new THREE.Color(0xffd27a)];
+const FLASH_HIT = new THREE.Color(0xffd0a8);
+const FLASH_BLOCK = new THREE.Color(0xfff1b0);
+const FLASH_HIT_GLOW = glowColor(0xffc49a, 1.35);
+const FLASH_BLOCK_GLOW = glowColor(0xfff0a8, 1.6);
 
 // ---- Textures ----------------------------------------------------------------
 
@@ -161,503 +168,8 @@ function tagTexture(name: string, color: string, hp: number): THREE.CanvasTextur
   );
 }
 
-// ---- Weapons ------------------------------------------------------------------
-
-const lambert = (color: number, extra: THREE.MeshLambertMaterialParameters = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
-const phong = (color: number) => new THREE.MeshPhongMaterial({ color, shininess: 80, specular: 0x999999 });
-
-/**
- * A weapon held at the origin (the grip), pointing along -z (blade, head or
- * tip forward). Sizes in meters.
- */
-function weaponMesh(kind: WeaponId): THREE.Group {
-  const g = new THREE.Group();
-  const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x = 0, y = 0, z = 0) => {
-    const m = new THREE.Mesh(geo, mat);
-    m.position.set(x, y, z);
-    g.add(m);
-    return m;
-  };
-  const steel = phong(STEEL);
-  const wood = lambert(WOOD);
-  const leather = lambert(LEATHER);
-  const gold = phong(GOLD);
-  switch (kind) {
-    case "daga":
-      add(new THREE.BoxGeometry(0.04, 0.012, 0.3), steel, 0, 0, -0.2);
-      add(new THREE.BoxGeometry(0.12, 0.025, 0.03), gold, 0, 0, -0.04);
-      add(new THREE.BoxGeometry(0.03, 0.03, 0.1), leather, 0, 0, 0.03);
-      break;
-    case "espada":
-      add(new THREE.BoxGeometry(0.06, 0.014, 0.85), steel, 0, 0, -0.5);
-      add(new THREE.ConeGeometry(0.03, 0.08, 4).rotateX(-Math.PI / 2), steel, 0, 0, -0.96);
-      add(new THREE.BoxGeometry(0.24, 0.03, 0.04), gold, 0, 0, -0.06);
-      add(new THREE.BoxGeometry(0.035, 0.035, 0.16), leather, 0, 0, 0.04);
-      add(new THREE.SphereGeometry(0.035, 8, 6), gold, 0, 0, 0.13);
-      break;
-    case "hacha": {
-      add(new THREE.CylinderGeometry(0.025, 0.03, 0.95, 8).rotateX(Math.PI / 2), wood, 0, 0, -0.35);
-      const head = new THREE.Shape();
-      head.moveTo(0, -0.05);
-      head.lineTo(0.12, -0.13);
-      head.quadraticCurveTo(0.22, 0, 0.12, 0.13);
-      head.lineTo(0, 0.05);
-      head.closePath();
-      // Drawn outward (x) along the shaft (y), then laid along the shaft (-z).
-      const blade = new THREE.ExtrudeGeometry(head, { depth: 0.025, bevelEnabled: false });
-      blade.translate(0, 0, -0.0125);
-      blade.rotateX(-Math.PI / 2);
-      add(blade, steel, 0, 0, -0.74);
-      break;
-    }
-    case "maza": {
-      add(new THREE.CylinderGeometry(0.025, 0.03, 0.7, 8).rotateX(Math.PI / 2), wood, 0, 0, -0.25);
-      add(new THREE.IcosahedronGeometry(0.1, 0), lambert(DARK_STEEL, { flatShading: true }), 0, 0, -0.65);
-      const spike = new THREE.ConeGeometry(0.025, 0.08, 5);
-      const up = new THREE.Vector3(0, 1, 0);
-      for (const [x, y, z] of [
-        [1, 0, 0],
-        [-1, 0, 0],
-        [0, 1, 0],
-        [0, -1, 0],
-        [0, 0, -1],
-      ]) {
-        const s = new THREE.Mesh(spike, steel);
-        s.position.set(x * 0.1, y * 0.1, z * 0.1 - 0.65);
-        s.quaternion.setFromUnitVectors(up, new THREE.Vector3(x, y, z));
-        g.add(s);
-      }
-      break;
-    }
-    case "lanza":
-      add(new THREE.CylinderGeometry(0.02, 0.022, 2.0, 8).rotateX(Math.PI / 2), wood, 0, 0, -0.6);
-      add(new THREE.ConeGeometry(0.045, 0.28, 6).rotateX(-Math.PI / 2), steel, 0, 0, -1.72);
-      add(new THREE.BoxGeometry(0.03, 0.03, 0.12), leather, 0, 0, 0.1);
-      break;
-    case "arco": {
-      // Vertical bow in the x/y plane; the grip at the origin.
-      const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, 0.62, 0.12), new THREE.Vector3(0, 0, -0.22), new THREE.Vector3(0, -0.62, 0.12));
-      add(new THREE.TubeGeometry(curve, 16, 0.018, 6, false), wood);
-      const string = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0.62, 0.12), new THREE.Vector3(0, 0, 0.12), new THREE.Vector3(0, -0.62, 0.12)]),
-        new THREE.LineBasicMaterial({ color: 0xf5f5f4 })
-      );
-      g.add(string);
-      g.userData.string = string;
-      add(new THREE.BoxGeometry(0.04, 0.12, 0.04), leather);
-      break;
-    }
-  }
-  return g;
-}
-
-function shieldMesh(team: TeamId | null): THREE.Group {
-  const g = new THREE.Group();
-  const face = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.05, 20).rotateX(Math.PI / 2), lambert(team ? TEAM_COLORS[team] : WOOD));
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.025, 6, 24), phong(DARK_STEEL));
-  const boss = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(-Math.PI / 2), phong(GOLD));
-  boss.position.z = -0.03;
-  g.add(face, rim, boss);
-  return g;
-}
-
-function arrowMesh(): THREE.Group {
-  const g = new THREE.Group();
-  g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.7, 5).rotateX(Math.PI / 2), lambert(WOOD)));
-  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.07, 4).rotateX(-Math.PI / 2), phong(STEEL));
-  tip.position.z = -0.38;
-  const fl = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.002, 0.1), lambert(0xf8fafc));
-  fl.position.z = 0.3;
-  const fl2 = fl.clone();
-  fl2.rotation.z = Math.PI / 2;
-  g.add(tip, fl, fl2);
-  return g;
-}
-
-/** A round flask of red potion with a cork, glowing a little. */
-function potionMesh(): THREE.Group {
-  const g = new THREE.Group();
-  const glass = new THREE.MeshPhongMaterial({ color: 0xe0f2fe, transparent: true, opacity: 0.35, shininess: 120 });
-  const liquid = new THREE.MeshLambertMaterial({ color: 0xef4444, emissive: 0x991b1b, emissiveIntensity: 0.8 });
-  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), glass);
-  const fill = new THREE.Mesh(new THREE.SphereGeometry(0.145, 16, 12), liquid);
-  fill.position.y = -0.01;
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.16, 10), glass);
-  neck.position.y = 0.2;
-  const cork = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.06, 8), lambert(0xa16207));
-  cork.position.y = 0.3;
-  g.add(fill, bulb, neck, cork);
-  return g;
-}
-
-function itemMesh(kind: ItemKind): THREE.Group {
-  if (kind === "pocion") return potionMesh();
-  return kind === "escudo" ? shieldMesh(null) : weaponMesh(kind);
-}
-
-// ---- Knights ------------------------------------------------------------------
-
-interface Limb {
-  pivot: THREE.Group;
-}
-
-interface Knight {
-  team: TeamId;
-  root: THREE.Group;
-  body: THREE.Group;
-  torso: THREE.Group;
-  head: THREE.Group;
-  legs: [Limb, Limb];
-  arms: [Limb, Limb];
-  hand: THREE.Group;
-  offHand: THREE.Group;
-  weapon: THREE.Group | null;
-  weaponKind: WeaponId | null;
-  shield: THREE.Group | null;
-  shadow: THREE.Mesh;
-  tag: THREE.Sprite;
-  tagKey: string;
-  label: string;
-  pose: KnightPose | null;
-  walk: number;
-  /** Seconds since it fell (for the fall animation), -1 standing. */
-  fallen: number;
-  hp: number;
-  /** Armor that flashes white for a moment when hit. */
-  flashMats: THREE.MeshPhongMaterial[];
-  flashT: number;
-  /** Last act seen (a dodge kicks up dust once). */
-  lastAct: string;
-  dustAcc: number;
-}
-
-function knightMesh(team: TeamId, glow: THREE.Texture): Omit<Knight, "tag" | "tagKey" | "label" | "pose" | "walk" | "fallen" | "hp" | "flashT" | "lastAct" | "dustAcc"> {
-  const root = new THREE.Group();
-  const body = new THREE.Group();
-  root.add(body);
-  const armor = phong(STEEL);
-  const darkArmor = phong(DARK_STEEL);
-  const cloth = lambert(TEAM_COLORS[team]);
-  const leather = lambert(LEATHER);
-  const box = (w: number, h: number, d: number, mat: THREE.Material, x = 0, y = 0, z = 0) => {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    m.position.set(x, y, z);
-    return m;
-  };
-
-  const legs: Limb[] = [];
-  for (const side of [-1, 1]) {
-    const pivot = new THREE.Group();
-    pivot.position.set(side * 0.13, 0.95, 0);
-    pivot.add(box(0.17, 0.5, 0.19, darkArmor, 0, -0.25, 0));
-    pivot.add(box(0.16, 0.45, 0.17, armor, 0, -0.68, 0));
-    pivot.add(box(0.17, 0.08, 0.28, leather, 0, -0.9, -0.04));
-    body.add(pivot);
-    legs.push({ pivot });
-  }
-
-  const torso = new THREE.Group();
-  torso.position.y = 0.95;
-  body.add(torso);
-  torso.add(box(0.5, 0.58, 0.3, armor, 0, 0.32, 0));
-  // Tabard in the team's color, front and back, with a belt.
-  torso.add(box(0.44, 0.7, 0.32, cloth, 0, 0.2, 0));
-  torso.add(box(0.46, 0.06, 0.33, leather, 0, 0.02, 0));
-  const pauldron = new THREE.SphereGeometry(0.13, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-  for (const side of [-1, 1]) {
-    const p = new THREE.Mesh(pauldron, armor);
-    p.position.set(side * 0.29, 0.56, 0);
-    torso.add(p);
-  }
-
-  const head = new THREE.Group();
-  head.position.y = 0.66;
-  torso.add(head);
-  const helm = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.15, 0.3, 14), armor);
-  helm.position.y = 0.12;
-  const top = new THREE.Mesh(new THREE.SphereGeometry(0.14, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), armor);
-  top.position.y = 0.27;
-  const visor = box(0.2, 0.035, 0.04, lambert(0x0b0b0f), 0, 0.16, -0.14);
-  const plume = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.16, 0.3), cloth);
-  plume.position.set(0, 0.42, 0.04);
-  head.add(helm, top, visor, plume);
-
-  const arms: Limb[] = [];
-  let hand = new THREE.Group();
-  let offHand = new THREE.Group();
-  for (const side of [-1, 1]) {
-    const pivot = new THREE.Group();
-    pivot.rotation.order = "YZX";
-    pivot.position.set(side * 0.33, 0.52, 0);
-    pivot.add(box(0.13, 0.32, 0.14, armor, 0, -0.16, 0));
-    pivot.add(box(0.12, 0.3, 0.13, darkArmor, 0, -0.45, 0));
-    pivot.add(box(0.12, 0.1, 0.12, leather, 0, -0.62, 0));
-    const grip = new THREE.Group();
-    grip.position.y = -0.63;
-    pivot.add(grip);
-    torso.add(pivot);
-    arms.push({ pivot });
-    if (side === 1) hand = grip;
-    else offHand = grip;
-  }
-
-  const shadow = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.1, 1.1),
-    new THREE.MeshBasicMaterial({ map: glow, color: 0x000000, transparent: true, opacity: 0.45, depthWrite: false })
-  );
-  shadow.rotation.x = -Math.PI / 2;
-  shadow.position.y = 0.02;
-  shadow.renderOrder = 1;
-
-  return {
-    team,
-    root,
-    body,
-    torso,
-    head,
-    legs: legs as [Limb, Limb],
-    arms: arms as [Limb, Limb],
-    hand,
-    offHand,
-    weapon: null,
-    weaponKind: null,
-    shield: null,
-    shadow,
-    flashMats: [armor, darkArmor],
-  };
-}
-
-const ease = (t: number) => t * t * (3 - 2 * t);
 /** How high an item floats over the sand. */
 const itemHeight = (kind: ItemKind) => (kind === "escudo" || kind === "arco" ? 0.75 : kind === "pocion" ? 0.45 : 0.35);
-const clamp01 = (t: number) => Math.max(0, Math.min(1, t));
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-
-/** Arm angles: raise forward (x), raise sideways (z), sweep around the body (y). */
-interface ArmPose {
-  x: number;
-  y: number;
-  z: number;
-}
-
-const ARM_DOWN: ArmPose = { x: 0.15, y: 0, z: 0.08 };
-const ARM_GUARD: ArmPose = { x: 0.95, y: 0.15, z: 0.12 };
-const ARM_WOUND: ArmPose = { x: 0.35, y: -0.55, z: 1.45 };
-const ARM_SWUNG: ArmPose = { x: 0.6, y: 2.1, z: 1.35 };
-const ARM_WOUND_LEFT: ArmPose = { x: 0.5, y: 2.3, z: 1.25 };
-const ARM_SWUNG_LEFT: ArmPose = { x: 0.45, y: -0.6, z: 1.45 };
-
-function mixArm(a: ArmPose, b: ArmPose, t: number): ArmPose {
-  return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t), z: lerp(a.z, b.z, t) };
-}
-
-/** Where a knight's limbs are for its pose (third person and rivals). */
-function animateKnight(k: Knight, p: KnightPose, dt: number) {
-  const weapon = WEAPONS[p.gear.w];
-  const right = k.arms[1].pivot;
-  const left = k.arms[0].pivot;
-  let rArm: ArmPose = ARM_GUARD;
-  let lArm: ArmPose = p.gear.sh ? { x: 0.7, y: -0.3, z: -0.1 } : ARM_DOWN;
-  let twist = 0;
-  let lean = 0;
-  let thrust = 0;
-  let weaponRoll = 0;
-  const t = p.actLen > 0 ? clamp01(p.actT / p.actLen) : 0;
-  const spear = p.gear.w === "lanza";
-  // Odd swings of a combo come back from the left.
-  const side = p.combo % 2 ? -1 : 1;
-  const wound = side > 0 ? ARM_WOUND : ARM_WOUND_LEFT;
-  const swung = side > 0 ? ARM_SWUNG : ARM_SWUNG_LEFT;
-
-  if (weapon.ranged) {
-    const aim = Math.PI / 2 + p.pitch;
-    lArm = { x: aim, y: 0.25, z: 0 };
-    rArm = p.act === "draw" ? { x: aim, y: -0.15 - p.draw * 0.5, z: 0 } : { x: aim - 0.3, y: -0.3, z: 0 };
-    twist = 0.2;
-  } else if (p.blocking) {
-    if (p.gear.sh) lArm = { x: 1.45, y: -0.55, z: 0 };
-    else {
-      rArm = { x: 1.5, y: 0.8, z: 0.2 };
-      weaponRoll = Math.PI / 2;
-    }
-  } else if (p.act === "windup") {
-    if (spear) {
-      rArm = mixArm(ARM_GUARD, { x: 1.35, y: 0.1, z: 0.1 }, ease(t));
-      thrust = -0.25 * ease(t);
-    } else {
-      rArm = mixArm(ARM_GUARD, wound, ease(t));
-      twist = -0.45 * side * ease(t);
-    }
-  } else if (p.act === "recover") {
-    const swing = clamp01(t / 0.35);
-    const back = clamp01((t - 0.35) / 0.65);
-    if (spear) {
-      rArm = { x: 1.45, y: 0.1, z: 0.1 };
-      thrust = lerp(lerp(-0.25, 0.55, ease(swing)), 0, ease(back));
-    } else {
-      rArm = mixArm(mixArm(wound, swung, ease(swing)), ARM_GUARD, ease(back));
-      twist = lerp(lerp(-0.45 * side, 0.5 * side, ease(swing)), 0, ease(back));
-      lean = -0.12 * Math.sin(swing * Math.PI);
-    }
-  } else if (p.act === "stagger") {
-    lean = 0.3 * Math.sin(t * Math.PI);
-    rArm = { x: 0.4, y: -0.2, z: 0.7 };
-    lArm = { x: 0.4, y: 0.2, z: -0.7 };
-  } else if (p.act === "dodge") {
-    lean = -0.35;
-    rArm = { x: 0.6, y: 0.3, z: 0.3 };
-    lArm = { x: 0.6, y: -0.3, z: -0.3 };
-  } else if (p.running) {
-    // Running: lean in and pump the arms.
-    lean = -0.2;
-    const pump = Math.sin(k.walk) * 0.7;
-    rArm = { x: 0.5 - pump, y: 0, z: 0.1 };
-    if (!p.gear.sh) lArm = { x: 0.5 + pump, y: 0, z: 0.1 };
-  }
-
-  const k1 = 1 - Math.exp(-dt * 18);
-  right.rotation.x = lerp(right.rotation.x, rArm.x, k1);
-  right.rotation.y = lerp(right.rotation.y, rArm.y, k1);
-  right.rotation.z = lerp(right.rotation.z, rArm.z, k1);
-  left.rotation.x = lerp(left.rotation.x, lArm.x, k1);
-  left.rotation.y = lerp(left.rotation.y, lArm.y, k1);
-  left.rotation.z = lerp(left.rotation.z, -lArm.z, k1);
-  k.torso.rotation.y = lerp(k.torso.rotation.y, twist, k1);
-  k.torso.rotation.x = lerp(k.torso.rotation.x, lean, k1);
-  right.position.z = lerp(right.position.z, -thrust, k1);
-  k.head.rotation.x = lerp(k.head.rotation.x, p.pitch * 0.6, k1);
-  if (k.weapon) k.weapon.rotation.z = lerp(k.weapon.rotation.z, weaponRoll, k1);
-
-  // Bow string pulled back with the draw.
-  const string = k.weapon?.userData.string as THREE.Line | undefined;
-  if (string) {
-    const pos = string.geometry.attributes.position as THREE.BufferAttribute;
-    pos.setZ(1, 0.12 + (p.act === "draw" ? p.draw * 0.45 : 0));
-    pos.needsUpdate = true;
-  }
-
-  // Legs swing with the walk.
-  const moving = Math.min(1, p.speed / 4.6);
-  k.walk += dt * (2 + p.speed * 1.8);
-  const swing = Math.sin(k.walk) * 0.65 * moving;
-  const air = p.y > 0.05 ? 0.4 : 0;
-  k.legs[0].pivot.rotation.x = lerp(k.legs[0].pivot.rotation.x, swing - air, k1);
-  k.legs[1].pivot.rotation.x = lerp(k.legs[1].pivot.rotation.x, -swing + air * 0.5, k1);
-  k.body.position.y = Math.abs(Math.sin(k.walk)) * 0.04 * moving - (p.act === "dodge" ? 0.18 : 0);
-}
-
-// ---- Particles ----------------------------------------------------------------
-
-const PARTICLE_VERT = `
-attribute float alpha;
-attribute float size;
-attribute vec3 pcolor;
-uniform float scale;
-varying float vAlpha;
-varying vec3 vColor;
-void main() {
-  vAlpha = alpha;
-  vColor = pcolor;
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
-  gl_PointSize = size * scale / max(0.1, -mv.z);
-  gl_Position = projectionMatrix * mv;
-}`;
-
-const PARTICLE_FRAG = `
-varying float vAlpha;
-varying vec3 vColor;
-void main() {
-  float r = length(gl_PointCoord - 0.5);
-  if (r > 0.5) discard;
-  gl_FragColor = vec4(vColor, vAlpha * smoothstep(0.5, 0.0, r));
-}`;
-
-class Particles {
-  readonly points: THREE.Points;
-  private material: THREE.ShaderMaterial;
-  private pos: Float32Array;
-  private col: Float32Array;
-  private alpha: Float32Array;
-  private size: Float32Array;
-  private vel: Float32Array;
-  private life: Float32Array;
-  private maxLife: Float32Array;
-  private startAlpha: Float32Array;
-  private next = 0;
-
-  constructor(
-    private max: number,
-    additive: boolean,
-    private gravity: number
-  ) {
-    this.pos = new Float32Array(max * 3);
-    this.col = new Float32Array(max * 3);
-    this.alpha = new Float32Array(max);
-    this.size = new Float32Array(max);
-    this.vel = new Float32Array(max * 3);
-    this.life = new Float32Array(max);
-    this.maxLife = new Float32Array(max);
-    this.startAlpha = new Float32Array(max);
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(this.pos, 3));
-    g.setAttribute("pcolor", new THREE.BufferAttribute(this.col, 3));
-    g.setAttribute("alpha", new THREE.BufferAttribute(this.alpha, 1));
-    g.setAttribute("size", new THREE.BufferAttribute(this.size, 1));
-    this.material = new THREE.ShaderMaterial({
-      uniforms: { scale: { value: 300 } },
-      vertexShader: PARTICLE_VERT,
-      fragmentShader: PARTICLE_FRAG,
-      transparent: true,
-      depthWrite: false,
-      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
-    });
-    this.points = new THREE.Points(g, this.material);
-    this.points.frustumCulled = false;
-    this.points.renderOrder = 3;
-  }
-
-  spawn(x: number, y: number, z: number, vx: number, vy: number, vz: number, color: THREE.Color, size: number, life: number, alpha: number) {
-    const i = this.next;
-    this.next = (this.next + 1) % this.max;
-    this.pos.set([x, y, z], i * 3);
-    this.vel.set([vx, vy, vz], i * 3);
-    this.col.set([color.r, color.g, color.b], i * 3);
-    this.size[i] = size;
-    this.life[i] = life;
-    this.maxLife[i] = life;
-    this.startAlpha[i] = alpha;
-    this.alpha[i] = alpha;
-  }
-
-  update(dt: number) {
-    const drag = Math.exp(-dt * 2);
-    for (let i = 0; i < this.max; i++) {
-      if (this.life[i] <= 0) continue;
-      this.life[i] -= dt;
-      if (this.life[i] <= 0) {
-        this.alpha[i] = 0;
-        continue;
-      }
-      const k = i * 3;
-      this.vel[k] *= drag;
-      this.vel[k + 2] *= drag;
-      this.vel[k + 1] -= this.gravity * dt;
-      this.pos[k] += this.vel[k] * dt;
-      this.pos[k + 1] = Math.max(0.02, this.pos[k + 1] + this.vel[k + 1] * dt);
-      this.pos[k + 2] += this.vel[k + 2] * dt;
-      this.alpha[i] = this.startAlpha[i] * (this.life[i] / this.maxLife[i]);
-    }
-    const a = this.points.geometry.attributes;
-    a.position.needsUpdate = true;
-    a.alpha.needsUpdate = true;
-    a.size.needsUpdate = true;
-    a.pcolor.needsUpdate = true;
-  }
-
-  setScale(scale: number) {
-    this.material.uniforms.scale.value = scale;
-  }
-}
 
 // ---- First-person hands ---------------------------------------------------------
 
@@ -707,9 +219,10 @@ function handPose(p: KnightPose, bob: number): { right: HandPose; left: HandPose
   } else if (p.act === "windup") {
     right = mix(right, wound, ease(t));
   } else if (p.act === "recover") {
-    const swing = clamp01(t / 0.35);
-    const back = clamp01((t - 0.35) / 0.65);
-    right = mix(mix(wound, swung, ease(swing)), right, ease(back));
+    // A fast swing that carries a little past, then back to the guard.
+    const swing = clamp01(t / 0.32);
+    const back = clamp01((t - 0.45) / 0.55);
+    right = mix(mix(wound, swung, easeOutBack(swing, spear ? 1.1 : 1.5)), right, ease(back));
   } else if (p.act === "stagger") {
     right = { ...right, py: right.py - 0.15, rz: right.rz - 0.4 };
   } else if (p.act === "dodge") {
@@ -743,8 +256,18 @@ export class ArenaScene {
   private knights = new Map<string, Knight>();
   private items = new Map<string, { kind: ItemKind; group: THREE.Group }>();
   private arrows = new Map<string, THREE.Group>();
-  private sparks = new Particles(300, true, 9);
-  private dust = new Particles(240, false, -0.5);
+  private sparks = new Particles(420, true, 9, 1.2);
+  private dust = new Particles(300, false, -0.4, 3);
+  private impacts: Impacts;
+  private geos = knightGeos();
+  /** Swing trails behind third-person weapons (id → trail). */
+  private trails = new Map<string, SwingTrail>();
+  private trailColor: THREE.Color;
+  private tagScale = 1;
+  /** The big screen's camera: where it looks and how far it stands. */
+  private overCam = new THREE.PerspectiveCamera(45, 1, 0.1, 400);
+  private overAt = new THREE.Vector3();
+  private overDist = 0;
   /** Embers rising from the torches. */
   private embers = new Particles(160, true, -1.2);
   private flames: THREE.Sprite[] = [];
@@ -766,6 +289,7 @@ export class ArenaScene {
   private handNow: { right: HandPose; left: HandPose } = { right: { ...HAND_IDLE }, left: { ...HAND_IDLE } };
   private bob = 0;
   private shake = 0;
+  private shakeT = 0;
   private camPos = new THREE.Vector3();
   private camReady = false;
   private rand = mulberry32(42);
@@ -789,7 +313,10 @@ export class ArenaScene {
     this.glow = glowTexture();
     this.camera.rotation.order = "YXZ";
     this.build();
-    this.scene.add(this.sparks.points, this.dust.points, this.embers.points);
+    this.impacts = new Impacts(this.glow);
+    // Under bloom the swing trails glow a little.
+    this.trailColor = high ? glowColor(0xfff2d6, 1.25) : new THREE.Color(0xfff2d6).multiplyScalar(0.85);
+    this.scene.add(this.sparks.points, this.dust.points, this.embers.points, this.impacts.group);
     // Specks of dust hanging in the sunlight.
     {
       const n = high ? 160 : 80;
@@ -1035,6 +562,12 @@ export class ArenaScene {
         disposeTree(k.root);
         disposeTree(k.shadow);
         this.knights.delete(id);
+        const trail = this.trails.get(id);
+        if (trail) {
+          this.scene.remove(trail.mesh);
+          trail.dispose();
+          this.trails.delete(id);
+        }
       }
     }
     for (const [id, f] of Object.entries(info)) {
@@ -1043,19 +576,35 @@ export class ArenaScene {
         known.label = f.label;
         continue;
       }
-      const parts = knightMesh(f.team, this.glow);
+      const parts = knightMesh(f.team, this.geos);
       const tag = new THREE.Sprite(new THREE.SpriteMaterial({ depthWrite: false, transparent: true }));
-      tag.scale.set(1.3, 0.41, 1);
-      tag.position.y = 2.35;
+      this.placeTag(tag);
       parts.root.add(tag);
+      parts.root.userData.shadows = this.shadows;
       if (this.shadows) {
         parts.root.traverse((o) => ((o as THREE.Mesh).castShadow = (o as THREE.Mesh).isMesh && o !== tag));
         // Real shadows replace the soft blob under the feet.
         parts.shadow.visible = false;
+      } else {
+        (parts.shadow.material as THREE.MeshBasicMaterial).map = this.glow;
       }
       this.scene.add(parts.root, parts.shadow);
-      this.knights.set(id, { ...parts, tag, tagKey: "", label: f.label, pose: null, walk: Math.random() * 6, fallen: -1, hp: 100, flashT: 0, lastAct: "", dustAcc: 0 });
+      this.knights.set(id, { ...parts, tag, tagKey: "", label: f.label, pose: null, hp: 100 });
+      const trail = new SwingTrail(this.trailColor);
+      this.trails.set(id, trail);
+      this.scene.add(trail.mesh);
     }
+  }
+
+  private placeTag(tag: THREE.Sprite) {
+    tag.scale.set(1.3 * this.tagScale, 0.41 * this.tagScale, 1);
+    tag.position.y = 2.35 + (this.tagScale - 1) * 0.25;
+  }
+
+  /** Makes the floating name and health tags bigger (a TV far away) or smaller. */
+  setTagScale(scale: number) {
+    this.tagScale = Math.max(0.2, scale);
+    for (const k of this.knights.values()) this.placeTag(k.tag);
   }
 
   setHealth(id: string, hp: number) {
@@ -1068,37 +617,7 @@ export class ArenaScene {
     if (!k) return;
     k.pose = pose;
     // What it holds.
-    if (k.weaponKind !== pose.gear.w) {
-      if (k.weapon) {
-        k.hand.remove(k.weapon);
-        k.offHand.remove(k.weapon);
-        disposeTree(k.weapon);
-      }
-      k.weapon = weaponMesh(pose.gear.w);
-      k.weaponKind = pose.gear.w;
-      if (pose.gear.w === "arco") {
-        // Limbs up and the belly forward when the arm points ahead.
-        k.weapon.rotation.set(-Math.PI / 2, 0, 0);
-        k.offHand.add(k.weapon);
-      } else {
-        // Blade forward from the fist, tilted up a bit.
-        k.weapon.rotation.x = 0.3;
-        k.hand.add(k.weapon);
-      }
-    }
-    if (!!k.shield !== pose.gear.sh) {
-      if (k.shield) {
-        k.offHand.remove(k.shield);
-        disposeTree(k.shield);
-        k.shield = null;
-      } else {
-        // Its face along the forearm's length, so it faces ahead when the arm is raised.
-        k.shield = shieldMesh(k.team);
-        k.shield.position.set(-0.06, -0.04, 0);
-        k.shield.rotation.x = Math.PI / 2;
-        k.offHand.add(k.shield);
-      }
-    }
+    equipKnight(k, pose.gear);
   }
 
   /** The weapons on the floor (id → kind and place). */
@@ -1162,33 +681,57 @@ export class ArenaScene {
     }
   }
 
-  /** A hit: sparks on metal (`block`), a puff and a few sparks on a clean hit, sand on a fall. */
+  /** A hit: sparks on metal (`block`), a flash, sparks and a ring on a clean hit, sand on a fall. */
   burst(x: number, y: number, z: number, kind: "hit" | "block" | "dust") {
-    const n = kind === "block" ? 22 : kind === "hit" ? 12 : 16;
-    const colors =
-      kind === "block"
-        ? [new THREE.Color(0xfde047), new THREE.Color(0xfffbeb), new THREE.Color(0xfb923c)]
-        : kind === "hit"
-          ? [new THREE.Color(0xfef3c7), new THREE.Color(0xfca5a5)]
-          : [new THREE.Color(0xe7cc9a)];
+    const high = this.shadows;
+    if (kind === "dust") {
+      this.dustRing(x, z, 18, 1.6, 0.55);
+      return;
+    }
+    const block = kind === "block";
+    const n = block ? (high ? 40 : 26) : high ? 30 : 20;
+    const colors = block ? BLOCK_SPARKS : HIT_SPARKS;
     for (let i = 0; i < n; i++) {
+      // Mostly outward and up, a few fast streaks.
       const a = this.rand() * Math.PI * 2;
-      const sp = kind === "dust" ? 1 + this.rand() * 1.5 : 2 + this.rand() * 4;
+      const fast = this.rand() < 0.3;
+      const sp = (block ? 3 : 2.2) + this.rand() * (fast ? 7 : 3.5);
       const c = colors[i % colors.length];
-      if (kind === "dust") this.dust.spawn(x, y, z, Math.cos(a) * sp, 0.3 + this.rand(), Math.sin(a) * sp, c, 0.5, 0.8 + this.rand() * 0.5, 0.5);
-      else this.sparks.spawn(x, y, z, Math.cos(a) * sp, 1 + this.rand() * 3, Math.sin(a) * sp, c, 0.08 + this.rand() * 0.06, 0.25 + this.rand() * 0.3, 1);
+      const size = fast ? 0.05 + this.rand() * 0.03 : 0.08 + this.rand() * 0.08;
+      this.sparks.spawn(x, y, z, Math.cos(a) * sp, 0.8 + this.rand() * (block ? 4.5 : 3), Math.sin(a) * sp, c, size, 0.22 + this.rand() * (block ? 0.45 : 0.3), 1);
+    }
+    // A flash and an impact ring; under bloom the flash glows.
+    const flash = block ? (high ? FLASH_BLOCK_GLOW : FLASH_BLOCK) : high ? FLASH_HIT_GLOW : FLASH_HIT;
+    this.impacts.spawn(x, y, z, flash, block ? 0.75 : 0.6, block ? 0.6 : 0.75, block ? 0.16 : 0.22);
+    if (!block) {
+      // A little cloud of grit off the armor.
+      for (let i = 0; i < 6; i++) {
+        const a = this.rand() * Math.PI * 2;
+        this.dust.spawn(x, y, z, Math.cos(a) * 1.2, 0.4 + this.rand(), Math.sin(a) * 1.2, DUST_LIGHT, 0.25, 0.5, 0.35, 0.8);
+      }
     }
   }
 
-  /** A knight that just took a clean hit flashes white. */
+  /** A ring of sand thrown out along the ground. */
+  private dustRing(x: number, z: number, n: number, speed: number, alpha: number) {
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + this.rand() * 0.3;
+      const sp = speed * (0.6 + this.rand() * 0.6);
+      this.dust.spawn(x + Math.cos(a) * 0.2, 0.08, z + Math.sin(a) * 0.2, Math.cos(a) * sp, 0.2 + this.rand() * 0.5, Math.sin(a) * sp, i % 3 ? DUST : DUST_LIGHT, 0.35 + this.rand() * 0.2, 0.7 + this.rand() * 0.5, alpha, 0.9);
+    }
+  }
+
+  /** A knight that just took a clean hit flashes white and rocks back. */
   hitFlash(id: string) {
     const k = this.knights.get(id);
-    if (k) k.flashT = 0.15;
+    if (!k) return;
+    k.flashT = 0.15;
+    k.hitV += 5.5;
   }
 
   /** Shakes the camera (you got hit, or landed a heavy blow). */
   jolt(amount: number) {
-    this.shake = Math.max(this.shake, amount);
+    this.shake = Math.min(1.6, Math.max(this.shake, amount) + amount * 0.25);
   }
 
   /** The crowd jumps for a moment. */
@@ -1196,46 +739,74 @@ export class ArenaScene {
     this.cheerT = 2.2;
   }
 
+  private tip = new THREE.Vector3();
+  private base = new THREE.Vector3();
+
   private update(dt: number) {
     this.time += dt;
-    for (const [, k] of this.knights) {
+    for (const [id, k] of this.knights) {
       const p = k.pose;
       k.root.visible = !!p;
       k.shadow.visible = !!p && !this.shadows;
-      if (!p) continue;
+      const trail = this.trails.get(id);
+      if (!p) {
+        trail?.clear();
+        continue;
+      }
       // Hit flash fading out.
       if (k.flashT > 0) {
         k.flashT = Math.max(0, k.flashT - dt);
         for (const m of k.flashMats) m.emissive.setScalar(k.flashT * 4);
       }
-      // Sand kicked up: running, and a burst on each dodge.
-      if (p.alive && p.y < 0.05) {
-        if (p.act === "dodge" && k.lastAct !== "dodge") this.burst(p.x, 0.1, p.z, "dust");
-        k.dustAcc += dt * Math.max(0, p.speed - 3.5) * 2.2;
-        while (k.dustAcc > 1) {
-          k.dustAcc -= 1;
-          const a = this.rand() * Math.PI * 2;
-          this.dust.spawn(p.x + Math.cos(a) * 0.25, 0.08, p.z + Math.sin(a) * 0.25, Math.cos(a) * 0.6, 0.35, Math.sin(a) * 0.6, new THREE.Color(0xe7cc9a), 0.35, 0.6, 0.35);
-        }
-      }
-      k.lastAct = p.act;
       k.root.position.set(p.x, p.y, p.z);
       k.root.rotation.y = p.yaw;
       k.shadow.position.set(p.x, 0.02, p.z);
-      animateKnight(k, p, dt);
-      // Falling over backwards, and staying down.
-      if (!p.alive) {
-        if (k.fallen < 0) {
-          k.fallen = 0;
-          this.burst(p.x, 0.1, p.z, "dust");
+      // The blob shadow shrinks while in the air.
+      k.shadow.scale.setScalar(1 - Math.min(0.5, p.y * 0.6));
+      const ev = animateKnight(k, p, dt, this.time);
+      // Sand kicked up: footsteps when running, a puff on dodges and landings.
+      if (p.alive && p.y < 0.05) {
+        if (p.act === "dodge" && k.lastAct !== "dodge") this.dustRing(p.x, p.z, 14, 1.8, 0.5);
+        if (ev.land > 0) this.dustRing(p.x, p.z, 16, 1.4 + ev.land, 0.45);
+        if (ev.steps && p.speed > 3) {
+          const run = p.running ? 1 : 0.5;
+          const rx = Math.cos(p.yaw);
+          const rz = -Math.sin(p.yaw);
+          const side = ev.steps & 1 ? -1 : 1;
+          const fx = p.x + rx * side * 0.13;
+          const fz = p.z + rz * side * 0.13;
+          for (let i = 0; i < (p.running ? 5 : 2); i++) {
+            const a = this.rand() * Math.PI * 2;
+            this.dust.spawn(fx, 0.06, fz, Math.cos(a) * 0.5 + Math.sin(p.yaw) * 0.6, 0.25 + this.rand() * 0.3, Math.sin(a) * 0.5 + Math.cos(p.yaw) * 0.6, DUST, 0.28, 0.55, 0.35 * run, 0.6);
+          }
         }
-        k.fallen += dt;
-        const f = ease(clamp01(k.fallen / 0.6));
-        k.body.rotation.x = (Math.PI / 2) * f * 0.97;
-        k.body.position.y = 0.15 * f;
-      } else if (k.fallen >= 0) {
-        k.fallen = -1;
-        k.body.rotation.x = 0;
+        if (p.act === "dodge") {
+          k.dustAcc += dt * 40;
+          while (k.dustAcc > 1) {
+            k.dustAcc -= 1;
+            const a = this.rand() * Math.PI * 2;
+            this.dust.spawn(p.x + Math.cos(a) * 0.2, 0.06, p.z + Math.sin(a) * 0.2, Math.cos(a) * 0.4, 0.3, Math.sin(a) * 0.4, DUST, 0.3, 0.5, 0.35, 0.6);
+          }
+        }
+      }
+      if (ev.fell) this.dustRing(p.x, p.z, 10, 1, 0.35);
+      if (ev.thud) {
+        // Lying on its back: the dust comes up along the body.
+        for (const d of [0.4, 0.9, 1.4]) this.dustRing(p.x + Math.sin(p.yaw) * d, p.z + Math.cos(p.yaw) * d, 8, 1.4, 0.5);
+      }
+      k.lastAct = p.act;
+      // The weapon's swing trail.
+      if (trail) {
+        const sw = swinging(p);
+        if (sw > 0 && k.weapon?.userData.tip) {
+          k.root.updateMatrixWorld(true);
+          this.tip.copy(k.weapon.userData.tip as THREE.Vector3);
+          this.base.copy(k.weapon.userData.base as THREE.Vector3);
+          k.weapon.localToWorld(this.tip);
+          k.weapon.localToWorld(this.base);
+          trail.push(this.base, this.tip, this.time, sw);
+        }
+        trail.update(this.time);
       }
       const key = `${k.label}:${Math.round(k.hp)}:${p.alive}`;
       if (key !== k.tagKey) {
@@ -1287,7 +858,8 @@ export class ArenaScene {
     this.sparks.update(dt);
     this.dust.update(dt);
     this.embers.update(dt);
-    this.shake = Math.max(0, this.shake - dt * 2.5);
+    this.shake = Math.max(0, this.shake - dt * (1.1 + this.shake * 1.6));
+    this.shakeT += dt;
   }
 
   /** First-person hands: the held weapon (and shield or bow), moving with the pose. */
@@ -1302,7 +874,7 @@ export class ArenaScene {
         }
       }
       this.handShield = null;
-      const fist = () => new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.12), phong(DARK_STEEL));
+      const fist = () => new THREE.Mesh(new THREE.CapsuleGeometry(0.048, 0.05, 3, 10).rotateX(Math.PI / 2), phong(DARK_STEEL));
       if (p.gear.w === "arco") {
         const bow = weaponMesh("arco");
         bow.rotation.set(0, 0, 0.15);
@@ -1353,19 +925,54 @@ export class ArenaScene {
     }
   }
 
+  /** Fits the renderer to the canvas; the canvas' size in CSS pixels, or null while it has none. */
+  private fit(): { cw: number; ch: number; dpr: number } | null {
+    const dpr = Math.min(window.devicePixelRatio || 1, this.maxDpr);
+    const cw = this.canvas.clientWidth;
+    const ch = this.canvas.clientHeight;
+    if (!cw || !ch) return null;
+    if (this.renderer.getPixelRatio() !== dpr) this.renderer.setPixelRatio(dpr);
+    const size = this.renderer.getSize(new THREE.Vector2());
+    if (size.x !== cw || size.y !== ch) this.renderer.setSize(cw, ch, false);
+    return { cw, ch, dpr };
+  }
+
+  /** A jolt: the camera shakes and rolls, smoothly (not a new random spot every frame). */
+  private applyShake(cam: THREE.PerspectiveCamera, amount = 1) {
+    if (this.shake <= 0) return;
+    const s = Math.min(1, this.shake) * this.shake * amount;
+    const t = this.shakeT * 38;
+    cam.position.x += (Math.sin(t * 1.1) + Math.sin(t * 2.3) * 0.5) * s * 0.09;
+    cam.position.y += (Math.sin(t * 1.7 + 1) + Math.sin(t * 2.9) * 0.5) * s * 0.09;
+    cam.rotateZ(Math.sin(t * 0.9 + 2) * s * 0.035);
+    cam.rotateX(Math.sin(t * 1.3) * s * 0.02);
+  }
+
+  /** Draws the scene through `cam`. */
+  private draw(cam: THREE.PerspectiveCamera, view: { ch: number; cw: number; dpr: number }, dt: number) {
+    const scale = (view.ch * view.dpr) / (2 * Math.tan((cam.fov * Math.PI) / 360));
+    this.sparks.setScale(scale);
+    this.dust.setScale(scale);
+    this.embers.setScale(scale);
+    this.impacts.update(dt, cam);
+    this.renderer.setViewport(0, 0, view.cw, view.ch);
+    if (this.bloom) {
+      this.bloom.render(cam, dt);
+    } else {
+      this.renderer.clear();
+      this.renderer.render(this.scene, cam);
+    }
+  }
+
   /**
    * Draws the arena from `follow`'s eyes (first person, with your hands) or
    * over its shoulder; `look` is where the camera points (your own look, or
    * the followed knight's). Nobody to follow: a slow tour around the arena.
    */
   render(follow: string | null, mode: ArenaCamera, look: { yaw: number; pitch: number; roll?: number; fov?: number }, dt: number) {
-    const dpr = Math.min(window.devicePixelRatio || 1, this.maxDpr);
-    const cw = this.canvas.clientWidth;
-    const ch = this.canvas.clientHeight;
-    if (!cw || !ch) return;
-    if (this.renderer.getPixelRatio() !== dpr) this.renderer.setPixelRatio(dpr);
-    const size = this.renderer.getSize(new THREE.Vector2());
-    if (size.x !== cw || size.y !== ch) this.renderer.setSize(cw, ch, false);
+    const view = this.fit();
+    if (!view) return;
+    const { cw, ch } = view;
     const fov = look.fov ?? 72;
     if (this.camera.aspect !== cw / ch || Math.abs(this.camera.fov - fov) > 0.05) {
       this.camera.aspect = cw / ch;
@@ -1414,25 +1021,13 @@ export class ArenaScene {
       cam.position.copy(this.camPos);
       cam.lookAt(eye.x + fx * 6 * Math.cos(pitch), eye.y - Math.sin(pitch) * 6 + 0.2, eye.z + fz * 6 * Math.cos(pitch));
     }
-    if (this.shake > 0) {
-      cam.position.x += (this.rand() - 0.5) * this.shake * 0.15;
-      cam.position.y += (this.rand() - 0.5) * this.shake * 0.15;
-    }
-    // Your own knight would be in the way of your eyes.
+    this.applyShake(cam);
+    // Your own knight (and its swing trail) would be in the way of your eyes.
     if (k) k.root.visible = !firstPerson && !!p;
+    const myTrail = follow ? this.trails.get(follow) : undefined;
+    if (myTrail && firstPerson) myTrail.mesh.visible = false;
 
-    const scale = (ch * dpr) / (2 * Math.tan((cam.fov * Math.PI) / 360));
-    this.sparks.setScale(scale);
-    this.dust.setScale(scale);
-    this.embers.setScale(scale);
-
-    this.renderer.setViewport(0, 0, cw, ch);
-    if (this.bloom) {
-      this.bloom.render(cam, dt);
-    } else {
-      this.renderer.clear();
-      this.renderer.render(this.scene, cam);
-    }
+    this.draw(cam, view, dt);
     if (firstPerson && p && k) {
       this.updateHands(p, k.team, dt);
       cam.updateMatrixWorld();
@@ -1443,9 +1038,80 @@ export class ArenaScene {
     }
   }
 
+  /**
+   * The whole fight from above, for a big screen: a camera up on the
+   * stands, always facing `OVERVIEW_YAW`, that pans and zooms to keep the
+   * fighters in `ids` (standing ones; none = the arena's middle) in frame.
+   * Every knight is drawn; no hands. Can be mixed with `render` on the same scene.
+   */
+  renderOverview(ids: string[], dt: number) {
+    const view = this.fit();
+    if (!view) return;
+    const cam = this.overCam;
+    const aspect = view.cw / view.ch;
+    if (cam.aspect !== aspect) {
+      cam.aspect = aspect;
+      cam.updateProjectionMatrix();
+    }
+    this.update(dt);
+
+    // What to keep in frame, in the camera's own ground axes (right, ahead).
+    const fx = -Math.sin(OVERVIEW_YAW);
+    const fz = -Math.cos(OVERVIEW_YAW);
+    const rx = -fz;
+    const rz = fx;
+    let minR = Infinity;
+    let maxR = -Infinity;
+    let minF = Infinity;
+    let maxF = -Infinity;
+    for (const id of ids) {
+      const p = this.knights.get(id)?.pose;
+      if (!p || !p.alive) continue;
+      const r = p.x * rx + p.z * rz;
+      const f = p.x * fx + p.z * fz;
+      minR = Math.min(minR, r);
+      maxR = Math.max(maxR, r);
+      minF = Math.min(minF, f);
+      maxF = Math.max(maxF, f);
+    }
+    if (minR === Infinity) minR = maxR = minF = maxF = 0;
+    const margin = 2.6;
+    const cr = (minR + maxR) / 2;
+    const cf = (minF + maxF) / 2;
+    const center = new THREE.Vector3(cr * rx + cf * fx, 0.9, cr * rz + cf * fz);
+    // The distance that fits the spread across the screen (width) and along
+    // the view (height, foreshortened by looking down).
+    const pitch = OVERVIEW_PITCH;
+    const halfV = (cam.fov * Math.PI) / 360;
+    const halfH = Math.atan(Math.tan(halfV) * aspect);
+    const wide = (maxR - minR) / 2 + margin;
+    const deep = ((maxF - minF) / 2 + margin * 0.65) * Math.sin(pitch) + 0.8;
+    const minDist = 7;
+    const maxDist = ((ARENA_RADIUS + 2) / Math.tan(Math.min(halfH, halfV * 1.3))) * 0.95;
+    const want = Math.max(minDist, Math.min(maxDist, Math.max(wide / Math.tan(halfH), deep / Math.tan(halfV))));
+    if (!this.overDist) {
+      this.overAt.copy(center);
+      this.overDist = want;
+    } else {
+      this.overAt.lerp(center, 1 - Math.exp(-dt * 2.2));
+      this.overDist += (want - this.overDist) * (1 - Math.exp(-dt * 1.8));
+    }
+    // Keep the view's middle on the sand.
+    const lim = ARENA_RADIUS - 3;
+    const r = Math.hypot(this.overAt.x, this.overAt.z);
+    if (r > lim) this.overAt.multiplyScalar(lim / r);
+    const d = this.overDist;
+    cam.position.set(this.overAt.x - fx * d * Math.cos(pitch), this.overAt.y + d * Math.sin(pitch), this.overAt.z - fz * d * Math.cos(pitch));
+    cam.lookAt(this.overAt);
+    this.applyShake(cam, 0.5);
+    this.draw(cam, view, dt);
+  }
+
   dispose() {
+    for (const t of this.trails.values()) t.dispose();
     disposeTree(this.scene);
     disposeTree(this.handScene);
+    disposeKnightGeos(this.geos);
     this.bloom?.dispose();
     this.glow.dispose();
     this.renderer.dispose();
@@ -1470,17 +1136,4 @@ function mergeBoxes(a: THREE.BufferGeometry, b: THREE.BufferGeometry): THREE.Buf
   g.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
   g.setAttribute("color", new THREE.BufferAttribute(col, 3));
   return g;
-}
-
-function disposeTree(root: THREE.Object3D) {
-  root.traverse((o) => {
-    const m = o as THREE.Mesh;
-    m.geometry?.dispose();
-    const mats = m.material ? (Array.isArray(m.material) ? m.material : [m.material]) : [];
-    for (const mat of mats) {
-      const map = (mat as THREE.MeshBasicMaterial).map;
-      if (map && map.name !== "glow") map.dispose();
-      mat.dispose();
-    }
-  });
 }

@@ -868,6 +868,13 @@ export const GUIDES: Record<GameId, Guide> = {
           "Computadora: haz clic en la arena. WASD para moverte, mouse para mirar, Shift para correr, clic para atacar, clic derecho o F para bloquear, Q para esquivar, espacio para saltar, E para agarrar y V para cambiar la cámara.",
         ],
       },
+      {
+        title: "En pantalla grande",
+        text: [
+          "Al crear la sala, elige «En una pantalla grande»: el combate se ve en una computadora conectada a la tele o al proyector, y cada uno entra desde su celular con el código.",
+          "El celular es el control: joystick para moverte (empujarlo a fondo es correr), «Atacar» y «Bloquear» se mantienen apretados, y «Esquivar», «Saltar» y «Agarrar» se tocan. Tu caballero mira solo al rival más cercano, y el celular vibra cuando te pegan.",
+        ],
+      },
     ],
   },
   yonunca: {

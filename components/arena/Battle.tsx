@@ -22,6 +22,9 @@ import {
   startMatch,
   strike,
   subscribeArrows,
+  subscribePads,
+  NO_PAD,
+  type ArenaPad,
   subscribePoses,
   teamFighters,
   teamInfo,
@@ -58,7 +61,8 @@ import {
   type Gear,
   type Strike,
 } from "@/lib/arenaSim";
-import { ArenaScene, type ArenaCamera, type KnightPose } from "@/lib/arena3d";
+import { ArenaScene, OVERVIEW_YAW, type ArenaCamera, type KnightPose } from "@/lib/arena3d";
+import { padInput } from "@/lib/arenaPad";
 import { ArenaAudio } from "@/lib/arenaAudio";
 import { serverNow } from "@/lib/serverTime";
 import type { PresenceMap } from "@/lib/presence";
@@ -111,7 +115,13 @@ interface BotRun {
   lastT: number;
   pickAt: number;
   send: ReturnType<typeof openPose>;
+  /** Big screen: a person driven by their phone's pad (presses already used). */
+  remote?: { j: number; d: number; p: number };
 }
+
+/** Big screen: what a pose sender looks like when nobody needs the poses. */
+const NO_SEND = { send: () => {}, close: () => {} } as unknown as ReturnType<typeof openPose>;
+
 
 interface Hud {
   hp: number;
@@ -161,6 +171,7 @@ export default function Battle({
   myId,
   presence,
   presenceLoaded,
+  screen = false,
 }: {
   roomId: string;
   meta: ArenaMeta;
@@ -168,6 +179,12 @@ export default function Battle({
   myId: string;
   presence: PresenceMap;
   presenceLoaded: boolean;
+  /**
+   * Big screen (`/pantalla`): no fighter of its own; it runs everyone — people
+   * from their phones' pads (`subscribePads`), bots with their brain — decides
+   * the hits and shows the whole arena from above.
+   */
+  screen?: boolean;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -222,11 +239,15 @@ export default function Battle({
     const canvas = canvasRef.current;
     if (!canvas || !quality) return;
     const scene = new ArenaScene(canvas, { quality });
+    // On a TV the names are read from the couch.
+    if (screen) scene.setTagScale(1.8);
     const audio = audioRef.current;
     let poses: Record<string, ArenaPose> = {};
     let arrowsIn: Record<string, ArenaArrow> = {};
     const unsubPoses = subscribePoses(roomId, (p) => (poses = p));
     const unsubArrows = subscribeArrows(roomId, (a) => (arrowsIn = a));
+    let pads: Record<string, ArenaPad> = {};
+    const unsubPads = screen ? subscribePads(roomId, (p) => (pads = p)) : () => {};
 
     let frame = 0;
     let last = performance.now();
@@ -426,8 +447,9 @@ export default function Battle({
       const { presence: pres, presenceLoaded: loaded } = presenceRef.current;
       const people = Object.keys(pres).filter((id) => id in s.players).sort();
       // Only once I see myself in the room, so two phones never both run them.
-      const botHost = loaded && people[0] === myId;
-      const botIds = ids.filter(isBot);
+      // The big screen runs everyone: bots and the people on their pads.
+      const botHost = screen || (loaded && people[0] === myId);
+      const botIds = screen ? ids : ids.filter(isBot);
       if (botHost && s.status !== "waiting") {
         for (const id of botIds) {
           if (bots.has(id)) continue;
@@ -436,7 +458,16 @@ export default function Battle({
           const p = poses[id];
           const sp = spawnPoint(team, list.indexOf(id), list.length);
           const f = p && p.k === key ? new Fighter(p.x, p.z, p.yw) : new Fighter(sp.x, sp.z, sp.yaw);
-          bots.set(id, { f, mind: newMind(), actAt: now, lastT: 0, pickAt: 0, send: openPose(roomId, id, false) });
+          const pad = pads[id] ?? NO_PAD;
+          bots.set(id, {
+            f,
+            mind: newMind(),
+            actAt: now,
+            lastT: 0,
+            pickAt: 0,
+            send: screen ? NO_SEND : openPose(roomId, id, false),
+            remote: screen && !isBot(id) ? { j: pad.j, d: pad.d, p: pad.p } : undefined,
+          });
         }
       } else if (bots.size) {
         for (const run of bots.values()) run.send.close();
@@ -558,7 +589,9 @@ export default function Battle({
                 return { ...v, act: v.act as BotEnemy["act"], actAt: v.actAt, weapon: gearOf(s, o).w };
               });
             const items = Object.entries(s.items).map(([iid, it]) => ({ id: iid, ...it }));
-            const { input, pick } = botInput(run.f, gearOf(s, id), s.hp[id] ?? 0, run.mind, { enemies, items }, STEP, Math.random);
+            const { input, pick } = run.remote
+              ? padInput(run.f, run.remote, pads[id] ?? NO_PAD, gearOf(s, id), { enemies, items }, OVERVIEW_YAW, STEP)
+              : botInput(run.f, gearOf(s, id), s.hp[id] ?? 0, run.mind, { enemies, items }, STEP, Math.random);
             if (pick && performance.now() - run.pickAt > 800) {
               run.pickAt = performance.now();
               pickItem(roomId, key, id, pick, run.f.x, run.f.z).catch(console.error);
@@ -783,12 +816,13 @@ export default function Battle({
       feel.fov += (72 + (me?.sprinting ? 9 : 0) + (me?.act === "dodge" ? 12 : 0) - feel.fov) * fe;
       const camLook = follow === myId ? { ...look, roll: feel.roll, fov: feel.fov } : { yaw: fv?.yaw ?? 0, pitch: -0.2 };
       const mode: ArenaCamera = follow === myId && myAlive ? cameraRef.current : "tercera";
-      if (fv) {
+      if (fv && !screen) {
         earX = fv.x;
         earZ = fv.z;
         earYaw = camLook.yaw;
       }
-      scene.render(follow, mode, camLook, dt);
+      if (screen) scene.renderOverview(ids.filter((id) => alive(s, id)), dt);
+      else scene.render(follow, mode, camLook, dt);
 
       // HUD, ten times a second.
       if (t - hudAt > 100) {
@@ -820,12 +854,13 @@ export default function Battle({
       clearTimeout(healTimer);
       unsubPoses();
       unsubArrows();
+      unsubPads();
       mySend?.close();
       for (const run of bots.values()) run.send.close();
       for (const a of myArrows) a.down();
       scene.dispose();
     };
-  }, [roomId, myId, gameNo, fine, quality]);
+  }, [roomId, myId, gameNo, fine, quality, screen]);
 
   const now = clock || serverNow();
   const counting = state.status === "fighting" && now < state.startedAt;
@@ -861,8 +896,11 @@ export default function Battle({
         </div>
       )}
 
-      {/* Top bar: back, score and round, options. */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 p-2.5">
+      {/* Top bar: back, score and round, options (bigger on a TV). */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 p-2.5"
+        style={screen ? { zoom: 1.6 } : undefined}
+      >
         <div className="pointer-events-auto flex flex-col gap-1.5">
           <Link href="/" aria-label="Volver a Talo" className="w-fit rounded-xl bg-slate-950/60 p-2 backdrop-blur">
             <TaloMark className="h-5 w-5" />
@@ -888,9 +926,11 @@ export default function Battle({
               {sound === "on" ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </button>
             <QualityButton quality={quality} onToggle={toggleQuality} />
-            <button onClick={toggleCamera} className="flex items-center gap-1 rounded-xl bg-slate-950/60 px-2.5 py-2 text-xs text-white backdrop-blur">
-              <Eye className="h-4 w-4" /> {camera === "primera" ? "1ª persona" : "3ª persona"}
-            </button>
+            {!screen && (
+              <button onClick={toggleCamera} className="flex items-center gap-1 rounded-xl bg-slate-950/60 px-2.5 py-2 text-xs text-white backdrop-blur">
+                <Eye className="h-4 w-4" /> {camera === "primera" ? "1ª persona" : "3ª persona"}
+              </button>
+            )}
             <FullscreenButton className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur" />
           </div>
           <TeamBars state={state} team="blue" myId={myId} />
@@ -935,7 +975,7 @@ export default function Battle({
         </div>
       )}
 
-      {!fine && (
+      {!fine && !screen && (
         <p className="pointer-events-none absolute inset-x-0 top-24 z-20 hidden items-center justify-center gap-1.5 text-xs text-white drop-shadow portrait:flex">
           <RotateCw className="h-3.5 w-3.5" /> Gira el teléfono para pelear mejor
         </p>
@@ -956,7 +996,7 @@ export default function Battle({
       )}
 
       {/* Watching (fell, or not fighting this match). */}
-      {hud && !hud.alive && state.status === "fighting" && hud.watching && (
+      {!screen && hud && !hud.alive && state.status === "fighting" && hud.watching && (
         <div className="absolute inset-x-0 bottom-6 z-20 flex justify-center">
           <div className="flex items-center gap-2 rounded-xl bg-slate-950/75 px-4 py-2 text-sm text-white backdrop-blur">
             <span>

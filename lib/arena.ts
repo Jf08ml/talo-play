@@ -68,8 +68,15 @@ export interface ArenaMeta {
   potions: boolean;
   /** Health slowly comes back when nobody hits you for a while. */
   regen: boolean;
+  /**
+   * Where the fight is seen: each on their phone (default), or on a big
+   * screen (`/arena-medieval/{id}/pantalla`, the authority) with the phones as pads.
+   */
+  view: ArenaView;
   createdAt: number | object;
 }
+
+export type ArenaView = "telefono" | "pantalla";
 
 export interface ArenaPlayer {
   name: string;
@@ -179,6 +186,7 @@ export function normalizeMeta(raw: Partial<ArenaMeta>): ArenaMeta {
     bots: raw.bots ?? true,
     potions: raw.potions ?? true,
     regen: raw.regen ?? false,
+    view: raw.view === "pantalla" ? "pantalla" : "telefono",
     createdAt: raw.createdAt ?? 0,
   };
 }
@@ -249,7 +257,7 @@ function mutate(roomId: string, fn: (state: ArenaState) => ArenaState | null) {
   return transactState(statePath(roomId), normalizeState, fn);
 }
 
-export type ArenaSettings = Pick<ArenaMeta, "size" | "wins" | "bots" | "potions" | "regen">;
+export type ArenaSettings = Pick<ArenaMeta, "size" | "wins" | "bots" | "potions" | "regen" | "view">;
 
 export async function createArenaRoom(hostId: string, settings: ArenaSettings): Promise<string> {
   const roomId = generateRoomCode();
@@ -602,4 +610,41 @@ export function shootArrow(roomId: string, arrow: ArenaArrow): () => void {
 
 export function subscribeArrows(roomId: string, cb: (arrows: Record<string, ArenaArrow>) => void): Unsubscribe {
   return onValue(ref(getDb(), `${base(roomId)}/arrows`), (snap) => cb(snap.val() ?? {}));
+}
+
+// ---- Big screen: the phones' pads -----------------------------------------------
+
+/**
+ * A phone's pad on the big screen (`arena/input/{clientId}`): the stick as
+ * seen on the TV (x right, y up, −1…1), the buttons held (attack, block) and
+ * presses counted (jump, dodge, pick up), so a tap between two samples is
+ * never lost. The screen turns it into a fighter's input.
+ */
+export interface ArenaPad {
+  x: number;
+  y: number;
+  a: number;
+  b: number;
+  j: number;
+  d: number;
+  p: number;
+}
+
+export const NO_PAD: ArenaPad = { x: 0, y: 0, a: 0, b: 0, j: 0, d: 0, p: 0 };
+
+/** Where my pad goes; it's removed when the phone disconnects. */
+export function openPad(roomId: string, clientId: string) {
+  const r = ref(getDb(), `${base(roomId)}/input/${clientId}`);
+  onDisconnect(r).remove().catch(console.error);
+  return {
+    send: (pad: ArenaPad) => set(r, pad).catch(console.error),
+    close: () => {
+      onDisconnect(r).cancel().catch(console.error);
+      remove(r).catch(console.error);
+    },
+  };
+}
+
+export function subscribePads(roomId: string, cb: (pads: Record<string, ArenaPad>) => void): Unsubscribe {
+  return onValue(ref(getDb(), `${base(roomId)}/input`), (snap) => cb(snap.val() ?? {}));
 }
