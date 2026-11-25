@@ -148,8 +148,8 @@ function Waiting({ roomId, meta, state, presence }: { roomId: string; meta: Aren
             {people.length ? "¡A pelear!" : "Esperando jugadores…"}
           </button>
           <p className="text-center text-sm text-white/50">
-            En el celular: joystick para moverte (a fondo, corres) y botones para atacar, bloquear, esquivar, saltar y agarrar. Cada uno tiene su parte de la pantalla (hasta
-            4) y la cámara se fija en el rival que tienes cerca.
+            En el celular: joystick para moverte, arrastra el dedo a la derecha para mirar, y botones para atacar, bloquear, esquivar,
+            saltar y agarrar. Cada uno tiene su parte de la pantalla (hasta 4).
           </p>
         </div>
       </div>
