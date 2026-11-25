@@ -5,32 +5,32 @@ import { Keyboard, MonitorPlay, Shield, Swords } from "lucide-react";
 import { NO_PAD, openPad, teamInfo, type ArenaPad, type ArenaState } from "@/lib/arena";
 import { MAX_HP, WEAPONS } from "@/lib/arenaSim";
 import { useWakeLock } from "@/components/carreras/Controller";
+import { TOUCH_LOOK } from "./Controls";
 
 /**
- * The phone as Arena medieval's controller when the fight is on a big screen:
- * a stick on the left (it appears where the thumb lands; up = away from the
- * TV's camera) and buttons on the right — «Atacar» and «Bloquear» (held),
- * «Esquivar», «Saltar» and «Agarrar» (presses, counted so none is lost).
- * Shows my health and gear and vibrates when I'm hit. On a computer: WASD
- * or the arrows move, J attacks, K blocks, L dodges, space jumps, E picks up.
+ * The phone as Arena medieval's controller when the fight is on a big screen,
+ * played like on the phone itself: a stick on the left (it appears where the
+ * thumb lands; up = forward), and on the right a zone to drag and look
+ * around — the knight faces and strikes where its camera looks — with the
+ * buttons on it: «Atacar» and «Bloquear» (held), «Esquivar», «Saltar» and
+ * «Agarrar» (presses, counted so none is lost). Shows my health and gear and
+ * vibrates when I'm hit. On a computer: WASD move, the arrows look, J
+ * attacks, K blocks, L dodges, space jumps, E picks up.
  */
 
 const SEND_MS = 50;
 const STICK_R = 60;
 const DEAD = 0.12;
+/** Arrow keys turn the look this fast (rad/s). */
+const KEY_LOOK = 2.4;
 
 const MOVE_KEYS: Record<string, [number, number]> = {
-  arrowup: [0, 1],
   w: [0, 1],
-  arrowdown: [0, -1],
   s: [0, -1],
-  arrowleft: [-1, 0],
   a: [-1, 0],
-  arrowright: [1, 0],
   d: [1, 0],
 };
 
-/** Presses per room and player, kept while the page lives (the screen only reacts to counts going up). */
 /** Keeps the finger's events on this element (it can fail on synthetic or already-ended pointers). */
 function capture(e: ReactPointerEvent<HTMLElement>) {
   try {
@@ -38,7 +38,8 @@ function capture(e: ReactPointerEvent<HTMLElement>) {
   } catch {}
 }
 
-const counts = new Map<string, Pick<ArenaPad, "j" | "d" | "p">>();
+/** Presses and look per room and player, kept while the page lives (the screen only uses what changed). */
+const counts = new Map<string, Pick<ArenaPad, "j" | "d" | "p" | "lx" | "ly">>();
 
 export default function Pad({ roomId, clientId, state }: { roomId: string; clientId: string; state: ArenaState }) {
   useWakeLock();
@@ -50,6 +51,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
   const [stick, setStick] = useState<{ ox: number; oy: number; x: number; y: number } | null>(null);
   const [held, setHeld] = useState({ a: false, b: false });
   const stickId = useRef<number | null>(null);
+  const lookId = useRef<{ id: number; x: number; y: number } | null>(null);
 
   useEffect(() => {
     const p = openPad(roomId, clientId);
@@ -65,7 +67,8 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
   /** Changes the pad and sends it now if it's been long enough, else when the gap is over (always the latest). */
   const send = (patch: Partial<ArenaPad>, urgent = false) => {
     wire.current = { ...wire.current, ...patch };
-    counts.set(key, { j: wire.current.j, d: wire.current.d, p: wire.current.p });
+    const w = wire.current;
+    counts.set(key, { j: w.j, d: w.d, p: w.p, lx: w.lx, ly: w.ly });
     const go = () => {
       timer.current = null;
       lastAt.current = performance.now();
@@ -80,6 +83,10 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
     const len = Math.hypot(x, y);
     const k = len < DEAD ? 0 : Math.min(1, len) / len;
     send({ x: Math.round(x * k * 100) / 100, y: Math.round(y * k * 100) / 100 });
+  };
+  const turn = (dx: number, dy: number) => {
+    const w = wire.current;
+    send({ lx: Math.round((w.lx + dx) * 10000) / 10000, ly: Math.round((w.ly + dy) * 10000) / 10000 });
   };
   const hold = (b: "a" | "b", on: boolean) => {
     if (!!wire.current[b] === on) return;
@@ -101,9 +108,20 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
     lastHit.current = hitN;
   }, [hitN, hit]);
 
-  // Keyboard (computers).
+  // Keyboard (computers): WASD move, arrows look.
   useEffect(() => {
     const down = new Set<string>();
+    let frame = 0;
+    let last = performance.now();
+    const loop = (t: number) => {
+      frame = requestAnimationFrame(loop);
+      const dt = Math.min(0.1, (t - last) / 1000);
+      last = t;
+      const lx = (down.has("arrowright") ? 1 : 0) - (down.has("arrowleft") ? 1 : 0);
+      const ly = (down.has("arrowdown") ? 1 : 0) - (down.has("arrowup") ? 1 : 0);
+      if (lx || ly) turn(lx * KEY_LOOK * dt, ly * KEY_LOOK * 0.6 * dt);
+    };
+    frame = requestAnimationFrame(loop);
     const apply = () => {
       let x = 0;
       let y = 0;
@@ -125,7 +143,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
       if (!e.repeat && k === " ") press("j");
       else if (!e.repeat && k === "l") press("d");
       else if (!e.repeat && k === "e") press("p");
-      else if (!(k in MOVE_KEYS) && k !== "j" && k !== "k") return;
+      else if (!(k in MOVE_KEYS) && k !== "j" && k !== "k" && !k.startsWith("arrow")) return;
       e.preventDefault();
       down.add(k);
       apply();
@@ -141,6 +159,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
     window.addEventListener("keyup", onUp);
     window.addEventListener("blur", clear);
     return () => {
+      cancelAnimationFrame(frame);
       window.removeEventListener("keydown", onDown);
       window.removeEventListener("keyup", onUp);
       window.removeEventListener("blur", clear);
@@ -176,6 +195,23 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
     setMove(0, 0);
   };
 
+  // Look: drag anywhere on the right side (the buttons keep their own touches).
+  const lookDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (lookId.current) return;
+    lookId.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    capture(e);
+  };
+  const lookMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const l = lookId.current;
+    if (!l || e.pointerId !== l.id) return;
+    turn((e.clientX - l.x) * TOUCH_LOOK, (e.clientY - l.y) * TOUCH_LOOK);
+    l.x = e.clientX;
+    l.y = e.clientY;
+  };
+  const lookUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (lookId.current?.id === e.pointerId) lookId.current = null;
+  };
+
   const team = state.roster[clientId];
   const color = team ? teamInfo(team).color : "#94a3b8";
   const hp = state.hp[clientId] ?? 0;
@@ -185,6 +221,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
   const holdBtn = (b: "a" | "b") => ({
     onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
       e.preventDefault();
+      e.stopPropagation();
       capture(e);
       hold(b, true);
     },
@@ -195,6 +232,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
   const tap = (c: "j" | "d" | "p") => ({
     onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
       e.preventDefault();
+      e.stopPropagation();
       press(c);
     },
   });
@@ -254,44 +292,55 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
             ) : (
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-center text-white/40">
                 <span className="h-24 w-24 rounded-full border-2 border-dashed border-white/25" />
-                <span className="px-3 text-sm font-bold">Apoya el dedo y muévelo para caminar (a fondo: correr)</span>
+                <span className="px-3 text-sm font-bold">Moverte (a fondo hacia adelante: correr)</span>
               </div>
             )}
           </div>
 
-          <div className="flex w-[46%] max-w-64 flex-col gap-3">
-            <button
-              type="button"
-              {...holdBtn("a")}
-              className={`flex flex-[3] items-center justify-center rounded-[24px] border-[3px] border-talo-ink font-display text-2xl text-talo-ink transition-transform ${held.a ? "scale-95 brightness-110" : ""}`}
-              style={{ background: color }}
-            >
-              Atacar
-            </button>
-            <button
-              type="button"
-              {...holdBtn("b")}
-              className={`flex flex-[2] items-center justify-center gap-2 rounded-[24px] text-lg font-bold ${held.b ? "bg-white text-talo-ink" : "bg-white/[0.12] text-white"}`}
-            >
-              <Shield className="h-5 w-5" /> Bloquear
-            </button>
-            <div className="grid flex-[1.4] grid-cols-3 gap-2">
-              <button type="button" {...tap("d")} className="rounded-2xl bg-white/[0.12] text-sm font-bold active:bg-white/25">
-                Esquivar
-              </button>
-              <button type="button" {...tap("j")} className="rounded-2xl bg-white/[0.12] text-sm font-bold active:bg-white/25">
-                Saltar
-              </button>
-              <button type="button" {...tap("p")} className="rounded-2xl bg-talo-hero/90 text-sm font-bold text-talo-ink active:bg-talo-hero">
-                Agarrar
-              </button>
+          <div
+            onPointerDown={lookDown}
+            onPointerMove={lookMove}
+            onPointerUp={lookUp}
+            onPointerCancel={lookUp}
+            className="relative flex-1 overflow-hidden rounded-[24px] bg-white/[0.03] ring-1 ring-white/[0.08]"
+          >
+            <span className="pointer-events-none absolute left-4 top-3 text-sm font-bold text-white/35">Arrastra aquí para mirar</span>
+            <div className="absolute bottom-3 right-3 flex items-end gap-3">
+              <div className="flex flex-col gap-2">
+                <button type="button" {...tap("p")} className="h-12 w-20 rounded-2xl bg-talo-hero/90 text-sm font-bold text-talo-ink active:bg-talo-hero">
+                  Agarrar
+                </button>
+                <button type="button" {...tap("j")} className="h-12 w-20 rounded-2xl bg-white/[0.14] text-sm font-bold active:bg-white/25">
+                  Saltar
+                </button>
+                <button type="button" {...tap("d")} className="h-12 w-20 rounded-2xl bg-white/[0.14] text-sm font-bold active:bg-white/25">
+                  Esquivar
+                </button>
+              </div>
+              <div className="flex flex-col items-center gap-3">
+                <button
+                  type="button"
+                  {...holdBtn("b")}
+                  className={`flex h-16 w-24 items-center justify-center gap-1.5 rounded-2xl text-sm font-bold ${held.b ? "bg-white text-talo-ink" : "bg-white/[0.14] text-white"}`}
+                >
+                  <Shield className="h-4 w-4" /> Bloquear
+                </button>
+                <button
+                  type="button"
+                  {...holdBtn("a")}
+                  className={`flex h-28 w-28 items-center justify-center rounded-full border-[3px] border-talo-ink font-display text-xl text-talo-ink transition-transform ${held.a ? "scale-95 brightness-110" : ""}`}
+                  style={{ background: color }}
+                >
+                  Atacar
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
       <p className="pointer-events-none hidden items-center justify-center gap-1.5 text-xs text-white/40 [@media(hover:hover)_and_(pointer:fine)]:flex">
-        <Keyboard className="h-3.5 w-3.5" /> WASD moverte · J atacar · K bloquear · L esquivar · espacio saltar · E agarrar
+        <Keyboard className="h-3.5 w-3.5" /> WASD moverte · flechas mirar · J atacar · K bloquear · L esquivar · espacio saltar · E agarrar
       </p>
     </div>
   );

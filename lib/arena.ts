@@ -615,14 +615,17 @@ export function subscribeArrows(roomId: string, cb: (arrows: Record<string, Aren
 // ---- Big screen: the phones' pads -----------------------------------------------
 
 /**
- * A phone's pad on the big screen (`arena/input/{clientId}`): the stick as
- * seen on the TV (x right, y up, −1…1), the buttons held (attack, block) and
- * presses counted (jump, dodge, pick up), so a tap between two samples is
- * never lost. The screen turns it into a fighter's input.
+ * A phone's pad on the big screen (`arena/input/{clientId}`): the stick
+ * (x strafe, y forward, −1…1), the look dragged so far (`lx`/`ly`, radians,
+ * accumulated), the buttons held (attack, block) and presses counted (jump,
+ * dodge, pick up), so a tap between two samples is never lost. The screen
+ * turns it into a fighter's input (`lib/arenaPad.ts`).
  */
 export interface ArenaPad {
   x: number;
   y: number;
+  lx: number;
+  ly: number;
   a: number;
   b: number;
   j: number;
@@ -630,7 +633,7 @@ export interface ArenaPad {
   p: number;
 }
 
-export const NO_PAD: ArenaPad = { x: 0, y: 0, a: 0, b: 0, j: 0, d: 0, p: 0 };
+export const NO_PAD: ArenaPad = { x: 0, y: 0, lx: 0, ly: 0, a: 0, b: 0, j: 0, d: 0, p: 0 };
 
 /** Where my pad goes; it's removed when the phone disconnects. */
 export function openPad(roomId: string, clientId: string) {

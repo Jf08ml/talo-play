@@ -61,8 +61,8 @@ import {
   type Gear,
   type Strike,
 } from "@/lib/arenaSim";
-import { ArenaScene, OVERVIEW_YAW, type ArenaCamera, type KnightPose } from "@/lib/arena3d";
-import { padInput } from "@/lib/arenaPad";
+import { ArenaScene, type ArenaCamera, type KnightPose } from "@/lib/arena3d";
+import { newPadSeen, padInput, type PadSeen } from "@/lib/arenaPad";
 import { ArenaAudio } from "@/lib/arenaAudio";
 import { serverNow } from "@/lib/serverTime";
 import type { PresenceMap } from "@/lib/presence";
@@ -116,7 +116,7 @@ interface BotRun {
   pickAt: number;
   send: ReturnType<typeof openPose>;
   /** Big screen: a person driven by their phone's pad (presses already used). */
-  remote?: { j: number; d: number; p: number };
+  remote?: PadSeen;
 }
 
 /** Big screen, split: the views' rectangles (fractions, from the top-left) for 1–4 people. */
@@ -134,9 +134,6 @@ export function splitPeople(state: ArenaState): string[] {
     .sort((a, b) => (state.roster[a] === state.roster[b] ? a.localeCompare(b) : state.roster[a] === "red" ? -1 : 1));
   return people.length <= 4 ? people : [];
 }
-
-/** A rival this close is what the split camera looks at. */
-const LOCK_RANGE = 9;
 
 /** Big screen: what a pose sender looks like when nobody needs the poses. */
 const NO_SEND = { send: () => {}, close: () => {} } as unknown as ReturnType<typeof openPose>;
@@ -266,8 +263,6 @@ export default function Battle({
     const unsubPoses = subscribePoses(roomId, (p) => (poses = p));
     const unsubArrows = subscribeArrows(roomId, (a) => (arrowsIn = a));
     let pads: Record<string, ArenaPad> = {};
-    /** Split screen: each person's camera yaw (smoothed). */
-    const viewYaw = new Map<string, number>();
     const unsubPads = screen ? subscribePads(roomId, (p) => (pads = p)) : () => {};
 
     let frame = 0;
@@ -487,7 +482,7 @@ export default function Battle({
             lastT: 0,
             pickAt: 0,
             send: screen ? NO_SEND : openPose(roomId, id, false),
-            remote: screen && !isBot(id) ? { j: pad.j, d: pad.d, p: pad.p } : undefined,
+            remote: screen && !isBot(id) ? newPadSeen(pad, f.yaw) : undefined,
           });
         }
       } else if (bots.size) {
@@ -611,7 +606,7 @@ export default function Battle({
               });
             const items = Object.entries(s.items).map(([iid, it]) => ({ id: iid, ...it }));
             const { input, pick } = run.remote
-              ? padInput(run.f, run.remote, pads[id] ?? NO_PAD, gearOf(s, id), { enemies, items }, viewYaw.get(id) ?? OVERVIEW_YAW, STEP)
+              ? padInput(run.f, run.remote, pads[id] ?? NO_PAD, { enemies, items })
               : botInput(run.f, gearOf(s, id), s.hp[id] ?? 0, run.mind, { enemies, items }, STEP, Math.random);
             if (pick && performance.now() - run.pickAt > 800) {
               run.pickAt = performance.now();
@@ -850,34 +845,15 @@ export default function Battle({
           scene.setTagScale(wantTags);
         }
         if (!views.length) {
-          for (const id of ids) viewYaw.delete(id);
           scene.renderOverview(ids.filter((id) => alive(s, id)), dt);
         } else {
           const rects = splitRects(views.length);
           scene.renderSplit(
             views.map((id, i) => {
-              // Look at the nearest standing rival when there's one at hand (lock-on), else slowly behind where it faces.
+              // Where each person looks (their drags), or the fighter's facing until their run starts.
+              const look = bots.get(id)?.remote;
               const v = viewOf(s, id);
-              let target = v.yaw;
-              let rate = 1.8;
-              let best = LOCK_RANGE;
-              for (const o of ids) {
-                if (s.roster[o] === s.roster[id] || !alive(s, o)) continue;
-                const ov = viewOf(s, o);
-                const d = Math.hypot(ov.x - v.x, ov.z - v.z);
-                if (d < best && v.alive) {
-                  best = d;
-                  target = Math.atan2(-(ov.x - v.x), -(ov.z - v.z));
-                  rate = 6;
-                }
-              }
-              const cur = viewYaw.get(id) ?? v.yaw;
-              let diff = target - cur;
-              while (diff > Math.PI) diff -= Math.PI * 2;
-              while (diff < -Math.PI) diff += Math.PI * 2;
-              const yaw = cur + diff * (1 - Math.exp(-dt * rate));
-              viewYaw.set(id, yaw);
-              return { id, yaw, rect: rects[i] };
+              return { id, yaw: look?.yaw ?? v.yaw, pitch: look?.pitch ?? 0, rect: rects[i] };
             }),
             dt
           );

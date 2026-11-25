@@ -1115,7 +1115,7 @@ export class ArenaScene {
    * along `yaw`. The scene advances once; no bloom (it works on the whole
    * canvas), shadows and the rest as usual.
    */
-  renderSplit(views: { id: string; yaw: number; rect: [number, number, number, number] }[], dt: number) {
+  renderSplit(views: { id: string; yaw: number; pitch?: number; rect: [number, number, number, number] }[], dt: number) {
     const view = this.fit();
     if (!view) return;
     this.update(dt);
@@ -1142,23 +1142,29 @@ export class ArenaScene {
       }
       const p = this.knights.get(v.id)?.pose;
       if (p) {
-        const back = p.alive ? 3.6 : 5;
+        // Over the right shoulder, like third person on the phone, tilting with the look.
+        const back = p.alive ? 3.4 : 5;
+        const pitch = Math.max(-0.6, Math.min(0.8, v.pitch ?? 0));
         const fx = -Math.sin(v.yaw);
         const fz = -Math.cos(v.yaw);
         const rx = Math.cos(v.yaw);
         const rz = -Math.sin(v.yaw);
-        const eye = new THREE.Vector3(p.x, p.y + EYE_HEIGHT + 0.2, p.z);
-        const want = new THREE.Vector3(eye.x - fx * back + rx * 0.55, eye.y + 0.9, eye.z - fz * back + rz * 0.55);
+        const eye = new THREE.Vector3(p.x, p.y + EYE_HEIGHT + 0.25, p.z);
+        const want = new THREE.Vector3(
+          eye.x - fx * back * Math.cos(pitch) + rx * 0.6,
+          eye.y + 0.45 + Math.sin(pitch) * back,
+          eye.z - fz * back * Math.cos(pitch) + rz * 0.6
+        );
         const r = Math.hypot(want.x, want.z);
         if (r > ARENA_RADIUS - 0.4) {
           want.x *= (ARENA_RADIUS - 0.4) / r;
           want.z *= (ARENA_RADIUS - 0.4) / r;
         }
         if (!slot.ready) slot.pos.copy(want);
-        else slot.pos.lerp(want, 1 - Math.exp(-dt * 10));
+        else slot.pos.lerp(want, 1 - Math.exp(-dt * 16));
         slot.ready = true;
         cam.position.copy(slot.pos);
-        cam.lookAt(eye.x + fx * 5, eye.y - 0.35, eye.z + fz * 5);
+        cam.lookAt(eye.x + fx * 6 * Math.cos(pitch), eye.y - Math.sin(pitch) * 6 + 0.1, eye.z + fz * 6 * Math.cos(pitch));
       } else {
         cam.position.set(0, 12, 16);
         cam.lookAt(0, 1, 0);

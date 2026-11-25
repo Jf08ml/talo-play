@@ -1,60 +1,45 @@
-import { PICK_RADIUS, WEAPONS, forward, type BotWorld, type Fighter, type FighterInput, type Gear } from "./arenaSim";
+import { PICK_RADIUS, type BotWorld, type Fighter, type FighterInput } from "./arenaSim";
 import type { ArenaPad } from "./arena";
 
 /**
- * Big screen: turns a phone's pad into a fighter's input. The stick is as seen
- * on the TV (`camYaw` is where the camera looks), so "up" walks away from the
- * camera. Nobody can aim with a mouse here, so the fighter turns by itself:
- * toward the nearest standing rival while attacking, blocking or close to one,
- * otherwise toward where it walks. Presses (jump, dodge, pick) are counters;
- * `seen` keeps the last ones used.
+ * Big screen: turns a phone's pad into a fighter's input, like playing on the
+ * phone itself — the player aims: dragging on the pad's right side turns the
+ * look (`lx`/`ly`, accumulated radians), the fighter faces and strikes where
+ * it looks, and the stick walks relative to that (up = forward, sideways =
+ * strafe). Presses (jump, dodge, pick) are counters. `seen` keeps what was
+ * already used and the look itself.
  */
 
-/** Turn rate when aiming for the player (rad/s). */
-const TURN = 11;
-/** A rival this close is faced even without attacking. */
-const FACE_RANGE = 4.5;
+export interface PadSeen {
+  j: number;
+  d: number;
+  p: number;
+  lx: number;
+  ly: number;
+  /** Where this fighter looks (yaw, pitch), built from the drags. */
+  yaw: number;
+  pitch: number;
+}
 
-const yawToward = (dx: number, dz: number) => Math.atan2(-dx, -dz);
+/** A jump in the accumulated look this big is a reloaded phone, not a drag. */
+const LOOK_RESET = 6;
 
-export function padInput(
-  f: Fighter,
-  seen: { j: number; d: number; p: number },
-  pad: ArenaPad,
-  gear: Gear,
-  world: BotWorld,
-  camYaw: number,
-  dt: number
-): { input: FighterInput; pick: string | null } {
-  const [cfx, cfz] = forward(camYaw);
-  const crx = -cfz;
-  const crz = cfx;
-  const jx = Math.max(-1, Math.min(1, pad.x || 0));
-  const jy = Math.max(-1, Math.min(1, pad.y || 0));
-  const mag = Math.min(1, Math.hypot(jx, jy));
-  const wx = cfx * jy + crx * jx;
-  const wz = cfz * jy + crz * jx;
+export function newPadSeen(pad: ArenaPad, yaw: number): PadSeen {
+  return { j: pad.j || 0, d: pad.d || 0, p: pad.p || 0, lx: pad.lx || 0, ly: pad.ly || 0, yaw, pitch: 0 };
+}
 
-  let nearest: { x: number; z: number; d: number } | null = null;
-  for (const e of world.enemies) {
-    if (!e.alive) continue;
-    const d = Math.hypot(e.x - f.x, e.z - f.z);
-    if (!nearest || d < nearest.d) nearest = { x: e.x, z: e.z, d };
-  }
+export function padInput(f: Fighter, seen: PadSeen, pad: ArenaPad, world: BotWorld): { input: FighterInput; pick: string | null } {
+  // Look: apply what was dragged since the last step.
+  const dlx = (pad.lx || 0) - seen.lx;
+  const dly = (pad.ly || 0) - seen.ly;
+  if (Math.abs(dlx) < LOOK_RESET) seen.yaw -= dlx;
+  if (Math.abs(dly) < LOOK_RESET) seen.pitch = Math.max(-1.2, Math.min(1.2, seen.pitch - dly));
+  seen.lx = pad.lx || 0;
+  seen.ly = pad.ly || 0;
 
-  let target = f.yaw;
-  const fighting = !!pad.a || !!pad.b || (WEAPONS[gear.w].ranged && !!pad.a);
-  if (nearest && (fighting || nearest.d < FACE_RANGE)) target = yawToward(nearest.x - f.x, nearest.z - f.z);
-  else if (mag > 0.2) target = yawToward(wx, wz);
-  let diff = target - f.yaw;
-  while (diff > Math.PI) diff -= Math.PI * 2;
-  while (diff < -Math.PI) diff += Math.PI * 2;
-  const yaw = f.yaw + Math.max(-TURN * dt, Math.min(TURN * dt, diff));
-
-  // The world move, in the fighter's own strafe/forward.
-  const [fx, fz] = forward(yaw);
-  const mz = wx * fx + wz * fz;
-  const mx = wx * -fz + wz * fx;
+  const mx = Math.max(-1, Math.min(1, pad.x || 0));
+  const mz = Math.max(-1, Math.min(1, pad.y || 0));
+  const mag = Math.min(1, Math.hypot(mx, mz));
 
   // Presses since the last step (a reloaded phone starts its counters again).
   for (const k of ["j", "d", "p"] as const) if ((pad[k] || 0) < seen[k]) seen[k] = pad[k] || 0;
@@ -78,7 +63,18 @@ export function padInput(
   }
 
   return {
-    input: { mx, mz, yaw, pitch: 0, jump, attack: !!pad.a, block: !!pad.b, sprint: mag > 0.95 && !pad.a && !pad.b, dodge },
+    input: {
+      mx,
+      mz,
+      yaw: seen.yaw,
+      pitch: seen.pitch,
+      jump,
+      attack: !!pad.a,
+      block: !!pad.b,
+      // Like on the phone: pushing the stick all the way forward runs.
+      sprint: mz > 0.6 && mag > 0.92 && !pad.a && !pad.b,
+      dodge,
+    },
     pick,
   };
 }
