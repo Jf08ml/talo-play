@@ -333,7 +333,7 @@
       "$client": {
         "$tab": {
           ".write": "$client.length <= 32 && $tab.length <= 12",
-          ".validate": "newData.val() == true"
+          ".validate": "newData.val() == true || (newData.isNumber() && newData.val() <= now + 60000)"
         }
       }
     },

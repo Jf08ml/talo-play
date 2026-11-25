@@ -335,22 +335,70 @@ export function subscribeCall(room: string, cb: (call: { by: string; at: number 
 
 // ---- Who's on Talo right now (every page, with or without an account) ------------
 
+/** A visible tab rewrites its time this often. */
+const ONLINE_BEAT_MS = 2 * 60_000;
+/** A tab not rewritten for this long (hidden, asleep, forgotten) isn't counted. */
+const ONLINE_STALE_MS = 5 * 60_000;
+/** A tab hidden this long takes itself off the list. */
+const ONLINE_HIDDEN_MS = ONLINE_STALE_MS;
+
 /**
- * Marks this tab as on Talo: `online/{clientId}/{tab}` = true, removed on
- * disconnect. Keyed by player first, so several tabs count as one person.
+ * Marks this tab as on Talo while it's on screen: `online/{clientId}/{tab}` =
+ * server time, rewritten every `ONLINE_BEAT_MS` while visible and removed on
+ * disconnect or after `ONLINE_HIDDEN_MS` hidden. A tab left open in the
+ * background keeps its connection, so without the time it would count forever.
+ * Keyed by player first, so several tabs count as one person.
  */
 export function trackOnline(clientId: string): () => void {
   const tab = Math.random().toString(36).slice(2, 10);
   const r = ref(db(), `online/${clientId}/${tab}`);
   onDisconnect(r).remove().catch(() => {});
-  set(r, true).catch(() => {});
+  let beat: ReturnType<typeof setInterval> | undefined;
+  let away: ReturnType<typeof setTimeout> | undefined;
+  const write = () => set(r, serverTimestamp()).catch(() => {});
+  const onVisibility = () => {
+    clearInterval(beat);
+    clearTimeout(away);
+    if (document.visibilityState === "visible") {
+      write();
+      beat = setInterval(write, ONLINE_BEAT_MS);
+    } else {
+      away = setTimeout(() => remove(r).catch(() => {}), ONLINE_HIDDEN_MS);
+    }
+  };
+  onVisibility();
+  document.addEventListener("visibilitychange", onVisibility);
   return () => {
+    document.removeEventListener("visibilitychange", onVisibility);
+    clearInterval(beat);
+    clearTimeout(away);
     onDisconnect(r).cancel().catch(() => {});
     remove(r).catch(() => {});
   };
 }
 
-/** How many people have Talo open right now. */
+/**
+ * How many people have Talo on screen right now: players with a tab written
+ * in the last `ONLINE_STALE_MS` (old clients' `true` doesn't count).
+ * Rechecked every half minute, since tabs go stale without any write.
+ */
 export function subscribeActive(cb: (count: number) => void): Unsubscribe {
-  return onValue(ref(db(), "online"), (snap) => cb(snap.size));
+  let data: Record<string, Record<string, unknown>> = {};
+  const emit = () => {
+    const now = serverNow();
+    let count = 0;
+    for (const tabs of Object.values(data)) {
+      if (tabs && Object.values(tabs).some((t) => typeof t === "number" && now - t < ONLINE_STALE_MS)) count++;
+    }
+    cb(count);
+  };
+  const off = onValue(ref(db(), "online"), (snap) => {
+    data = (snap.val() as typeof data | null) ?? {};
+    emit();
+  });
+  const timer = setInterval(emit, 30_000);
+  return () => {
+    off();
+    clearInterval(timer);
+  };
 }
