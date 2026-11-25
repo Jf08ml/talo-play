@@ -16,26 +16,38 @@ export interface PadSeen {
   p: number;
   lx: number;
   ly: number;
-  /** Where this fighter looks (yaw, pitch), built from the drags. */
+  /**
+   * Where this fighter looks (yaw, pitch): `aimYaw`/`aimPitch` follow the
+   * drags as they arrive (in bursts, over the network), and `yaw`/`pitch`
+   * glide after them every step, so the knight and its camera turn smoothly.
+   */
   yaw: number;
   pitch: number;
+  aimYaw: number;
+  aimPitch: number;
 }
+
+/** How fast the look glides to where it was dragged (1/s): high enough to feel direct, low enough to hide the bursts. */
+const LOOK_GLIDE = 22;
 
 /** A jump in the accumulated look this big is a reloaded phone, not a drag. */
 const LOOK_RESET = 6;
 
 export function newPadSeen(pad: ArenaPad, yaw: number): PadSeen {
-  return { j: pad.j || 0, d: pad.d || 0, p: pad.p || 0, lx: pad.lx || 0, ly: pad.ly || 0, yaw, pitch: 0 };
+  return { j: pad.j || 0, d: pad.d || 0, p: pad.p || 0, lx: pad.lx || 0, ly: pad.ly || 0, yaw, pitch: 0, aimYaw: yaw, aimPitch: 0 };
 }
 
-export function padInput(f: Fighter, seen: PadSeen, pad: ArenaPad, world: BotWorld): { input: FighterInput; pick: string | null } {
-  // Look: apply what was dragged since the last step.
+export function padInput(f: Fighter, seen: PadSeen, pad: ArenaPad, world: BotWorld, dt: number): { input: FighterInput; pick: string | null } {
+  // Look: take what was dragged since the last step, then glide toward it.
   const dlx = (pad.lx || 0) - seen.lx;
   const dly = (pad.ly || 0) - seen.ly;
-  if (Math.abs(dlx) < LOOK_RESET) seen.yaw -= dlx;
-  if (Math.abs(dly) < LOOK_RESET) seen.pitch = Math.max(-1.2, Math.min(1.2, seen.pitch - dly));
+  if (Math.abs(dlx) < LOOK_RESET) seen.aimYaw -= dlx;
+  if (Math.abs(dly) < LOOK_RESET) seen.aimPitch = Math.max(-1.2, Math.min(1.2, seen.aimPitch - dly));
   seen.lx = pad.lx || 0;
   seen.ly = pad.ly || 0;
+  const k = 1 - Math.exp(-dt * LOOK_GLIDE);
+  seen.yaw += (seen.aimYaw - seen.yaw) * k;
+  seen.pitch += (seen.aimPitch - seen.pitch) * k;
 
   const mx = Math.max(-1, Math.min(1, pad.x || 0));
   const mz = Math.max(-1, Math.min(1, pad.y || 0));

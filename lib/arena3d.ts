@@ -1161,7 +1161,8 @@ export class ArenaScene {
           want.z *= (ARENA_RADIUS - 0.4) / r;
         }
         if (!slot.ready) slot.pos.copy(want);
-        else slot.pos.lerp(want, 1 - Math.exp(-dt * 16));
+        // Close behind: the look already glides, so the camera only softens bumps.
+        else slot.pos.lerp(want, 1 - Math.exp(-dt * 30));
         slot.ready = true;
         cam.position.copy(slot.pos);
         cam.lookAt(eye.x + fx * 6 * Math.cos(pitch), eye.y - Math.sin(pitch) * 6 + 0.1, eye.z + fz * 6 * Math.cos(pitch));

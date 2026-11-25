@@ -606,7 +606,7 @@ export default function Battle({
               });
             const items = Object.entries(s.items).map(([iid, it]) => ({ id: iid, ...it }));
             const { input, pick } = run.remote
-              ? padInput(run.f, run.remote, pads[id] ?? NO_PAD, { enemies, items })
+              ? padInput(run.f, run.remote, pads[id] ?? NO_PAD, { enemies, items }, STEP)
               : botInput(run.f, gearOf(s, id), s.hp[id] ?? 0, run.mind, { enemies, items }, STEP, Math.random);
             if (pick && performance.now() - run.pickAt > 800) {
               run.pickAt = performance.now();

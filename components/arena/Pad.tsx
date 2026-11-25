@@ -18,7 +18,8 @@ import { TOUCH_LOOK } from "./Controls";
  * attacks, K blocks, L dodges, space jumps, E picks up.
  */
 
-const SEND_MS = 50;
+/** ~30 a second: the look feels direct on the TV without flooding the database. */
+const SEND_MS = 33;
 const STICK_R = 60;
 const DEAD = 0.12;
 /** Arrow keys turn the look this fast (rad/s). */
