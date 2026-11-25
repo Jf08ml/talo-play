@@ -12,6 +12,7 @@ import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import JoinRoomForm from "@/components/JoinRoomForm";
 import PlazaBanner from "@/components/PlazaBanner";
 import QuickPlay from "@/components/QuickPlay";
+import InstallButton from "@/components/InstallButton";
 import OpenRoomsList from "@/components/OpenRoomsList";
 import { shelfLanding } from "@/lib/landings";
 import PlayerIdentity from "@/components/PlayerIdentity";
@@ -111,6 +112,7 @@ export default function HomeClient() {
       <div className="mx-auto max-w-[1360px] px-5 pt-8 sm:px-10 sm:pt-14">
         <PlazaBanner />
         <OpenRoomsList where="inicio" limit={6} title="Salas abiertas ahora" className="mt-6" />
+        <InstallButton card className="mt-6" />
       </div>
 
       {/* JUEGOS NUEVOS: only while something came out in the last weeks (lib/newGames.ts). */}

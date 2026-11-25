@@ -135,6 +135,20 @@
         }
       }
     },
+    "push": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || root.child('friends').child($uid).child(auth.uid).exists() || root.child('requests').child($uid).child(auth.uid).exists())",
+        ".write": "auth != null && auth.uid == $uid",
+        "$key": {
+          ".validate": "!newData.exists() || ($key.length <= 32 && newData.hasChildren(['endpoint', 'p256dh', 'auth', 'at']))",
+          "endpoint": { ".validate": "newData.isString() && newData.val().beginsWith('https://') && newData.val().length <= 1000" },
+          "p256dh": { ".validate": "newData.isString() && newData.val().length <= 200" },
+          "auth": { ".validate": "newData.isString() && newData.val().length <= 100" },
+          "at": { ".validate": "newData.isNumber()" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
     "invites": {
       "$to": {
         ".read": "auth != null && auth.uid == $to",

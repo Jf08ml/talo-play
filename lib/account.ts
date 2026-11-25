@@ -26,6 +26,7 @@ import { getAuthInstance, getDb } from "./firebase";
 import { generateRoomCode } from "./ids";
 import { dropAccountIdentity } from "@/hooks/useClientIdentity";
 import type { GameId } from "./games";
+import { notify } from "./push";
 
 /**
  * Accounts and friends (optional: playing never needs one). Signing in is
@@ -176,15 +177,17 @@ export async function addFriendByCode(me: string, rawCode: string): Promise<AddR
   }
   if ((await get(ref(db(), `requests/${other}/${me}`))).exists()) return "already";
   await set(ref(db(), `requests/${other}/${me}`), { at: serverTimestamp() });
+  notify("request", other);
   return "sent";
 }
 
-export function acceptRequest(me: string, from: string) {
-  return update(ref(db()), {
+export async function acceptRequest(me: string, from: string) {
+  await update(ref(db()), {
     [`friends/${me}/${from}`]: true,
     [`friends/${from}/${me}`]: true,
     [`requests/${me}/${from}`]: null,
   });
+  notify("accepted", from);
 }
 
 export function declineRequest(me: string, from: string) {
@@ -270,8 +273,8 @@ export function setActivity(room: string | null, game?: GameId) {
 
 // ---- Invites ---------------------------------------------------------------------
 
-export function sendInvite(me: string, from: { name: string; clientId: string }, to: string, room: string, game: GameId) {
-  return push(ref(db(), `invites/${to}`), {
+export async function sendInvite(me: string, from: { name: string; clientId: string }, to: string, room: string, game: GameId) {
+  await push(ref(db(), `invites/${to}`), {
     from: me,
     name: from.name.slice(0, 24),
     clientId: from.clientId,
@@ -279,6 +282,7 @@ export function sendInvite(me: string, from: { name: string; clientId: string },
     game,
     at: serverTimestamp(),
   });
+  notify("invite", to, { room, game });
 }
 
 export function subscribeInvites(me: string, cb: (invites: Invite[]) => void): Unsubscribe {

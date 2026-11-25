@@ -1,5 +1,6 @@
 import { limitToLast, onValue, push, query, ref, serverTimestamp, set, type Unsubscribe } from "firebase/database";
 import { getDb } from "./firebase";
+import { notify } from "./push";
 
 /**
  * Chats between friends (`/amigos`): `dms/{a}/{b}/{pushId}` with the two uids
@@ -36,7 +37,7 @@ export function subscribeDm(me: string, other: string, cb: (messages: DirectMess
 export function sendDm(me: string, other: string, text: string) {
   const clean = text.trim().slice(0, DM_MAX_CHARS);
   if (!clean) return Promise.resolve();
-  return push(ref(getDb(), `dms/${pair(me, other)}`), { from: me, text: clean, at: serverTimestamp() });
+  return push(ref(getDb(), `dms/${pair(me, other)}`), { from: me, text: clean, at: serverTimestamp() }).then(() => notify("dm", other, { text: clean }));
 }
 
 export function markSeen(me: string, other: string) {

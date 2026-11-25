@@ -7,6 +7,7 @@ import AccountProvider from "@/components/AccountProvider";
 import PageViews from "@/components/PageViews";
 import PlazaProvider from "@/components/PlazaProvider";
 import ZoomGuard from "@/components/ZoomGuard";
+import ServiceWorker from "@/components/ServiceWorker";
 import "./globals.css";
 
 // Talo's type (talo-handoff/tokens.css): Albert Sans for text and UI, Dela
@@ -89,6 +90,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <VoiceKeeper />
         <PageViews />
         <ZoomGuard />
+        <ServiceWorker />
       </body>
       {process.env.NODE_ENV === "production" && GA_ID && <GoogleAnalytics gaId={GA_ID} />}
     </html>

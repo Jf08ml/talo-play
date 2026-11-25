@@ -19,6 +19,8 @@ import { countDailyRoom } from "./dailyStats";
  * - `plaza_message` / `plaza_call` / `plaza_join`: a message in the Plaza (`kind`: frase / texto), a waiting room asking it for players, someone joining a room from it.
  * - `open_room_join`: someone entered a room from a list of open rooms (`where`: inicio / lobby / plaza).
  * - `page_not_found`: a 404 (`path` = the broken URL).
+ * - `install_app`: the «Instalar Talo» button (`step`: prompt / ios / accepted).
+ * - `push_toggle`: notifications turned on or off on a device.
  * - `quick_play`: a game picked in the home's «Jugar ya» (`random` = from «Sorpréndeme»).
  *
  * `create_room` also counts the room in our own per-day stats (lib/dailyStats.ts).
@@ -42,6 +44,8 @@ type Events = {
   plaza_open: { where: "boton" | "inicio" | "sala" | "link" };
   page_not_found: { path: string };
   quick_play: { game: GameId; random: boolean };
+  install_app: { step: "prompt" | "ios" | "accepted" };
+  push_toggle: { on: boolean };
 };
 
 export function trackEvent<E extends keyof Events>(name: E, params: Events[E]): void {

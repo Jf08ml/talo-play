@@ -11,6 +11,7 @@ import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import NamePrompt from "@/components/NamePrompt";
 import { Talo } from "@/components/Talo";
 import { SignInButton } from "@/components/FriendInvite";
+import PushCard from "@/components/PushCard";
 import { statusLabel, useAccount, useFriends, type Friend } from "@/components/AccountProvider";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import {
@@ -126,6 +127,7 @@ function SignedIn({
       <div className="flex min-w-0 flex-col gap-4 sm:gap-6">
         <ProfileCard profile={profile} />
         <AddFriend uid={uid} initialCode={initialCode} />
+        <PushCard uid={uid} />
       </div>
       <div className="flex min-w-0 flex-col gap-4 sm:gap-6">
         {requests.length > 0 && (
