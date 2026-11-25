@@ -2,7 +2,7 @@ import { ref, get, onValue, serverTimestamp, update, type Unsubscribe } from "fi
 import { getDb } from "./firebase";
 import { generateRoomCode } from "./ids";
 import { transactState } from "./transact";
-import { BOT_ID, botPlayer, normalizeBotLevel, type BotLevel } from "./boardBot";
+import { normalizeBotFields, onlineSeats, type BotLevel, type Opponent } from "./boardBot";
 
 /**
  * 4 en línea. Two seats (`a` red, `b` yellow); everyone else in the room
@@ -26,8 +26,8 @@ export interface CuatroMeta {
   game: "cuatro";
   /** Who created the room: starts the game (anyone can if they're away). */
   hostId?: string;
-  /** "Contra la app": the creator against the computer (`BOT_ID` in seat b). */
-  botLevel?: BotLevel;
+  /** Made by «Jugar en línea» (against a person or, unknown to them, a bot). */
+  online?: boolean;
   createdAt: number | object;
 }
 
@@ -51,8 +51,10 @@ export interface CuatroState {
   winner: Disc | "draw" | "";
   /** Games won per client id, across rematches. */
   wins: Record<string, number>;
-  /** Set in rooms against the computer; "" otherwise. */
+  /** «Jugar en línea»: the bot's id and level ("" against a person); see lib/boardBot.ts. */
+  botId: string;
   botLevel: BotLevel | "";
+  online: boolean;
 }
 
 export function emptyCells(): string {
@@ -72,7 +74,7 @@ function normalizeState(raw: Partial<CuatroState> | null): CuatroState | null {
     lastMove: raw.lastMove ?? -1,
     winner: raw.winner ?? "",
     wins: raw.wins ?? {},
-    botLevel: normalizeBotLevel(raw.botLevel),
+    ...normalizeBotFields(raw),
   };
 }
 
@@ -140,12 +142,12 @@ function mutate(roomId: string, fn: (state: CuatroState) => CuatroState | null) 
   return transactState(statePath(roomId), normalizeState, fn);
 }
 
-/** With `botLevel`, a room against the computer that starts at once (the creator plays red and starts). */
-export async function createCuatroRoom(hostId: string, botLevel?: BotLevel): Promise<string> {
+/** With `vs`, a «Jugar en línea» room: both seated (colors at random) and playing at once. */
+export async function createCuatroRoom(hostId: string, vs?: Opponent): Promise<string> {
   const roomId = generateRoomCode();
-  const meta: CuatroMeta = { game: "cuatro", hostId, createdAt: serverTimestamp(), ...(botLevel ? { botLevel } : {}) };
-  const state: Partial<CuatroState> = botLevel
-    ? { status: "playing", gameNo: 0, cells: emptyCells(), turn: "a", starter: "a", lastMove: -1, botLevel, seats: { a: hostId, b: BOT_ID }, players: { [BOT_ID]: botPlayer(botLevel) } }
+  const meta: CuatroMeta = { game: "cuatro", hostId, createdAt: serverTimestamp(), ...(vs ? { online: true } : {}) };
+  const state: Partial<CuatroState> = vs
+    ? { status: "playing", gameNo: 0, cells: emptyCells(), turn: "a", starter: "a", lastMove: -1, ...onlineSeats(hostId, vs) }
     : { status: "waiting", gameNo: 0, cells: emptyCells(), turn: "a", starter: "a" };
   await update(ref(getDb()), {
     [`rooms/${roomId}/meta`]: meta,

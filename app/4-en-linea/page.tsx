@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { createCuatroRoom } from "@/lib/cuatro";
 import { roomPath } from "@/lib/games";
 import GameLobby from "@/components/GameLobby";
-import VsBotTabs from "@/components/VsBotTabs";
+import OnlineTabs from "@/components/OnlineTabs";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 
@@ -33,10 +33,10 @@ export default function CuatroHome() {
 
   return (
     <GameLobby game="cuatro">
-      <VsBotTabs
+      <OnlineTabs
         game="cuatro"
-        text="Tú con las rojas, la computadora con las amarillas. En cada revancha empieza el otro."
-        create={(hostId, level) => createCuatroRoom(hostId, level)}
+        text="Te emparejamos al momento con alguien que también quiere jugar. En cada revancha empieza el otro."
+        create={(hostId, vs) => createCuatroRoom(hostId, vs)}
         friends={
           <form
             onSubmit={handleCreate}

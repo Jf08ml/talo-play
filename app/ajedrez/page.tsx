@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { createAjedrezRoom } from "@/lib/ajedrez";
 import { roomPath } from "@/lib/games";
 import GameLobby from "@/components/GameLobby";
-import VsBotTabs from "@/components/VsBotTabs";
+import OnlineTabs from "@/components/OnlineTabs";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 
@@ -33,10 +33,10 @@ export default function AjedrezHome() {
 
   return (
     <GameLobby game="ajedrez">
-      <VsBotTabs
+      <OnlineTabs
         game="ajedrez"
-        text="Tú con las blancas y empiezas. En fácil se equivoca seguido; en difícil piensa varias jugadas y no regala piezas. En cada revancha se cambian los colores."
-        create={(hostId, level) => createAjedrezRoom(hostId, level)}
+        text="Te emparejamos al momento con alguien que también quiere jugar. Los colores se sortean y en cada revancha se cambian."
+        create={(hostId, vs) => createAjedrezRoom(hostId, vs)}
         friends={
           <form
             onSubmit={handleCreate}

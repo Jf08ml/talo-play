@@ -2,7 +2,7 @@ import { ref, get, onValue, serverTimestamp, update, type Unsubscribe } from "fi
 import { getDb } from "./firebase";
 import { generateRoomCode } from "./ids";
 import { transactState } from "./transact";
-import { BOT_ID, botPlayer, normalizeBotLevel, type BotLevel } from "./boardBot";
+import { normalizeBotFields, onlineSeats, type BotLevel, type Opponent } from "./boardBot";
 
 /**
  * Damas on an 8×8 board. Two seats (`a` whites, starting at the bottom and
@@ -31,8 +31,8 @@ export const SEAT_STYLE: Record<Seat, { label: string; fill: string; ring: strin
 
 export interface DamasMeta {
   game: "damas";
-  /** "Contra la app": the creator against the computer (`BOT_ID` in seat b). */
-  botLevel?: BotLevel;
+  /** Made by «Jugar en línea» (against a person or, unknown to them, a bot). */
+  online?: boolean;
   /** Who created the room: starts the game (anyone can if they're away). */
   hostId?: string;
   createdAt: number | object;
@@ -68,8 +68,10 @@ export interface DamasState {
   winner: Seat | "draw" | "";
   endReason: EndReason;
   wins: Record<string, number>;
-  /** Set in rooms against the computer; "" otherwise. */
+  /** «Jugar en línea»: the bot's id and level ("" against a person); see lib/boardBot.ts. */
+  botId: string;
   botLevel: BotLevel | "";
+  online: boolean;
 }
 
 export function initialCells(): string {
@@ -99,7 +101,7 @@ function normalizeState(raw: Partial<DamasState> | null): DamasState | null {
     winner: raw.winner ?? "",
     endReason: raw.endReason ?? "",
     wins: raw.wins ?? {},
-    botLevel: normalizeBotLevel(raw.botLevel),
+    ...normalizeBotFields(raw),
   };
 }
 
@@ -241,12 +243,12 @@ function mutate(roomId: string, fn: (state: DamasState) => DamasState | null) {
   return transactState(statePath(roomId), normalizeState, fn);
 }
 
-/** With `botLevel`, a room against the computer that starts at once (the creator moves first). */
-export async function createDamasRoom(hostId: string, botLevel?: BotLevel): Promise<string> {
+/** With `vs`, a «Jugar en línea» room: both seated (colors at random) and playing at once. */
+export async function createDamasRoom(hostId: string, vs?: Opponent): Promise<string> {
   const roomId = generateRoomCode();
-  const meta: DamasMeta = { game: "damas", hostId, createdAt: serverTimestamp(), ...(botLevel ? { botLevel } : {}) };
-  const state: Partial<DamasState> = botLevel
-    ? { gameNo: 0, cells: initialCells(), turn: "a", status: "playing", botLevel, seats: { a: hostId, b: BOT_ID }, players: { [BOT_ID]: botPlayer(botLevel) } }
+  const meta: DamasMeta = { game: "damas", hostId, createdAt: serverTimestamp(), ...(vs ? { online: true } : {}) };
+  const state: Partial<DamasState> = vs
+    ? { gameNo: 0, cells: initialCells(), turn: "a", status: "playing", ...onlineSeats(hostId, vs) }
     : { status: "waiting", gameNo: 0, cells: initialCells(), turn: "a" };
   await update(ref(getDb()), {
     [`rooms/${roomId}/meta`]: meta,

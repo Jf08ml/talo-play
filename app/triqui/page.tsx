@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import GameLobby from "@/components/GameLobby";
-import VsBotTabs from "@/components/VsBotTabs";
+import OnlineTabs from "@/components/OnlineTabs";
 import { CreateRoomForm } from "@/components/RoomSettings";
 import { chipClass } from "@/components/ui";
 import { VARIANTS, createTriquiRoom, type Variant } from "@/lib/triqui";
@@ -12,9 +12,10 @@ export default function TriquiHome() {
   const [variant, setVariant] = useState<Variant>("clasico");
   return (
     <GameLobby game="triqui">
-      <VsBotTabs
+      <OnlineTabs
         game="triqui"
-        text="Partidas cortas, una revancha detrás de otra. En difícil no pierde nunca: a ver si le sacas un empate."
+        queue={`triqui-${variant}`}
+        text="Te emparejamos al momento con alguien que también quiere jugar: partidas cortas, una revancha detrás de otra."
         extra={
           <div>
             <p className="mb-1.5 text-[13px] font-bold text-white/60">Modo</p>
@@ -28,7 +29,7 @@ export default function TriquiHome() {
             </div>
           </div>
         }
-        create={(hostId, level) => createTriquiRoom(variant, hostId, level)}
+        create={(hostId, vs) => createTriquiRoom(variant, hostId, vs)}
         friends={<CreateRoomForm settings={SETTINGS} />}
       />
     </GameLobby>

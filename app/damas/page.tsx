@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { createDamasRoom } from "@/lib/damas";
 import { roomPath } from "@/lib/games";
 import GameLobby from "@/components/GameLobby";
-import VsBotTabs from "@/components/VsBotTabs";
+import OnlineTabs from "@/components/OnlineTabs";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 
@@ -33,10 +33,10 @@ export default function DamasHome() {
 
   return (
     <GameLobby game="damas">
-      <VsBotTabs
+      <OnlineTabs
         game="damas"
-        text="Tú con las blancas y empiezas; la computadora con las negras. Si le ofreces tablas, las acepta cuando no va ganando."
-        create={(hostId, level) => createDamasRoom(hostId, level)}
+        text="Te emparejamos al momento con alguien que también quiere jugar. Los colores se sortean y en cada revancha se cambian."
+        create={(hostId, vs) => createDamasRoom(hostId, vs)}
         friends={
           <form
             onSubmit={handleCreate}

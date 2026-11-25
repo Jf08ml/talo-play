@@ -276,8 +276,8 @@ export const GUIDES: Record<GameId, Guide> = {
         art: "cuatro",
       },
       {
-        title: "Contra la app",
-        text: ["¿No hay nadie para jugar? Elige «Contra la app» y juegas al momento contra la computadora, en fácil, normal o difícil. En cada revancha empieza el otro."],
+        title: "En línea",
+        text: ["¿No tienes con quién jugar? Elige «En línea» y te emparejamos al momento con alguien que también quiere jugar. Los colores se sortean y en cada revancha empieza el otro."],
       },
     ],
     tips: ["Las columnas del centro sirven para más líneas: empieza por ahí.", "Mira dónde puede ganar el rival en su próximo turno y tápalo."],
@@ -420,8 +420,8 @@ export const GUIDES: Record<GameId, Guide> = {
       },
       { title: "Dama", text: ["La ficha que termina su jugada en la última fila se corona dama: se mueve y come en diagonal a cualquier distancia, en las cuatro direcciones."] },
       {
-        title: "Contra la app",
-        text: ["¿No hay nadie para jugar? Elige «Contra la app» y juegas al momento contra la computadora, en fácil, normal o difícil. Si le ofreces tablas, las acepta cuando no va ganando."],
+        title: "En línea",
+        text: ["¿No tienes con quién jugar? Elige «En línea» y te emparejamos al momento con alguien que también quiere jugar. Los colores se sortean y en cada revancha se cambian."],
       },
     ],
   },
@@ -966,8 +966,8 @@ export const GUIDES: Record<GameId, Guide> = {
         text: ["Jaque mate gana. Si el que mueve no tiene jugadas y no está en jaque, es tablas (ahogado); también por material insuficiente, 50 jugadas sin capturas ni movimientos de peón, o si se acuerdan tablas."],
       },
       {
-        title: "Contra la app",
-        text: ["¿No hay nadie para jugar? Elige «Contra la app» y juegas al momento contra la computadora, en fácil, normal o difícil. Si le ofreces tablas, las acepta cuando no va ganando."],
+        title: "En línea",
+        text: ["¿No tienes con quién jugar? Elige «En línea» y te emparejamos al momento con alguien que también quiere jugar. Los colores se sortean y en cada revancha se cambian."],
       },
     ],
     tips: ["En la app, toca una pieza para ver sus casillas posibles: no te deja hacer jugadas ilegales."],
@@ -1053,8 +1053,8 @@ export const GUIDES: Record<GameId, Guide> = {
       },
       { title: "Final", text: ["Si no tienes jugada, pasas. Cuando ninguno puede jugar (o se llena el tablero), gana quien tiene más fichas."] },
       {
-        title: "Contra la app",
-        text: ["¿No hay nadie para jugar? Elige «Contra la app» y juegas al momento contra la computadora, en fácil, normal o difícil. En difícil cuida las esquinas y juega perfecto las últimas casillas."],
+        title: "En línea",
+        text: ["¿No tienes con quién jugar? Elige «En línea» y te emparejamos al momento con alguien que también quiere jugar. Los colores se sortean y en cada revancha se cambian."],
       },
     ],
     tips: ["Las esquinas nunca se pueden dar vuelta: son las casillas más valiosas.", "Evita jugar en las casillas pegadas a una esquina vacía: le abres la esquina al rival."],
@@ -1080,8 +1080,8 @@ export const GUIDES: Record<GameId, Guide> = {
       },
       { title: "Revancha", text: ["En cada revancha se cambian X y O, así arranca uno y después el otro. La app lleva la cuenta de ganadas."] },
       {
-        title: "Contra la app",
-        text: ["¿Estás solo? Elige «Contra la app» y juegas al momento contra la computadora, en fácil, normal o difícil. En difícil y modo clásico no pierde nunca: lo mejor que puedes sacarle es un empate."],
+        title: "En línea",
+        text: ["¿No tienes con quién jugar? Elige «En línea» y te emparejamos al momento con alguien que también quiere jugar. Se sortea quién juega con X y en cada revancha se cambian."],
       },
     ],
     tips: [

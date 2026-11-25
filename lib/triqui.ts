@@ -2,7 +2,7 @@ import { ref, onValue, serverTimestamp, update, type Unsubscribe } from "firebas
 import { getDb } from "./firebase";
 import { generateRoomCode } from "./ids";
 import { transactState } from "./transact";
-import { BOT_ID, botPlayer, normalizeBotLevel, type BotLevel } from "./boardBot";
+import { normalizeBotFields, onlineSeats, type BotLevel, type Opponent } from "./boardBot";
 import { joinSeats, leaveSeatIn, otherSeat, seatOf2, swapSeatsIn, takeSeatIn, type Seat2, type SeatPlayer } from "./twoSeats";
 
 /**
@@ -44,8 +44,8 @@ export interface TriquiMeta {
   game: "triqui";
   variant: Variant;
   hostId?: string;
-  /** "Contra la app": the creator against the computer (`BOT_ID` in seat b). */
-  botLevel?: BotLevel;
+  /** Made by «Jugar en línea» (against a person or, unknown to them, a bot). */
+  online?: boolean;
   createdAt: number | object;
 }
 
@@ -59,8 +59,10 @@ export interface TriquiState {
   winner: Seat | "draw" | "";
   endReason: EndReason;
   wins: Record<string, number>;
-  /** Set in rooms against the computer; "" otherwise. */
+  /** «Jugar en línea»: the bot's id and level ("" against a person); see lib/boardBot.ts. */
+  botId: string;
   botLevel: BotLevel | "";
+  online: boolean;
 }
 
 function normalizeState(raw: Partial<TriquiState> | null): TriquiState | null {
@@ -75,7 +77,7 @@ function normalizeState(raw: Partial<TriquiState> | null): TriquiState | null {
     winner: raw.winner ?? "",
     endReason: raw.endReason ?? "",
     wins: raw.wins ?? {},
-    botLevel: normalizeBotLevel(raw.botLevel),
+    ...normalizeBotFields(raw),
   };
 }
 
@@ -126,12 +128,12 @@ function mutate(roomId: string, fn: (state: TriquiState) => TriquiState | null) 
   return transactState(statePath(roomId), normalizeState, fn);
 }
 
-/** With `botLevel`, a room against the computer that starts at once (the creator plays X). */
-export async function createTriquiRoom(variant: Variant, hostId: string, botLevel?: BotLevel): Promise<string> {
+/** With `vs`, a «Jugar en línea» room: both seated (colors at random) and playing at once. */
+export async function createTriquiRoom(variant: Variant, hostId: string, vs?: Opponent): Promise<string> {
   const roomId = generateRoomCode();
-  const meta: TriquiMeta = { game: "triqui", variant, hostId, createdAt: serverTimestamp(), ...(botLevel ? { botLevel } : {}) };
-  const state: Partial<TriquiState> = botLevel
-    ? { status: "playing", variant, gameNo: 0, botLevel, seats: { a: hostId, b: BOT_ID }, players: { [BOT_ID]: botPlayer(botLevel) } }
+  const meta: TriquiMeta = { game: "triqui", variant, hostId, createdAt: serverTimestamp(), ...(vs ? { online: true } : {}) };
+  const state: Partial<TriquiState> = vs
+    ? { status: "playing", variant, gameNo: 0, ...onlineSeats(hostId, vs) }
     : { status: "waiting", variant, gameNo: 0 };
   await update(ref(getDb()), {
     [`rooms/${roomId}/meta`]: meta,

@@ -39,8 +39,7 @@ import { Flag } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
-import { useBotTurn } from "@/hooks/useBotTurn";
-import { BOT_ID, isBot } from "@/lib/boardBot";
+import { useBotPresence, useBotTurn } from "@/hooks/useBotTurn";
 import { oteloBotMove } from "@/lib/oteloBot";
 
 type Status = "loading" | "not-found" | "ready" | "error";
@@ -90,24 +89,27 @@ export default function OteloClient({ roomId }: { roomId: string }) {
     joinOtelo(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
 
-  const botTurn = !!state?.botLevel && state.status === "playing" && state.seats[state.turn] === BOT_ID;
+  // «Jugar en línea» against a bot: it moves from here and shows as connected while I play.
+  const botId = state?.botId ?? "";
+  useBotPresence(roomId, botId, botId ? state?.players[botId] : undefined, !!state && !!seatOf(state, myId));
+  const botTurn = !!botId && state?.status === "playing" && state.seats[state.turn] === botId;
   useBotTurn(botTurn, `${state?.gameNo}:${state?.moveNo}`, () => {
     if (!state?.botLevel) return;
     const idx = oteloBotMove(state.cells, state.turn, state.botLevel);
-    return idx >= 0 ? placeDisc(roomId, BOT_ID, idx, state.moveNo) : undefined;
+    return idx >= 0 ? placeDisc(roomId, botId, idx, state.moveNo) : undefined;
   });
 
   if (!configured) return <FirebaseSetupNotice />;
 
-  // The computer is never in presence, but it never leaves either.
-  const isAway = (id: string) => presenceLoaded && !!id && !isBot(id) && !(id in presence);
+  // The bot never leaves (its presence goes when I do).
+  const isAway = (id: string) => presenceLoaded && !!id && id !== botId && !(id in presence);
 
   return (
     <div className="flex min-h-dvh flex-col">
       <RoomHeader
         game="otelo"
         roomId={roomId}
-        social={!state?.botLevel}
+        social={!state?.online}
         right={status === "ready" && <PlayerBadges presence={presence} myClientId={myId} />}
       />
 

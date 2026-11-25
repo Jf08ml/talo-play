@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { createOteloRoom } from "@/lib/otelo";
 import { roomPath } from "@/lib/games";
 import GameLobby from "@/components/GameLobby";
-import VsBotTabs from "@/components/VsBotTabs";
+import OnlineTabs from "@/components/OnlineTabs";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 
@@ -33,10 +33,10 @@ export default function OteloHome() {
 
   return (
     <GameLobby game="otelo">
-      <VsBotTabs
+      <OnlineTabs
         game="otelo"
-        text="Tú con las negras y empiezas; la computadora con las blancas. En cada revancha se cambian los colores."
-        create={(hostId, level) => createOteloRoom(hostId, level)}
+        text="Te emparejamos al momento con alguien que también quiere jugar. Los colores se sortean y en cada revancha se cambian."
+        create={(hostId, vs) => createOteloRoom(hostId, vs)}
         friends={
           <form
             onSubmit={handleCreate}

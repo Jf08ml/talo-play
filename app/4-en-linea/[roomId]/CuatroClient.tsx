@@ -37,8 +37,7 @@ import { ArrowLeftRight } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
-import { useBotTurn } from "@/hooks/useBotTurn";
-import { BOT_ID, isBot } from "@/lib/boardBot";
+import { useBotPresence, useBotTurn } from "@/hooks/useBotTurn";
 import { cuatroBotMove } from "@/lib/cuatroBot";
 
 type Status = "loading" | "not-found" | "ready" | "error";
@@ -112,23 +111,26 @@ export default function CuatroClient({ roomId }: { roomId: string }) {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const botTurn = !!state?.botLevel && state.status === "playing" && state.seats[state.turn] === BOT_ID;
+  // «Jugar en línea» against a bot: it moves from here and shows as connected while I play.
+  const botId = state?.botId ?? "";
+  useBotPresence(roomId, botId, botId ? state?.players[botId] : undefined, !!state && !!seatOf(state, myId));
+  const botTurn = !!botId && state?.status === "playing" && state.seats[state.turn] === botId;
   useBotTurn(botTurn, `${state?.gameNo}:${moves}`, () => {
     if (!state?.botLevel) return;
-    return dropDisc(roomId, BOT_ID, cuatroBotMove(state.cells, state.turn, state.botLevel), moves);
-  });
+    return dropDisc(roomId, botId, cuatroBotMove(state.cells, state.turn, state.botLevel), moves);
+  }, 0.8);
 
   if (!configured) return <FirebaseSetupNotice />;
 
-  // The computer is never in presence, but it never leaves either.
-  const isAway = (id: string) => presenceLoaded && !!id && !isBot(id) && !(id in presence);
+  // The bot never leaves (its presence goes when I do).
+  const isAway = (id: string) => presenceLoaded && !!id && id !== botId && !(id in presence);
 
   return (
     <div className="flex min-h-dvh flex-col">
       <RoomHeader
         game="cuatro"
         roomId={roomId}
-        social={!state?.botLevel}
+        social={!state?.online}
         right={status === "ready" && <PlayerBadges presence={presence} myClientId={myId} />}
       />
 
