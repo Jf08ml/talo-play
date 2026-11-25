@@ -39,6 +39,7 @@ import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { Shuffle } from "lucide-react";
 import { useSoundOn } from "@/hooks/useSound";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = { hostId: string; seconds: number; turns: number };
@@ -112,6 +113,22 @@ export default function MimicaClient({ roomId }: { roomId: string }) {
     // `connected` is read at that moment; it shouldn't re-trigger the effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expired, roomId, turnNo, totalTurns]);
+
+  // Ranking: my team's result once the game is over (two teams; a tie is a draw).
+  const awardTeam = state?.players[myId]?.team;
+  const otherTeam = awardTeam === "red" ? "blue" : "red";
+  useAwardMatch(
+    "mimica",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && awardTeam
+      ? {
+          place:
+            state.scores[awardTeam] === state.scores[otherTeam] ? null : state.scores[awardTeam] > state.scores[otherTeam] ? 1 : 2,
+          players: 2,
+        }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

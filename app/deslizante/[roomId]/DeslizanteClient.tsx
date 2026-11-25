@@ -38,6 +38,7 @@ import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 import { Confetti } from "@/components/Results";
 import { playSound } from "@/lib/sfx";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = { size: number; imageUrl: string; showNumbers: boolean; hostId: string };
@@ -150,6 +151,20 @@ export default function DeslizanteClient({ roomId }: { roomId: string }) {
   useEffect(() => {
     if (racing && solved && !iFinished) reportFinish(roomId, gameNo, myId, moves).catch(console.error);
   }, [racing, solved, iFinished, roomId, gameNo, myId, moves]);
+
+  // Ranking: once I've solved it, my place by finishing time (results only grow, in order).
+  const myResult = state?.results[myId];
+  const raceSize = state
+    ? Object.keys(state.players).filter((id) => id === myId || id in presence || state.results[id]).length
+    : 0;
+  useAwardMatch(
+    "deslizante",
+    roomId,
+    state?.gameNo ?? 0,
+    state && myResult
+      ? { place: 1 + Object.values(state.results).filter((r) => r.ms < myResult.ms).length, players: raceSize }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

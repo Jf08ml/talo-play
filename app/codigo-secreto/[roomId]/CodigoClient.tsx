@@ -37,6 +37,7 @@ import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useSoundOn } from "@/hooks/useSound";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -88,6 +89,17 @@ export default function CodigoClient({ roomId }: { roomId: string }) {
 
   const seed = state?.seed;
   const board = useMemo(() => (seed !== undefined ? buildBoard(seed) : null), [seed]);
+
+  // Ranking: my team's result once the game is over (two teams, so the places are the teams).
+  const awardTeam = state?.players[myId]?.team;
+  useAwardMatch(
+    "codigo",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && state.winner && awardTeam
+      ? { place: awardTeam === state.winner ? 1 : 2, players: 2 }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

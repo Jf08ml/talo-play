@@ -53,6 +53,7 @@ import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
 import { useBotPresence, useBotTurn } from "@/hooks/useBotTurn";
 import { backgammonBotStep, backgammonBotTakes } from "@/lib/backgammonBot";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -131,6 +132,17 @@ export default function BackgammonClient({ roomId }: { roomId: string }) {
     ];
   })();
   useBotTurn(!!botAction, `${state?.gameNo}:${state?.gameInMatch}:${state?.moveNo}:${state?.phase}`, () => botAction?.[0](), botAction?.[1] ?? 1);
+
+  // Ranking: my result once the match is over (the «en línea» bot counts as a person).
+  const mySeatNow = state ? seatOf(state, myId) : null;
+  useAwardMatch(
+    "backgammon",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && mySeatNow && state.result.winner
+      ? { place: state.result.winner === mySeatNow ? 1 : 2, players: 2 }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

@@ -36,6 +36,7 @@ import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -83,6 +84,27 @@ export default function GeneralaClient({ roomId }: { roomId: string }) {
     if (!hasState || !identity.clientId || !identity.name) return;
     joinGenerala(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
+
+  // Ranking: once the game is over, the winner first (none on a tie), the rest by total.
+  const awardOver = state?.status === "finished" && state.order.includes(myId);
+  useAwardMatch(
+    "generala",
+    roomId,
+    state?.gameNo ?? 0,
+    awardOver && state
+      ? {
+          place:
+            state.winner === myId
+              ? 1
+              : (state.winner ? 1 : 0) +
+                placeIn(
+                  state.order.filter((id) => id !== state.winner).map((id) => ({ id, score: sheetTotal(state.sheets[id]) })),
+                  myId
+                ),
+          players: state.order.length,
+        }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

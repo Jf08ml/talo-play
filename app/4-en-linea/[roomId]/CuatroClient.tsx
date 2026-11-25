@@ -39,6 +39,7 @@ import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
 import { useBotPresence, useBotTurn } from "@/hooks/useBotTurn";
 import { cuatroBotMove } from "@/lib/cuatroBot";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -119,6 +120,16 @@ export default function CuatroClient({ roomId }: { roomId: string }) {
     if (!state?.botLevel) return;
     return dropDisc(roomId, botId, cuatroBotMove(state.cells, state.turn, state.botLevel), moves);
   }, 0.8);
+
+  // Ranking: my result once the game is over (the «en línea» bot counts as a person).
+  useAwardMatch(
+    "cuatro",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && mySeat && state.winner
+      ? { place: state.winner === "draw" ? null : state.winner === mySeat ? 1 : 2, players: 2 }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

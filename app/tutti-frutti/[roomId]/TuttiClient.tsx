@@ -46,6 +46,7 @@ import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import GameResults, { rankFrom } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = Pick<TuttiMeta, "categories" | "rounds" | "roundSeconds" | "letters">;
@@ -172,6 +173,17 @@ export default function TuttiClient({ roomId }: { roomId: string }) {
       );
     });
   }, [state, config, answers, votes]);
+
+  // Ranking: my place by the game's total once it's over (after every round).
+  const awardTotals = state?.status === "finished" && results.length ? totals(state, results) : null;
+  useAwardMatch(
+    "tutti",
+    roomId,
+    state?.gameNo ?? 0,
+    awardTotals && state && state.order.includes(myId)
+      ? { place: placeIn(state.order.map((id) => ({ id, score: awardTotals[id] ?? 0 })), myId), players: state.order.length }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

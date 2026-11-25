@@ -35,6 +35,7 @@ import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_INPUT } from "@/components/ui";
 import GameResults, { rankFrom } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -105,6 +106,17 @@ export default function VerdadesClient({ roomId }: { roomId: string }) {
   useEffect(() => {
     if (expired || everyoneVoted) closeVote(roomId, turnNo).catch(console.error);
   }, [expired, everyoneVoted, roomId, turnNo]);
+
+  // Ranking: my place by points once the game is over.
+  const awardIds = state ? Object.keys(state.players) : [];
+  useAwardMatch(
+    "verdades",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && awardIds.includes(myId)
+      ? { place: placeIn(awardIds.map((id) => ({ id, score: state.scores[id] ?? 0 })), myId), players: awardIds.length }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

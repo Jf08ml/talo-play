@@ -41,6 +41,7 @@ import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { Eye, EyeOff } from "lucide-react";
 import { useSoundOn } from "@/hooks/useSound";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -118,6 +119,17 @@ export default function LoboClient({ roomId }: { roomId: string }) {
     if (phase === "night") closeNight(roomId, round).catch(console.error);
     if (phase === "day") closeDay(roomId, round).catch(console.error);
   }, [expired, allActed, phase, roomId, round]);
+
+  // Ranking: my side's result (wolves or village; the dead played too) once the game is over.
+  const awardRole = state?.roles[myId];
+  useAwardMatch(
+    "lobo",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && state.winner && awardRole
+      ? { place: (awardRole === "lobo") === (state.winner === "lobos") ? 1 : 2, players: 2 }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

@@ -36,6 +36,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 import { formatTime } from "@/components/ladrillazo/Hud";
 import { SETTINGS } from "../settings";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 const RaceGame = dynamic(() => import("@/components/ladrillazo/RaceGame"), { ssr: false });
 const SharedGame = dynamic(() => import("@/components/ladrillazo/SharedGame"), { ssr: false });
@@ -107,6 +108,18 @@ export default function LadrillazoClient({ roomId }: { roomId: string }) {
     const t = setTimeout(() => nextOnlineRound(roomId, connectedKey.split(",")).catch(console.error), wait);
     return () => clearTimeout(t);
   }, [waitingNext, nextAt, roomId, connectedKey]);
+
+  // Ranking once the game is over: co-op has no winner; the rest go by the results' order, the
+  // winner first. Bots are shown as bots in friends' rooms; online they pass for people.
+  const awardOutcome = (() => {
+    if (state?.status !== "finished" || !state.roster.includes(myId)) return null;
+    const vsBotsOnly = !state.online && state.roster.every((id) => id === myId || id in state.bots);
+    if (state.mode === "coop") return { place: null, players: state.roster.length, vsBotsOnly };
+    const order = ranking(state).map((r) => r.id);
+    const sorted = state.winner && order.includes(state.winner) ? [state.winner, ...order.filter((id) => id !== state.winner)] : order;
+    return { place: sorted.indexOf(myId) + 1, players: state.roster.length, vsBotsOnly };
+  })();
+  useAwardMatch("ladrillazo", roomId, `${state?.gameNo ?? 0}:${state?.seed ?? 0}`, awardOutcome);
 
   if (!configured) return <FirebaseSetupNotice />;
 

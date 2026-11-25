@@ -37,6 +37,7 @@ import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -89,6 +90,23 @@ export default function OcaClient({ roomId }: { roomId: string }) {
     if (!hasState || !identity.clientId || !identity.name) return;
     joinOca(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
+
+  // Ranking: once the game is over, the winner first, the rest by square.
+  const awardOver = state?.status === "finished" && !!state.winner && state.order.includes(myId);
+  useAwardMatch(
+    "oca",
+    roomId,
+    state?.gameNo ?? 0,
+    awardOver && state
+      ? {
+          place:
+            state.winner === myId
+              ? 1
+              : 1 + placeIn(state.order.filter((id) => id !== state.winner).map((id) => ({ id, score: state.pos[id] ?? 0 })), myId),
+          players: state.order.length,
+        }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

@@ -36,6 +36,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { PRIMARY_BUTTON } from "@/components/ui";
 import Scorecard from "@/components/minigolf/Scorecard";
 import { SETTINGS } from "../settings";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 const RoomGame = dynamic(() => import("@/components/minigolf/RoomGame"), { ssr: false });
 
@@ -102,6 +103,21 @@ export default function MinigolfClient({ roomId }: { roomId: string }) {
     const t = setTimeout(() => nextOnlineGame(roomId, connectedKey.split(",")).catch(console.error), wait);
     return () => clearTimeout(t);
   }, [waitingNext, nextAt, roomId, connectedKey]);
+
+  // Ranking: my place by total strokes (fewer is better) once the course is over. Bots are shown
+  // as bots in friends' rooms; online they pass for people, so they count as such.
+  useAwardMatch(
+    "minigolf",
+    roomId,
+    `${state?.gameNo ?? 0}:${state?.seed ?? 0}`,
+    state?.status === "finished" && state.roster.includes(myId)
+      ? {
+          place: placeIn(state.roster.map((id) => ({ id, score: totalOf(state, id) })), myId, false),
+          players: state.roster.length,
+          vsBotsOnly: !state.online && state.roster.every((id) => id === myId || id in state.bots),
+        }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
   const connected = Object.keys(presence);

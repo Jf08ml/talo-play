@@ -46,6 +46,7 @@ import { RoomSettingsEditor } from "@/components/RoomSettings";
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { carrerasSettings } from "./settings";
 import { MonitorPlay, Shuffle, Smartphone } from "lucide-react";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -106,6 +107,25 @@ export default function RoomClient({ game, roomId }: { game: CarrerasGame; roomI
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
 
   useRaceCloser(roomId, state, presence, presenceLoaded);
+
+  // Ranking: my place once the race is closed (finishers by time, then those who didn't finish).
+  // Bots are shown as bots, so a race against only them is worth less.
+  const awardSeat = state ? seatOf(state, myId) : null;
+  const awardRacers = state ? (state.racers.split("") as Seat[]) : [];
+  const awardTimes = state ? Object.values(state.results).filter((ms): ms is number => typeof ms === "number") : [];
+  const myTime = awardSeat ? state?.results[awardSeat] : undefined;
+  useAwardMatch(
+    game,
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && awardSeat && awardRacers.includes(awardSeat)
+      ? {
+          place: 1 + (myTime === undefined ? awardTimes.length : awardTimes.filter((ms) => ms < myTime).length),
+          players: awardRacers.length,
+          vsBotsOnly: awardRacers.every((x) => x === awardSeat || state.bots.includes(x)),
+        }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

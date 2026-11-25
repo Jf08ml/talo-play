@@ -47,6 +47,7 @@ import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { useSoundOn } from "@/hooks/useSound";
 import { useBotPresence, useBotTurn } from "@/hooks/useBotTurn";
 import { navalBotShot } from "@/lib/navalBot";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -114,6 +115,16 @@ export default function NavalClient({ roomId }: { roomId: string }) {
       return fire(roomId, botId, idx, botShots);
     },
     0.8
+  );
+
+  // Ranking: my result once the game is over (the «en línea» bot counts as a person).
+  useAwardMatch(
+    "naval",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && state.winner && seatOf(state, myId)
+      ? { place: state.winner === seatOf(state, myId) ? 1 : 2, players: 2 }
+      : null
   );
 
   if (!configured) return <FirebaseSetupNotice />;

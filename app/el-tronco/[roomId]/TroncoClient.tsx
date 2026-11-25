@@ -33,6 +33,7 @@ import { BackToRoomButton, RoomSettingsEditor } from "@/components/RoomSettings"
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { PRIMARY_BUTTON } from "@/components/ui";
 import { SETTINGS } from "../settings";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 const TroncoGame = dynamic(() => import("@/components/tronco/Game"), { ssr: false });
 
@@ -109,6 +110,25 @@ export default function TroncoClient({ roomId }: { roomId: string }) {
     const t = setTimeout(() => nextOnlineRound(roomId, connectedKey.split(",")).catch(console.error), wait);
     return () => clearTimeout(t);
   }, [waitingNext, nextAt, roomId, connectedKey]);
+
+  // Ranking once the ring is decided: the last one standing first, then by who fell later.
+  // Bots are shown as bots in friends' rooms; online they pass for people, so they count as such.
+  const awardOut = state?.out ?? {};
+  useAwardMatch(
+    "tronco",
+    roomId,
+    `${state?.gameNo ?? 0}:${state?.seed ?? 0}`,
+    state?.status === "finished" && state.winner && state.roster.includes(myId)
+      ? {
+          place: placeIn(
+            state.roster.map((id) => ({ id, score: id === state.winner ? Infinity : (awardOut[id] ?? 0) })),
+            myId
+          ),
+          players: state.roster.length,
+          vsBotsOnly: !state.online && state.roster.every((id) => id === myId || id in state.bots),
+        }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
   const connected = Object.keys(presence);

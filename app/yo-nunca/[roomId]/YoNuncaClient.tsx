@@ -32,6 +32,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useSoundOn } from "@/hooks/useSound";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 interface Config {
@@ -107,6 +108,14 @@ export default function YoNuncaClient({ roomId }: { roomId: string }) {
   useEffect(() => {
     if (allAnswered) revealNow(roomId, qNo).catch(console.error);
   }, [allAnswered, roomId, qNo]);
+
+  // Ranking: a party game with no winner, so finishing it is what counts.
+  useAwardMatch(
+    "yonunca",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && myId in state.players ? { place: null, players: Object.keys(state.players).length } : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

@@ -63,6 +63,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_INPUT } from "@/components/ui";
 import GameResults, { Confetti, rankFrom } from "@/components/Results";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -141,6 +142,22 @@ export default function OndaClient({ roomId }: { roomId: string }) {
       canSteer(state, myId) ||
       canBet(state, myId));
   useTurnAlert(myMove);
+
+  // Ranking once the game is over: «juntos» is co-op (no winner), «equipos» goes by team
+  // (a tie is a draw), «cada» by my points.
+  const awardTeam = state?.teams[myId];
+  const awardOutcome = (() => {
+    if (state?.status !== "finished" || !state.order.includes(myId)) return null;
+    if (state.mode === "juntos") return { place: null, players: state.order.length };
+    if (state.mode === "equipos") {
+      if (!awardTeam) return null;
+      const mine = state.teamScores[awardTeam] ?? 0;
+      const theirs = state.teamScores[awardTeam === "red" ? "blue" : "red"] ?? 0;
+      return { place: mine === theirs ? null : mine > theirs ? 1 : 2, players: 2 };
+    }
+    return { place: placeIn(state.order.map((id) => ({ id, score: state.scores[id] ?? 0 })), myId), players: state.order.length };
+  })();
+  useAwardMatch("onda", roomId, state?.gameNo ?? 0, awardOutcome);
 
   if (!configured) return <FirebaseSetupNotice />;
 

@@ -34,6 +34,7 @@ import { BackToRoomButton, RoomSettingsEditor } from "@/components/RoomSettings"
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { PRIMARY_BUTTON } from "@/components/ui";
 import { SETTINGS } from "../settings";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 const GolpeGame = dynamic(() => import("@/components/golpe/Game"), { ssr: false });
 
@@ -92,6 +93,19 @@ export default function GolpeClient({ roomId }: { roomId: string }) {
     if (!hasState || !identity.clientId || !identity.name) return;
     joinGolpe(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, stateStatus, roomId, identity.clientId, identity.name, identity.color]);
+
+  // Ranking once the heist is over: everyone for themselves by diamonds banked (ties share),
+  // teams by the winning team (a tie is a draw). Bots are shown as bots.
+  const awardOutcome = (() => {
+    if (state?.status !== "finished") return null;
+    const ids = thieves(state);
+    if (!ids.includes(myId)) return null;
+    const teams = state.mode === "equipos";
+    const vsBotsOnly = ids.every((id) => id === myId || (teams && state.teams[id] === state.teams[myId]) || id in state.bots);
+    if (teams) return { place: state.winTeam ? (state.winTeam === state.teams[myId] ? 1 : 2) : null, players: 2, vsBotsOnly };
+    return { place: placeIn(ids.map((id) => ({ id, score: state.final[id] ?? 0 })), myId), players: ids.length, vsBotsOnly };
+  })();
+  useAwardMatch("golpe", roomId, state?.gameNo ?? 0, awardOutcome);
 
   if (!configured) return <FirebaseSetupNotice />;
 

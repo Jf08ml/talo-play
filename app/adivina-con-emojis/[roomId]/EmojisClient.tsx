@@ -37,6 +37,7 @@ import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, TEXT_INPUT } from "@/components/ui";
 import GameResults, { rankFrom } from "@/components/Results";
 import { useCountdownTicks, useSoundOn } from "@/hooks/useSound";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = { questionCount: number; seconds: number; categories: EmojiCategory[]; hostId: string };
@@ -111,6 +112,17 @@ export default function EmojisClient({ roomId }: { roomId: string }) {
     if (phase === "question" && expired) revealAnswer(roomId, qNo).catch(console.error);
     else if (phase === "reveal" && expired) nextQuestion(roomId, qNo, total).catch(console.error);
   }, [phase, expired, roomId, qNo, total]);
+
+  // Ranking: my place by points once the game is over.
+  const awardIds = state ? Object.keys(state.players) : [];
+  useAwardMatch(
+    "emojis",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && awardIds.includes(myId)
+      ? { place: placeIn(awardIds.map((id) => ({ id, score: state.scores[id] ?? 0 })), myId), players: awardIds.length }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

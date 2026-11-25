@@ -47,6 +47,7 @@ import { CARD, PRIMARY_BUTTON, TEXT_INPUT } from "@/components/ui";
 import { Eye, EyeOff } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { useSoundOn } from "@/hooks/useSound";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = Pick<ImpostorMeta, "categories" | "clueMode" | "clueRounds" | "impostorHint"> & { hostId: string };
@@ -125,6 +126,17 @@ export default function ImpostorClient({ roomId }: { roomId: string }) {
     } else if (phase === "voting" && expired) closeVote(roomId, roundNo).catch(console.error);
     else if (phase === "guess" && (expired || impostorGone)) guessTimeout(roomId, roundNo).catch(console.error);
   }, [phase, appClues, expired, speakerGone, impostorGone, roomId, clueNo, speaker, totalClues, roundNo]);
+
+  // Ranking: each round is a whole game (crew vs impostor), so it's awarded when its result shows.
+  // The seed joins the key because a room sent back to waiting starts again at the same round number.
+  useAwardMatch(
+    "impostor",
+    roomId,
+    `${state?.roundNo ?? 0}:${state?.seed ?? 0}`,
+    state?.status === "result" && state.outcome && state.order.includes(myId)
+      ? { place: (state.impostor === myId) === (state.outcome === "impostor") ? 1 : 2, players: 2 }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

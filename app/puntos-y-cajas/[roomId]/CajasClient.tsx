@@ -37,6 +37,7 @@ import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -89,6 +90,20 @@ export default function CajasClient({ roomId }: { roomId: string }) {
     if (!hasState || !identity.clientId || !identity.name) return;
     joinCajas(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
+
+  // Ranking: once the game is over, places by boxes (ties share).
+  const awardOver = state?.status === "finished" && state.order.includes(myId);
+  useAwardMatch(
+    "cajas",
+    roomId,
+    state?.gameNo ?? 0,
+    awardOver && state
+      ? {
+          place: placeIn(state.order.map((id, i) => ({ id, score: countBoxes(state.boxes, i) })), myId),
+          players: state.order.length,
+        }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

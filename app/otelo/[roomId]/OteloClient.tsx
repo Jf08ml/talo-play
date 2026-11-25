@@ -41,6 +41,7 @@ import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
 import { useBotPresence, useBotTurn } from "@/hooks/useBotTurn";
 import { oteloBotMove } from "@/lib/oteloBot";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -98,6 +99,17 @@ export default function OteloClient({ roomId }: { roomId: string }) {
     const idx = oteloBotMove(state.cells, state.turn, state.botLevel);
     return idx >= 0 ? placeDisc(roomId, botId, idx, state.moveNo) : undefined;
   });
+
+  // Ranking: my result once the game is over (the «en línea» bot counts as a person).
+  const mySeatNow = state ? seatOf(state, myId) : null;
+  useAwardMatch(
+    "otelo",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && mySeatNow && state.winner
+      ? { place: state.winner === "draw" ? null : state.winner === mySeatNow ? 1 : 2, players: 2 }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

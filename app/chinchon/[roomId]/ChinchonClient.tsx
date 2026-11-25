@@ -38,6 +38,7 @@ import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -90,6 +91,28 @@ export default function ChinchonClient({ roomId }: { roomId: string }) {
     if (!hasState || !identity.clientId || !identity.name) return;
     joinChinchon(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
+
+  // Ranking: once the game is over, the winner first, the rest by points (fewer is better).
+  const awardOver = state?.status === "finished" && !!state.winner && state.order.includes(myId);
+  useAwardMatch(
+    "chinchon",
+    roomId,
+    state?.gameNo ?? 0,
+    awardOver && state
+      ? {
+          place:
+            state.winner === myId
+              ? 1
+              : 1 +
+                placeIn(
+                  state.order.filter((id) => id !== state.winner).map((id) => ({ id, score: state.scores[id] ?? 0 })),
+                  myId,
+                  false
+                ),
+          players: state.order.length,
+        }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

@@ -36,6 +36,7 @@ import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 import GameResults, { rankFrom } from "@/components/Results";
 import { useCountdownTicks, useSoundOn } from "@/hooks/useSound";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = { questionCount: number; seconds: number; categories: TriviaCategory[]; hostId: string };
@@ -118,6 +119,17 @@ export default function TriviaClient({ roomId }: { roomId: string }) {
     if (phase === "question" && expired) revealAnswer(roomId, qNo).catch(console.error);
     else if (phase === "reveal" && expired) nextQuestion(roomId, qNo, total).catch(console.error);
   }, [phase, expired, roomId, qNo, total]);
+
+  // Ranking: my place by points once the game is over.
+  const awardIds = state ? Object.keys(state.players) : [];
+  useAwardMatch(
+    "trivia",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && awardIds.includes(myId)
+      ? { place: placeIn(awardIds.map((id) => ({ id, score: state.scores[id] ?? 0 })), myId), players: awardIds.length }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

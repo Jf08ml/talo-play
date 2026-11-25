@@ -39,6 +39,7 @@ import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 import { Check, Lock } from "lucide-react";
 import GameResults, { rankFrom } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -114,6 +115,17 @@ export default function ConocesClient({ roomId }: { roomId: string }) {
     if (protagonistGone && !answered) skipTurn(roomId, turnNo, total).catch(console.error);
     else if (expired || allIn) closeTurn(roomId, turnNo).catch(console.error);
   }, [answering, protagonistGone, answered, expired, allIn, roomId, turnNo, total]);
+
+  // Ranking: my place by points once the game is over.
+  const awardIds = state ? Object.keys(state.players) : [];
+  useAwardMatch(
+    "conoces",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && awardIds.includes(myId)
+      ? { place: placeIn(awardIds.map((id) => ({ id, score: state.scores[id] ?? 0 })), myId), players: awardIds.length }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

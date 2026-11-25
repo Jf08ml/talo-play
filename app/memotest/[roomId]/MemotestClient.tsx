@@ -37,6 +37,7 @@ import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -133,6 +134,24 @@ export default function MemotestClient({ roomId }: { roomId: string }) {
   useEffect(() => {
     if (turnExpired) passTurn(roomId, turn, turnStartedAt).catch(console.error);
   }, [turnExpired, roomId, turn, turnStartedAt]);
+
+  // Ranking: once the deck is done. Co-op has no winner; by turns, places by pairs.
+  // Each game has a new seed, so it keys the match.
+  const awardScores = state?.status === "finished" && rules ? scores(state) : null;
+  useAwardMatch(
+    "memotest",
+    roomId,
+    state?.seed ?? 0,
+    awardScores && state && rules && state.order.includes(identity.clientId)
+      ? {
+          place:
+            rules.mode === "colab"
+              ? null
+              : placeIn(state.order.map((id) => ({ id, score: awardScores[id] ?? 0 })), identity.clientId),
+          players: state.order.length,
+        }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

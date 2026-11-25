@@ -38,6 +38,7 @@ import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 import { Crown } from "lucide-react";
 import { useSoundOn } from "@/hooks/useSound";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 interface Config {
@@ -115,6 +116,14 @@ export default function ProbableClient({ roomId }: { roomId: string }) {
   useEffect(() => {
     if (expired || allVoted) closeVote(roomId, qNo).catch(console.error);
   }, [expired, allVoted, roomId, qNo]);
+
+  // Ranking: a party game with no winner, so finishing it is what counts.
+  useAwardMatch(
+    "probable",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && myId in state.players ? { place: null, players: Object.keys(state.players).length } : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

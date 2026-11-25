@@ -36,6 +36,7 @@ import { useWakeLock } from "@/components/carreras/Controller";
 import Pad from "@/components/empujones/Pad";
 import { PRIMARY_BUTTON } from "@/components/ui";
 import { SETTINGS } from "../settings";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -91,6 +92,20 @@ export default function EmpujonesClient({ roomId }: { roomId: string }) {
     if (!hasState || !identity.clientId || !identity.name) return;
     joinEmpujones(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
+
+  // Ranking: my place by rounds won once the match is over. Bots are shown as bots.
+  useAwardMatch(
+    "empujones",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && state.roster.includes(myId)
+      ? {
+          place: placeIn(state.roster.map((id) => ({ id, score: state.score[id] ?? 0 })), myId),
+          players: state.roster.length,
+          vsBotsOnly: state.roster.every((id) => id === myId || id in state.bots),
+        }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
   const connected = Object.keys(presence);

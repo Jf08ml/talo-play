@@ -29,6 +29,7 @@ import { BackToRoomButton, RoomSettingsEditor } from "@/components/RoomSettings"
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { PRIMARY_BUTTON } from "@/components/ui";
 import { SETTINGS } from "../settings";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 const ViboraGame = dynamic(() => import("@/components/vibora/Game"), { ssr: false });
 
@@ -82,6 +83,22 @@ export default function ViboraClient({ roomId }: { roomId: string }) {
     if (!hasState || !identity.clientId || !identity.name) return;
     joinVibora(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
+
+  // Ranking: my place by final size once a friends' match is over (online worlds never end, so
+  // they don't count). The room's settings call its extra snakes bots.
+  const awardIds = state ? Object.keys(state.final) : [];
+  useAwardMatch(
+    "vibora",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && !state.online && awardIds.includes(myId)
+      ? {
+          place: placeIn(awardIds.map((id) => ({ id, score: state.final[id] ?? 0 })), myId),
+          players: awardIds.length,
+          // Viborita's bots pass for people on purpose (CLAUDE.md): they count like anyone.
+        }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

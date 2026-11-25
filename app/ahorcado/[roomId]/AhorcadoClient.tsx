@@ -37,6 +37,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import GameResults, { rankFrom } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -85,6 +86,16 @@ export default function AhorcadoClient({ roomId }: { roomId: string }) {
     if (!hasState || !identity.clientId || !identity.name) return;
     joinAhorcado(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
+
+  // Ranking: my place by points once the game is over.
+  useAwardMatch(
+    "ahorcado",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && state.order.includes(myId)
+      ? { place: placeIn(state.order.map((id) => ({ id, score: state.scores[id] ?? 0 })), myId), players: state.order.length }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

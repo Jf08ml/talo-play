@@ -36,6 +36,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 import { useSoundOn } from "@/hooks/useSound";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = { hostId: string; theme: SopaTheme; level: SopaLevel };
@@ -95,6 +96,23 @@ export default function SopaClient({ roomId }: { roomId: string }) {
     [seed, config]
   );
   const now = useServerNow(state?.status === "playing", 250);
+
+  // Ranking: my place by words found once the soup is done.
+  const awardIds = state ? Object.keys(state.players) : [];
+  useAwardMatch(
+    "sopa",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && awardIds.includes(myId)
+      ? {
+          place: placeIn(
+            awardIds.map((id) => ({ id, score: Object.values(state.found).filter((by) => by === id).length })),
+            myId
+          ),
+          players: awardIds.length,
+        }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

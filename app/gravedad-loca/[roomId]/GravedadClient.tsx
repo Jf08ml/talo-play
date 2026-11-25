@@ -33,6 +33,7 @@ import { BackToRoomButton, RoomSettingsEditor } from "@/components/RoomSettings"
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { PRIMARY_BUTTON } from "@/components/ui";
 import { SETTINGS } from "../settings";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 const RaceGame = dynamic(() => import("@/components/gravedad/RaceGame"), { ssr: false });
 
@@ -99,6 +100,21 @@ export default function GravedadClient({ roomId }: { roomId: string }) {
     const t = setTimeout(() => nextOnlineRound(roomId, connectedKey.split(",")).catch(console.error), wait);
     return () => clearTimeout(t);
   }, [waitingNext, nextAt, roomId, connectedKey]);
+
+  // Ranking: my place by points once every round is played. Bots are shown as bots in friends'
+  // rooms; online they pass for people, so they count as such.
+  useAwardMatch(
+    "gravedad",
+    roomId,
+    `${state?.gameNo ?? 0}:${state?.seed ?? 0}`,
+    state?.status === "finished" && state.roster.includes(myId)
+      ? {
+          place: placeIn(state.roster.map((id) => ({ id, score: state.scores[id] ?? 0 })), myId),
+          players: state.roster.length,
+          vsBotsOnly: !state.online && state.roster.every((id) => id === myId || id in state.bots),
+        }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
   const connected = Object.keys(presence);

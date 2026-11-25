@@ -42,6 +42,7 @@ import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
 import { useBotPresence, useBotTurn } from "@/hooks/useBotTurn";
 import { damasBotAcceptsDraw, damasBotMove } from "@/lib/damasBot";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -107,6 +108,17 @@ export default function DamasClient({ roomId }: { roomId: string }) {
   const botTakesDraw =
     playingBot && !!state.drawOffer && state.drawOffer !== botSeat && damasBotAcceptsDraw(state.cells, botSeat);
   useBotTurn(botTakesDraw, `draw:${state?.gameNo}:${state?.moveNo}`, () => offerDraw(roomId, botId));
+
+  // Ranking: my result once the game is over (the «en línea» bot counts as a person).
+  const mySeatNow = state ? seatOf(state, myId) : null;
+  useAwardMatch(
+    "damas",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && mySeatNow && state.winner
+      ? { place: state.winner === "draw" ? null : state.winner === mySeatNow ? 1 : 2, players: 2 }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

@@ -38,6 +38,7 @@ import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 import { Delete } from "lucide-react";
 import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -163,6 +164,28 @@ export default function PalabraClient({ roomId }: { roomId: string }) {
       reportFinish(roomId, gameNo, myId, tries, solved).catch(console.error);
     }
   }, [racing, solved, outOfTries, iFinished, answer, roomId, gameNo, myId, tries]);
+
+  // Ranking: solving it gives my place by time at once; otherwise I wait for everyone to finish
+  // and come after those who solved it (nobody solving = no winner).
+  const myResult = state?.results[myId];
+  const raceIds = state ? Object.keys(state.players).filter((id) => id === myId || id in presence || state.results[id]) : [];
+  const solvedTimes = state ? Object.values(state.results).filter((r) => r.solved).map((r) => r.ms) : [];
+  const raceOver = !!state && raceIds.every((id) => state.results[id]);
+  useAwardMatch(
+    "palabra",
+    roomId,
+    state?.gameNo ?? 0,
+    myResult && (myResult.solved || raceOver)
+      ? {
+          place: myResult.solved
+            ? 1 + solvedTimes.filter((ms) => ms < myResult.ms).length
+            : solvedTimes.length
+              ? 1 + solvedTimes.length
+              : null,
+          players: raceIds.length,
+        }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

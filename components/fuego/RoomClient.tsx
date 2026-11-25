@@ -6,6 +6,7 @@ import { isFirebaseConfigured } from "@/lib/firebase";
 import {
   chooseTeam,
   getFuegoMeta,
+  isBot,
   joinFuego,
   normalizeMeta,
   shuffleTeams,
@@ -30,6 +31,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import Battle from "./Battle";
 import { SETTINGS } from "./settings";
 import { Bot, Shuffle, Smartphone } from "lucide-react";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -87,6 +89,20 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     if (!hasState || !identity.clientId || !identity.name) return;
     joinFuego(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
+
+  // Ranking once the match is over: free-for-all by kills (ties share), teams by the winner
+  // ("draw" = no winner). Bots are shown as bots.
+  const awardSide = state?.roster[myId];
+  const awardOutcome = (() => {
+    if (state?.status !== "finished" || !awardSide) return null;
+    const ids = Object.keys(state.roster);
+    const vsBotsOnly = ids.every((id) => id === myId || (awardSide !== "ffa" && state.roster[id] === awardSide) || isBot(id));
+    if (awardSide === "ffa") {
+      return { place: placeIn(ids.map((id) => ({ id, score: state.kills[id] ?? 0 })), myId), players: ids.length, vsBotsOnly };
+    }
+    return { place: state.winner === "draw" ? null : state.winner === awardSide ? 1 : 2, players: 2, vsBotsOnly };
+  })();
+  useAwardMatch("fuego", roomId, state?.gameNo ?? 0, awardOutcome);
 
   if (!configured) return <FirebaseSetupNotice />;
 

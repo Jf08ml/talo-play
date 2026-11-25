@@ -55,6 +55,7 @@ import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { useSoundOn } from "@/hooks/useSound";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -110,6 +111,18 @@ export default function TrucoClient({ roomId }: { roomId: string }) {
     if (!hasState || !identity.clientId || !identity.name) return;
     joinTruco(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
+
+  // Ranking: my team's result once the game is over (the «en línea» bot counts as a person).
+  // Two teams, so the places are the teams.
+  const awardSeat = state ? seatOf(state, myId) : null;
+  useAwardMatch(
+    "truco",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && state.winner && awardSeat && activeSeats(state).includes(awardSeat)
+      ? { place: String(teamOf(awardSeat)) === state.winner ? 1 : 2, players: 2 }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

@@ -43,6 +43,7 @@ import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -95,6 +96,25 @@ export default function LudoClient({ roomId }: { roomId: string }) {
     if (!hasState || !identity.clientId || !identity.name) return;
     joinLudo(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
+
+  // Ranking: once the game is over, the winner first, the rest by how far their tokens got.
+  const awardSeat = state ? seatOf(state, myId) : null;
+  const awardSeats = state ? activeSeats(state) : [];
+  const progressOf = (seat: Seat) => (state ? parseTokens(state.tokens[seat]).reduce((sum, p) => sum + p + 1, 0) : 0);
+  useAwardMatch(
+    "ludo",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && state.winner && awardSeat && awardSeats.includes(awardSeat)
+      ? {
+          place:
+            state.winner === awardSeat
+              ? 1
+              : 1 + placeIn(awardSeats.filter((x) => x !== state.winner).map((x) => ({ id: x, score: progressOf(x) })), awardSeat),
+          players: awardSeats.length,
+        }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

@@ -45,6 +45,7 @@ import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
 import { useBotPresence, useBotTurn } from "@/hooks/useBotTurn";
 import { triquiBotMove } from "@/lib/triquiBot";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -107,6 +108,17 @@ export default function TriquiClient({ roomId }: { roomId: string }) {
     const idx = triquiBotMove(state.moves, state.variant, state.botLevel);
     return playSquare(roomId, botId, idx, state.moves.length);
   }, 0.6);
+
+  // Ranking: my result once the game is over (the «en línea» bot counts as a person).
+  const mySeatNow = state ? seatOf(state, myId) : null;
+  useAwardMatch(
+    "triqui",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && mySeatNow && state.winner
+      ? { place: state.winner === "draw" ? null : state.winner === mySeatNow ? 1 : 2, players: 2 }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

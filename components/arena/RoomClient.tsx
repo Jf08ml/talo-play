@@ -6,6 +6,7 @@ import { isFirebaseConfigured } from "@/lib/firebase";
 import {
   chooseTeam,
   getArenaMeta,
+  isBot,
   joinArena,
   normalizeMeta,
   shuffleTeams,
@@ -31,6 +32,7 @@ import Battle from "./Battle";
 import Pad from "./Pad";
 import { SETTINGS } from "./settings";
 import { Bot, Eye, Shuffle, Smartphone } from "lucide-react";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -87,6 +89,22 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     if (!hasState || !identity.clientId || !identity.name) return;
     joinArena(roomId, identity.clientId, { name: identity.name, color: identity.color }, size).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color, size]);
+
+  // Ranking: my team's result once the match (all its rounds) is over. Two teams, so the
+  // places are the teams; bots are shown as bots.
+  const awardTeam = state?.roster[myId];
+  useAwardMatch(
+    "arena",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && state.winner && awardTeam
+      ? {
+          place: awardTeam === state.winner ? 1 : 2,
+          players: 2,
+          vsBotsOnly: Object.keys(state.roster).every((id) => state.roster[id] === awardTeam || isBot(id)),
+        }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

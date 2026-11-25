@@ -50,6 +50,7 @@ import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
 import { useBotPresence, useBotTurn } from "@/hooks/useBotTurn";
 import { dominoBotAction } from "@/lib/dominoBot";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -119,6 +120,26 @@ export default function DominoClient({ roomId }: { roomId: string }) {
     return [() => playTile(roomId, botId, action.tile, action.side, mv), 1];
   })();
   useBotTurn(!!botAction, `${state?.gameNo}:${state?.handNo}:${state?.moveNo}:${state?.phase}`, () => botAction?.[0](), botAction?.[1] ?? 1);
+
+  // Ranking: my result once the match is over (the «en línea» bot counts as a person).
+  // In pairs the two sides are the places; alone, places go by points.
+  const awardSeat = state ? seatOf(state, myId) : null;
+  const awardSeats = state ? activeSeats(state) : [];
+  useAwardMatch(
+    "domino",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && state.winner && awardSeat && awardSeats.includes(awardSeat)
+      ? awardSeats.length === 4
+        ? { place: sameSide(state, awardSeat, state.winner) ? 1 : 2, players: 2 }
+        : {
+            place: sameSide(state, awardSeat, state.winner)
+              ? 1
+              : 1 + awardSeats.filter((x) => state.score[x] > state.score[awardSeat]).length,
+            players: awardSeats.length,
+          }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

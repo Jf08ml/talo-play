@@ -41,6 +41,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON, SECONDARY_BUTTON, TEXT_INPUT } from "@/components/ui";
 import { useSoundOn } from "@/hooks/useSound";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -116,6 +117,14 @@ export default function TelefonoClient({ roomId }: { roomId: string }) {
   useEffect(() => {
     if (pastGrace || allDone) forceNextStep(roomId, gameNo, step).catch(console.error);
   }, [pastGrace, allDone, roomId, gameNo, step]);
+
+  // Ranking: no winner here; reaching the album is finishing the game.
+  useAwardMatch(
+    "telefono",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "album" && state.order.includes(myId) ? { place: null, players: state.order.length } : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

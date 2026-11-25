@@ -50,6 +50,7 @@ import { SETTINGS } from "../settings";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 import GameResults, { rankFrom } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -157,6 +158,16 @@ export default function DibujoClient({ roomId }: { roomId: string }) {
     else if (phase === "drawing" && (expired || !drawerHere)) endTurn(roomId, turnNo).catch(console.error);
     else if (phase === "reveal" && expired) nextTurn(roomId, turnNo, rounds).catch(console.error);
   }, [phase, expired, drawerHere, roomId, turnNo, rounds, firstOption]);
+
+  // Ranking: my place by points once the game is over.
+  useAwardMatch(
+    "dibujo",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && state.order.includes(myId)
+      ? { place: placeIn(state.order.map((id) => ({ id, score: state.scores[id] ?? 0 })), myId), players: state.order.length }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
 

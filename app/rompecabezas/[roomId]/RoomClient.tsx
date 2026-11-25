@@ -28,6 +28,7 @@ import TeamPicker from "@/components/TeamPicker";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import RoomHeader from "@/components/RoomHeader";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
+import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 const PuzzleStage = dynamic(() => import("@/components/PuzzleStage"), {
   ssr: false,
@@ -229,6 +230,27 @@ export default function RoomClient({ roomId }: { roomId: string }) {
       reportTeamFinished(roomId, myTeam).catch(() => {});
     }
   }, [isVersus, myTeam, race.status, progress, roomId]);
+
+  // Ranking: a puzzle I saw being played here (not one opened already done). Co-op has no
+  // winner; versus is two teams, the first to finish wins.
+  const puzzleDone = progress.total > 0 && progress.placed === progress.total;
+  const inPlay = isVersus ? race.status === "racing" && !!myTeam : Object.keys(pieces).length > 0 && !puzzleDone;
+  const [sawPlaying, setSawPlaying] = useState(false);
+  if (inPlay && !sawPlaying) setSawPlaying(true);
+  useAwardMatch(
+    "rompecabezas",
+    roomId,
+    isVersus ? `versus${race.startedAt ?? 0}` : "colab",
+    !sawPlaying
+      ? null
+      : isVersus
+        ? race.status === "finished" && race.winner && myTeam
+          ? { place: race.winner === myTeam ? 1 : 2, players: 2 }
+          : null
+        : puzzleDone
+          ? { place: null, players: Math.max(1, Object.keys(presence).length) }
+          : null
+  );
 
   if (!configured) {
     return <FirebaseSetupNotice />;

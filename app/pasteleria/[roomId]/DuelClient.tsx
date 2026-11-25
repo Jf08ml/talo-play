@@ -48,6 +48,7 @@ import CakeArt from "@/components/bakery/CakeArt";
 import { CakeBuilder, OrderCard, useBuilderStep, usePrefersReducedMotion } from "@/components/bakery/Builder";
 import { SETTINGS } from "@/components/bakery/settings";
 import { Confetti } from "@/components/Results";
+import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 type Config = { hostId: string; level: number; minutes: number };
@@ -107,6 +108,22 @@ export default function DuelClient({ roomId }: { roomId: string }) {
     if (!hasState || !identity.clientId || !identity.name) return;
     joinDuel(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
+
+  // Ranking: my place by points once the shift is closed (nobody scoring = no winner).
+  const awardIds = state ? Object.keys(state.final) : [];
+  useAwardMatch(
+    "pasteleria",
+    roomId,
+    state?.gameNo ?? 0,
+    state?.status === "finished" && awardIds.includes(myId)
+      ? {
+          place: Object.values(state.final).some((p) => p > 0)
+            ? placeIn(awardIds.map((id) => ({ id, score: state.final[id] ?? 0 })), myId)
+            : null,
+          players: awardIds.length,
+        }
+      : null
+  );
 
   if (!configured) return <FirebaseSetupNotice />;
   // While cooking the page is exactly the screen (like the solo game); the waiting room scrolls.
