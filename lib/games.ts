@@ -302,7 +302,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     minPlayers: 2,
     maxPlayers: 2,
     duration: "10–15 min",
-    contexts: ["pareja", "amigos"],
+    contexts: ["pareja", "amigos", "solo"],
     howTo: [
       "Las fichas avanzan en diagonal, de a una casilla. Comen saltando por encima, hacia adelante o hacia atrás.",
       "Comer es obligatorio, y si después puedes seguir comiendo, sigues con la misma ficha.",
@@ -592,7 +592,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     minPlayers: 2,
     maxPlayers: 2,
     duration: "10–15 min",
-    contexts: ["pareja", "amigos"],
+    contexts: ["pareja", "amigos", "solo"],
     howTo: [
       "Juegan negras contra blancas, por turnos; empiezan las negras.",
       "Pon una ficha de modo que encierre en línea (recta o diagonal) fichas del rival: esas se dan vuelta y pasan a ser tuyas.",
@@ -699,7 +699,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     minPlayers: 2,
     maxPlayers: 2,
     duration: "15–40 min",
-    contexts: ["pareja", "amigos"],
+    contexts: ["pareja", "amigos", "solo"],
     howTo: [
       "Crea la sala y mándale el link a tu rival; los demás pueden mirar.",
       "Toca una pieza para ver a dónde puede ir y toca el destino. La app solo deja hacer jugadas válidas.",

@@ -419,6 +419,10 @@ export const GUIDES: Record<GameId, Guide> = {
         art: "damas",
       },
       { title: "Dama", text: ["La ficha que termina su jugada en la última fila se corona dama: se mueve y come en diagonal a cualquier distancia, en las cuatro direcciones."] },
+      {
+        title: "Contra la app",
+        text: ["¿No hay nadie para jugar? Elige «Contra la app» y juegas al momento contra la computadora, en fácil, normal o difícil. Si le ofreces tablas, las acepta cuando no va ganando."],
+      },
     ],
   },
   cajas: {
@@ -961,6 +965,10 @@ export const GUIDES: Record<GameId, Guide> = {
         title: "Final",
         text: ["Jaque mate gana. Si el que mueve no tiene jugadas y no está en jaque, es tablas (ahogado); también por material insuficiente, 50 jugadas sin capturas ni movimientos de peón, o si se acuerdan tablas."],
       },
+      {
+        title: "Contra la app",
+        text: ["¿No hay nadie para jugar? Elige «Contra la app» y juegas al momento contra la computadora, en fácil, normal o difícil. Si le ofreces tablas, las acepta cuando no va ganando."],
+      },
     ],
     tips: ["En la app, toca una pieza para ver sus casillas posibles: no te deja hacer jugadas ilegales."],
   },
@@ -1044,6 +1052,10 @@ export const GUIDES: Record<GameId, Guide> = {
         art: "otelo",
       },
       { title: "Final", text: ["Si no tienes jugada, pasas. Cuando ninguno puede jugar (o se llena el tablero), gana quien tiene más fichas."] },
+      {
+        title: "Contra la app",
+        text: ["¿No hay nadie para jugar? Elige «Contra la app» y juegas al momento contra la computadora, en fácil, normal o difícil. En difícil cuida las esquinas y juega perfecto las últimas casillas."],
+      },
     ],
     tips: ["Las esquinas nunca se pueden dar vuelta: son las casillas más valiosas.", "Evita jugar en las casillas pegadas a una esquina vacía: le abres la esquina al rival."],
   },

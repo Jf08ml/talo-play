@@ -2,6 +2,7 @@ import { ref, get, onValue, serverTimestamp, update, type Unsubscribe } from "fi
 import { getDb } from "./firebase";
 import { generateRoomCode } from "./ids";
 import { transactState } from "./transact";
+import { BOT_ID, botPlayer, normalizeBotLevel, type BotLevel } from "./boardBot";
 import { INITIAL, applyMove, legalMoves, outcome, sameMove, toSan, type ChessMove, type Color, type Position, type PromoPiece } from "./ajedrezRules";
 
 /**
@@ -21,6 +22,8 @@ export const seatOfColor = (c: Color): Seat => (c === "w" ? "a" : "b");
 
 export interface AjedrezMeta {
   game: "ajedrez";
+  /** "Contra la app": the creator against the computer (`BOT_ID` in seat b). */
+  botLevel?: BotLevel;
   /** Who created the room: starts the game (anyone can if they're away). */
   hostId?: string;
   createdAt: number | object;
@@ -52,6 +55,8 @@ export interface AjedrezState {
   winner: Seat | "draw" | "";
   endReason: EndReason;
   wins: Record<string, number>;
+  /** Set in rooms against the computer; "" otherwise. */
+  botLevel: BotLevel | "";
 }
 
 function normalizeState(raw: Partial<AjedrezState> | null): AjedrezState | null {
@@ -73,6 +78,7 @@ function normalizeState(raw: Partial<AjedrezState> | null): AjedrezState | null 
     winner: raw.winner ?? "",
     endReason: raw.endReason ?? "",
     wins: raw.wins ?? {},
+    botLevel: normalizeBotLevel(raw.botLevel),
   };
 }
 
@@ -127,10 +133,13 @@ function mutate(roomId: string, fn: (state: AjedrezState) => AjedrezState | null
   return transactState(statePath(roomId), normalizeState, fn);
 }
 
-export async function createAjedrezRoom(hostId: string): Promise<string> {
+/** With `botLevel`, a room against the computer that starts at once (the creator moves first). */
+export async function createAjedrezRoom(hostId: string, botLevel?: BotLevel): Promise<string> {
   const roomId = generateRoomCode();
-  const meta: AjedrezMeta = { game: "ajedrez", hostId, createdAt: serverTimestamp() };
-  const state: Partial<AjedrezState> = { status: "waiting", gameNo: 0, cells: INITIAL.cells };
+  const meta: AjedrezMeta = { game: "ajedrez", hostId, createdAt: serverTimestamp(), ...(botLevel ? { botLevel } : {}) };
+  const state: Partial<AjedrezState> = botLevel
+    ? { gameNo: 0, cells: INITIAL.cells, status: "playing", botLevel, seats: { a: hostId, b: BOT_ID }, players: { [BOT_ID]: botPlayer(botLevel) } }
+    : { status: "waiting", gameNo: 0, cells: INITIAL.cells };
   await update(ref(getDb()), {
     [`rooms/${roomId}/meta`]: meta,
     [statePath(roomId)]: state,

@@ -39,6 +39,9 @@ import { ArrowLeftRight } from "lucide-react";
 import { useTurnAlert } from "@/hooks/useTurnAlert";
 import { Confetti } from "@/components/Results";
 import { useSoundOn } from "@/hooks/useSound";
+import { useBotTurn } from "@/hooks/useBotTurn";
+import { BOT_ID, isBot } from "@/lib/boardBot";
+import { ajedrezBotAcceptsDraw, ajedrezBotMove } from "@/lib/ajedrezBot";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -101,15 +104,33 @@ export default function AjedrezClient({ roomId }: { roomId: string }) {
     joinAjedrez(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
   }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
 
+  const playingBot = !!state?.botLevel && state.status === "playing";
+  const botSeat = state?.seats.a === BOT_ID ? "a" : "b";
+  const botTurn = playingBot && state.seats[state.turn === "w" ? "a" : "b"] === BOT_ID;
+  useBotTurn(botTurn, `${state?.gameNo}:${state?.moveNo}`, () => {
+    if (!state?.botLevel) return;
+    const m = ajedrezBotMove(positionOf(state), state.botLevel);
+    return m ? makeMove(roomId, BOT_ID, m.from, m.to, m.promo, state.moveNo) : undefined;
+  });
+  // A draw offer to the computer: it takes it unless it's ahead (otherwise its next move clears it).
+  const botTakesDraw =
+    playingBot &&
+    !!state.drawOffer &&
+    state.drawOffer !== botSeat &&
+    ajedrezBotAcceptsDraw(positionOf(state), botSeat === "a" ? "w" : "b");
+  useBotTurn(botTakesDraw, `draw:${state?.gameNo}:${state?.moveNo}`, () => offerDraw(roomId, BOT_ID));
+
   if (!configured) return <FirebaseSetupNotice />;
 
-  const isAway = (id: string) => presenceLoaded && !!id && !(id in presence);
+  // The computer is never in presence, but it never leaves either.
+  const isAway = (id: string) => presenceLoaded && !!id && !isBot(id) && !(id in presence);
 
   return (
     <div className="flex min-h-dvh flex-col">
       <RoomHeader
         game="ajedrez"
         roomId={roomId}
+        social={!state?.botLevel}
         right={status === "ready" && <PlayerBadges presence={presence} myClientId={myId} />}
       />
 

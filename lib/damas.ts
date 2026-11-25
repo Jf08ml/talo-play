@@ -2,6 +2,7 @@ import { ref, get, onValue, serverTimestamp, update, type Unsubscribe } from "fi
 import { getDb } from "./firebase";
 import { generateRoomCode } from "./ids";
 import { transactState } from "./transact";
+import { BOT_ID, botPlayer, normalizeBotLevel, type BotLevel } from "./boardBot";
 
 /**
  * Damas on an 8×8 board. Two seats (`a` whites, starting at the bottom and
@@ -30,6 +31,8 @@ export const SEAT_STYLE: Record<Seat, { label: string; fill: string; ring: strin
 
 export interface DamasMeta {
   game: "damas";
+  /** "Contra la app": the creator against the computer (`BOT_ID` in seat b). */
+  botLevel?: BotLevel;
   /** Who created the room: starts the game (anyone can if they're away). */
   hostId?: string;
   createdAt: number | object;
@@ -65,6 +68,8 @@ export interface DamasState {
   winner: Seat | "draw" | "";
   endReason: EndReason;
   wins: Record<string, number>;
+  /** Set in rooms against the computer; "" otherwise. */
+  botLevel: BotLevel | "";
 }
 
 export function initialCells(): string {
@@ -94,6 +99,7 @@ function normalizeState(raw: Partial<DamasState> | null): DamasState | null {
     winner: raw.winner ?? "",
     endReason: raw.endReason ?? "",
     wins: raw.wins ?? {},
+    botLevel: normalizeBotLevel(raw.botLevel),
   };
 }
 
@@ -202,6 +208,25 @@ export function legalMoves(cells: string, side: Seat, chain: number): Move[] {
   return captures.length ? captures : steps;
 }
 
+/**
+ * The board after `move` (one step or one jump) by `turn`: a jump that can
+ * keep capturing leaves `chain` on that piece and the same side to move;
+ * otherwise a man ending on the far row is crowned and the turn passes.
+ */
+export function applyMove(cells: string, turn: Seat, move: Move): { cells: string; chain: number; turn: Seat } {
+  const out = [...cells];
+  out[move.to] = out[move.from];
+  out[move.from] = EMPTY;
+  if (move.captured >= 0) out[move.captured] = EMPTY;
+  let next = out.join("");
+  if (move.captured >= 0 && capturesFrom(next, move.to).length > 0) return { cells: next, chain: move.to, turn };
+  const row = Math.floor(move.to / SIZE);
+  if (!isKing(next[move.to]) && row === (turn === "a" ? 0 : SIZE - 1)) {
+    next = next.slice(0, move.to) + next[move.to].toUpperCase() + next.slice(move.to + 1);
+  }
+  return { cells: next, chain: -1, turn: otherSeat(turn) };
+}
+
 export function pieceCount(cells: string, side: Seat): number {
   let n = 0;
   for (const ch of cells) if (ownerOf(ch) === side) n++;
@@ -216,10 +241,13 @@ function mutate(roomId: string, fn: (state: DamasState) => DamasState | null) {
   return transactState(statePath(roomId), normalizeState, fn);
 }
 
-export async function createDamasRoom(hostId: string): Promise<string> {
+/** With `botLevel`, a room against the computer that starts at once (the creator moves first). */
+export async function createDamasRoom(hostId: string, botLevel?: BotLevel): Promise<string> {
   const roomId = generateRoomCode();
-  const meta: DamasMeta = { game: "damas", hostId, createdAt: serverTimestamp() };
-  const state: Partial<DamasState> = { status: "waiting", gameNo: 0, cells: initialCells(), turn: "a" };
+  const meta: DamasMeta = { game: "damas", hostId, createdAt: serverTimestamp(), ...(botLevel ? { botLevel } : {}) };
+  const state: Partial<DamasState> = botLevel
+    ? { gameNo: 0, cells: initialCells(), turn: "a", status: "playing", botLevel, seats: { a: hostId, b: BOT_ID }, players: { [BOT_ID]: botPlayer(botLevel) } }
+    : { status: "waiting", gameNo: 0, cells: initialCells(), turn: "a" };
   await update(ref(getDb()), {
     [`rooms/${roomId}/meta`]: meta,
     [statePath(roomId)]: state,
@@ -319,19 +347,10 @@ export function makeMove(roomId: string, clientId: string, from: number, to: num
     if (s.status !== "playing" || s.seats[s.turn] !== clientId || s.moveNo !== expectedMoveNo) return null;
     const move = legalMoves(s.cells, s.turn, s.chain).find((m) => m.from === from && m.to === to);
     if (!move) return null;
-    const out = [...s.cells];
-    out[to] = out[from];
-    out[from] = EMPTY;
-    if (move.captured >= 0) out[move.captured] = EMPTY;
-    let cells = out.join("");
-    const base = { ...s, lastMove: { from, to }, moveNo: s.moveNo + 1, drawOffer: "" as const };
-    if (move.captured >= 0 && capturesFrom(cells, to).length > 0) return { ...base, cells, chain: to };
-    const row = Math.floor(to / SIZE);
-    if (!isKing(cells[to]) && row === (s.turn === "a" ? 0 : SIZE - 1)) {
-      cells = cells.slice(0, to) + cells[to].toUpperCase() + cells.slice(to + 1);
-    }
-    const next = { ...base, cells, chain: -1, turn: otherSeat(s.turn) };
-    return legalMoves(cells, next.turn, -1).length === 0 ? finish(next, s.turn, "nomoves") : next;
+    const after = applyMove(s.cells, s.turn, move);
+    const next = { ...s, ...after, lastMove: { from, to }, moveNo: s.moveNo + 1, drawOffer: "" as const };
+    if (after.chain >= 0) return next;
+    return legalMoves(after.cells, after.turn, -1).length === 0 ? finish(next, s.turn, "nomoves") : next;
   });
 }
 

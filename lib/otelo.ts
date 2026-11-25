@@ -2,6 +2,7 @@ import { ref, get, onValue, serverTimestamp, update, type Unsubscribe } from "fi
 import { getDb } from "./firebase";
 import { generateRoomCode } from "./ids";
 import { transactState } from "./transact";
+import { BOT_ID, botPlayer, normalizeBotLevel, type BotLevel } from "./boardBot";
 import { joinSeats, leaveSeatIn, otherSeat, seatOf2, swapSeatsIn, takeSeatIn, type Seat2, type SeatPlayer } from "./twoSeats";
 
 /**
@@ -28,6 +29,8 @@ export const SEAT_STYLE: Record<Seat, { label: string; fill: string; ring: strin
 
 export interface OteloMeta {
   game: "otelo";
+  /** "Contra la app": the creator against the computer (`BOT_ID` in seat b). */
+  botLevel?: BotLevel;
   hostId?: string;
   createdAt: number | object;
 }
@@ -48,6 +51,8 @@ export interface OteloState {
   winner: Seat | "draw" | "";
   endReason: EndReason;
   wins: Record<string, number>;
+  /** Set in rooms against the computer; "" otherwise. */
+  botLevel: BotLevel | "";
 }
 
 export function initialCells(): string {
@@ -75,6 +80,7 @@ function normalizeState(raw: Partial<OteloState> | null): OteloState | null {
     winner: raw.winner ?? "",
     endReason: raw.endReason ?? "",
     wins: raw.wins ?? {},
+    botLevel: normalizeBotLevel(raw.botLevel),
   };
 }
 
@@ -129,10 +135,13 @@ function mutate(roomId: string, fn: (state: OteloState) => OteloState | null) {
   return transactState(statePath(roomId), normalizeState, fn);
 }
 
-export async function createOteloRoom(hostId: string): Promise<string> {
+/** With `botLevel`, a room against the computer that starts at once (the creator moves first). */
+export async function createOteloRoom(hostId: string, botLevel?: BotLevel): Promise<string> {
   const roomId = generateRoomCode();
-  const meta: OteloMeta = { game: "otelo", hostId, createdAt: serverTimestamp() };
-  const state: Partial<OteloState> = { status: "waiting", gameNo: 0 };
+  const meta: OteloMeta = { game: "otelo", hostId, createdAt: serverTimestamp(), ...(botLevel ? { botLevel } : {}) };
+  const state: Partial<OteloState> = botLevel
+    ? { gameNo: 0, status: "playing", botLevel, seats: { a: hostId, b: BOT_ID }, players: { [BOT_ID]: botPlayer(botLevel) } }
+    : { status: "waiting", gameNo: 0 };
   await update(ref(getDb()), {
     [`rooms/${roomId}/meta`]: meta,
     [statePath(roomId)]: state,

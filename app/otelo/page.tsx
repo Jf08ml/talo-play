@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createOteloRoom } from "@/lib/otelo";
 import { roomPath } from "@/lib/games";
 import GameLobby from "@/components/GameLobby";
+import VsBotTabs from "@/components/VsBotTabs";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import { CARD, PRIMARY_BUTTON } from "@/components/ui";
 
@@ -32,17 +33,36 @@ export default function OteloHome() {
 
   return (
     <GameLobby game="otelo">
-      <form onSubmit={handleCreate} className={`${CARD} flex flex-col gap-4`}>
-        <h2 className="font-display text-lg font-semibold text-slate-100">Crear una sala nueva</h2>
-        <p className="text-sm text-slate-400">
-          Tablero de 8 × 8 con las reglas de siempre. La app te marca dónde puedes jugar y da vuelta las fichas sola. Crea la
-          sala y mándale el link a tu rival.
-        </p>
-        {createError && <p className="text-sm text-red-400">{createError}</p>}
-        <button type="submit" disabled={creating} className={`mt-auto ${PRIMARY_BUTTON}`}>
-          {creating ? "Creando sala…" : "Crear sala"}
-        </button>
-      </form>
+      <VsBotTabs
+        game="otelo"
+        text="Tú con las negras y empiezas; la computadora con las blancas. En cada revancha se cambian los colores."
+        create={(hostId, level) => createOteloRoom(hostId, level)}
+        friends={
+          <form
+            onSubmit={handleCreate}
+            className={`${CARD} flex flex-col gap-4`}
+          >
+            <h2 className="font-display text-lg font-semibold text-slate-100">
+              Crear una sala nueva
+            </h2>
+            <p className="text-sm text-slate-400">
+              Tablero de 8 × 8 con las reglas de siempre. La app te marca dónde
+              puedes jugar y da vuelta las fichas sola. Crea la sala y mándale
+              el link a tu rival.
+            </p>
+            {createError && (
+              <p className="text-sm text-red-400">{createError}</p>
+            )}
+            <button
+              type="submit"
+              disabled={creating}
+              className={`mt-auto ${PRIMARY_BUTTON}`}
+            >
+              {creating ? "Creando sala…" : "Crear sala"}
+            </button>
+          </form>
+        }
+      />
     </GameLobby>
   );
 }
