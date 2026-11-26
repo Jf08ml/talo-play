@@ -864,6 +864,8 @@ export function subscribeBooms(roomId: string, cb: (list: Record<string, FuegoBo
  */
 export interface FuegoPad {
   sid: number;
+  /** Wants auto-fire (the screen shoots for them while the crosshair is on a rival). */
+  af?: number;
   /** Ability presses. */
   h: number;
   x: number;

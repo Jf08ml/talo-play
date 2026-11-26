@@ -199,13 +199,19 @@ export interface WeaponChip {
 }
 
 /** How each control looks (shared by the game and the editor). */
-function Face({ id, size, fireOnRelease, aiming, ability, weapons, pickLabel }: { id: TouchButtonId; size: number; fireOnRelease?: boolean; aiming?: boolean; ability?: { label: string; color: string; ready: number }; weapons?: WeaponChip; pickLabel?: string }) {
+function Face({ id, size, fireOnRelease, aiming, ability, weapons, pickLabel, bare }: { id: TouchButtonId; size: number; fireOnRelease?: boolean; aiming?: boolean; ability?: { label: string; color: string; ready: number }; weapons?: WeaponChip; pickLabel?: string; bare?: boolean }) {
   const round = "flex h-full w-full items-center justify-center rounded-full text-white ring-2";
   const icon = { width: size * 0.42, height: size * 0.42 };
   switch (id) {
     case "stick":
       return <div className="flex h-full w-full items-center justify-center rounded-full border-2 border-dashed border-white/30 text-[10px] text-white/60">mover</div>;
     case "fire":
+      if (bare)
+        return (
+          <div className={`${round} bg-orange-500/55 ring-orange-300/80`}>
+            <HandMetal style={icon} />
+          </div>
+        );
       return (
         <div className={`${round} relative ${fireOnRelease ? "bg-sky-500/45 ring-sky-300/80" : "bg-rose-500/45 ring-rose-300/80"}`}>
           <Crosshair style={icon} />
@@ -315,9 +321,12 @@ export function TouchControls({
   fireOnRelease,
   ability,
   weapons,
+  bare = false,
 }: {
   controlsRef: RefObject<ControlState>;
   settings: TouchSettings;
+  /** Unarmed (infected, the last step of escalada): «Disparar» punches. */
+  bare?: boolean;
   canPick: boolean;
   pickLabel: string;
   aiming: boolean;
@@ -446,7 +455,7 @@ export function TouchControls({
   const tapped = { onPointerDown: tapDown, onContextMenu: noMenu };
 
   const face = (id: TouchButtonId) => (
-    <Face id={id} size={boxOf(id, settings, v).size} fireOnRelease={fireOnRelease} aiming={aiming} ability={ability} weapons={weapons} pickLabel={pickLabel} />
+    <Face id={id} size={boxOf(id, settings, v).size} fireOnRelease={fireOnRelease} aiming={aiming} ability={ability} weapons={weapons} pickLabel={pickLabel} bare={bare} />
   );
   const at = (id: TouchButtonId) => ({ type: "button" as const, "aria-label": BUTTON_INFO[id].label, className: "absolute touch-none", style: placeStyle(id, settings, v) });
 

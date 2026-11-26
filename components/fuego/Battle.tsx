@@ -1166,6 +1166,7 @@ export default function Battle({
             if (r.m) myMelee++;
             if (r.g) myGrenades++;
           }
+          if (screen) autoPulse = !autoPulse;
           for (const [id, run] of runs) {
             if (run.dead || !isAlive(s, id)) continue;
             let evs: ArsenalEvent[];
@@ -1175,7 +1176,8 @@ export default function Battle({
               const zoom = run.aiming ? WEAPONS[run.a.weapon].zoom : BASE_FOV;
               let k = Math.sqrt(zoom / BASE_FOV);
               if (!run.aiming && overEnemy(s, id, run.s, run.s.yaw, run.s.pitch)) k *= 0.55;
-              const inp = padInput(run.remote, pads[id] ?? NO_PAD, STEP, k, run.s.onGround);
+              const pad = pads[id] ?? NO_PAD;
+              const inp = padInput(run.remote, pad, STEP, k, run.s.onGround);
               if (inp.ability) triggerAbility(s, id, run.s, run.s.yaw, inp.move.mx, inp.move.mz);
               run.aiming = inp.aim;
               const wasAir = !run.s.onGround;
@@ -1185,7 +1187,18 @@ export default function Battle({
                 run.s.landed = 0;
               }
               const bare = unarmedIn(s, id);
-              evs = run.a.step(bare ? { fire: false, aim: false, reload: false, swap: false, grenade: false, melee: inp.arms.melee || inp.arms.fire } : { ...inp.arms, aim: run.aiming }, STEP);
+              // Auto-fire chosen on the phone: the screen knows when the crosshair is on a rival.
+              const auto =
+                !!pad.af &&
+                !bare &&
+                run.a.weapon !== "francotirador" &&
+                run.a.weapon !== "lanzacohetes" &&
+                (WEAPONS[run.a.weapon].auto || autoPulse) &&
+                overEnemy(s, id, run.s, run.s.yaw, run.s.pitch);
+              evs = run.a.step(
+                bare ? { fire: false, aim: false, reload: false, swap: false, grenade: false, melee: inp.arms.melee || inp.arms.fire } : { ...inp.arms, fire: inp.arms.fire || auto, aim: run.aiming },
+                STEP
+              );
               if (inp.pick) run.wantPick = true;
             } else {
               const view = {
@@ -1808,6 +1821,7 @@ export default function Battle({
           fireOnRelease={hud.zoomed}
           ability={{ label: ABILITY_INFO[hud.ability.kit].label, color: ABILITY_INFO[hud.ability.kit].color, ready: hud.ability.ready }}
           settings={touch}
+          bare={unarmedIn(state, myId)}
           weapons={{
             label: WEAPONS[hud.weapon].label,
             mag: hud.mag,

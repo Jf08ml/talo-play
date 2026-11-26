@@ -180,9 +180,7 @@ function Waiting({ roomId, meta, state, presence }: { roomId: string; meta: Fueg
             {people.length ? "¡A combatir!" : "Esperando jugadores…"}
           </button>
           <p className="text-center text-sm text-white/50">
-            En el celular (mejor horizontal): joystick para moverte, arrastra a la derecha para mirar, botón grande para disparar, y
-            botones para apuntar, saltar, recargar, cambiar de arma, granada, golpe y agarrar. Cada uno ve en la tele su parte de la
-            pantalla, en primera persona.
+            En el celular (mejor horizontal): los mismos controles que jugando en el celular, al estilo de los shooters móviles, y cada uno puede moverlos y ajustarlos con el ícono de arriba a la izquierda. Cada uno ve en la tele su parte de la pantalla, en primera persona.
           </p>
         </div>
       </div>
