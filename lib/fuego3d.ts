@@ -6,11 +6,16 @@ import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { mulberry32 } from "./random";
+import { taloShape, type TaloShape } from "./talos";
 import { MAPS, solidBoxes, type Box, type MapDef, type MapId, type MapTheme, type PickupKind, type Ramp } from "./fuegoMaps";
 import { EYE, topAt, worldOf, type ProjectileKind, type WeaponId, type World } from "./fuegoSim";
 
 /**
- * Fuego cruzado in 3D (three.js), browser only: the map built from its
+ * Fuego cruzado in 3D (three.js), browser only — a toy shooter: the players
+ * are talos (the brand's shapes, extruded, with eyes that blink, squint,
+ * smile and go X when they fall) holding plastic paint blasters, and every
+ * shot leaves paint in the shooter's color on walls and floors.
+ * the map built from its
  * boxes and ramps, dressed by theme (sky, clouds, sun, ambient particles,
  * glowing panels); armored soldiers made of primitives and animated from
  * their poses alone; pickups floating over glowing pads; tracers, muzzle
@@ -42,6 +47,18 @@ export interface SoldierDraw {
   deadFor: number;
   /** Just respawned and still protected: the shield shimmers. */
   guard?: boolean;
+  /** Chaos "fantasmas": only the eyes are seen (until it shoots). */
+  ghost?: boolean;
+  /** Chaos "ojos saltones": how big the eyes are. */
+  eyes?: number;
+  /** No blaster (infected, the last step of escalada): just the mitts. */
+  unarmed?: boolean;
+}
+
+/** The modes' objectives: the flags (at their base, dropped, or on a carrier's back) and the golden egg. */
+export interface ObjectivesDraw {
+  flags: { team: "red" | "blue"; x: number; y: number; z: number; carried: boolean; base: { x: number; y: number; z: number } }[];
+  egg: { x: number; y: number; z: number; held: boolean } | null;
 }
 
 /** An eye to draw the world from. */
@@ -73,6 +90,8 @@ export interface ViewModel {
   color: string;
   /** Hide it (sniper scope, dead). */
   hidden: boolean;
+  /** Bare mitts, no blaster. */
+  unarmed?: boolean;
 }
 
 type WallKind = "panel" | "stone" | "rock";
@@ -458,6 +477,45 @@ function scorchTexture(): THREE.CanvasTexture {
   return t;
 }
 
+/** A white paint splat (tinted per instance): a blob with a ragged edge and drops around it. */
+function splatTexture(): THREE.CanvasTexture {
+  return canvasTexture(
+    128,
+    128,
+    (ctx) => {
+      const rand = mulberry32(77);
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      const n = 22;
+      for (let i = 0; i <= n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        const r = 30 + rand() * 12 + (i % 3 === 0 ? 8 : 0);
+        const x = 64 + Math.cos(a) * r;
+        const y = 64 + Math.sin(a) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      for (let i = 0; i < 12; i++) {
+        const a = rand() * Math.PI * 2;
+        const r = 40 + rand() * 20;
+        ctx.beginPath();
+        ctx.arc(64 + Math.cos(a) * r, 64 + Math.sin(a) * r, 2 + rand() * 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // A slightly darker rim, like wet paint.
+      ctx.globalCompositeOperation = "source-atop";
+      const g = ctx.createRadialGradient(64, 64, 18, 64, 64, 50);
+      g.addColorStop(0, "rgba(255,255,255,0)");
+      g.addColorStop(1, "rgba(0,0,0,0.18)");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 128, 128);
+    },
+    false
+  );
+}
+
 function cloudTexture(): THREE.CanvasTexture {
   const t = canvasTexture(
     128,
@@ -541,18 +599,6 @@ function put(parent: THREE.Object3D, geo: THREE.BufferGeometry, mat: THREE.Mater
   const m = new THREE.Mesh(geo, mat);
   m.position.set(x, y, z);
   m.rotation.set(rx, ry, rz);
-  parent.add(m);
-  return m;
-}
-
-/** A rounded limb (capsule) from a to b, with round ends at both joints. */
-function limb(parent: THREE.Object3D, a: [number, number, number], b: [number, number, number], r: number, mat: THREE.Material): THREE.Mesh {
-  const va = new THREE.Vector3(...a);
-  const vb = new THREE.Vector3(...b);
-  const dir = vb.clone().sub(va);
-  const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, Math.max(0.001, dir.length()), 4, 10), mat);
-  m.position.copy(va).add(vb).multiplyScalar(0.5);
-  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
   parent.add(m);
   return m;
 }
@@ -653,94 +699,86 @@ function skirtGeometry(boxes: Box[]): THREE.BufferGeometry | null {
 
 // ---- Weapons ----------------------------------------------------------------------------------
 
+/** Each blaster's plastic, from the brand's shelf colors. */
+const TOY_COLORS: Record<WeaponId, number> = {
+  rifle: 0xff7a1a,
+  pistola: 0xffc400,
+  escopeta: 0x00b26b,
+  francotirador: 0x8a4dff,
+  lanzacohetes: 0xff5fa2,
+};
+
 /**
- * A weapon from rounded parts with real details (rails, curved magazine,
- * sights, muzzle brakes, pump, scope, bipod), baked into a few meshes.
- * Weapons point toward -z; (0, 0, 0) is the grip.
+ * A toy paint blaster of chunky rounded plastic: the body in its own color,
+ * white barrels with a bright safety tip, ink grips, and a see-through tank
+ * full of the player's paint (`paint`). Baked into a few meshes. Weapons
+ * point toward -z; (0, 0, 0) is the grip.
  */
-function weaponMesh(id: WeaponId, accent = 0x22d3ee): THREE.Group {
+function weaponMesh(id: WeaponId, paint = 0x22d3ee): THREE.Group {
   const g = new THREE.Group();
-  const dark = phong(0x1d2229, 70);
-  const mid = phong(0x48525f, 90);
-  const light = phong(0x9aa3ad, 110);
-  const glow = glowMat(accent, 2.2);
+  const body = new THREE.MeshPhongMaterial({ color: TOY_COLORS[id], shininess: 90, specular: 0x666666 });
+  const white = new THREE.MeshPhongMaterial({ color: 0xf4f4f5, shininess: 100, specular: 0x777777 });
+  const ink = new THREE.MeshPhongMaterial({ color: 0x3b4150, shininess: 60, specular: 0x555555 });
+  const tip = new THREE.MeshPhongMaterial({ color: id === "rifle" ? 0xffd400 : 0xff6a00, shininess: 90, specular: 0x666666 });
+  const tank = new THREE.MeshPhongMaterial({
+    color: paint,
+    emissive: new THREE.Color(paint).multiplyScalar(0.25),
+    shininess: 140,
+    specular: 0xffffff,
+    transparent: true,
+    opacity: 0.88,
+  });
   const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number, rx = 0, ry = 0, rz = 0) => put(g, geo, mat, x, y, z, rx, ry, rz);
-  const tube = (rTop: number, rBottom: number, len: number, seg = 14) => new THREE.CylinderGeometry(rTop, rBottom, len, seg);
-  // A cylinder turned to lie along z (its top toward +z).
+  const tube = (rTop: number, rBottom: number, len: number, seg = 16) => new THREE.CylinderGeometry(rTop, rBottom, len, seg);
   const Z = Math.PI / 2;
-  const guard = (z: number, y = -0.012) => add(new THREE.TorusGeometry(0.032, 0.007, 6, 14, Math.PI), dark, 0, y, z, 0, Z, Math.PI);
+  const grip = (z: number, y = -0.06, tilt = -0.3) => add(rbox(0.06, 0.14, 0.075, 0.028), ink, 0, y, z, tilt);
   if (id === "rifle") {
-    add(rbox(0.1, 0.12, 0.4, 0.025), mid, 0, 0.05, -0.16);
-    add(rbox(0.085, 0.035, 0.5, 0.012), dark, 0, 0.13, -0.22);
-    for (let i = 0; i < 7; i++) add(rbox(0.092, 0.014, 0.025, 0.005), dark, 0, 0.152, -0.03 - i * 0.065);
-    add(rbox(0.105, 0.105, 0.3, 0.035), dark, 0, 0.045, -0.5);
-    for (const sd of [-1, 1]) add(rbox(0.008, 0.02, 0.18, 0.003), glow, sd * 0.053, 0.05, -0.5);
-    add(tube(0.022, 0.022, 0.2), mid, 0, 0.05, -0.72, Z);
-    add(tube(0.032, 0.032, 0.07), dark, 0, 0.05, -0.785, Z);
-    add(rbox(0.055, 0.12, 0.085, 0.02), dark, 0, -0.06, -0.2, 0.12);
-    add(rbox(0.055, 0.11, 0.08, 0.02), dark, 0, -0.16, -0.235, 0.4);
-    add(rbox(0.055, 0.14, 0.07, 0.022), dark, 0, -0.06, 0.0, -0.3);
-    guard(-0.08);
-    add(rbox(0.07, 0.09, 0.22, 0.03), dark, 0, 0.045, 0.17);
-    add(rbox(0.075, 0.15, 0.045, 0.02), mid, 0, 0.015, 0.29);
-    add(rbox(0.06, 0.03, 0.14, 0.012), light, 0, 0.1, 0.16);
-    add(rbox(0.06, 0.055, 0.09, 0.015), dark, 0, 0.19, -0.13);
-    add(new THREE.CircleGeometry(0.02, 14), glowMat(0xf87171, 2.2), 0, 0.195, -0.084);
-    add(rbox(0.012, 0.04, 0.02, 0.004), light, 0, 0.165, -0.6);
-    add(rbox(0.008, 0.02, 0.16, 0.003), glow, 0.051, 0.06, -0.15);
+    add(rbox(0.13, 0.15, 0.5, 0.055), body, 0, 0.05, -0.22);
+    add(new THREE.SphereGeometry(0.085, 18, 14), tank, 0, 0.18, -0.12);
+    add(tube(0.035, 0.035, 0.05), white, 0, 0.12, -0.12);
+    add(rbox(0.135, 0.03, 0.3, 0.012), white, 0, 0.0, -0.25);
+    add(tube(0.032, 0.032, 0.3), white, 0, 0.06, -0.62, Z);
+    add(tube(0.042, 0.042, 0.06), tip, 0, 0.06, -0.79, Z);
+    add(rbox(0.06, 0.12, 0.08, 0.028), ink, 0, -0.07, -0.45, 0.15);
+    grip(0.0);
+    add(rbox(0.09, 0.1, 0.13, 0.045), ink, 0, 0.045, 0.1);
   } else if (id === "pistola") {
-    add(rbox(0.066, 0.07, 0.3, 0.018), light, 0, 0.1, -0.1);
-    for (let i = 0; i < 5; i++) add(rbox(0.07, 0.05, 0.007, 0.002), mid, 0, 0.1, 0.0 + i * 0.012);
-    add(rbox(0.058, 0.05, 0.25, 0.015), mid, 0, 0.05, -0.08);
-    add(tube(0.014, 0.014, 0.03, 10), dark, 0, 0.1, -0.255, Z);
-    add(rbox(0.058, 0.16, 0.08, 0.024), dark, 0, -0.035, 0.015, -0.22);
-    guard(-0.07, 0.02);
-    add(rbox(0.012, 0.018, 0.012, 0.004), glow, 0, 0.142, -0.23);
-    add(rbox(0.04, 0.018, 0.012, 0.004), dark, 0, 0.142, 0.03);
-    add(rbox(0.02, 0.01, 0.1, 0.004), glow, 0, 0.137, -0.1);
+    add(rbox(0.085, 0.095, 0.27, 0.035), body, 0, 0.09, -0.08);
+    add(new THREE.CapsuleGeometry(0.03, 0.1, 4, 12), tank, 0, 0.155, -0.07, Z);
+    add(tube(0.022, 0.022, 0.08), white, 0, 0.09, -0.24, Z);
+    add(tube(0.03, 0.03, 0.04), tip, 0, 0.09, -0.3, Z);
+    add(rbox(0.065, 0.16, 0.085, 0.03), ink, 0, -0.03, 0.02, -0.22);
   } else if (id === "escopeta") {
-    add(rbox(0.1, 0.12, 0.34, 0.03), dark, 0, 0.05, -0.08);
-    add(tube(0.03, 0.03, 0.6), mid, 0, 0.075, -0.52, Z);
-    add(tube(0.036, 0.036, 0.05), dark, 0, 0.075, -0.8, Z);
-    add(tube(0.026, 0.026, 0.48), dark, 0, 0.0, -0.48, Z);
-    add(rbox(0.105, 0.085, 0.2, 0.035), light, 0, 0.005, -0.44);
-    for (let i = 0; i < 4; i++) add(rbox(0.11, 0.07, 0.012, 0.004), dark, 0, 0.005, -0.375 - i * 0.045);
-    add(rbox(0.07, 0.03, 0.42, 0.012), dark, 0, 0.112, -0.52);
-    add(rbox(0.06, 0.14, 0.075, 0.022), dark, 0, -0.06, 0.06, -0.3);
-    guard(-0.02, 0.0);
-    add(rbox(0.075, 0.11, 0.26, 0.035), dark, 0, 0.02, 0.22, -0.12);
-    add(rbox(0.08, 0.15, 0.04, 0.02), mid, 0, 0.0, 0.35, -0.12);
-    add(rbox(0.008, 0.02, 0.22, 0.003), glow, 0.051, 0.07, -0.1);
+    add(rbox(0.16, 0.15, 0.42, 0.06), body, 0, 0.05, -0.15);
+    for (const x of [-0.038, 0.038]) {
+      add(tube(0.032, 0.032, 0.36), white, x, 0.07, -0.52, Z);
+      add(tube(0.05, 0.036, 0.08), tip, x, 0.07, -0.74, Z);
+    }
+    add(tube(0.06, 0.06, 0.15, 18), tank, 0, -0.06, -0.14, 0, 0, Z);
+    add(rbox(0.14, 0.08, 0.16, 0.035), ink, 0, -0.0, -0.46);
+    grip(0.06);
+    add(rbox(0.09, 0.1, 0.13, 0.045), ink, 0, 0.035, 0.14, -0.1);
   } else if (id === "francotirador") {
-    add(rbox(0.08, 0.1, 0.56, 0.025), dark, 0, 0.04, -0.15);
-    add(tube(0.024, 0.026, 0.68), mid, 0, 0.05, -0.77, Z);
-    add(rbox(0.055, 0.05, 0.09, 0.015), dark, 0, 0.05, -1.155);
-    add(tube(0.038, 0.038, 0.3), mid, 0, 0.16, -0.2, Z);
-    add(tube(0.04, 0.052, 0.09), mid, 0, 0.16, -0.39, Z);
-    add(tube(0.044, 0.036, 0.06), mid, 0, 0.16, -0.02, Z);
-    add(tube(0.016, 0.016, 0.04), mid, 0, 0.21, -0.2);
-    add(tube(0.016, 0.016, 0.04), mid, 0.045, 0.16, -0.2, 0, 0, Z);
-    for (const z of [-0.1, -0.3]) add(rbox(0.05, 0.07, 0.03, 0.01), mid, 0, 0.11, z);
-    add(new THREE.CircleGeometry(0.046, 16), glowMat(0x60a5fa, 2), 0, 0.16, -0.436, 0, Math.PI);
-    add(rbox(0.06, 0.12, 0.07, 0.02), dark, 0, -0.04, -0.12);
-    add(rbox(0.055, 0.14, 0.07, 0.022), dark, 0, -0.07, 0.04, -0.3);
-    guard(-0.04);
-    add(rbox(0.075, 0.13, 0.3, 0.035), dark, 0, 0.0, 0.27, -0.15);
-    add(rbox(0.06, 0.03, 0.16, 0.01), light, 0, 0.085, 0.22);
-    for (const sd of [-1, 1]) add(tube(0.008, 0.008, 0.26, 6), mid, sd * 0.02, 0.0, -0.75, Z + 0.12);
-    add(rbox(0.008, 0.015, 0.4, 0.003), glow, 0.042, 0.04, -0.2);
+    add(rbox(0.1, 0.12, 0.62, 0.045), body, 0, 0.04, -0.2);
+    add(tube(0.028, 0.03, 0.62), white, 0, 0.05, -0.8, Z);
+    add(tube(0.04, 0.04, 0.06), tip, 0, 0.05, -1.14, Z);
+    add(tube(0.045, 0.045, 0.32), ink, 0, 0.17, -0.2, Z);
+    add(tube(0.045, 0.058, 0.08), ink, 0, 0.17, -0.4, Z);
+    add(new THREE.CircleGeometry(0.05, 18), glowMat(paint, 1.8), 0, 0.17, -0.441, 0, Math.PI);
+    for (const z of [-0.12, -0.28]) add(rbox(0.05, 0.07, 0.03, 0.012), white, 0, 0.12, z);
+    add(new THREE.CapsuleGeometry(0.035, 0.18, 4, 12), tank, 0, -0.04, -0.4, Z);
+    grip(0.03);
+    add(rbox(0.09, 0.12, 0.18, 0.045), ink, 0, 0.01, 0.2, -0.12);
   } else {
-    const olive = phong(0x4a5a3c, 50);
-    const band = phong(0xfacc15, 60);
-    add(tube(0.095, 0.095, 0.95, 18), olive, 0, 0.08, -0.25, Z);
-    add(tube(0.1, 0.115, 0.14, 18), dark, 0, 0.08, -0.75, Z);
-    add(tube(0.11, 0.1, 0.12, 18), dark, 0, 0.08, 0.27, Z);
-    for (const z of [-0.55, 0.05]) add(tube(0.098, 0.098, 0.05, 18), band, 0, 0.08, z, Z);
-    add(rbox(0.06, 0.15, 0.08, 0.022), dark, 0, -0.06, -0.02, 0.2);
-    add(rbox(0.055, 0.12, 0.07, 0.02), dark, 0, -0.04, -0.4, 0.15);
-    add(rbox(0.1, 0.09, 0.15, 0.025), dark, 0, 0.21, -0.1);
-    add(rbox(0.07, 0.05, 0.006, 0.002), glow, 0, 0.215, -0.024);
-    add(rbox(0.012, 0.03, 0.22, 0.005), glow, 0.096, 0.1, -0.4);
+    add(tube(0.105, 0.105, 0.85, 22), body, 0, 0.08, -0.25, Z);
+    add(new THREE.TorusGeometry(0.1, 0.03, 10, 24), white, 0, 0.08, -0.68);
+    add(new THREE.SphereGeometry(0.09, 18, 14), tank, 0, 0.08, -0.64);
+    add(tube(0.12, 0.1, 0.1, 22), white, 0, 0.08, 0.2, Z);
+    for (const z of [-0.45, -0.05]) add(tube(0.108, 0.108, 0.04, 22), white, 0, 0.08, z, Z);
+    grip(-0.02, -0.07, 0.15);
+    add(rbox(0.06, 0.12, 0.075, 0.028), ink, 0, -0.05, -0.4, 0.15);
+    add(rbox(0.1, 0.08, 0.13, 0.035), ink, 0, 0.21, -0.1);
+    add(rbox(0.07, 0.045, 0.006, 0.002), glowMat(paint, 1.6), 0, 0.215, -0.034);
   }
   bake(g);
   return g;
@@ -783,18 +821,17 @@ function pickupMesh(kind: PickupKind): THREE.Group {
 
 interface SoldierModel {
   root: THREE.Group;
-  /** The whole figure (it falls when dead); hips hold the legs, chest everything above. */
+  /** The talo (it bobs, waddles, squashes and falls), its feet, and the hands holding the gun (they pitch with the aim). */
   body: THREE.Group;
-  hips: THREE.Group;
-  chest: THREE.Group;
-  head: THREE.Group;
-  legL: THREE.Group;
-  legR: THREE.Group;
-  kneeL: THREE.Group;
-  kneeR: THREE.Group;
+  torso: THREE.Mesh;
+  feet: [THREE.Group, THREE.Group];
   arms: THREE.Group;
   gun: THREE.Group;
   gunId: WeaponId | "";
+  eyes: { white: THREE.Mesh; pupil: THREE.Mesh; happy: THREE.Mesh; dead: THREE.Group; x: number }[];
+  eyeY: number;
+  stars: THREE.Group;
+  blob: THREE.Mesh;
   tag: THREE.Sprite;
   tagKey: string;
   flash: THREE.Sprite;
@@ -804,146 +841,180 @@ interface SoldierModel {
   shieldT: number;
   wasAlive: boolean;
   color: number;
-  /** Materials that flash red when hit, and how much is left of the flash. */
-  hurtMats: THREE.MeshPhongMaterial[];
+  bodyMat: THREE.MeshPhongMaterial;
+  /** Hit (squint + red flash), just got a kill (smile + hop), blink clock, landing squash. */
   hurtT: number;
-  /** Smoothed velocity in its own frame (forward, right), last position, and how much it's in the air. */
+  cheerT: number;
+  blinkT: number;
+  squash: number;
+  /** Smoothed velocity in its own frame (forward, right), last position, how much it's in the air. */
   vf: number;
   vs: number;
   prev: { x: number; z: number } | null;
   air: number;
+  wasAir: boolean;
 }
 
+/** A talo's outline (the brand's shapes), standing from y≈0.2 to 1.74, centered on x. */
+function taloOutline(shape: TaloShape): THREE.Shape {
+  const s = new THREE.Shape();
+  const B = 0.1;
+  const y0 = 0.2 + B;
+  const y1 = 1.74 - B;
+  const h = y1 - y0;
+  const roundRect = (w: number, r: number) => {
+    const x0 = -w / 2;
+    const x1 = w / 2;
+    s.moveTo(x0 + r, y0);
+    s.lineTo(x1 - r, y0);
+    s.quadraticCurveTo(x1, y0, x1, y0 + r);
+    s.lineTo(x1, y1 - r);
+    s.quadraticCurveTo(x1, y1, x1 - r, y1);
+    s.lineTo(x0 + r, y1);
+    s.quadraticCurveTo(x0, y1, x0, y1 - r);
+    s.lineTo(x0, y0 + r);
+    s.quadraticCurveTo(x0, y0, x0 + r, y0);
+  };
+  const arch = (w: number, topR: number, footR: number) => {
+    const x0 = -w / 2;
+    const x1 = w / 2;
+    s.moveTo(x0 + footR, y0);
+    s.lineTo(x1 - footR, y0);
+    s.quadraticCurveTo(x1, y0, x1, y0 + footR);
+    s.lineTo(x1, y1 - topR);
+    s.absellipse(0, y1 - topR, w / 2, topR, 0, Math.PI, false);
+    s.lineTo(x0, y0 + footR);
+    s.quadraticCurveTo(x0, y0, x0 + footR, y0);
+  };
+  if (shape === "pochi") s.absellipse(0, (y0 + y1) / 2, 0.56, h / 2, 0, Math.PI * 2, false);
+  else if (shape === "pipo") s.absellipse(0, (y0 + y1) / 2, 0.48, h / 2, 0, Math.PI * 2, false);
+  else if (shape === "tano") arch(0.8, 0.4, 0.08);
+  else if (shape === "dado") roundRect(1.0, 0.22);
+  else if (shape === "mora") arch(1.12, 0.6, 0.14);
+  else arch(0.92, 0.46, 0.12);
+  return s;
+}
+
+const TALO_EYE: Record<TaloShape, { y: number; gap: number }> = {
+  pochi: { y: 1.36, gap: 0.19 },
+  tano: { y: 1.42, gap: 0.16 },
+  dado: { y: 1.4, gap: 0.2 },
+  mora: { y: 1.32, gap: 0.22 },
+  pipo: { y: 1.36, gap: 0.17 },
+  sombra: { y: 1.38, gap: 0.19 },
+};
+
 /**
- * An armored soldier of rounded parts: capsule limbs with knees and elbows,
- * a helmet with a visor, shoulder pads, chest and shin plates, a backpack
- * with a light. Each rigid part is baked into a few meshes.
+ * A player's talo in 3D: their brand shape (`taloShape(id)`) extruded into a
+ * chunky plastic figure in their color, about a soldier's size (the hitboxes
+ * don't change), with big eyes on the front (blinking, squinting when hit,
+ * smiling after a kill, X when out), little feet that step and round mitts
+ * holding the blaster.
  */
-function soldierModel(color: number, glow: THREE.Texture, flash: THREE.Texture, shadows: boolean): SoldierModel {
-  void glow;
+function soldierModel(id: string, color: number, flash: THREE.Texture, shadows: boolean): SoldierModel {
+  const shape = taloShape(id);
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
-  const armor = new THREE.MeshPhongMaterial({ color, shininess: 90, specular: 0x888888 });
-  const plate = new THREE.MeshPhongMaterial({ color: new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.2), shininess: 110, specular: 0x999999 });
-  const under = new THREE.MeshPhongMaterial({ color: 0x2a3038, shininess: 25, specular: 0x333333 });
-  const dark = new THREE.MeshPhongMaterial({ color: 0x171b21, shininess: 40, specular: 0x444444 });
-  const trim = glowMat(color, 1.6);
-  const visorMat = new THREE.MeshPhongMaterial({ color: 0xf2b134, emissive: new THREE.Color(0xd97706).multiplyScalar(0.9), shininess: 140, specular: 0xffffff });
+  const bodyMat = new THREE.MeshPhongMaterial({ color, shininess: 70, specular: 0x444444 });
+  const mittMat = new THREE.MeshPhongMaterial({ color: new THREE.Color(color).multiplyScalar(0.82), shininess: 60, specular: 0x333333 });
+  const ink = new THREE.MeshPhongMaterial({ color: 0x1b1b20, shininess: 40, specular: 0x333333 });
+  const white = new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 80, specular: 0x666666 });
+  const black = new THREE.MeshBasicMaterial({ color: 0x111111 });
 
-  // Hips and legs (thigh, then the knee with shin and boot).
-  const hips = new THREE.Group();
-  hips.position.y = 0.95;
-  body.add(hips);
-  put(hips, rbox(0.36, 0.2, 0.26, 0.08), under, 0, 0.02, 0);
-  put(hips, new THREE.TorusGeometry(0.17, 0.032, 6, 22), dark, 0, 0.09, 0, Math.PI / 2).scale.set(1.08, 0.82, 1);
-  for (const x of [-0.13, 0.13]) put(hips, rbox(0.08, 0.1, 0.06, 0.02), dark, x, 0.05, -0.14);
-  const legs: { leg: THREE.Group; knee: THREE.Group }[] = [];
-  for (const x of [-0.12, 0.12]) {
-    const leg = new THREE.Group();
-    leg.position.set(x, 0, 0);
-    hips.add(leg);
-    limb(leg, [0, -0.02, 0], [0, -0.44, 0], 0.1, under);
-    put(leg, rbox(0.19, 0.25, 0.08, 0.03), armor, 0, -0.2, -0.085);
-    const knee = new THREE.Group();
-    knee.position.y = -0.46;
-    leg.add(knee);
-    put(knee, rbox(0.14, 0.12, 0.09, 0.035), plate, 0, 0, -0.07);
-    limb(knee, [0, 0, 0], [0, -0.36, 0], 0.085, under);
-    put(knee, rbox(0.17, 0.27, 0.11, 0.04), armor, 0, -0.19, -0.05);
-    put(knee, rbox(0.16, 0.11, 0.3, 0.045), dark, 0, -0.435, -0.05);
-    bake(leg);
-    bake(knee);
-    legs.push({ leg, knee });
+  const torso = new THREE.Mesh(
+    new THREE.ExtrudeGeometry(taloOutline(shape), { depth: 0.42, bevelEnabled: true, bevelThickness: 0.12, bevelSize: 0.1, bevelSegments: 5, curveSegments: 32 }),
+    bodyMat
+  );
+  torso.geometry.translate(0, 0, -0.21);
+  body.add(torso);
+
+  // Eyes on the front face (z −0.33): white, pupil; a smile arc and an X, shown when they apply.
+  const { y: eyeY, gap } = TALO_EYE[shape];
+  const eyes: SoldierModel["eyes"] = [];
+  for (const sd of [-1, 1]) {
+    const x = sd * gap;
+    const w = put(body, new THREE.SphereGeometry(0.15, 18, 14), white, x, eyeY, -0.33);
+    w.scale.set(1, 1.1, 0.45);
+    const pupil = put(body, new THREE.SphereGeometry(0.075, 14, 10), black, x, eyeY - 0.01, -0.39);
+    pupil.scale.set(1, 1, 0.5);
+    const happy = put(body, new THREE.TorusGeometry(0.09, 0.024, 6, 14, Math.PI), black, x, eyeY - 0.04, -0.36);
+    happy.visible = false;
+    const dead = new THREE.Group();
+    dead.position.set(x, eyeY, -0.36);
+    for (const r of [Math.PI / 4, -Math.PI / 4]) put(dead, rbox(0.2, 0.045, 0.03, 0.012), black, 0, 0, 0, 0, 0, r);
+    dead.visible = false;
+    body.add(dead);
+    eyes.push({ white: w, pupil, happy, dead, x });
   }
 
-  // Chest (pivot at the waist).
-  const chest = new THREE.Group();
-  chest.position.y = 0.95;
-  body.add(chest);
-  put(chest, new THREE.CapsuleGeometry(0.15, 0.12, 4, 12), under, 0, 0.16, 0);
-  put(chest, rbox(0.56, 0.42, 0.33, 0.12), armor, 0, 0.43, 0);
-  put(chest, rbox(0.44, 0.16, 0.28, 0.07), under, 0, 0.27, 0);
-  put(chest, rbox(0.38, 0.24, 0.06, 0.03), plate, 0, 0.46, -0.16);
-  put(chest, rbox(0.26, 0.12, 0.05, 0.022), armor, 0, 0.2, -0.14);
-  put(chest, rbox(0.28, 0.022, 0.02, 0.008), trim, 0, 0.33, -0.19);
-  put(chest, new THREE.CylinderGeometry(0.11, 0.13, 0.08, 16), dark, 0, 0.65, 0);
-  put(chest, rbox(0.36, 0.36, 0.15, 0.05), under, 0, 0.42, 0.22);
-  for (const x of [-0.08, 0.08]) put(chest, rbox(0.07, 0.24, 0.03, 0.012), dark, x, 0.42, 0.3);
-  put(chest, rbox(0.05, 0.2, 0.02, 0.008), trim, 0.16, 0.42, 0.29);
-  for (const x of [-0.31, 0.31]) {
-    put(chest, new THREE.SphereGeometry(0.09, 12, 10), under, x, 0.54, 0);
-    put(chest, rbox(0.2, 0.15, 0.3, 0.065), armor, x * 1.04, 0.58, 0, 0, 0, -Math.sign(x) * 0.3);
-    put(chest, rbox(0.21, 0.025, 0.31, 0.01), trim, x * 1.07, 0.52, 0, 0, 0, -Math.sign(x) * 0.3);
+  // Feet that step, under the body.
+  const feet: THREE.Group[] = [];
+  for (const sd of [-1, 1]) {
+    const f = new THREE.Group();
+    f.position.set(sd * 0.22, 0, -0.02);
+    put(f, new THREE.CapsuleGeometry(0.1, 0.16, 4, 12), ink, 0, 0.1, -0.03, Math.PI / 2);
+    root.add(f);
+    feet.push(f);
   }
 
-  // Head: helmet, visor, crest, ear pods.
-  const head = new THREE.Group();
-  head.position.y = 0.7;
-  chest.add(head);
-  limb(head, [0, -0.04, 0], [0, 0.06, 0], 0.07, under);
-  put(head, new THREE.SphereGeometry(0.17, 22, 16), armor, 0, 0.13, 0).scale.set(1, 1.07, 1.12);
-  const visor = put(head, new THREE.SphereGeometry(0.15, 22, 12, -Math.PI * 0.36, Math.PI * 0.72, Math.PI * 0.3, Math.PI * 0.34), visorMat, 0, 0.12, -0.075, 0, Math.PI);
-  visor.scale.set(1.18, 1, 1.12);
-  put(head, rbox(0.05, 0.05, 0.26, 0.02), plate, 0, 0.3, 0.0);
-  for (const x of [-0.165, 0.165]) put(head, new THREE.CylinderGeometry(0.05, 0.05, 0.04, 14), dark, x, 0.12, 0.01, 0, 0, Math.PI / 2);
-  put(head, rbox(0.14, 0.06, 0.08, 0.025), dark, 0, 0.0, -0.11);
-
-  // Arms (they pitch with the aim): shoulder → elbow → hand on the gun.
+  // Round mitts holding the blaster in front; they pitch with the aim.
   const arms = new THREE.Group();
-  arms.position.set(0, 0.5, 0);
-  chest.add(arms);
-  const RS: [number, number, number] = [0.3, 0.05, 0];
-  const RE: [number, number, number] = [0.28, -0.14, -0.17];
-  const RH: [number, number, number] = [0.13, -0.08, -0.34];
-  const LS: [number, number, number] = [-0.3, 0.05, 0];
-  const LE: [number, number, number] = [-0.2, -0.16, -0.34];
-  const LH: [number, number, number] = [0.05, -0.05, -0.6];
-  limb(arms, RS, RE, 0.072, under);
-  limb(arms, RE, RH, 0.064, under);
-  limb(arms, LS, LE, 0.072, under);
-  limb(arms, LE, LH, 0.064, under);
-  for (const e of [RE, LE]) put(arms, new THREE.SphereGeometry(0.068, 12, 10), plate, e[0], e[1], e[2]);
-  for (const h of [RH, LH]) put(arms, rbox(0.085, 0.09, 0.1, 0.035), dark, h[0], h[1], h[2]);
+  arms.position.set(0, 1.02, -0.22);
+  body.add(arms);
   const gun = new THREE.Group();
-  gun.position.set(0.12, -0.02, -0.38);
+  gun.position.set(0.1, 0, -0.26);
   arms.add(gun);
-  bake(chest);
-  bake(head);
-  bake(arms);
+  put(arms, new THREE.SphereGeometry(0.11, 16, 12), mittMat, 0.1, -0.06, -0.25).scale.set(1, 0.9, 1.15);
+  put(arms, new THREE.SphereGeometry(0.1, 16, 12), mittMat, 0.06, -0.02, -0.62).scale.set(1, 0.9, 1.15);
 
-  const fl = new THREE.Sprite(new THREE.SpriteMaterial({ map: flash, color: 0xffffff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false }));
-  fl.scale.setScalar(0.7);
+  const fl = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: flash, color: new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.5).multiplyScalar(1.6), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })
+  );
+  fl.scale.setScalar(0.8);
   gun.add(fl);
+
+  // A soft shadow blob (grounds it even without real-time shadows).
+  const blob = new THREE.Mesh(new THREE.CircleGeometry(0.55, 22), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25, depthWrite: false }));
+  blob.rotation.x = -Math.PI / 2;
+  blob.position.y = 0.02;
+  root.add(blob);
+
+  // Stars going round the head of the fallen.
+  const stars = new THREE.Group();
+  const starMat = glowMat(0xffd400, 1.3);
+  for (let k = 0; k < 4; k++) put(stars, new THREE.OctahedronGeometry(0.09, 0), starMat, Math.cos((k / 4) * Math.PI * 2) * 0.4, 0, Math.sin((k / 4) * Math.PI * 2) * 0.4);
+  stars.position.y = 0.6;
+  stars.visible = false;
+  root.add(stars);
 
   const tag = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthWrite: false }));
   tag.scale.set(1.6, 0.4, 1);
-  tag.position.y = 2.25;
+  tag.position.y = 2.2;
   root.add(tag);
 
+  // The shield: a soap bubble.
   const shield = new THREE.Mesh(
-    new THREE.SphereGeometry(0.62, 22, 16),
-    new THREE.MeshBasicMaterial({ color: new THREE.Color(0x67e8f9).multiplyScalar(1.6), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, wireframe: true })
+    new THREE.SphereGeometry(0.82, 28, 20),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(0x9be7ff).multiplyScalar(1.3), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })
   );
-  shield.scale.set(1, 1.6, 1);
+  shield.scale.set(1, 1.25, 1);
   shield.position.y = 0.95;
   root.add(shield);
 
-  if (shadows) root.traverse((o) => ((o as THREE.Mesh).isMesh ? ((o as THREE.Mesh).castShadow = true) : null));
-  shield.castShadow = false;
+  if (shadows) for (const o of [torso, ...feet.flatMap((f) => f.children)]) (o as THREE.Mesh).castShadow = true;
   return {
     root,
     body,
-    hips,
-    chest,
-    head,
-    legL: legs[0].leg,
-    legR: legs[1].leg,
-    kneeL: legs[0].knee,
-    kneeR: legs[1].knee,
+    torso,
+    feet: [feet[0], feet[1]],
     arms,
     gun,
     gunId: "",
+    eyes,
+    eyeY,
+    stars,
+    blob,
     tag,
     tagKey: "",
     flash: fl,
@@ -953,12 +1024,16 @@ function soldierModel(color: number, glow: THREE.Texture, flash: THREE.Texture, 
     shieldT: 0,
     wasAlive: true,
     color,
-    hurtMats: [armor, plate, under],
+    bodyMat,
     hurtT: 0,
+    cheerT: 0,
+    blinkT: 1 + (id.length % 3),
+    squash: 0,
     vf: 0,
     vs: 0,
     prev: null,
     air: 0,
+    wasAir: false,
   };
 }
 
@@ -1172,6 +1247,8 @@ interface Blast {
 
 export interface ProjectileDraw {
   kind: ProjectileKind;
+  /** Its owner's paint. */
+  color?: string;
   x: number;
   y: number;
   z: number;
@@ -1182,7 +1259,13 @@ export interface ProjectileDraw {
   age?: number;
 }
 
+/** How big a weapon's paint splat is (m). */
+const splatSize = (w: WeaponId) => (w === "francotirador" ? 0.85 : w === "escopeta" ? 0.32 : w === "pistola" ? 0.5 : 0.45);
+
 const SIDE_COLORS: Record<string, number> = { red: 0xd9283f, blue: 0x1f7fd6 };
+/** How many paint splats stay on the map (the oldest is reused). */
+const SPLATS = 420;
+const DEFAULT_PAINT = "#f472b6";
 
 export class FuegoScene {
   private renderer: THREE.WebGLRenderer;
@@ -1200,6 +1283,14 @@ export class FuegoScene {
   private projectiles = new Map<string, THREE.Group>();
   private sparks = new Particles(500, true, 9);
   private smoke = new Particles(360, false, -0.5, 1.2);
+  /** Paint droplets (they fall). */
+  private drops = new Particles(520, false, 9.5, 0.8);
+  /** Paint splats left on walls and floors: one instanced mesh, reused in a ring. */
+  private splats!: THREE.InstancedMesh;
+  private splatNext = 0;
+  private dummy = new THREE.Object3D();
+  private flagMeshes = new Map<string, { group: THREE.Group; cloth: THREE.Mesh; ring: THREE.Mesh; beam: THREE.Mesh }>();
+  private eggMesh: { group: THREE.Group; body: THREE.Group; beam: THREE.Mesh; glow: THREE.Sprite } | null = null;
   private motes: Motes;
   private tracers: Tracer[] = [];
   private blasts: Blast[] = [];
@@ -1251,7 +1342,7 @@ export class FuegoScene {
     this.renderer.toneMappingExposure = this.map.theme === "bunker" ? 1.25 : 1.1;
     if (high) {
       this.renderer.shadowMap.enabled = true;
-      this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      this.renderer.shadowMap.type = THREE.PCFShadowMap;
     }
     this.scene.fog = new THREE.Fog(this.theme.fog, this.map.theme === "bunker" ? 32 : 70, this.map.theme === "valle" ? 260 : 170);
     this.glow = glowTexture();
@@ -1261,7 +1352,7 @@ export class FuegoScene {
     this.camera.rotation.order = "YXZ";
     this.build(mapId);
     this.motes = new Motes(high ? 260 : 140, this.theme.motes);
-    this.scene.add(this.sparks.points, this.smoke.points, this.motes.points);
+    this.scene.add(this.sparks.points, this.smoke.points, this.drops.points, this.motes.points);
     this.makePools();
 
     // The hands have their own light, so they read well wherever you stand.
@@ -1281,6 +1372,16 @@ export class FuegoScene {
 
   private makePools() {
     const s = this.scene;
+    const splatMat = new THREE.MeshLambertMaterial({ map: splatTexture(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+    this.splats = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), splatMat, SPLATS);
+    const none = new THREE.Matrix4().makeScale(0, 0, 0);
+    const white = new THREE.Color(0xffffff);
+    for (let i = 0; i < SPLATS; i++) {
+      this.splats.setMatrixAt(i, none);
+      this.splats.setColorAt(i, white);
+    }
+    this.splats.frustumCulled = false;
+    s.add(this.splats);
     // Lights for muzzle flashes and explosions, always in the scene (intensity 0 when idle).
     for (let i = 0; i < 3; i++) {
       const l = new THREE.PointLight(0xffc070, 0, 9, 2);
@@ -1605,7 +1706,7 @@ export class FuegoScene {
     for (const [id, inf] of Object.entries(info)) {
       let k = this.soldiers.get(id);
       if (!k) {
-        k = soldierModel(new THREE.Color(inf.color).getHex(), this.glow, this.flashTex, this.shadows);
+        k = soldierModel(id, new THREE.Color(inf.color).getHex(), this.flashTex, this.shadows);
         this.soldiers.set(id, k);
         this.scene.add(k.root);
       }
@@ -1627,15 +1728,23 @@ export class FuegoScene {
     k.root.visible = !!d && (d.alive || d.deadFor < 4);
     if (!d) return;
     // Died just now: the shield pops. Back alive: a spawn shimmer.
-    if (k.wasAlive && !d.alive) this.burst(d.x, d.y + 1.1, d.z, 0x67e8f9, 22, 6);
+    if (k.wasAlive && !d.alive) {
+      const c = new THREE.Color(k.color);
+      this.spray(d.x, d.y + 1.1, d.z, 40, 5, 5, c);
+      this.burst(d.x, d.y + 1.2, d.z, 0xffd400, 12, 5);
+      this.burst(d.x, d.y + 1.2, d.z, 0xffffff, 10, 5);
+      this.paint(d.x, topAt(this.world, d.x, d.z), d.z, [0, 1, 0], 1.8, c);
+    }
     if (!k.wasAlive && d.alive) this.spawnFx(d.x, d.y, d.z, k.color);
     k.wasAlive = d.alive;
+    k.gun.visible = !d.unarmed;
     if (k.gunId !== d.weapon) {
       k.gunId = d.weapon;
       for (const ch of [...k.gun.children]) if (ch !== k.flash) k.gun.remove(ch);
-      const gm = weaponMesh(d.weapon);
+      const gm = weaponMesh(d.weapon, k.color);
       if (this.shadows) gm.traverse((o) => ((o as THREE.Mesh).isMesh ? ((o as THREE.Mesh).castShadow = true) : null));
       k.gun.add(gm);
+      gm.scale.setScalar(1.15);
       k.flash.position.set(0, 0.05, d.weapon === "pistola" ? -0.3 : d.weapon === "francotirador" ? -1.2 : -0.82);
     }
   }
@@ -1649,7 +1758,8 @@ export class FuegoScene {
     ez: number,
     weapon: WeaponId,
     hit: "nada" | "escudo" | "cuerpo" | null,
-    normal: [number, number, number] | null = null
+    normal: [number, number, number] | null = null,
+    color: string = DEFAULT_PAINT
   ) {
     if (id) {
       const k = this.soldiers.get(id);
@@ -1663,11 +1773,11 @@ export class FuegoScene {
     const len = Math.hypot(dx, dy, dz);
     if (len > 0.5 && weapon !== "lanzacohetes") {
       const sniper = weapon === "francotirador";
-      const thick = sniper ? 0.03 : 0.012;
+      const thick = sniper ? 0.035 : weapon === "escopeta" ? 0.016 : 0.022;
       const mesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(thick, thick, len, 5, 1, true),
+        new THREE.CylinderGeometry(thick, thick, len, 6, 1, true),
         new THREE.MeshBasicMaterial({
-          color: new THREE.Color(sniper ? 0x93c5fd : 0xffe08a).multiplyScalar(sniper ? 2.5 : 2),
+          color: new THREE.Color(color).lerp(new THREE.Color(0xffffff), 0.25).multiplyScalar(sniper ? 1.8 : 1.4),
           transparent: true,
           opacity: 0.9,
           blending: THREE.AdditiveBlending,
@@ -1677,10 +1787,10 @@ export class FuegoScene {
       mesh.position.set(fx + dx / 2, fy + dy / 2, fz + dz / 2);
       mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(dx / len, dy / len, dz / len));
       this.scene.add(mesh);
-      const max = sniper ? 0.45 : 0.07;
+      const max = sniper ? 0.45 : 0.1;
       this.tracers.push({ mesh, life: max, max });
     }
-    if (hit) this.impact(ex, ey, ez, hit, normal);
+    if (hit) this.impact(ex, ey, ez, hit, normal, color, splatSize(weapon));
   }
 
   private flashLight(x: number, y: number, z: number, k: number) {
@@ -1690,33 +1800,18 @@ export class FuegoScene {
     l.intensity = 6 * k;
   }
 
-  impact(x: number, y: number, z: number, kind: "nada" | "escudo" | "cuerpo", normal: [number, number, number] | null = null) {
+  impact(x: number, y: number, z: number, kind: "nada" | "escudo" | "cuerpo", normal: [number, number, number] | null = null, color: string = DEFAULT_PAINT, size = 0.36) {
     const [nx, ny, nz] = normal ?? [0, 1, 0];
+    const c = new THREE.Color(color);
     if (kind === "nada") {
-      const surf = this.theme.impact;
-      const color = new THREE.Color(IMPACT_COLORS[surf]);
-      // A bullet hole oriented on the surface.
-      if (normal) {
-        const h = this.holes[this.holeNext];
-        this.holeNext = (this.holeNext + 1) % this.holes.length;
-        h.visible = true;
-        h.position.set(x + nx * 0.01, y + ny * 0.01, z + nz * 0.01);
-        h.lookAt(x + nx, y + ny, z + nz);
-        h.rotation.z = this.rand() * Math.PI;
-      }
-      const spark = surf === "metal" ? 7 : 3;
-      for (let i = 0; i < spark; i++) {
-        this.sparks.spawn(x, y, z, nx * 2 + (this.rand() - 0.5) * 4, ny * 2 + this.rand() * 3, nz * 2 + (this.rand() - 0.5) * 4, new THREE.Color(0xffd27a), 0.05, 0.2 + this.rand() * 0.2, 1);
-      }
-      for (let i = 0; i < (surf === "metal" ? 1 : 3); i++) {
-        this.smoke.spawn(x + nx * 0.1, y + ny * 0.1, z + nz * 0.1, nx * 0.8 + (this.rand() - 0.5) * 0.4, ny * 0.8 + 0.3, nz * 0.8 + (this.rand() - 0.5) * 0.4, color, 0.18, 0.7 + this.rand() * 0.4, 0.55, 0.7);
-      }
+      // Paint on the surface, and a few drops bouncing off it.
+      if (normal) this.paint(x, y, z, normal, size * (0.8 + this.rand() * 0.5), c);
+      this.spray(x + nx * 0.05, y + ny * 0.05, z + nz * 0.05, 6, 1.6, 1.5, c, [nx, ny, nz]);
       return;
     }
-    const color = new THREE.Color(kind === "escudo" ? 0x67e8f9 : 0xef4444);
-    for (let i = 0; i < 10; i++) {
-      this.sparks.spawn(x, y, z, (this.rand() - 0.5) * 5, this.rand() * 4, (this.rand() - 0.5) * 5, color, kind === "escudo" ? 0.07 : 0.06, 0.25 + this.rand() * 0.2, 1);
-    }
+    // On a talo: a splash of the shooter's paint (and the bubble shimmers on the shield).
+    this.spray(x, y, z, 12, 2.6, 2.5, c);
+    if (kind === "escudo") this.burst(x, y, z, 0x9be7ff, 6, 3);
   }
 
   private burst(x: number, y: number, z: number, color: number, n: number, speed: number) {
@@ -1745,6 +1840,120 @@ export class FuegoScene {
     }
   }
 
+  /** Draws the flags (with a ring at each base) and the golden egg where the mode says they are. */
+  setObjectives(o: ObjectivesDraw) {
+    for (const f of o.flags) {
+      let m = this.flagMeshes.get(f.team);
+      const col = new THREE.Color(SIDE_COLORS[f.team]);
+      if (!m) {
+        const group = new THREE.Group();
+        put(group, new THREE.CylinderGeometry(0.045, 0.045, 2.3, 12), phong(0xf4f4f5, 90), 0, 1.15, 0);
+        put(group, new THREE.SphereGeometry(0.08, 14, 10), phong(0xffd400, 120), 0, 2.33, 0);
+        const cloth = put(group, rbox(0.9, 0.58, 0.05, 0.02), new THREE.MeshPhongMaterial({ color: col, emissive: col.clone().multiplyScalar(0.25), shininess: 60 }), 0.47, 1.95, 0);
+        // A talo face on the flag.
+        for (const x of [0.36, 0.58]) put(cloth, new THREE.SphereGeometry(0.06, 12, 10), phong(0xffffff, 80), x - 0.47, 0.05, 0.03).scale.set(1, 1.1, 0.4);
+        const ring = new THREE.Mesh(new THREE.RingGeometry(1.0, 1.25, 40), glowMat(SIDE_COLORS[f.team], 1.3, { transparent: true, opacity: 0.7, depthWrite: false }));
+        ring.rotation.x = -Math.PI / 2;
+        const beam = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.35, 0.35, 14, 16, 1, true),
+          new THREE.MeshBasicMaterial({ color: col.clone().multiplyScalar(0.9), transparent: true, opacity: 0.09, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
+        );
+        this.scene.add(group, ring, beam);
+        m = { group, cloth, ring, beam };
+        this.flagMeshes.set(f.team, m);
+      }
+      m.group.position.set(f.x, f.y, f.z);
+      m.group.scale.setScalar(f.carried ? 0.6 : 1);
+      m.ring.position.set(f.base.x, f.base.y + 0.03, f.base.z);
+      m.beam.position.set(f.x, f.y + 7, f.z);
+      m.beam.visible = !f.carried;
+    }
+    if (o.egg) {
+      if (!this.eggMesh) {
+        const group = new THREE.Group();
+        const body = new THREE.Group();
+        group.add(body);
+        const gold = new THREE.MeshPhongMaterial({ color: 0xffc400, emissive: new THREE.Color(0xffa000).multiplyScalar(0.35), shininess: 160, specular: 0xffffff });
+        put(body, new THREE.SphereGeometry(0.42, 28, 20), gold, 0, 0, 0).scale.set(1, 1.3, 1);
+        for (const x of [-0.15, 0.15]) {
+          put(body, new THREE.SphereGeometry(0.11, 14, 12), phong(0xffffff, 80), x, 0.12, -0.36).scale.set(1, 1.1, 0.45);
+          put(body, new THREE.SphereGeometry(0.055, 12, 10), new THREE.MeshBasicMaterial({ color: 0x111111 }), x, 0.11, -0.41).scale.set(1, 1, 0.5);
+        }
+        const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: new THREE.Color(0xffd400).multiplyScalar(0.7), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+        glow.scale.setScalar(1.5);
+        group.add(glow);
+        const beam = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.4, 0.4, 16, 16, 1, true),
+          new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffd400).multiplyScalar(0.9), transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
+        );
+        this.scene.add(group, beam);
+        this.eggMesh = { group, body, beam, glow };
+      }
+      const e = this.eggMesh;
+      e.group.visible = true;
+      e.group.position.set(o.egg.x, o.egg.y, o.egg.z);
+      e.group.scale.setScalar(o.egg.held ? 0.7 : 1);
+      e.beam.visible = !o.egg.held;
+      e.beam.position.set(o.egg.x, o.egg.y + 8, o.egg.z);
+    } else if (this.eggMesh) {
+      this.eggMesh.group.visible = false;
+      this.eggMesh.beam.visible = false;
+    }
+  }
+
+  /** Leaves a paint splat of `size` meters on a surface (normal `n`). */
+  paint(x: number, y: number, z: number, n: [number, number, number], size: number, color: THREE.Color) {
+    const i = this.splatNext;
+    this.splatNext = (i + 1) % SPLATS;
+    const o = this.dummy;
+    const lift = 0.006 + (i % 9) * 0.0011;
+    o.position.set(x + n[0] * lift, y + n[1] * lift, z + n[2] * lift);
+    o.lookAt(x + n[0], y + n[1], z + n[2]);
+    o.rotateZ(this.rand() * Math.PI * 2);
+    o.scale.set(size, size, 1);
+    o.updateMatrix();
+    this.splats.setMatrixAt(i, o.matrix);
+    this.splats.setColorAt(i, color);
+    this.splats.instanceMatrix.needsUpdate = true;
+    if (this.splats.instanceColor) this.splats.instanceColor.needsUpdate = true;
+  }
+
+  /** A burst of paint drops. */
+  private spray(x: number, y: number, z: number, n: number, speed: number, up: number, color: THREE.Color, dir: [number, number, number] = [0, 0, 0]) {
+    const c = new THREE.Color();
+    for (let i = 0; i < n; i++) {
+      const a = this.rand() * Math.PI * 2;
+      const v = speed * (0.3 + this.rand() * 0.7);
+      c.copy(color).lerp(new THREE.Color(0xffffff), this.rand() * 0.25);
+      this.drops.spawn(x, y, z, dir[0] * speed + Math.cos(a) * v, dir[1] * speed + up * (0.4 + this.rand()), dir[2] * speed + Math.sin(a) * v, c, 0.07 + this.rand() * 0.09, 0.45 + this.rand() * 0.5, 1);
+    }
+  }
+
+  /** An ability, seen by everyone: a dash's dust, a super jump's ring, a teleport's sparkle, the radar's column, the bubble. */
+  abilityFx(kind: string, x: number, y: number, z: number, color: string) {
+    const c = new THREE.Color(color);
+    if (kind === "impulso") {
+      this.dust(x, y, z, 8);
+      this.spray(x, y + 0.8, z, 10, 2, 1, c);
+    } else if (kind === "salto") {
+      this.dust(x, y, z, 14);
+      this.burst(x, y + 0.2, z, 0xffffff, 12, 4);
+    } else if (kind === "teletransporte") {
+      this.burst(x, y + 1, z, c.getHex(), 24, 4);
+      this.burst(x, y + 1, z, 0xffffff, 10, 3);
+    } else if (kind === "radar") {
+      this.spawnFx(x, y, z, c.getHex());
+    } else if (kind === "burbuja") {
+      this.burst(x, y + 1, z, 0x9be7ff, 24, 3.5);
+    }
+  }
+
+  /** Just got a kill: the talo smiles and hops. */
+  cheer(id: string) {
+    const k = this.soldiers.get(id);
+    if (k) k.cheerT = 1.3;
+  }
+
   /** Hit: on the shield it shimmers; on health the armor flashes red and the soldier flinches. */
   hurt(id: string, shield: boolean) {
     const k = this.soldiers.get(id);
@@ -1759,15 +1968,17 @@ export class FuegoScene {
     if (k) k.shieldT = 0.3;
   }
 
-  explosion(x: number, y: number, z: number, big: boolean, near: number) {
+  /** A paint balloon bursting: a flash of its color, a ring, a rain of drops and paint on the floor around. */
+  explosion(x: number, y: number, z: number, big: boolean, near: number, color: string = DEFAULT_PAINT) {
+    const c = new THREE.Color(color);
     const size = big ? 7.5 : 6;
-    const core = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: new THREE.Color(0xfff2c4).multiplyScalar(3), transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const core = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: new THREE.Color(0xffffff).lerp(c, 0.3).multiplyScalar(2.4), transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }));
     core.position.set(x, y + 0.4, z);
-    const fire = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: new THREE.Color(0xff7a1a).multiplyScalar(2.2), transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const fire = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: c.clone().multiplyScalar(1.7), transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false }));
     fire.position.set(x, y + 0.8, z);
     const ring = new THREE.Mesh(
       new THREE.RingGeometry(0.8, 1, 40),
-      new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffd7a0).multiplyScalar(1.8), transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
+      new THREE.MeshBasicMaterial({ color: c.clone().lerp(new THREE.Color(0xffffff), 0.4).multiplyScalar(1.5), transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })
     );
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(x, Math.max(0.05, y - 0.2), z);
@@ -1775,54 +1986,27 @@ export class FuegoScene {
     const light = this.blastLights[this.blastNext];
     this.blastNext = (this.blastNext + 1) % this.blastLights.length;
     light.position.set(x, y + 1.2, z);
+    light.color.copy(c).lerp(new THREE.Color(0xffffff), 0.3);
     light.intensity = 45;
     this.blasts.push({ core, fire, ring, light, t: 0, size });
-    // Embers, smoke and flying chunks.
-    const ember = new THREE.Color(0xffb347);
-    for (let i = 0; i < 46; i++) {
-      const a = this.rand() * Math.PI * 2;
-      const v = 3 + this.rand() * 10;
-      this.sparks.spawn(x, y + 0.3, z, Math.cos(a) * v, this.rand() * 9, Math.sin(a) * v, ember, 0.1, 0.4 + this.rand() * 0.6, 1);
+    // A rain of paint, white confetti and a puff.
+    this.spray(x, y + 0.3, z, big ? 90 : 70, 9, 7, c);
+    this.burst(x, y + 0.4, z, 0xffffff, 14, 7);
+    const puff = c.clone().lerp(new THREE.Color(0xffffff), 0.6);
+    for (let i = 0; i < 8; i++) {
+      this.smoke.spawn(x + (this.rand() - 0.5) * 1.2, y + 0.4 + this.rand(), z + (this.rand() - 0.5) * 1.2, (this.rand() - 0.5) * 2.5, 0.8 + this.rand() * 1.5, (this.rand() - 0.5) * 2.5, puff, 0.5 + this.rand() * 0.4, 1 + this.rand() * 0.6, 0.4, 1.1);
     }
-    const gray = new THREE.Color(0x9ca3af);
-    const dark = new THREE.Color(0x52525b);
-    for (let i = 0; i < 16; i++) {
-      this.smoke.spawn(
-        x + (this.rand() - 0.5) * 1.5,
-        y + 0.4 + this.rand(),
-        z + (this.rand() - 0.5) * 1.5,
-        (this.rand() - 0.5) * 3,
-        1 + this.rand() * 2,
-        (this.rand() - 0.5) * 3,
-        i % 3 ? gray : dark,
-        0.5 + this.rand() * 0.5,
-        1.4 + this.rand(),
-        0.45,
-        1.1
-      );
-    }
-    for (let i = 0; i < 10; i++) {
-      const d = this.debris[this.debrisNext];
-      this.debrisNext = (this.debrisNext + 1) % this.debris.length;
-      const a = this.rand() * Math.PI * 2;
-      const v = 4 + this.rand() * 7;
-      d.mesh.visible = true;
-      d.mesh.position.set(x, y + 0.3, z);
-      d.mesh.scale.setScalar(0.5 + this.rand());
-      d.vx = Math.cos(a) * v;
-      d.vz = Math.sin(a) * v;
-      d.vy = 4 + this.rand() * 6;
-      d.spin = (this.rand() - 0.5) * 20;
-      d.life = 2.5;
-      d.floor = topAt(worldOf(this.map.id), x, z);
-    }
-    // A scorch mark on the floor.
-    if (y < topAt(worldOf(this.map.id), x, z) + 1.2) {
-      const sc = this.scorches[this.scorchNext];
-      this.scorchNext = (this.scorchNext + 1) % this.scorches.length;
-      sc.visible = true;
-      sc.rotation.set(-Math.PI / 2, 0, this.rand() * Math.PI);
-      sc.position.set(x, topAt(worldOf(this.map.id), x, z) + 0.02, z);
+    // Paint on the floor: a big splat and smaller ones around.
+    const floorY = topAt(this.world, x, z);
+    if (y < floorY + 1.6) {
+      this.paint(x, floorY, z, [0, 1, 0], big ? 3.8 : 3.2, c);
+      for (let i = 0; i < 9; i++) {
+        const a = this.rand() * Math.PI * 2;
+        const r = 1.3 + this.rand() * 2.4;
+        const px = x + Math.cos(a) * r;
+        const pz = z + Math.sin(a) * r;
+        this.paint(px, topAt(this.world, px, pz), pz, [0, 1, 0], 0.45 + this.rand() * 0.7, c);
+      }
     }
     this.shake = Math.max(this.shake, Math.max(0, 1 - near / 20) * 1.3);
   }
@@ -1894,19 +2078,27 @@ export class FuegoScene {
       let g = this.projectiles.get(id);
       if (!g) {
         g = new THREE.Group();
+        const c = new THREE.Color(p.color ?? DEFAULT_PAINT);
+        const skin = new THREE.MeshPhongMaterial({ color: c, shininess: 140, specular: 0xffffff, emissive: c.clone().multiplyScalar(0.15) });
         if (p.kind === "cohete") {
-          const body = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.5, 8), phong(0x9ca3af));
-          body.rotation.x = Math.PI / 2;
-          const tip = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.18, 8), phong(0xdc2626));
-          tip.rotation.x = -Math.PI / 2;
-          tip.position.z = -0.33;
-          const fl = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: new THREE.Color(0xffa040).multiplyScalar(3), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
-          fl.scale.setScalar(1.1);
-          fl.position.z = 0.35;
-          g.add(body, tip, fl);
+          // A paint balloon: round, a knot behind, a little glow trail.
+          const ball = new THREE.Mesh(new THREE.SphereGeometry(0.17, 18, 14), skin);
+          ball.scale.set(1, 1, 1.25);
+          const knot = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.08, 10), skin);
+          knot.rotation.x = Math.PI / 2;
+          knot.position.z = 0.24;
+          const fl = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: c.clone().multiplyScalar(1.8), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+          fl.scale.setScalar(0.8);
+          fl.position.z = 0.3;
+          g.add(ball, knot, fl);
         } else {
-          g.add(new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 10), phong(0x3f6212)));
-          const blink = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: new THREE.Color(0x84cc16).multiplyScalar(2.5), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+          // A water balloon of paint.
+          const ball = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 12), skin);
+          ball.scale.set(1, 1.12, 1);
+          const knot = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.06, 10), skin);
+          knot.position.y = 0.14;
+          g.add(ball, knot);
+          const blink = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glow, color: c.clone().multiplyScalar(2.2), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
           blink.scale.setScalar(0.45);
           blink.name = "blink";
           g.add(blink);
@@ -1918,8 +2110,9 @@ export class FuegoScene {
       const sp = Math.hypot(p.vx, p.vy, p.vz);
       if (sp > 0.1) g.lookAt(p.x - p.vx, p.y - p.vy, p.z - p.vz);
       if (p.kind === "cohete") {
-        this.smoke.spawn(p.x, p.y, p.z, (this.rand() - 0.5) * 0.3, 0.2, (this.rand() - 0.5) * 0.3, new THREE.Color(0xd1d5db), 0.3, 1.1, 0.45, 0.9);
-        this.sparks.spawn(p.x, p.y, p.z, -p.vx * 0.05, -p.vy * 0.05, -p.vz * 0.05, new THREE.Color(0xffa040), 0.09, 0.15, 1);
+        const c = new THREE.Color(p.color ?? DEFAULT_PAINT);
+        this.smoke.spawn(p.x, p.y, p.z, (this.rand() - 0.5) * 0.3, 0.2, (this.rand() - 0.5) * 0.3, c.clone().lerp(new THREE.Color(0xffffff), 0.7), 0.22, 0.8, 0.35, 0.9);
+        if (this.rand() < 0.5) this.drops.spawn(p.x, p.y, p.z, -p.vx * 0.05, -p.vy * 0.05, -p.vz * 0.05, c, 0.08, 0.4, 1);
       } else {
         // Blinks faster as the fuse runs out.
         const blink = g.getObjectByName("blink") as THREE.Sprite | undefined;
@@ -1965,6 +2158,7 @@ export class FuegoScene {
     this.time += dt;
     this.sparks.update(dt);
     this.smoke.update(dt);
+    this.drops.update(dt);
     this.motes.update(dt, this.camera.position.x, this.camera.position.y, this.camera.position.z, this.time);
     this.stepBits(this.debris, dt, 0.35);
     this.stepBits(this.shells, dt, 0.3);
@@ -2014,6 +2208,13 @@ export class FuegoScene {
         this.beams.splice(i, 1);
       }
     }
+    // Flags wave, the egg turns and bobs.
+    for (const m of this.flagMeshes.values()) m.cloth.rotation.y = Math.sin(this.time * 3) * 0.25;
+    if (this.eggMesh) {
+      this.eggMesh.body.rotation.y = Math.sin(this.time * 1.5) * 0.6;
+      this.eggMesh.body.position.y = 0.6 + Math.sin(this.time * 2.5) * 0.08;
+      this.eggMesh.glow.position.y = this.eggMesh.body.position.y;
+    }
     for (const cl of this.clouds) {
       cl.position.x += dt * 1.5;
       if (cl.position.x > 450) cl.position.x -= 900;
@@ -2043,55 +2244,81 @@ export class FuegoScene {
       k.vf += (Math.max(-7, Math.min(7, -vx * sy - vz * cy)) - k.vf) * ease;
       k.vs += (Math.max(-7, Math.min(7, vx * cy - vz * sy)) - k.vs) * ease;
       const speed = d.alive ? Math.hypot(k.vf, k.vs) : 0;
-      k.root.position.set(d.x, d.y, d.z);
-      k.root.rotation.y = d.yaw;
       const inAir = d.alive && d.y - topAt(this.world, d.x, d.z) > 0.25;
+      if (k.wasAir && !inAir && d.alive) k.squash = 1;
+      k.wasAir = inAir;
       k.air += ((inAir ? 1 : 0) - k.air) * (1 - Math.exp(-dt * 10));
+      const sink = d.alive ? 0 : Math.max(0, d.deadFor - 2.4) * 0.8;
+      k.root.position.set(d.x, d.y - sink, d.z);
+      k.root.rotation.y = d.yaw;
 
-      // Walk cycle: thighs swing (sideways when strafing), knees bend on the way forward, the chest bobs.
+      // Waddle: the body bobs and sways, the feet step along the way it moves, it leans into the run.
       const amt = Math.min(1, speed / 5);
-      k.walk += dt * (1.5 + speed * 1.55) * (k.vf < -0.5 ? -1 : 1) * (amt > 0.05 ? 1 : 0);
+      k.walk += dt * (2.2 + speed * 1.9) * (amt > 0.05 ? 1 : 0);
       const ph = k.walk;
-      const side = Math.abs(k.vs) / (Math.abs(k.vf) + Math.abs(k.vs) + 0.001);
-      const swing = Math.sin(ph) * 0.7 * amt;
-      const tuck = k.air;
-      k.legL.rotation.x = swing * (1 - side) * (1 - tuck) + 0.55 * tuck;
-      k.legR.rotation.x = -swing * (1 - side) * (1 - tuck) - 0.1 * tuck;
-      k.legL.rotation.z = -Math.sin(ph) * 0.22 * amt * side;
-      k.legR.rotation.z = Math.sin(ph) * 0.22 * amt * side;
-      k.kneeL.rotation.x = -(Math.max(0, Math.sin(ph + 1.3)) * 1.0 * amt + 0.06) * (1 - tuck) - 1.0 * tuck;
-      k.kneeR.rotation.x = -(Math.max(0, Math.sin(ph + 1.3 + Math.PI)) * 1.0 * amt + 0.06) * (1 - tuck) - 0.45 * tuck;
-      k.chest.position.y = 0.95 + Math.abs(Math.cos(ph)) * 0.035 * amt - 0.05 * amt;
-      // Lean into the run and the strafe, look up and down with the aim; a flinch when hit.
-      const flinch = k.hurtT * 1.2;
-      k.chest.rotation.x = Math.max(-0.35, Math.min(0.35, d.pitch * 0.25 - k.vf * 0.03)) + flinch * 0.5;
-      k.chest.rotation.z = -k.vs * 0.025;
-      k.chest.rotation.y = Math.sin(ph) * 0.06 * amt * (1 - side);
-      k.arms.rotation.x = Math.max(-1.2, Math.min(1.2, d.pitch)) - flinch * 0.3;
-      k.head.rotation.x = Math.max(-0.5, Math.min(0.5, d.pitch * 0.4));
+      const dirF = speed > 0.1 ? k.vf / speed : 0;
+      const dirS = speed > 0.1 ? k.vs / speed : 0;
+      k.feet.forEach((f, i) => {
+        const step = Math.sin(ph + i * Math.PI) * 0.17 * amt;
+        f.position.x = (i ? 0.22 : -0.22) + step * dirS;
+        f.position.z = -0.02 - step * dirF;
+        f.position.y = Math.max(0, Math.cos(ph + i * Math.PI)) * 0.09 * amt + k.air * 0.12;
+      });
+      k.squash = Math.max(0, k.squash - dt * 5);
+      k.cheerT = Math.max(0, k.cheerT - dt);
+      const sq = k.squash;
+      const stretch = k.air * 0.07;
+      k.body.scale.set(1 + sq * 0.14 - stretch * 0.5, 1 - sq * 0.17 + stretch, 1 + sq * 0.14 - stretch * 0.5);
+      const hop = k.cheerT > 0.5 ? Math.abs(Math.sin((1.3 - k.cheerT) * 9)) * 0.18 : 0;
+      k.body.position.y = Math.abs(Math.sin(ph)) * 0.07 * amt + hop;
+      k.body.rotation.z = Math.sin(ph) * 0.08 * amt - k.vs * 0.02;
+      k.body.rotation.x = -k.vf * 0.025 + k.hurtT * 0.6;
+      k.arms.rotation.x = Math.max(-1.1, Math.min(1.1, d.pitch));
+
+      // Eyes: blink now and then, squint when hit, smile after a kill, X when out.
+      k.blinkT -= dt;
+      if (k.blinkT < -0.12) k.blinkT = 2.2 + this.rand() * 3;
       k.hurtT = Math.max(0, k.hurtT - dt);
-      for (const m of k.hurtMats) m.emissive.setRGB(k.hurtT * 3.2, k.hurtT * 0.5, k.hurtT * 0.4);
+      const open = k.blinkT < 0 ? 0.12 : k.hurtT > 0 ? 0.35 : 1;
+      const happy = d.alive && k.cheerT > 0;
+      // Chaos: a ghost shows only its eyes; googly eyes grow.
+      const ghost = !!d.ghost && d.alive;
+      k.torso.visible = k.arms.visible = k.blob.visible = !ghost;
+      for (const f of k.feet) f.visible = !ghost;
+      const big = d.eyes ?? 1;
+      for (const e of k.eyes) {
+        e.white.visible = e.pupil.visible = d.alive && !happy;
+        e.happy.visible = happy;
+        e.dead.visible = !d.alive;
+        e.white.scale.set(big, 1.1 * open * big, 0.45 * big);
+        e.pupil.scale.set(big, open * big, 0.5 * big);
+        e.happy.scale.setScalar(big);
+        e.pupil.position.x = e.x + Math.max(-0.04, Math.min(0.04, k.vs * 0.008));
+        e.pupil.position.y = k.eyeY - 0.01 + Math.max(-0.05, Math.min(0.05, d.pitch * 0.05));
+      }
+      k.bodyMat.emissive.setRGB(k.hurtT * 2.4, k.hurtT * 0.3, k.hurtT * 0.3);
+      k.blob.scale.setScalar(1 - k.air * 0.35);
 
       if (!d.alive) {
-        // Falls back with the knees giving way, then sinks into the floor before it's gone.
-        const f = Math.min(1, d.deadFor / 0.55);
+        // Falls on its back, flattens a bit, sees stars, then sinks into the floor before it's gone.
+        const f = Math.min(1, d.deadFor / 0.5);
         const e = 1 - (1 - f) * (1 - f);
-        k.body.rotation.x = e * (Math.PI / 2) * 0.95;
-        k.body.position.y = -e * 0.55 - Math.max(0, d.deadFor - 2.4) * 0.8;
-        k.kneeL.rotation.x = -0.8 * e;
-        k.kneeR.rotation.x = -0.5 * e;
-        k.arms.rotation.x = -0.6 * e;
+        k.body.rotation.x = e * (Math.PI / 2) * 0.92;
+        k.body.scale.set(1 + e * 0.08, 1 - e * 0.1, 1 + e * 0.08);
+        k.body.position.y = 0.1 * e;
+        k.stars.visible = d.deadFor > 0.4;
+        k.stars.rotation.y = this.time * 4;
+        k.stars.position.set(0, 0.62 + Math.sin(this.time * 6) * 0.05, 1.2);
         k.tag.visible = false;
       } else {
-        k.body.rotation.x = 0;
-        k.body.position.y = 0;
-        k.tag.visible = true;
+        k.stars.visible = false;
+        k.tag.visible = !ghost;
       }
       const fm = k.flash.material as THREE.SpriteMaterial;
       fm.opacity = Math.max(0, fm.opacity - dt * 18);
       fm.rotation = this.rand() * Math.PI;
       k.shieldT = Math.max(d.guard && d.alive ? 0.07 + Math.sin(this.time * 9) * 0.03 : 0, k.shieldT - dt);
-      k.shield.material.opacity = k.shieldT * 2.2;
+      k.shield.material.opacity = k.shieldT * 1.4;
       k.shield.rotation.y += dt * 4;
     }
   }
@@ -2118,6 +2345,7 @@ export class FuegoScene {
     const scale = (ch * dpr) / (2 * Math.tan((cam.fov * Math.PI) / 360));
     this.sparks.setScale(scale);
     this.smoke.setScale(scale);
+    this.drops.setScale(scale);
     this.motes.setScale(scale);
     this.renderer.setViewport(0, 0, cw, ch);
     if (this.composer) {
@@ -2227,6 +2455,7 @@ export class FuegoScene {
       const scale = (h * dpr) / (2 * Math.tan((cam.fov * Math.PI) / 360));
       this.sparks.setScale(scale);
       this.smoke.setScale(scale);
+      this.drops.setScale(scale);
       this.motes.setScale(scale);
       r.setViewport(x, y, w, h);
       r.setScissor(x, y, w, h);
@@ -2280,50 +2509,32 @@ class HandRig {
   }
 
   update(v: ViewModel, dt: number, time: number, rand: () => number) {
-    const key = `${v.weapon}|${v.color}`;
+    const key = `${v.weapon}|${v.color}|${v.unarmed ? 1 : 0}`;
     if (this.key !== key) {
       this.key = key;
       for (const ch of [...this.gun.children]) {
         this.gun.remove(ch);
         if (ch !== this.flash) disposeTree(ch);
       }
-      const gun = weaponMesh(v.weapon);
-      this.gun.add(gun);
+      if (!v.unarmed) this.gun.add(weaponMesh(v.weapon, new THREE.Color(v.color).getHex()));
       // Gloved hands with short forearms in a dark suit, a small armor plate in your color on each.
-      const suit = phong(0x2b313b, 40);
-      const glove = phong(0x1f242c, 35);
-      const plate = phong(new THREE.Color(v.color).getHex(), 90);
+      // Round talo mitts in your color (talos have no arms): one on the grip, one in front.
+      const mitt = phong(new THREE.Color(v.color).getHex(), 70);
       const pistol = v.weapon === "pistola";
-      // Rounded forearms in the suit with an armor plate in your color, a cuff at the wrist.
-      const forearm = (x: number, y: number, z: number, ry: number) => {
-        const g2 = new THREE.Group();
-        put(g2, new THREE.CapsuleGeometry(0.046, 0.2, 4, 12), suit, 0, 0, 0.15, Math.PI / 2);
-        put(g2, rbox(0.09, 0.035, 0.16, 0.015), plate, 0, 0.045, 0.15);
-        put(g2, new THREE.TorusGeometry(0.05, 0.013, 8, 16), glove, 0, 0, 0.04);
-        g2.position.set(x, y, z);
-        g2.rotation.set(0.35, ry, 0);
-        bake(g2);
-        return g2;
-      };
-      // A gloved hand: palm, four fingers wrapped around the grip and a thumb along it.
       const hand = (x: number, y: number, z: number) => {
         const h = new THREE.Group();
-        put(h, rbox(0.075, 0.09, 0.1, 0.03), glove, 0, 0, 0.01);
-        for (let i = 0; i < 4; i++) put(h, new THREE.CapsuleGeometry(0.016, 0.05, 3, 8), glove, -0.005, 0.03 - i * 0.022, -0.052, 0, 0, Math.PI / 2);
-        put(h, new THREE.CapsuleGeometry(0.017, 0.05, 3, 8), glove, 0.04, 0.035, -0.02, Math.PI / 2);
+        put(h, new THREE.SphereGeometry(0.075, 20, 16), mitt, 0, 0, 0).scale.set(1, 0.9, 1.15);
+        put(h, new THREE.SphereGeometry(0.03, 14, 10), mitt, 0.055, 0.035, -0.035);
         h.position.set(x, y, z);
         bake(h);
         return h;
       };
-      this.gun.add(
-        hand(0.015, -0.07, 0.04),
-        hand(-0.03, -0.05, pistol ? 0.0 : -0.38),
-        forearm(0.04, -0.1, 0.08, 0.38),
-        forearm(-0.06, -0.08, pistol ? 0.04 : -0.33, pistol ? -0.4 : -0.65)
-      );
+      if (v.unarmed) this.gun.add(hand(0.0, -0.04, -0.05), hand(-0.34, -0.04, -0.05));
+      else this.gun.add(hand(0.0, -0.06, 0.03), pistol ? hand(-0.05, -0.075, 0.05) : hand(-0.01, -0.035, -0.42));
+      (this.flash.material as THREE.SpriteMaterial).color.set(v.color).lerp(new THREE.Color(0xffffff), 0.5).multiplyScalar(1.6);
       this.gun.add(this.flash);
       this.flash.position.set(0, 0.05, pistol ? -0.33 : v.weapon === "francotirador" ? -1.2 : v.weapon === "lanzacohetes" ? -0.84 : -0.82);
-      this.gun.scale.setScalar(0.62);
+      this.gun.scale.setScalar(0.56);
     }
     this.root.visible = !v.hidden;
     const moving = Math.min(1, v.speed / 5);
@@ -2341,8 +2552,8 @@ class HandRig {
     sw.x = Math.max(-0.06, Math.min(0.06, sw.x));
     sw.y = Math.max(-0.06, Math.min(0.06, sw.y));
     const aimK = v.aiming ? 0.25 : 1;
-    const hip = { x: 0.16, y: -0.15, z: -0.34 };
-    const ads = { x: 0, y: v.weapon === "francotirador" ? -0.1 : -0.075, z: -0.26 };
+    const hip = { x: 0.17, y: -0.16, z: -0.46 };
+    const ads = { x: 0, y: v.weapon === "francotirador" ? -0.11 : -0.085, z: -0.38 };
     const target = v.aiming ? ads : hip;
     const kick = Math.max(0, 1 - v.sinceShot / 0.12);
     const big = v.weapon === "escopeta" || v.weapon === "lanzacohetes" || v.weapon === "francotirador";

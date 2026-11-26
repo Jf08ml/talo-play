@@ -19,6 +19,13 @@ function hash(s: string): number {
   return Math.abs(h);
 }
 
+export type TaloShape = (typeof SHAPES)[number]["name"];
+
+/** The name of a player's talo shape (the same one `playerTalo` draws), for 3D games that build it. */
+export function taloShape(id: string): TaloShape {
+  return SHAPES[hash(id) % SHAPES.length].name;
+}
+
 export interface TaloLook {
   w: number;
   h: number;

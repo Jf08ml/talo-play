@@ -5,6 +5,29 @@ import { serverNow } from "./serverTime";
 import { transactState } from "./transact";
 import { TEAMS, type TeamId } from "./teams";
 import { MAPS, type MapId, type PickupKind } from "./fuegoMaps";
+import { chaosAt } from "./fuegoChaos";
+import { ABILITY_IDS, OVERSHIELD, defaultKit, type AbilityId } from "./fuegoAbilities";
+import {
+  EGG_RESET_MS,
+  EGG_TARGET_MS,
+  FLAG_CAPS,
+  FLAG_RETURN_MS,
+  INFECTED,
+  INFECTED_COLOR,
+  INFECTED_MAX_MIN,
+  INFECTED_PER,
+  LADDER,
+  MODE_ORDER,
+  SURVIVORS,
+  eggScore,
+  flagBase,
+  isTeamMode,
+  ladderStep,
+  type Egg,
+  type Flag,
+  type FuegoMode,
+} from "./fuegoModes";
+import { makeSeed } from "./random";
 import { MAX_HP, MAX_SHIELD, MEDKIT_HEAL, SHIELD_DELAY_MS, SHIELD_RATE, type BotLevel, type ProjectileKind } from "./fuegoSim";
 
 /**
@@ -49,7 +72,7 @@ export const RESPAWN_ITEM_MS: Record<PickupKind, number> = {
   botiquin: 30000,
 };
 
-export type FuegoMode = "todos" | "equipos";
+export type { FuegoMode } from "./fuegoModes";
 export type FuegoStatus = "waiting" | "playing" | "finished";
 /** Where the match is seen: each on their phone, or a big screen with the phones as controllers. */
 export type FuegoView = "telefono" | "pantalla";
@@ -69,6 +92,8 @@ export interface FuegoMeta {
   bots: boolean;
   level: BotLevel;
   view: FuegoView;
+  /** Chaos events every minute (lib/fuegoChaos.ts). */
+  chaos: boolean;
   createdAt: number | object;
 }
 
@@ -99,6 +124,9 @@ export interface HitNote {
 export interface FuegoState {
   status: FuegoStatus;
   gameNo: number;
+  /** Chaos on for this match, and the seed its events come from. */
+  chaos: boolean;
+  seed: number;
   map: MapId;
   mode: FuegoMode;
   goal: number;
@@ -106,6 +134,8 @@ export interface FuegoState {
   players: Record<string, FuegoPlayer>;
   /** Teams picked while waiting (teams mode). */
   teams: Record<string, TeamId>;
+  /** Each one's ability (picked while waiting; bots get one at the start). */
+  kits: Record<string, AbilityId>;
   /** This match's fighters and their side. */
   roster: Record<string, Side>;
   bots: Record<string, string>;
@@ -128,6 +158,11 @@ export interface FuegoState {
   best: Record<string, number>;
   score: Record<TeamId, number>;
   items: Record<string, { kind: PickupKind; x: number; z: number }>;
+  /** Atrapa la bandera: each team's flag. */
+  flags: Partial<Record<TeamId, Flag>>;
+  /** El tesoro: the egg, and the time each one has banked holding it (ms). */
+  egg: Egg | null;
+  held: Record<string, number>;
   respawns: Record<string, { kind: PickupKind; x: number; z: number; at: number }>;
   feed: Record<string, FeedEntry>;
   feedSeq: number;
@@ -158,6 +193,8 @@ export interface FuegoPose {
   /** Walking speed. */
   sp: number;
   t: number;
+  /** Abilities used so far (others show the effect when it grows); absent on older clients. */
+  h?: number;
 }
 
 export interface FuegoProjectile {
@@ -176,6 +213,8 @@ export interface FuegoProjectile {
 export interface FuegoBoom {
   k: number;
   kind: ProjectileKind;
+  /** Whose balloon (its paint color); absent on older ones. */
+  o?: string;
   x: number;
   y: number;
   z: number;
@@ -189,13 +228,14 @@ export function normalizeMeta(raw: Partial<FuegoMeta>): FuegoMeta {
     game: "fuego",
     hostId: raw.hostId,
     map: raw.map && raw.map in MAPS ? raw.map : "bunker",
-    mode: raw.mode === "equipos" ? "equipos" : "todos",
+    mode: raw.mode && MODE_ORDER.includes(raw.mode) ? raw.mode : "todos",
     size: Math.max(2, Math.min(8, raw.size ?? 4)),
     goal: raw.goal ?? 20,
     minutes: raw.minutes ?? 10,
     bots: raw.bots ?? true,
     level: raw.level ?? "normal",
     view: raw.view === "pantalla" ? "pantalla" : "telefono",
+    chaos: raw.chaos ?? true,
     createdAt: raw.createdAt ?? 0,
   };
 }
@@ -205,12 +245,15 @@ function normalizeState(raw: Partial<FuegoState> | null): FuegoState | null {
   return {
     status: raw.status,
     gameNo: raw.gameNo ?? 0,
+    chaos: raw.chaos ?? false,
+    seed: raw.seed ?? 0,
     map: raw.map ?? "bunker",
     mode: raw.mode ?? "todos",
     goal: raw.goal ?? 20,
     level: raw.level ?? "normal",
     players: raw.players ?? {},
     teams: raw.teams ?? {},
+    kits: raw.kits ?? {},
     roster: raw.roster ?? {},
     bots: raw.bots ?? {},
     startedAt: raw.startedAt ?? 0,
@@ -227,6 +270,9 @@ function normalizeState(raw: Partial<FuegoState> | null): FuegoState | null {
     best: raw.best ?? {},
     score: { red: raw.score?.red ?? 0, blue: raw.score?.blue ?? 0 },
     items: raw.items ?? {},
+    flags: raw.flags ?? {},
+    egg: raw.egg ?? null,
+    held: raw.held ?? {},
     respawns: raw.respawns ?? {},
     feed: raw.feed ?? {},
     feedSeq: raw.feedSeq ?? 0,
@@ -237,8 +283,12 @@ function normalizeState(raw: Partial<FuegoState> | null): FuegoState | null {
 
 export const isBot = (id: string) => id.startsWith("bot");
 
+/** Who the sky's balloons (chaos "lluvia") are, in the kill feed. */
+export const SKY = "cielo";
+
 export function fighterName(s: FuegoState, id: string, myId = ""): string {
   if (id === myId) return "Tú";
+  if (id === SKY) return "La lluvia";
   return s.bots[id] ?? s.players[id]?.name ?? "Soldado";
 }
 
@@ -269,12 +319,22 @@ export function guarded(s: Pick<FuegoState, "spawnAt">, id: string, now: number)
 /** A fighter's color: their team's, or their own in free-for-all. */
 export function fighterColor(s: FuegoState, id: string): string {
   const side = s.roster[id];
+  if (s.mode === "infectados" && side) return side === INFECTED ? INFECTED_COLOR : teamInfo("blue").color;
   return side === "red" || side === "blue" ? teamInfo(side).color : (s.players[id]?.color ?? "#f97316");
 }
 
 /** The fighters ranked by kills (then fewer deaths). */
 export function ranking(s: FuegoState): string[] {
+  if (s.mode === "tesoro") {
+    const now = serverNow();
+    return Object.keys(s.roster).sort((a, b) => eggScore(s, b, now) - eggScore(s, a, now) || (s.kills[b] ?? 0) - (s.kills[a] ?? 0));
+  }
   return Object.keys(s.roster).sort((a, b) => (s.kills[b] ?? 0) - (s.kills[a] ?? 0) || (s.deaths[a] ?? 0) - (s.deaths[b] ?? 0));
+}
+
+/** What a fighter's score is in this mode (kills, or the egg's seconds). */
+export function scoreOf(s: FuegoState, id: string, now: number): number {
+  return s.mode === "tesoro" ? Math.floor(eggScore(s, id, now) / 1000) : (s.kills[id] ?? 0);
 }
 
 // ---- Firebase ------------------------------------------------------------------------------
@@ -286,7 +346,7 @@ function mutate(roomId: string, fn: (state: FuegoState) => FuegoState | null) {
   return transactState(statePath(roomId), normalizeState, fn);
 }
 
-export type FuegoSettings = Pick<FuegoMeta, "map" | "mode" | "size" | "goal" | "minutes" | "bots" | "level" | "view">;
+export type FuegoSettings = Pick<FuegoMeta, "map" | "mode" | "size" | "goal" | "minutes" | "bots" | "level" | "view" | "chaos">;
 
 export async function createFuegoRoom(hostId: string, settings: FuegoSettings): Promise<string> {
   const roomId = generateRoomCode();
@@ -323,6 +383,23 @@ export function joinFuego(roomId: string, clientId: string, player: FuegoPlayer)
   });
 }
 
+/** Picks your ability (while waiting). */
+export function chooseKit(roomId: string, clientId: string, kit: AbilityId) {
+  return mutate(roomId, (s) => (s.status !== "playing" && s.kits[clientId] !== kit ? { ...s, kits: { ...s.kits, [clientId]: kit } } : null));
+}
+
+/** The ability a fighter has. */
+export const kitOf = (s: Pick<FuegoState, "kits">, id: string): AbilityId => s.kits[id] ?? defaultKit(id);
+
+/** Ability "burbuja": the shield full and some extra (it lasts until the shield would start recharging). */
+export function popBubble(roomId: string, key: number, id: string) {
+  return mutate(roomId, (s) => {
+    if (!playing(s, key) || !isAlive(s, id) || kitOf(s, id) !== "burbuja") return null;
+    const now = Math.round(serverNow());
+    return { ...s, sh: { ...s.sh, [id]: MAX_SHIELD + OVERSHIELD }, hitAt: { ...s.hitAt, [id]: now } };
+  });
+}
+
 export function chooseTeam(roomId: string, clientId: string, team: TeamId) {
   return mutate(roomId, (s) => (s.status === "waiting" && s.teams[clientId] !== team ? { ...s, teams: { ...s.teams, [clientId]: team } } : null));
 }
@@ -349,7 +426,7 @@ export function startMatch(roomId: string, settings: FuegoSettings, connected: s
     const people = connected.filter((id) => s.players[id]).slice(0, most);
     const roster: Record<string, Side> = {};
     const bots: Record<string, string> = {};
-    if (settings.mode === "equipos") {
+    if (isTeamMode(settings.mode)) {
       const half = Math.ceil(settings.size / 2);
       const count = { red: 0, blue: 0 };
       for (const id of people) {
@@ -368,17 +445,27 @@ export function startMatch(roomId: string, settings: FuegoSettings, connected: s
         }
       }
     } else {
-      for (const id of people) roster[id] = "ffa";
+      // Infectados: everyone starts as a survivor, then a few are picked as the first infected.
+      const side: Side = settings.mode === "infectados" ? SURVIVORS : "ffa";
+      for (const id of people) roster[id] = side;
       if (settings.bots) {
         for (let n = 0; people.length + n < settings.size; n++) {
-          roster[`bot${n}`] = "ffa";
+          roster[`bot${n}`] = side;
           bots[`bot${n}`] = BOT_NAMES[n % BOT_NAMES.length];
         }
+      }
+      if (settings.mode === "infectados") {
+        const all = Object.keys(roster).sort(() => Math.random() - 0.5);
+        const n = Math.max(1, Math.floor(all.length / INFECTED_PER));
+        for (const id of all.slice(0, Math.min(n, all.length - 1))) roster[id] = INFECTED;
       }
     }
     const ids = Object.keys(roster);
     if (ids.length < 2 || !ids.some((id) => !isBot(id))) return null;
-    if (settings.mode === "equipos" && (!ids.some((id) => roster[id] === "red") || !ids.some((id) => roster[id] === "blue"))) return null;
+    // Bots get an ability at random; people keep theirs.
+    const kits = { ...s.kits };
+    for (const id of ids) if (isBot(id)) kits[id] = ABILITY_IDS[Math.floor(Math.random() * ABILITY_IDS.length)];
+    if (isTeamMode(settings.mode) && (!ids.some((id) => roster[id] === "red") || !ids.some((id) => roster[id] === "blue"))) return null;
     const map = MAPS[settings.map];
     const items: FuegoState["items"] = {};
     map.items.forEach((it, i) => (items[`i${i}`] = it));
@@ -387,14 +474,23 @@ export function startMatch(roomId: string, settings: FuegoSettings, connected: s
       ...s,
       status: "playing",
       gameNo: s.gameNo + 1,
+      chaos: settings.chaos,
+      seed: makeSeed(),
       map: settings.map,
       mode: settings.mode,
       goal: settings.goal,
       level: settings.level,
       roster,
       bots,
+      kits,
       startedAt: start,
-      endsAt: start + settings.minutes * 60000,
+      endsAt: start + (settings.mode === "infectados" ? Math.min(settings.minutes, INFECTED_MAX_MIN) : settings.minutes) * 60000,
+      flags:
+        settings.mode === "bandera"
+          ? Object.fromEntries((["red", "blue"] as TeamId[]).map((t) => [t, { st: "base", by: "", ...flagBase(map, t), at: 0 } satisfies Flag]))
+          : {},
+      egg: settings.mode === "tesoro" ? { by: "", x: 0, z: 0, at: start } : null,
+      held: {},
       hp: Object.fromEntries(ids.map((id) => [id, MAX_HP])),
       sh: Object.fromEntries(ids.map((id) => [id, MAX_SHIELD])),
       hitAt: {},
@@ -446,8 +542,9 @@ export interface DamageHit {
  */
 export function damage(roomId: string, key: number, attacker: string, from: { x: number; z: number }, weapon: string, hits: DamageHit[]) {
   return mutate(roomId, (s) => {
-    if (!playing(s, key) || !(attacker in s.roster)) return null;
+    if (!playing(s, key) || !(attacker in s.roster || attacker === SKY)) return null;
     const now = serverNow();
+    const worth = chaosAt(s, now)?.id === "doble" ? 2 : 1;
     let next = {
       ...s,
       hp: { ...s.hp },
@@ -467,10 +564,14 @@ export function damage(roomId: string, key: number, attacker: string, from: { x:
       if (!isAlive(s, t) || next.deadAt[t]) continue;
       const self = t === attacker;
       if (self && weapon !== "cohete" && weapon !== "granada") continue;
+      if (attacker === SKY && weapon !== "granada") continue;
       if (!self && allies(s, attacker, t)) continue;
       if (!self && guarded(s, t, now)) continue;
       changed = true;
-      let dmg = Math.max(0, h.damage);
+      // An infected's punch infects at once; the last step of escalada knocks out too.
+      const knockout =
+        weapon === "golpe" && ((s.mode === "infectados" && s.roster[attacker] === INFECTED) || (s.mode === "escalada" && ladderStep(s.kills[attacker] ?? 0) === "golpe"));
+      let dmg = knockout ? 999 : Math.max(0, h.damage);
       const shield = shieldOf(next, t, now);
       const absorbed = Math.min(shield, dmg);
       dmg -= absorbed;
@@ -483,14 +584,26 @@ export function damage(roomId: string, key: number, attacker: string, from: { x:
         next.deaths[t] = (next.deaths[t] ?? 0) + 1;
         delete next.streak[t];
         let streak = 0;
-        if (!self) {
-          next.kills[attacker] = (next.kills[attacker] ?? 0) + 1;
+        if (!self && attacker !== SKY) {
+          next.kills[attacker] = (next.kills[attacker] ?? 0) + worth;
           streak = (next.streak[attacker] ?? 0) + 1;
           next.streak[attacker] = streak;
           next.best[attacker] = Math.max(next.best[attacker] ?? 0, streak);
           const side = s.roster[attacker];
-          if (side !== "ffa") next.score[side] += 1;
+          if (s.mode === "equipos" && side !== "ffa") next.score[side] += worth;
         }
+        // What the fallen one carried drops; a fallen survivor joins the infected.
+        if (s.mode === "bandera") {
+          for (const team of ["red", "blue"] as TeamId[]) {
+            const f = next.flags[team];
+            if (f?.st === "carried" && f.by === t) next.flags = { ...next.flags, [team]: { ...f, st: "dropped", at: Math.round(now) } };
+          }
+        }
+        if (s.mode === "tesoro" && next.egg?.by === t) {
+          next.held = { ...next.held, [t]: Math.round(eggScore(next, t, now)) };
+          next.egg = { ...next.egg, by: "", at: Math.round(now), last: t };
+        }
+        if (s.mode === "infectados" && next.roster[t] === SURVIVORS) next.roster = { ...next.roster, [t]: INFECTED };
         const entry: FeedEntry = { k: attacker, v: t, w: weapon, h: h.head, t: Math.round(now) };
         if (streak) entry.s = streak;
         next = { ...next, ...addFeed(next, entry) };
@@ -501,7 +614,11 @@ export function damage(roomId: string, key: number, attacker: string, from: { x:
     if (s.mode === "equipos") {
       const champ = (["red", "blue"] as TeamId[]).find((t) => next.score[t] >= s.goal);
       if (champ) return finish(next, champ);
-    } else if ((next.kills[attacker] ?? 0) >= s.goal) {
+    } else if (s.mode === "infectados") {
+      if (!Object.values(next.roster).includes(SURVIVORS)) return finish(next, INFECTED);
+    } else if (s.mode === "escalada") {
+      if (attacker !== SKY && (next.kills[attacker] ?? 0) >= LADDER.length) return finish(next, attacker);
+    } else if (s.mode === "todos" && attacker !== SKY && (next.kills[attacker] ?? 0) >= s.goal) {
       return finish(next, attacker);
     }
     return next;
@@ -561,12 +678,118 @@ export function respawnItems(roomId: string, key: number) {
 export function timeUp(roomId: string, key: number) {
   return mutate(roomId, (s) => {
     if (s.status !== "playing" || s.gameNo !== key || serverNow() < s.endsAt) return null;
-    if (s.mode === "equipos") {
+    if (s.mode === "equipos" || s.mode === "bandera") {
       return finish(s, s.score.red > s.score.blue ? "red" : s.score.blue > s.score.red ? "blue" : "draw");
     }
+    if (s.mode === "infectados") return finish(s, Object.values(s.roster).includes(SURVIVORS) ? SURVIVORS : INFECTED);
+    const now = serverNow();
     const [first, second] = ranking(s);
-    const tie = second !== undefined && (s.kills[first] ?? 0) === (s.kills[second] ?? 0);
+    const tie = second !== undefined && scoreOf(s, first, now) === scoreOf(s, second, now) && (s.mode === "tesoro" || (s.kills[first] ?? 0) === (s.kills[second] ?? 0));
     return finish(s, tie ? "draw" : first);
+  });
+}
+
+// ---- Atrapa la bandera ------------------------------------------------------------------------
+
+function flagHome(s: FuegoState, team: TeamId): Flag {
+  return { st: "base", by: "", ...flagBase(MAPS[s.map], team), at: Math.round(serverNow()) };
+}
+
+/**
+ * `id` touches `team`'s flag: a rival takes it (from its base or the floor);
+ * a teammate sends it home if it was dropped.
+ */
+export function touchFlag(roomId: string, key: number, id: string, team: TeamId) {
+  return mutate(roomId, (s) => {
+    if (!playing(s, key) || s.mode !== "bandera" || !isAlive(s, id)) return null;
+    const f = s.flags[team];
+    if (!f) return null;
+    if (s.roster[id] === team) return f.st === "dropped" ? { ...s, flags: { ...s.flags, [team]: flagHome(s, team) } } : null;
+    if (f.st === "carried") return null;
+    return { ...s, flags: { ...s.flags, [team]: { ...f, st: "carried", by: id, at: Math.round(serverNow()) } } };
+  });
+}
+
+/** `id` brought the rival's flag to its base while its own is home: a capture. */
+export function captureFlag(roomId: string, key: number, id: string) {
+  return mutate(roomId, (s) => {
+    if (!playing(s, key) || s.mode !== "bandera" || !isAlive(s, id)) return null;
+    const side = s.roster[id];
+    if (side !== "red" && side !== "blue") return null;
+    const rival: TeamId = side === "red" ? "blue" : "red";
+    const theirs = s.flags[rival];
+    if (theirs?.st !== "carried" || theirs.by !== id || s.flags[side]?.st !== "base") return null;
+    const score = { ...s.score, [side]: s.score[side] + 1 };
+    const next: FuegoState = {
+      ...s,
+      score,
+      flags: { ...s.flags, [rival]: flagHome(s, rival) },
+      ...addFeed(s, { k: id, v: "", w: "captura", h: false, t: Math.round(serverNow()) }),
+    };
+    return score[side] >= FLAG_CAPS ? finish(next, side) : next;
+  });
+}
+
+/** The phone of whoever dropped a flag or the egg says where it fell (the state only knew where it was taken). */
+export function placeDropped(roomId: string, key: number, id: string, x: number, z: number) {
+  return mutate(roomId, (s) => {
+    if (!playing(s, key)) return null;
+    const now = serverNow();
+    const pos = { x: Math.round(x * 10) / 10, z: Math.round(z * 10) / 10 };
+    let changed = false;
+    const flags = { ...s.flags };
+    for (const team of ["red", "blue"] as TeamId[]) {
+      const f = flags[team];
+      if (f?.st === "dropped" && f.by === id && now - f.at < 5000 && (f.x !== pos.x || f.z !== pos.z)) {
+        flags[team] = { ...f, ...pos };
+        changed = true;
+      }
+    }
+    let egg = s.egg;
+    if (egg && !egg.by && egg.last === id && now - egg.at < 5000 && (egg.x !== pos.x || egg.z !== pos.z)) {
+      egg = { ...egg, ...pos };
+      changed = true;
+    }
+    return changed ? { ...s, flags, egg } : null;
+  });
+}
+
+/** Dropped flags left alone go home; an egg left alone goes back to the middle. */
+export function tidyObjectives(roomId: string, key: number) {
+  return mutate(roomId, (s) => {
+    if (!playing(s, key)) return null;
+    const now = serverNow();
+    let changed = false;
+    const flags = { ...s.flags };
+    for (const team of ["red", "blue"] as TeamId[]) {
+      if (flags[team]?.st === "dropped" && now - flags[team]!.at > FLAG_RETURN_MS) {
+        flags[team] = flagHome(s, team);
+        changed = true;
+      }
+    }
+    let egg = s.egg;
+    if (egg && !egg.by && now - egg.at > EGG_RESET_MS && (egg.x !== 0 || egg.z !== 0)) {
+      egg = { by: "", x: 0, z: 0, at: Math.round(now) };
+      changed = true;
+    }
+    return changed ? { ...s, flags, egg } : null;
+  });
+}
+
+// ---- El tesoro ----------------------------------------------------------------------------
+
+export function takeEgg(roomId: string, key: number, id: string) {
+  return mutate(roomId, (s) => {
+    if (!playing(s, key) || s.mode !== "tesoro" || !s.egg || s.egg.by || !isAlive(s, id)) return null;
+    return { ...s, egg: { ...s.egg, by: id, at: Math.round(serverNow()) } };
+  });
+}
+
+/** Held long enough: the match is won. */
+export function claimEgg(roomId: string, key: number, id: string) {
+  return mutate(roomId, (s) => {
+    if (!playing(s, key) || s.mode !== "tesoro" || eggScore(s, id, serverNow()) < EGG_TARGET_MS) return null;
+    return finish(s, id);
   });
 }
 
@@ -641,6 +864,8 @@ export function subscribeBooms(roomId: string, cb: (list: Record<string, FuegoBo
  */
 export interface FuegoPad {
   sid: number;
+  /** Ability presses. */
+  h: number;
   x: number;
   y: number;
   lx: number;
@@ -656,7 +881,7 @@ export interface FuegoPad {
   p: number;
 }
 
-export const NO_PAD: FuegoPad = { sid: 0, x: 0, y: 0, lx: 0, ly: 0, f: 0, a: 0, ft: 0, j: 0, r: 0, q: 0, g: 0, m: 0, p: 0 };
+export const NO_PAD: FuegoPad = { sid: 0, h: 0, x: 0, y: 0, lx: 0, ly: 0, f: 0, a: 0, ft: 0, j: 0, r: 0, q: 0, g: 0, m: 0, p: 0 };
 
 export function openPad(roomId: string, clientId: string) {
   const r = ref(getDb(), `${base(roomId)}/input/${clientId}`);
@@ -682,6 +907,8 @@ export function subscribePads(roomId: string, cb: (pads: Record<string, FuegoPad
  * on the floor in reach (`n`, a label or ""), reloading and aiming.
  */
 export interface FuegoLive {
+  /** The ability's readiness, 0–100 (100 = ready). */
+  c: number;
   w: number;
   o: number;
   m: number;

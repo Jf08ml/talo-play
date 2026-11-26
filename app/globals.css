@@ -146,6 +146,13 @@
   }
 }
 
+/* Fuego cruzado: paint that hits your screen, then fades. */
+@keyframes paint-splat {
+  0% { opacity: 0.95; transform: translate(-50%, -50%) scale(0.5) rotate(var(--rot, 0deg)); }
+  12% { opacity: 0.95; transform: translate(-50%, -50%) scale(1) rotate(var(--rot, 0deg)); }
+  100% { opacity: 0; transform: translate(-50%, -46%) scale(1.05) rotate(var(--rot, 0deg)); }
+}
+
 @keyframes celebration-in {
   from {
     opacity: 0;

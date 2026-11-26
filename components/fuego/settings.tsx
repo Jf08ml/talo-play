@@ -1,6 +1,7 @@
 "use client";
 
-import { Bot, MonitorPlay, Smartphone } from "lucide-react";
+import { Bot, Egg, Flag, MonitorPlay, Skull, Smartphone, Swords, TrendingUp, Users, Zap } from "lucide-react";
+import { MODE_INFO, MODE_ORDER, isTeamMode, usesKillGoal, type FuegoMode } from "@/lib/fuegoModes";
 import { roomPath } from "@/lib/games";
 import { GOAL_OPTIONS, MINUTE_OPTIONS, SIZE_OPTIONS, createFuegoRoom, normalizeMeta, type FuegoSettings } from "@/lib/fuego";
 import { MAPS, MAP_ORDER } from "@/lib/fuegoMaps";
@@ -14,10 +15,12 @@ const LEVELS: { id: BotLevel; label: string }[] = [
   { id: "dificil", label: "Difíciles" },
 ];
 
+const MODE_ICONS: Record<FuegoMode, typeof Users> = { todos: Swords, equipos: Users, infectados: Skull, escalada: TrendingUp, bandera: Flag, tesoro: Egg };
+
 /** Where it's seen, map, mode, how many fighters, kills to win, time and bots. */
 export const SETTINGS: GameSettings<FuegoSettings> = {
   game: "fuego",
-  initial: { map: "bunker", mode: "todos", size: 4, goal: 20, minutes: 10, bots: true, level: "normal", view: "telefono" },
+  initial: { map: "bunker", mode: "todos", size: 4, goal: 20, minutes: 10, bots: true, level: "normal", view: "telefono", chaos: true },
   fields: [
     {
       kind: "choice",
@@ -46,11 +49,9 @@ export const SETTINGS: GameSettings<FuegoSettings> = {
       kind: "choice",
       key: "mode",
       label: "Modo",
-      layout: "segment",
-      options: [
-        { value: "todos", label: "Todos contra todos" },
-        { value: "equipos", label: "Rojos contra azules" },
-      ],
+      layout: 2,
+      options: MODE_ORDER.map((m) => ({ value: m, label: MODE_INFO[m].label, icon: MODE_ICONS[m] })),
+      hint: (v) => MODE_INFO[v.mode].hint,
     },
     {
       kind: "choice",
@@ -60,12 +61,19 @@ export const SETTINGS: GameSettings<FuegoSettings> = {
       options: (v) =>
         SIZE_OPTIONS.map((n) => ({
           value: n,
-          label: v.mode === "equipos" ? `${n / 2} vs ${n / 2}` : `${n}`,
+          label: isTeamMode(v.mode) ? `${n / 2} vs ${n / 2}` : `${n}`,
           disabled: n > MAPS[v.map].maxPlayers,
         })),
     },
-    { kind: "choice", key: "goal", label: "Bajas para ganar", options: choices(GOAL_OPTIONS, (n) => `${n}`) },
+    { kind: "choice", key: "goal", label: "Bajas para ganar", show: (v) => usesKillGoal(v.mode), options: choices(GOAL_OPTIONS, (n) => `${n}`) },
     { kind: "choice", key: "minutes", label: "Tiempo", layout: 2, options: choices(MINUTE_OPTIONS, (n) => `${n} min`) },
+    {
+      kind: "toggle",
+      key: "chaos",
+      icon: Zap,
+      label: "Caos cada minuto",
+      hint: "Cada minuto pasa algo por 25 segundos: gravedad baja, turbo, ojos saltones, solo salpicadoras, munición infinita, fantasmas, lluvia de globos o bajas dobles.",
+    },
     {
       kind: "toggle",
       key: "bots",
@@ -88,6 +96,6 @@ export const SETTINGS: GameSettings<FuegoSettings> = {
   save: (roomId, v) => saveRoomSettings(roomId, "fuego/state", { ...v }, { map: v.map, mode: v.mode }),
   fromMeta: (meta) => {
     const m = normalizeMeta(meta);
-    return { map: m.map, mode: m.mode, size: m.size, goal: m.goal, minutes: m.minutes, bots: m.bots, level: m.level, view: m.view };
+    return { map: m.map, mode: m.mode, size: m.size, goal: m.goal, minutes: m.minutes, bots: m.bots, level: m.level, view: m.view, chaos: m.chaos };
   },
 };

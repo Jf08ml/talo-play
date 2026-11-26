@@ -1136,43 +1136,67 @@ export const GUIDES: Record<GameId, Guide> = {
     tips: ["El 1 de espada y el 1 de basto son las cartas más fuertes: si los tienes, canta truco con confianza."],
   },
   fuego: {
-    goal: "Llegar primero a las bajas pedidas (o tener más cuando se acaba el tiempo).",
+    goal: "Ganar el modo que eligieron: más bajas, sobrevivir a los infectados, completar la escalada, capturar banderas o aguantar con el huevo dorado.",
     sections: [
       {
-        title: "Armas y escudo",
+        title: "Talos de pintura",
         text: [
-          "Empiezas con fusil, pistola y granadas. Por el mapa hay escopeta, francotirador y lanzacohetes; llevas dos armas a la vez (agarrar una cambia la que tienes en la mano).",
-          "El escudo absorbe los primeros daños y se recarga solo si dejan de pegarte. La vida, en cambio, solo vuelve con botiquines.",
-          "Al reaparecer quedas protegido dos segundos (el escudo brilla): nadie puede eliminarte apenas vuelves.",
+          "Cada jugador es su talo, con los ojos que reaccionan: se achinan cuando le pegan, sonríen cuando eliminan a alguien y quedan en X cuando cae. Todo dispara pintura del color de quien dispara, y el mapa se va llenando de manchas.",
+          "Empiezas con rociador, pistola y dos globos de pintura. Por el mapa hay salpicadora, francotirador y lanzaglobos; llevas dos a la vez (agarrar una cambia la que tienes en la mano).",
+          "La burbuja (el escudo) absorbe los primeros golpes y se recarga sola si dejan de pegarte; la vida solo vuelve con botiquines. Al reaparecer quedas protegido dos segundos.",
+        ],
+      },
+      {
+        title: "Modos",
+        text: [
+          "Todos contra todos y Rojos contra azules: gana quien llega primero a las bajas pedidas.",
+          "Infectados: unos pocos empiezan infectados (verdes, sin arma y más rápidos) y contagian de un manotazo; quien cae se suma a ellos. Los sobrevivientes ganan si aguanta alguno hasta el final.",
+          "Escalada: cada baja te cambia el arma por la siguiente de la lista. La última es el manotazo: una baja con él y ganas.",
+          "Atrapa la bandera: lleva la bandera rival a tu base mientras la tuya está en casa. Si cae quien la lleva, queda en el piso: tócala para devolverla a tu base. Gana el primero en hacer 3 capturas.",
+          "El tesoro: un huevo dorado con ojos. Mientras lo tienes sumas segundos y todos te ven en el radar; si te eliminan, lo sueltas. Gana quien junte 60.",
+        ],
+      },
+      {
+        title: "Caos cada minuto",
+        text: [
+          "Si está activado, cada minuto pasa algo por 25 segundos, igual para todos: gravedad baja, turbo, ojos saltones (tiros a la cabeza más fáciles), solo salpicadoras, munición infinita, fantasmas (solo se ven los ojos hasta que disparan), lluvia de globos de pintura o bajas dobles. Se anuncia unos segundos antes.",
+        ],
+      },
+      {
+        title: "Habilidades",
+        text: [
+          "Antes de empezar, cada uno elige una: Impulso (un empujón rápido), Supersalto, Teletransporte (7 metros adelante), Radar (ves a todos los rivales unos segundos) o Burbuja (escudo lleno y 50 extra). Se usa con C o con su botón, y después hay que esperar a que se recargue.",
         ],
       },
       {
         title: "Rachas y medallas",
         text: [
-          "Cada baja seguida sin morir suma a tu racha: a las 5 eres imparable y a las 10, leyenda. La tabla guarda la mejor racha de cada uno.",
-          "También hay medallas por la primera baja de la partida, por eliminar a quien te eliminó (venganza), por bajas dobles y triples, por tiros a la cabeza y por culatazos. Cuando alguien queda a una baja de ganar, todos lo ven.",
+          "Cada baja seguida sin caer suma a tu racha: a las 5 eres imparable y a las 10, leyenda. La tabla guarda la mejor racha de cada uno.",
+          "También hay medallas por la primera baja de la partida, por eliminar a quien te eliminó (venganza), por bajas dobles y triples, por tiros a la cabeza y por manotazos. Cuando alguien queda a punto de ganar, todos lo ven.",
         ],
       },
       {
         title: "En una pantalla grande",
         text: [
           "Al crear la sala elige «En una pantalla grande»: la partida se ve en una computadora conectada a la tele, con la pantalla dividida para hasta 4 personas, cada una en primera persona. Los demás lugares los ocupan bots.",
-          "Cada celular es el control de su soldado: joystick a la izquierda, arrastra a la derecha para mirar, y botones para disparar (si lo arrastras, también miras), apuntar, saltar, recargar, cambiar de arma, granada, golpe y agarrar. El celular muestra tu escudo, tu vida y tu munición, y vibra cuando te pegan.",
+          "Cada celular es el control de su talo: joystick a la izquierda, arrastra a la derecha para mirar, y botones para disparar (si lo arrastras, también miras), apuntar, la habilidad, saltar, recargar, cambiar de arma, globo, golpe y agarrar. El celular muestra tu escudo, tu vida y tu munición, y vibra cuando te pegan.",
         ],
       },
       {
         title: "Controles",
         text: [
-          "Computadora: haz clic en el juego. WASD para moverte, mouse para mirar, clic para disparar, clic derecho para apuntar, R recarga, Q / 1 / 2 o la rueda cambian de arma, G tira una granada, F o V golpea, E agarra, espacio salta y Tab muestra el puntaje.",
-          "Celular: joystick para moverte, arrastra para mirar, botón de disparo (si lo arrastras, también miras), y botones para apuntar, saltar, recargar y granadas. El francotirador apunta mientras mantienes y dispara al soltar.",
+          "Computadora: haz clic en el juego. WASD para moverte, mouse para mirar, clic para disparar, clic derecho para apuntar, C usa la habilidad, R recarga, Q / 1 / 2 o la rueda cambian de arma, G tira un globo, F o V golpea, E agarra, espacio salta y Tab muestra el puntaje.",
+          "Celular: joystick para moverte, arrastra para mirar, botón de disparo (si lo arrastras, también miras), y botones para apuntar, la habilidad, saltar, recargar y globos. El francotirador apunta mientras mantienes y dispara al soltar.",
         ],
       },
     ],
     tips: [
       "Si te quedas sin escudo, cúbrete unos segundos antes de volver a pelear.",
-      "Al morir verás con qué te eliminaron y cuánta vida le quedaba al otro: si quedó débil, ve a buscarlo.",
+      "Al caer verás con qué te eliminaron y cuánta vida le quedaba al otro: si quedó débil, ve a buscarlo.",
+      "En la lluvia de globos, no te quedes quieto: mira las sombras que caen.",
     ],
   },
+
   otelo: {
     goal: "Terminar con más fichas de tu color en el tablero.",
     sections: [

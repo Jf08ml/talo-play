@@ -5,30 +5,40 @@ import Link from "next/link";
 import {
   NO_PAD,
   RESPAWN_MS,
+  SKY,
   allies,
   backToWaiting,
+  captureFlag,
+  claimEgg,
   damage,
   fighterColor,
   fighterName,
   guarded,
   isAlive,
   isBot,
+  kitOf,
   openPose,
   pickItem,
+  placeDropped,
   publishBoom,
   publishLive,
   ranking,
   respawn,
   respawnItems,
   shieldOf,
+  scoreOf,
   startMatch,
   subscribeBooms,
   subscribePads,
   subscribePoses,
   subscribeProjectiles,
+  takeEgg,
   teamInfo,
   throwProjectile,
+  tidyObjectives,
   timeUp,
+  touchFlag,
+  popBubble,
   type DamageHit,
   type FeedEntry,
   type FuegoBoom,
@@ -63,6 +73,7 @@ import {
   pickSpawn,
   rayWorldHit,
   spreadDir,
+  topAt,
   worldOf,
   type ArsenalEvent,
   type BotMind,
@@ -71,8 +82,27 @@ import {
   type WeaponId,
 } from "@/lib/fuegoSim";
 import { kickLook, newPadSeen, padInput, resetLook, type PadSeen } from "@/lib/fuegoPad";
+import {
+  EGG_REACH,
+  EGG_TARGET_MS,
+  FLAG_CAPS,
+  FLAG_REACH,
+  INFECTED,
+  INFECTED_JUMP,
+  INFECTED_SPEED,
+  LADDER,
+  MODE_INFO,
+  SURVIVORS,
+  eggScore,
+  fixedWeapons,
+  flagBase,
+  isTeamMode,
+  ladderStep,
+} from "@/lib/fuegoModes";
+import { ABILITY_INFO, BLINK_DIST, DASH_SPEED, RADAR_MS, SUPER_JUMP, type AbilityId } from "@/lib/fuegoAbilities";
+import { CHAOS_INFO, NO_MODS, RAIN_DAMAGE, RAIN_FALL_S, RAIN_HEIGHT, WARN_MS, chaosAt, chaosMods, nextChaos, rainDrops, type ChaosMods } from "@/lib/fuegoChaos";
 import { MAPS, type PickupKind } from "@/lib/fuegoMaps";
-import { FuegoScene, type Eye, type ViewModel } from "@/lib/fuego3d";
+import { FuegoScene, type Eye, type ObjectivesDraw, type ViewModel } from "@/lib/fuego3d";
 import { useQuality } from "@/hooks/useQuality";
 import QualityButton from "@/components/QualityButton";
 import { FuegoAudio } from "@/lib/fuegoAudio";
@@ -83,8 +113,10 @@ import { useWakeLock } from "@/components/carreras/Controller";
 import { TaloMark } from "@/components/TaloLogo";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { MOUSE_LOOK, TOUCH_LOOK, TouchControls, newControls, useDesktopControls, useFinePointer, type ControlState } from "./Controls";
-import { Bomb, Crown, Flame, ListOrdered, MousePointerClick, RotateCw, ShieldCheck, Skull, Volume2, VolumeX } from "lucide-react";
+import { Bomb, Crown, Flame, ListOrdered, MousePointerClick, RotateCw, ShieldCheck, Skull, Volume2, VolumeX, Zap } from "lucide-react";
 import FullscreenButton from "@/components/FullscreenButton";
+import { Talo } from "@/components/Talo";
+import { playerTalo } from "@/lib/talos";
 
 const STEP = 1 / 60;
 const POSE_MS = 50;
@@ -94,6 +126,9 @@ const BASE_FOV = 78;
 /** Mobile aim help: bullets that pass this close (radians) to someone still hit. */
 const TOUCH_ASSIST = 0.06;
 const TOAST_MS = 2600;
+/** Colors of the balloons that fall in the chaos "lluvia" (the brand's). */
+const RAIN_COLORS = ["#FF5FA2", "#FF7A1A", "#2D5BFF", "#00B26B", "#8A4DFF", "#FFC400"];
+const keyHash = (k: string) => [...k].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) | 0, 7);
 
 interface Ghost {
   x: number;
@@ -109,6 +144,8 @@ interface Ghost {
   f: number;
   m: number;
   firedAt: number;
+  /** Abilities seen used (to show the effect when it grows). */
+  h: number;
 }
 
 /** How someone died: who, with what, and how much the killer had left. */
@@ -187,6 +224,8 @@ interface Hud {
   range: number;
   zoomX: number;
   onTarget: boolean;
+  /** The ability and how ready it is (0–1). */
+  ability: { kit: AbilityId; ready: number };
   /** Tab held (desktop scoreboard). */
   board: boolean;
 }
@@ -215,14 +254,14 @@ function formatClock(ms: number): string {
 }
 
 const WEAPON_WORD: Record<string, string> = {
-  rifle: "fusil",
+  rifle: "rociador",
   pistola: "pistola",
-  escopeta: "escopeta",
+  escopeta: "salpicadora",
   francotirador: "francotirador",
-  lanzacohetes: "cohete",
-  cohete: "cohete",
-  granada: "granada",
-  golpe: "culatazo",
+  lanzacohetes: "globazo",
+  cohete: "globazo",
+  granada: "globo de pintura",
+  golpe: "manotazo",
 };
 
 /** Big screen, split: the views' rectangles (fractions, from the top-left) for 1–4 people. */
@@ -253,14 +292,78 @@ function medalsFor(e: FeedEntry, recent: number, lastKiller: string, firstBlood:
   else if (recent === 2) out.push("¡Doble baja!");
   if (firstBlood) out.push("¡Primera sangre!");
   if (lastKiller && e.v === lastKiller) out.push("¡Venganza!");
-  if (e.w === "golpe") out.push("¡Culatazo!");
+  if (e.w === "golpe") out.push("¡Manotazo!");
   else if (e.h) out.push("¡Tiro a la cabeza!");
   return out;
 }
 
+/** Where a bot heads for the mode's objective (null: fight and wander as usual). */
+function botGoal(s: FuegoState, id: string): { x: number; z: number; rush?: boolean } | null {
+  if (s.mode === "bandera") {
+    const side = s.roster[id];
+    if (side !== "red" && side !== "blue") return null;
+    const rival: TeamId = side === "red" ? "blue" : "red";
+    const mine = s.flags[side];
+    const theirs = s.flags[rival];
+    const map = MAPS[s.map];
+    if (theirs?.st === "carried" && theirs.by === id) return { ...flagBase(map, side), rush: true };
+    if (mine && mine.st !== "base") return mine.st === "dropped" ? { x: mine.x, z: mine.z, rush: true } : null;
+    // A third of each team stays home; the rest go for the rival's flag.
+    const defender = [...id].reduce((h, ch) => h + ch.charCodeAt(0), 0) % 3 === 0;
+    if (defender) return flagBase(map, side);
+    if (theirs && theirs.st !== "carried") return { x: theirs.x, z: theirs.z };
+    return null;
+  }
+  if (s.mode === "tesoro" && s.egg && !s.egg.by) return { x: s.egg.x, z: s.egg.z, rush: true };
+  return null;
+}
+
+/** What the mode asks of you right now, in a few words (or ""). */
+function objectiveHint(s: FuegoState, myId: string, screen: boolean): string {
+  if (screen || s.status !== "playing" || !(myId in s.roster)) return "";
+  if (s.mode === "infectados") return s.roster[myId] === INFECTED ? "Estás infectado: atrapa a los sobrevivientes" : "";
+  if (s.mode === "tesoro" && s.egg?.by === myId) return "¡Tienes el huevo! Aguanta";
+  if (s.mode === "bandera") {
+    const side = s.roster[myId];
+    if (side !== "red" && side !== "blue") return "";
+    const rival: TeamId = side === "red" ? "blue" : "red";
+    if (s.flags[rival]?.st === "carried" && s.flags[rival]?.by === myId) return s.flags[side]?.st === "base" ? "¡Tienes la bandera! Llévala a tu base" : "Tienes la bandera: recupera la tuya para capturar";
+    if (s.flags[side]?.st === "carried") return "¡Se llevaron tu bandera!";
+  }
+  return "";
+}
+
+/** Unarmed in this mode: the infected, and the last step of escalada (the punch). */
+function unarmedIn(s: FuegoState, id: string): boolean {
+  return (s.mode === "infectados" && s.roster[id] === INFECTED) || (s.mode === "escalada" && ladderStep(s.kills[id] ?? 0) === "golpe");
+}
+
+/** Carries a flag or the egg (everyone sees them on the radar). */
+function carrier(s: FuegoState, id: string): boolean {
+  return s.egg?.by === id || Object.values(s.flags).some((f) => f?.st === "carried" && f.by === id);
+}
+
 /** "One kill from winning" for whoever is there, or "". */
-function nearWin(s: FuegoState, myId: string): string {
+function nearWin(s: FuegoState, myId: string, now: number): string {
   if (s.status !== "playing") return "";
+  if (s.mode === "bandera") {
+    const team = (["red", "blue"] as TeamId[]).find((t) => s.score[t] === FLAG_CAPS - 1);
+    if (!team) return "";
+    return s.roster[myId] === team ? "¡A una captura de ganar!" : `¡El ${teamInfo(team).label} está a una captura!`;
+  }
+  if (s.mode === "infectados") {
+    const left = Object.keys(s.roster).filter((id) => s.roster[id] === SURVIVORS);
+    return left.length === 1 ? (left[0] === myId ? "¡Eres el último sobreviviente!" : `¡Queda solo ${fighterName(s, left[0])}!`) : "";
+  }
+  if (s.mode === "tesoro") {
+    const top = ranking(s)[0];
+    if (!top || eggScore(s, top, now) < EGG_TARGET_MS - 10000) return "";
+    return top === myId ? "¡Te faltan 10 segundos!" : `¡${fighterName(s, top)} está por ganar!`;
+  }
+  if (s.mode === "escalada") {
+    const top = ranking(s).find((id) => ladderStep(s.kills[id] ?? 0) === "golpe");
+    return top ? (top === myId ? "¡Último escalón: gana con un manotazo!" : `¡${fighterName(s, top)} va por el manotazo final!`) : "";
+  }
   if (s.mode === "equipos") {
     const team = (["red", "blue"] as TeamId[]).find((t) => s.score[t] === s.goal - 1);
     if (!team) return "";
@@ -313,6 +416,7 @@ export default function Battle({
   const [hit, setHit] = useState<{ n: number; head: boolean; kill: boolean }>({ n: 0, head: false, kill: false });
   const [hurtDirs, setHurtDirs] = useState<{ a: number; id: number; shield: boolean }[]>([]);
   const [shieldBroke, setShieldBroke] = useState(0);
+  const [paintHits, setPaintHits] = useState<{ id: number; x: number; y: number; size: number; rot: number; color: string }[]>([]);
   const [quality, toggleQuality] = useQuality(QUALITY_KEY);
   const [toast, setToast] = useState<Toast | null>(null);
   const [aimToggle, setAimToggle] = useState(false);
@@ -417,6 +521,12 @@ export default function Battle({
     const mySend = !screen && myId in stateRef.current.roster ? openPose(roomId, myId, true) : null;
     for (const [id, h] of Object.entries(stateRef.current.hits)) seenHits.set(id, h.n);
     const rand = Math.random;
+    // Chaos: what the event on now changes, which event that was, and the sky's balloons already burst.
+    let mods: ChaosMods = NO_MODS;
+    let chaosN = -1;
+    const seenRain = new Set<string>();
+    // Escalada: each one's step, to tell them when it changes.
+    const steps = new Map<string, string>();
 
     const once = (name: string, fn: () => unknown, every = 1200) => {
       const now = performance.now();
@@ -528,7 +638,8 @@ export default function Battle({
       return { killer, weapon: entry?.w ?? "", hp: alive ? (s.hp[killer] ?? 0) : -1, sh: alive ? Math.round(shieldOf(s, killer, now)) : 0 };
     };
 
-    const poseFor = (sol: Soldier, a: Arsenal, end: [number, number, number], m: number, g: number, aim: boolean): FuegoPose => ({
+    const poseFor = (sol: Soldier, a: Arsenal, end: [number, number, number], m: number, g: number, aim: boolean, h: number): FuegoPose => ({
+      h,
       k: key,
       x: Math.round(sol.x * 100) / 100,
       y: Math.round(sol.y * 100) / 100,
@@ -547,6 +658,50 @@ export default function Battle({
       sp: Math.round(sol.speed * 10) / 10,
       t: Math.round(serverNow()),
     });
+
+    // Abilities: when each one's is ready again, until when its radar shows everyone, and how many times it was used.
+    const abilityReady = new Map<string, number>();
+    const radarUntil = new Map<string, number>();
+    const abilityUses = new Map<string, number>();
+    const readiness = (s: FuegoState, id: string) => {
+      const left = (abilityReady.get(id) ?? 0) - performance.now();
+      return left <= 0 ? 1 : Math.max(0, 1 - left / (ABILITY_INFO[kitOf(s, id)].cooldown * 1000));
+    };
+
+    /** Uses `id`'s ability if it's ready (mx/mz: where it's moving, for the dash). Returns whether it went. */
+    const triggerAbility = (s: FuegoState, id: string, sol: Soldier, yaw: number, mx: number, mz: number): boolean => {
+      const t0 = performance.now();
+      if ((abilityReady.get(id) ?? 0) > t0) return false;
+      const kit = kitOf(s, id);
+      const color = fighterColor(s, id);
+      if (kit === "impulso") {
+        const fx = -Math.sin(yaw);
+        const fz = -Math.cos(yaw);
+        let dx = fx * mz + Math.cos(yaw) * mx;
+        let dz = fz * mz - Math.sin(yaw) * mx;
+        if (Math.hypot(dx, dz) < 0.2) {
+          dx = fx;
+          dz = fz;
+        }
+        sol.dash(dx, dz, DASH_SPEED);
+      } else if (kit === "salto") {
+        if (!sol.onGround) return false;
+        sol.superJump(SUPER_JUMP);
+      } else if (kit === "teletransporte") {
+        const from = { x: sol.x, y: sol.y, z: sol.z };
+        if (!sol.blink(world, yaw, BLINK_DIST)) return false;
+        scene.abilityFx(kit, from.x, from.y, from.z, color);
+      } else if (kit === "radar") {
+        radarUntil.set(id, t0 + RADAR_MS);
+      } else {
+        once(`bubble:${id}`, () => popBubble(roomId, key, id), 500);
+      }
+      scene.abilityFx(kit, sol.x, sol.y, sol.z, color);
+      if (id === myId || runs.get(id)?.remote) audio?.pickup();
+      abilityReady.set(id, t0 + ABILITY_INFO[kit].cooldown * 1000);
+      abilityUses.set(id, (abilityUses.get(id) ?? 0) + 1);
+      return true;
+    };
 
     /** A hit marker for whoever fired: me on my phone, or that person's view on the big screen. */
     const markHit = (id: string, head: boolean, kill: boolean) => {
@@ -578,7 +733,7 @@ export default function Battle({
           let hitKind: "escudo" | "cuerpo" | "nada" = "nada";
           for (const off of ev.dirs) {
             const [dx, dy, dz] = spreadDir(sol.yaw, sol.pitch, off);
-            const res = castBullet(world, { ox: sol.x, oy: eyeY, oz: sol.z, dx, dy, dz }, ev.weapon, targets, assist);
+            const res = castBullet(world, { ox: sol.x, oy: eyeY, oz: sol.z, dx, dy, dz }, ev.weapon, targets, assist, mods.head);
             first ??= res.end;
             if (res.hit) {
               const prev = byTarget.get(res.hit.target);
@@ -591,10 +746,9 @@ export default function Battle({
               : run?.remote
                 ? muzzleOfEye(sol, dx, dy, dz, run.aiming)
                 : (scene.muzzle(id) ?? [sol.x, eyeY - 0.2, sol.z]);
-            scene.shot(mine ? null : id, from, res.end[0], res.end[1], res.end[2], ev.weapon, res.hit ? hitKind : "nada", res.normal);
+            scene.shot(mine ? null : id, from, res.end[0], res.end[1], res.end[2], ev.weapon, res.hit ? hitKind : "nada", res.normal, fighterColor(s, id));
             if (!mine && !res.hit) nearMiss(from, res.end);
           }
-          if (mine) scene.ejectShell(ev.weapon);
           out.end = first ?? out.end;
           audio?.shot(ev.weapon, vol, pan);
           if (mine) {
@@ -687,6 +841,8 @@ export default function Battle({
       let nearId = "";
       for (const [iid, it] of Object.entries(s.items)) {
         if (Math.hypot(it.x - sol.x, it.z - sol.z) > 1.3) continue;
+        // The mode decides the weapon (escalada), or there's none (infected).
+        if (isWeapon(it.kind) && (fixedWeapons(s.mode) || unarmedIn(s, id))) continue;
         if (autoPick(a, it.kind, s.hp[id] ?? MAX_HP)) tryPick(s, id, a, iid, mine);
         else if (isWeapon(it.kind) && !a.has(it.kind)) {
           near = PICKUP_LABEL[it.kind];
@@ -727,7 +883,7 @@ export default function Battle({
           if (!p) continue;
           const ally = allies(s, id, o);
           const g = ghosts.get(o);
-          const loud = p.speed > 3.5 || (g && performance.now() - g.firedAt < 1500) || (runs.get(o)?.a.cool ?? 0) > 0 || (o === myId && sinceShot < 1.5);
+          const loud = (!ally && (radarUntil.get(id) ?? 0) > performance.now()) || carrier(s, o) || p.speed > 3.5 || (g && performance.now() - g.firedAt < 1500) || (runs.get(o)?.a.cool ?? 0) > 0 || (o === myId && sinceShot < 1.5);
           if (!ally && !loud) continue;
           const dx = p.x - sol.x;
           const dz = p.z - sol.z;
@@ -769,6 +925,7 @@ export default function Battle({
         watching,
         ...scope,
         board: boardHeld,
+        ability: { kit: kitOf(s, id), ready: readiness(s, id) },
       };
     };
 
@@ -782,6 +939,34 @@ export default function Battle({
       const c = controlsRef.current;
       const inRoster = !screen && myId in s.roster;
 
+      // Chaos: the event on now (the same on every phone), and its weapon and ammo rules on everyone this client runs.
+      const slot = s.status === "playing" ? chaosAt(s, now) : null;
+      mods = chaosMods(slot?.id);
+      if ((slot?.n ?? -1) !== chaosN) {
+        if (slot) audio?.go();
+        chaosN = slot?.n ?? -1;
+      }
+      const gear = (a: Arsenal, id: string) => {
+        a.infinite = mods.infinite;
+        if (s.mode === "escalada") {
+          // Escalada: the weapon of your step (the punch is shown with a pistol put away).
+          const step = ladderStep(s.kills[id] ?? 0);
+          const want = step === "golpe" ? "pistola" : step;
+          if (a.slots.length !== 1 || a.weapon !== want || a.forced) a.setOnly(want);
+          const was = steps.get(id);
+          if (was !== undefined && was !== step) celebrate(id, step === "golpe" ? "¡Último escalón!" : "¡Nueva arma!", step === "golpe" ? "Manotazo: una baja más y ganas" : `Ahora: ${WEAPONS[step].label}`);
+          steps.set(id, step);
+          return;
+        }
+        if (mods.weapon && !a.forced) a.force(mods.weapon);
+        else if (!mods.weapon && a.forced) a.restore();
+      };
+      if (inRoster) gear(arms, myId);
+      for (const [id, run] of runs) gear(run.a, id);
+      /** Chaos and the infected's speed together. */
+      const modsFor = (id: string): ChaosMods =>
+        s.mode === "infectados" && s.roster[id] === INFECTED ? { ...mods, speed: mods.speed * INFECTED_SPEED, jump: mods.jump * INFECTED_JUMP } : mods;
+
       // My life: died, waiting, back.
       const stateSaysAlive = isAlive(s, myId);
       if (inRoster) {
@@ -791,6 +976,7 @@ export default function Battle({
           myDeath = deathOf(s, myId, now);
           myLastKiller = myDeath.killer !== myId ? myDeath.killer : "";
           if (me) deathSpot = { x: me.x, y: me.y, z: me.z, yaw: look.yaw };
+          if (s.mode === "bandera" || s.mode === "tesoro") once("drop:me", () => placeDropped(roomId, key, myId, deathSpot.x, deathSpot.z), 500);
           audio?.death();
           scene.jolt(0.8);
         }
@@ -834,6 +1020,7 @@ export default function Battle({
           run.death = deathOf(s, id, now);
           run.lastKiller = run.death.killer !== id ? run.death.killer : "";
           run.aiming = false;
+          if (s.mode === "bandera" || s.mode === "tesoro") once(`drop:${id}`, () => placeDropped(roomId, key, id, run.deathSpot.x, run.deathSpot.z), 500);
           if (run.remote) audio?.death();
         }
         if (run.dead && !alive && s.status === "playing" && now >= (s.deadAt[id] ?? 0) + RESPAWN_MS) once(`respawn:${id}`, () => respawn(roomId, key, id), 800);
@@ -874,6 +1061,12 @@ export default function Battle({
         if (id === myId && me && !screen) {
           const a = Math.atan2(-(h.x - me.x), -(h.z - me.z)) - look.yaw;
           setHurtDirs((list) => [...list.slice(-3), { a, id: hurtId++, shield: onShield }]);
+          // Their paint lands on your screen (on your side they came from).
+          const side = Math.sin(a) < 0 ? 1 : -1;
+          setPaintHits((list) => [
+            ...list.slice(-5),
+            { id: hurtId++, x: 50 + side * (18 + Math.random() * 26), y: 25 + Math.random() * 50, size: onShield ? 90 : 140 + Math.random() * 80, rot: Math.random() * 360, color: fighterColor(s, h.from) },
+          ]);
           audio?.hurt(onShield);
           scene.jolt(0.25);
         }
@@ -889,6 +1082,7 @@ export default function Battle({
         if (seenFeed.has(fid)) continue;
         seenFeed.add(fid);
         if (e.k === e.v) continue;
+        scene.cheer(e.k);
         const firstBlood = !anyKill;
         anyKill = true;
         const tNow = performance.now();
@@ -924,6 +1118,10 @@ export default function Battle({
 
       // Physics, at a fixed step.
       if (playing) {
+        if (c.ability) {
+          c.ability = false;
+          if (me && !myDead && inRoster) triggerAbility(s, myId, me, look.yaw, c.mx, c.mz);
+        }
         acc += dt;
         while (acc >= STEP) {
           acc -= STEP;
@@ -933,13 +1131,14 @@ export default function Battle({
               .map((o) => ({ x: o.x, y: o.y, z: o.z }));
           if (me && !myDead && inRoster) {
             const wasAir = !me.onGround;
-            me.step({ mx: c.mx, mz: c.mz, yaw: look.yaw, pitch: look.pitch, jump: c.jump, aiming }, world, STEP, solids(myId));
+            me.step({ mx: c.mx, mz: c.mz, yaw: look.yaw, pitch: look.pitch, jump: c.jump, aiming, mods: modsFor(myId) }, world, STEP, solids(myId));
             if (wasAir && me.landed > 0) {
               scene.jolt(Math.min(0.5, me.landed / 25));
               land = Math.min(1, me.landed / 12);
               me.landed = 0;
             }
-            const evs = arms.step({ fire: c.fire, aim: aiming, reload: c.reload, swap: c.swap, grenade: c.grenade, melee: c.melee }, STEP);
+            const bare = unarmedIn(s, myId);
+            const evs = arms.step({ fire: c.fire && !bare, aim: aiming && !bare, reload: c.reload, swap: c.swap && !bare, grenade: c.grenade && !bare, melee: c.melee || (bare && c.fire) }, STEP);
             const r = handleEvents(s, myId, me, arms, evs, true);
             if (r.end) myEnd = r.end;
             if (r.m) myMelee++;
@@ -955,14 +1154,16 @@ export default function Battle({
               let k = Math.sqrt(zoom / BASE_FOV);
               if (!run.aiming && overEnemy(s, id, run.s, run.s.yaw, run.s.pitch)) k *= 0.55;
               const inp = padInput(run.remote, pads[id] ?? NO_PAD, STEP, k, run.s.onGround);
+              if (inp.ability) triggerAbility(s, id, run.s, run.s.yaw, inp.move.mx, inp.move.mz);
               run.aiming = inp.aim;
               const wasAir = !run.s.onGround;
-              run.s.step({ ...inp.move, aiming: run.aiming }, world, STEP, solids(id));
+              run.s.step({ ...inp.move, aiming: run.aiming, mods: modsFor(id) }, world, STEP, solids(id));
               if (wasAir && run.s.landed > 0) {
                 run.land = Math.min(1, run.s.landed / 12);
                 run.s.landed = 0;
               }
-              evs = run.a.step({ ...inp.arms, aim: run.aiming }, STEP);
+              const bare = unarmedIn(s, id);
+              evs = run.a.step(bare ? { fire: false, aim: false, reload: false, swap: false, grenade: false, melee: inp.arms.melee || inp.arms.fire } : { ...inp.arms, aim: run.aiming }, STEP);
               if (inp.pick) run.wantPick = true;
             } else {
               const view = {
@@ -976,9 +1177,25 @@ export default function Battle({
                 items: Object.entries(s.items).map(([iid, it]) => ({ id: iid, ...it })),
                 hp: s.hp[id] ?? MAX_HP,
                 shield: shieldOf(s, id, now),
+                goal: botGoal(s, id),
+                meleeOnly: unarmedIn(s, id),
               };
               const out = botThink(world, graph, run.s, run.a, run.mind, view, s.level, STEP, rand);
-              run.s.step(out.move, world, STEP, solids(id));
+              // Bots use their ability now and then, when it makes sense.
+              const kit = kitOf(s, id);
+              const fighting = !!run.mind.target;
+              const wants =
+                kit === "burbuja"
+                  ? fighting && shieldOf(s, id, now) < 25
+                  : kit === "radar"
+                    ? !fighting && rand() < STEP * 0.1
+                    : kit === "impulso"
+                      ? fighting && rand() < STEP * 0.35
+                      : kit === "salto"
+                        ? run.mind.stuckT > 0.3 || (fighting && rand() < STEP * 0.12)
+                        : !fighting && !!view.goal && rand() < STEP * 0.2;
+              if (wants) triggerAbility(s, id, run.s, out.move.yaw, out.move.mx, out.move.mz);
+              run.s.step({ ...out.move, mods: modsFor(id) }, world, STEP, solids(id));
               evs = run.a.step(out.arms, STEP, rand);
               pick = out.pick ?? null;
             }
@@ -990,6 +1207,7 @@ export default function Battle({
               // Bots take what's under their feet when it helps them.
               for (const [iid, it] of Object.entries(s.items)) {
                 if (Math.hypot(it.x - run.s.x, it.z - run.s.z) > 1.3) continue;
+                if (isWeapon(it.kind) && (fixedWeapons(s.mode) || unarmedIn(s, id))) continue;
                 if (autoPick(run.a, it.kind, s.hp[id] ?? MAX_HP) || (pick === iid && isWeapon(it.kind) && !run.a.has(it.kind))) tryPick(s, id, run.a, iid, false);
               }
             }
@@ -1029,15 +1247,15 @@ export default function Battle({
           }
         }
         // Mine are shown right here: skip them when they come back from the database.
-        seenBooms.add(publishBoom(roomId, { k: key, kind: pr.p.kind, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, z: Math.round(z * 10) / 10, t: Math.round(serverNow()) }));
+        seenBooms.add(publishBoom(roomId, { k: key, o: pr.owner, kind: pr.p.kind, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, z: Math.round(z * 10) / 10, t: Math.round(serverNow()) }));
         const [vol, pan] = where(x, z);
         const near = screen ? 999 : Math.hypot(x - (me?.x ?? 999), z - (me?.z ?? 999));
-        scene.explosion(x, y, z, pr.p.kind === "cohete", near);
+        scene.explosion(x, y, z, pr.p.kind === "cohete", near, fighterColor(s, pr.owner));
         audio?.explosion(vol, pan);
       }
       // Everyone else's: flown the same way from their launch, drawn.
-      const draws: Record<string, { kind: Projectile["kind"]; x: number; y: number; z: number; vx: number; vy: number; vz: number; age?: number }> = {};
-      for (const pr of myProj) draws[pr.id] = { ...pr.p, age: pr.age };
+      const draws: Record<string, { kind: Projectile["kind"]; x: number; y: number; z: number; vx: number; vy: number; vz: number; age?: number; color?: string }> = {};
+      for (const pr of myProj) draws[pr.id] = { ...pr.p, age: pr.age, color: fighterColor(s, pr.owner) };
       for (const [pid, raw] of Object.entries(projIn)) {
         if (raw.k !== key || raw.o === myId || runs.has(raw.o)) continue;
         let r = remoteProj.get(pid);
@@ -1050,9 +1268,30 @@ export default function Battle({
         }
         r.age += dt;
         flyProjectile(world, r.p, dt, []);
-        draws[pid] = { ...r.p, age: r.age };
+        draws[pid] = { ...r.p, age: r.age, color: fighterColor(s, raw.o) };
       }
       for (const pid of remoteProj.keys()) if (!(pid in projIn)) remoteProj.delete(pid);
+      // Chaos "lluvia": balloons falling from the sky; each phone hurts only the soldiers it runs.
+      if (slot?.id === "lluvia" && playing) {
+        for (const d of rainDrops(slot, s.seed, map, now, 1000)) {
+          const ground = topAt(world, d.x, d.z);
+          const color = RAIN_COLORS[Math.abs(keyHash(d.key)) % RAIN_COLORS.length];
+          if (now < d.t) {
+            draws[`rain${d.key}`] = { kind: "granada", x: d.x, y: ground + 0.2 + ((d.t - now) / 1000) * (RAIN_HEIGHT / RAIN_FALL_S), z: d.z, vx: 0, vy: -1, vz: 0, age: 2, color };
+            continue;
+          }
+          if (seenRain.has(d.key)) continue;
+          seenRain.add(d.key);
+          const [vol, pan] = where(d.x, d.z);
+          scene.explosion(d.x, ground + 0.2, d.z, false, screen ? 999 : Math.hypot(d.x - (me?.x ?? 999), d.z - (me?.z ?? 999)), color);
+          audio?.explosion(vol * 0.7, pan);
+          const mine: Target[] = [];
+          if (me && !myDead && inRoster) mine.push({ id: myId, x: me.x, y: me.y, z: me.z });
+          for (const [id, run] of runs) if (!run.dead && isAlive(s, id)) mine.push({ id, x: run.s.x, y: run.s.y, z: run.s.z });
+          const hits = blast(world, "granada", d.x, ground + 0.2, d.z, mine).map((h) => ({ ...h, damage: h.damage * RAIN_DAMAGE }));
+          if (hits.length) damage(roomId, key, SKY, { x: d.x, z: d.z }, "granada", hits).catch(console.error);
+        }
+      }
       scene.setProjectiles(draws);
       // Their explosions.
       for (const [bid, b] of Object.entries(boomsIn)) {
@@ -1061,7 +1300,7 @@ export default function Battle({
         if (b.k !== key || now - b.t > 2000) continue;
         const [vol, pan] = where(b.x, b.z);
         const near = screen ? 999 : Math.hypot(b.x - (me?.x ?? 999), b.z - (me?.z ?? 999));
-        scene.explosion(b.x, b.y, b.z, b.kind === "cohete", near);
+        scene.explosion(b.x, b.y, b.z, b.kind === "cohete", near, b.o ? fighterColor(s, b.o) : undefined);
         audio?.explosion(vol, pan);
       }
 
@@ -1095,7 +1334,7 @@ export default function Battle({
           continue;
         }
         if (!g) {
-          g = { x: p.x, y: p.y, z: p.z, yaw: p.yw, pitch: p.pt, vx: 0, vz: 0, lastT: 0, pose: null, f: p.f, m: p.m, firedAt: 0 };
+          g = { x: p.x, y: p.y, z: p.z, yaw: p.yw, pitch: p.pt, vx: 0, vz: 0, lastT: 0, pose: null, f: p.f, m: p.m, firedAt: 0, h: p.h ?? 0 };
           ghosts.set(id, g);
         }
         if (g.pose && p.t !== g.lastT && g.lastT) {
@@ -1139,7 +1378,7 @@ export default function Battle({
               const hitW = rayWorldHit(world, { ox: from[0], oy: from[1], oz: from[2], dx: dx / len, dy: dy / len, dz: dz / len }, len + 0.3);
               if (Math.abs(hitW.t - len) < 0.35) normal = hitW.n;
             }
-            scene.shot(id, from, p.sx, p.sy, p.sz, weapon, normal ? "nada" : null, normal);
+            scene.shot(id, from, p.sx, p.sy, p.sz, weapon, normal ? "nada" : null, normal, fighterColor(s, id));
             nearMiss(from, [p.sx, p.sy, p.sz]);
             const [vol, pan] = where(g.x, g.z);
             audio?.shot(weapon, vol, pan);
@@ -1149,6 +1388,10 @@ export default function Battle({
           g.m = p.m;
           const [vol, pan] = where(g.x, g.z);
           audio?.melee(vol, pan);
+        }
+        if ((p.h ?? 0) > g.h) {
+          g.h = p.h ?? 0;
+          scene.abilityFx(kitOf(s, id), p.x, p.y, p.z, fighterColor(s, id));
         }
       }
 
@@ -1178,8 +1421,8 @@ export default function Battle({
       // Publish my pose and my bots' (the big screen publishes none: nobody else draws them).
       if (t - lastPose >= POSE_MS) {
         lastPose = t;
-        if (me && mySend && !myDead) mySend.send(poseFor(me, arms, myEnd, myMelee, myGrenades, aiming));
-        for (const run of runs.values()) if (!run.dead) run.send.send(poseFor(run.s, run.a, run.end, run.m, run.g, false));
+        if (me && mySend && !myDead) mySend.send(poseFor(me, arms, myEnd, myMelee, myGrenades, aiming, abilityUses.get(myId) ?? 0));
+        for (const [id, run] of runs) if (!run.dead) run.send.send(poseFor(run.s, run.a, run.end, run.m, run.g, false, abilityUses.get(id) ?? 0));
       }
       // Big screen: each phone learns its ammo, weapons and what it can pick up.
       if (screen && t - lastLive >= LIVE_MS) {
@@ -1197,6 +1440,7 @@ export default function Battle({
             n: run.near,
             l: run.a.reloading > 0 ? 1 : 0,
             z: run.aiming ? 1 : 0,
+            c: Math.round(readiness(s, id) * 100),
           };
           const k = JSON.stringify(live);
           if (liveSent.get(id) !== k) {
@@ -1225,7 +1469,23 @@ export default function Battle({
         const deadFor = alive ? 0 : Math.max(0, (now - (s.deadAt[id] ?? now)) / 1000);
         if (pos) {
           const weapon = run ? run.a.weapon : (WEAPON_IDS[g?.pose?.w ?? 0] ?? "rifle");
-          scene.setSoldier(id, { x: pos.x, y: pos.y, z: pos.z, yaw: pos.yaw, pitch: pos.pitch, weapon, speed: pos.speed, alive, deadFor, guard: guarded(s, id, now) });
+          // Chaos "fantasmas": only the eyes show, unless it just fired.
+          const fired = run ? run.sinceShot < 1.2 : g ? performance.now() - g.firedAt < 1200 : false;
+          scene.setSoldier(id, {
+            x: pos.x,
+            y: pos.y,
+            z: pos.z,
+            yaw: pos.yaw,
+            pitch: pos.pitch,
+            weapon,
+            speed: pos.speed,
+            alive,
+            deadFor,
+            guard: guarded(s, id, now),
+            ghost: mods.ghosts && !fired && !carrier(s, id),
+            eyes: mods.head,
+            unarmed: unarmedIn(s, id),
+          });
         } else if (!alive && (run || g)) {
           const x = run ? run.s.x : g!.x;
           const y = run ? run.s.y : g!.y;
@@ -1235,6 +1495,52 @@ export default function Battle({
           scene.setSoldier(id, null);
         }
       }
+      // The mode's objectives, touched by the soldiers this client runs.
+      if (playing && (s.mode === "bandera" || s.mode === "tesoro")) {
+        const mine: { id: string; sol: Soldier }[] = [];
+        if (me && !myDead && inRoster) mine.push({ id: myId, sol: me });
+        for (const [id, run] of runs) if (!run.dead && isAlive(s, id)) mine.push({ id, sol: run.s });
+        for (const { id, sol } of mine) {
+          const near = (x: number, z: number, r: number) => Math.hypot(x - sol.x, z - sol.z) < r;
+          if (s.mode === "bandera") {
+            const side = s.roster[id];
+            if (side !== "red" && side !== "blue") continue;
+            for (const team of ["red", "blue"] as TeamId[]) {
+              const f = s.flags[team];
+              if (!f || f.st === "carried" || !near(f.x, f.z, FLAG_REACH)) continue;
+              if (team !== side || f.st === "dropped") once(`flag:${id}:${team}`, () => touchFlag(roomId, key, id, team), 700);
+            }
+            const rival: TeamId = side === "red" ? "blue" : "red";
+            const home = flagBase(map, side);
+            if (s.flags[rival]?.st === "carried" && s.flags[rival]?.by === id && s.flags[side]?.st === "base" && near(home.x, home.z, FLAG_REACH + 0.6)) {
+              once(`cap:${id}`, () => captureFlag(roomId, key, id), 900);
+            }
+          } else if (s.egg) {
+            if (!s.egg.by && near(s.egg.x, s.egg.z, EGG_REACH)) once(`egg:${id}`, () => takeEgg(roomId, key, id), 700);
+            if (s.egg.by === id && eggScore(s, id, now) >= EGG_TARGET_MS) once(`win:${id}`, () => claimEgg(roomId, key, id), 900);
+          }
+        }
+        once("tidy", () => tidyObjectives(roomId, key), 2000);
+      }
+      const objectives: ObjectivesDraw = { flags: [], egg: null };
+      if (s.mode === "bandera") {
+        for (const team of ["red", "blue"] as TeamId[]) {
+          const f = s.flags[team];
+          if (!f) continue;
+          const b = flagBase(map, team);
+          const base = { x: b.x, y: topAt(world, b.x, b.z), z: b.z };
+          const holder = f.st === "carried" ? (f.by === myId && me && !myDead ? { x: me.x, y: me.y, z: me.z } : posOf(f.by)) : null;
+          if (holder) objectives.flags.push({ team, x: holder.x, y: holder.y + 1.5, z: holder.z + 0.35, carried: true, base });
+          else objectives.flags.push({ team, x: f.x, y: topAt(world, f.x, f.z), z: f.z, carried: false, base });
+        }
+      } else if (s.egg) {
+        const holder = s.egg.by ? posOf(s.egg.by) : null;
+        objectives.egg = holder ? { x: holder.x, y: holder.y + 1.75, z: holder.z, held: true } : { x: s.egg.x, y: topAt(world, s.egg.x, s.egg.z), z: s.egg.z, held: false };
+        // My own egg isn't drawn on my head (I can't see it).
+        if (s.egg.by === myId && !screen) objectives.egg = null;
+      }
+      scene.setObjectives(objectives);
+
       if (s.items !== lastItems) {
         lastItems = s.items;
         scene.setPickups(s.items, mapId, map.items);
@@ -1297,6 +1603,7 @@ export default function Battle({
                       land: run.land,
                       color: fighterColor(s, id),
                       hidden: zoomed,
+                      unarmed: unarmedIn(s, id),
                     }
                   : alive
                     ? { weapon: run.a.weapon, sinceShot: 10, reload: 0, switching: 0, melee: 0, aiming: false, speed: 0, lookDX: 0, lookDY: 0, land: 0, color: fighterColor(s, id), hidden: false }
@@ -1338,6 +1645,7 @@ export default function Battle({
                 land,
                 color: fighterColor(s, myId),
                 hidden: zoomed,
+                unarmed: unarmedIn(s, myId),
               }
             : null,
           dt
@@ -1403,6 +1711,11 @@ export default function Battle({
     return () => clearTimeout(t);
   }, [toast]);
   useEffect(() => {
+    if (!paintHits.length) return;
+    const t = setTimeout(() => setPaintHits([]), 1900);
+    return () => clearTimeout(t);
+  }, [paintHits]);
+  useEffect(() => {
     if (!hurtDirs.length) return;
     const t = setTimeout(() => setHurtDirs([]), 900);
     return () => clearTimeout(t);
@@ -1419,7 +1732,11 @@ export default function Battle({
     .slice(-5)
     .map(([, e]) => e)
     .filter((e) => now - e.t < 8000);
-  const alert = nearWin(state, myId);
+  const alert = nearWin(state, myId, now);
+  const objective = objectiveHint(state, myId, screen);
+  const chaosNow = state.status === "playing" && !counting ? chaosAt(state, now) : null;
+  const chaosSoon = !chaosNow && state.status === "playing" && !counting ? nextChaos(state, now) : null;
+  const chaosIn = chaosSoon ? chaosSoon.start - now : Infinity;
   const big = screen ? { zoom: 1.4 } : undefined;
 
   return (
@@ -1451,6 +1768,9 @@ export default function Battle({
           <div className={`absolute left-1/2 top-0 h-0 w-0 -translate-x-1/2 border-x-[14px] border-b-[22px] border-x-transparent ${h.shield ? "border-b-cyan-300/80" : "border-b-red-500/85"}`} />
         </div>
       ))}
+      {paintHits.map((p) => (
+        <PaintSplat key={p.id} x={p.x} y={p.y} size={p.size} rot={p.rot} color={p.color} />
+      ))}
       {/* The shield just broke. */}
       {shieldBroke > 0 && (
         <div key={shieldBroke} className="pointer-events-none absolute inset-0 animate-[ping_0.5s_ease-out_1] opacity-0" style={{ boxShadow: "inset 0 0 160px 50px rgba(103,232,249,0.6)" }} />
@@ -1464,6 +1784,7 @@ export default function Battle({
           aiming={aimToggle}
           onAim={() => setAimToggle((v) => !v)}
           fireOnRelease={hud.zoomed}
+          ability={{ label: ABILITY_INFO[hud.ability.kit].label, color: ABILITY_INFO[hud.ability.kit].color, ready: hud.ability.ready }}
         />
       )}
 
@@ -1486,8 +1807,19 @@ export default function Battle({
         </div>
 
         <div className="flex flex-col items-center gap-1" style={big}>
-          <ScorePanel state={state} myId={screen ? "" : myId} clock={state.status === "playing" && !counting ? formatClock(left) : ""} lastMinute={state.status === "playing" && !counting && left < 60000} />
+          <ScorePanel state={state} myId={screen ? "" : myId} now={now} clock={state.status === "playing" && !counting ? formatClock(left) : ""} lastMinute={state.status === "playing" && !counting && left < 60000} />
           {alert && <p className="animate-pulse rounded-full bg-amber-400 px-3 py-0.5 text-xs font-bold text-slate-950">{alert}</p>}
+          {objective && <p className="rounded-full bg-white px-3 py-0.5 text-xs font-bold text-slate-950">{objective}</p>}
+          {chaosNow && (
+            <p className="flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-bold text-white" style={{ background: CHAOS_INFO[chaosNow.id].color }}>
+              <Zap className="h-3.5 w-3.5" /> {CHAOS_INFO[chaosNow.id].label} · {Math.max(0, Math.ceil((chaosNow.end - now) / 1000))} s
+            </p>
+          )}
+          {chaosSoon && chaosIn < WARN_MS && chaosIn > 0 && (
+            <p className="flex animate-pulse items-center gap-1.5 rounded-full bg-white px-3 py-0.5 text-xs font-bold text-slate-950">
+              <Zap className="h-3.5 w-3.5" /> ¡Caos en {Math.ceil(chaosIn / 1000)}!
+            </p>
+          )}
         </div>
 
         <div className="pointer-events-auto flex flex-col items-end gap-1.5">
@@ -1521,7 +1853,7 @@ export default function Battle({
         <div className="pointer-events-none absolute inset-x-0 bottom-24 z-20 flex justify-center">
           <p className="flex max-w-xl items-center gap-2 rounded-xl bg-slate-950/75 px-4 py-2 text-sm text-white backdrop-blur">
             <MousePointerClick className="h-4 w-4 shrink-0" />
-            Haz clic para jugar · WASD moverte · clic disparar · clic derecho apuntar · R recargar · Q cambiar arma · G granada · F golpe · E agarrar · espacio saltar · Esc soltar el mouse
+            Haz clic para jugar · WASD moverte · clic disparar · clic derecho apuntar · C habilidad · R recargar · Q cambiar arma · G globo · F golpe · E agarrar · espacio saltar · Esc soltar el mouse
           </p>
         </div>
       )}
@@ -1532,6 +1864,17 @@ export default function Battle({
         </p>
       )}
 
+      {chaosNow && now - chaosNow.start < 3200 && (
+        <div key={chaosNow.n} className="pointer-events-none absolute inset-x-0 top-[24%] z-20 flex justify-center px-4" style={big}>
+          <div className="animate-celebration-in flex flex-col items-center rounded-3xl bg-slate-950/75 px-6 py-3 text-center backdrop-blur">
+            <p className="font-display text-4xl sm:text-5xl" style={{ color: CHAOS_INFO[chaosNow.id].color }}>
+              {CHAOS_INFO[chaosNow.id].label}
+            </p>
+            <p className="text-sm text-white sm:text-base">{CHAOS_INFO[chaosNow.id].hint}</p>
+          </div>
+        </div>
+      )}
+
       {toast && (
         <div key={toast.id} className="pointer-events-none absolute inset-x-0 top-1/3 z-20 flex justify-center">
           <MedalToast title={toast.title} sub={toast.sub} />
@@ -1540,14 +1883,15 @@ export default function Battle({
 
       {counting && (
         <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center">
-          <p className="mb-2 font-display text-2xl text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">{MAPS[state.map].name}</p>
+          <p className="mb-1 font-display text-2xl text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">{MAPS[state.map].name} · {MODE_INFO[state.mode].label}</p>
+          <p className="mb-2 max-w-md px-4 text-center text-sm text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">{MODE_INFO[state.mode].hint}</p>
           <span key={count} className="animate-celebration-in font-display text-[24vmin] text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.7)]">
             {count}
           </span>
         </div>
       )}
 
-      {inRoster && hud && !hud.alive && state.status === "playing" && !counting && <DeathCard hud={hud} />}
+      {inRoster && hud && !hud.alive && state.status === "playing" && !counting && <DeathCard hud={hud} talo={playerTalo(myId, fighterColor(state, myId), 72)} />}
 
       {!inRoster && !screen && hud?.watching && state.status === "playing" && (
         <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center">
@@ -1605,7 +1949,7 @@ function ViewOverlay({
       {/* Name, shield and health: under the score in the top row, at the top in the bottom row. */}
       <div className={`absolute left-3 flex w-60 flex-col gap-1.5 rounded-2xl bg-slate-950/70 px-3.5 py-2.5 ${bottomRow ? "top-3" : "bottom-3"}`}>
         <span className="flex items-center gap-2 truncate text-lg font-bold" style={{ color }}>
-          <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: color }} />
+          <Talo {...playerTalo(v.id, color, 22)} expr={v.alive ? "normal" : "triste"} />
           {fighterName(state, v.id)}
           {v.guard && v.alive && <ShieldCheck className="h-4 w-4 shrink-0 text-cyan-300" aria-label="Protegido" />}
           <span className="ml-auto font-mono text-base text-white">{state.kills[v.id] ?? 0}</span>
@@ -1634,7 +1978,7 @@ function ViewOverlay({
       )}
       {!v.alive && playing && (
         <div className="absolute inset-0 bg-red-950/25">
-          <DeathCard hud={v} />
+          <DeathCard hud={v} talo={playerTalo(v.id, color, 72)} />
         </div>
       )}
     </div>
@@ -1685,6 +2029,16 @@ function WeaponPanel({ hud, keys, align }: { hud: Hud; keys: boolean; align: "le
       </p>
       {dry && <p className="text-xs font-bold text-red-400">Sin munición: cambia de arma</p>}
       {low && <p className="animate-pulse text-xs font-bold text-amber-300">{keys ? "R: recarga" : "Recarga"}</p>}
+      <div className={`flex w-full items-center gap-1.5 text-[11px] font-bold ${align === "right" ? "flex-row-reverse" : ""}`}>
+        <Zap className="h-3 w-3 shrink-0" style={{ color: ABILITY_INFO[hud.ability.kit].color }} />
+        <span className={hud.ability.ready >= 1 ? "text-white" : "text-slate-500"}>
+          {keys && <b className="mr-1">C</b>}
+          {ABILITY_INFO[hud.ability.kit].label}
+        </span>
+        <span className="h-1.5 w-12 overflow-hidden rounded-full bg-white/10">
+          <span className="block h-full rounded-full" style={{ width: `${hud.ability.ready * 100}%`, background: ABILITY_INFO[hud.ability.kit].color }} />
+        </span>
+      </div>
       <div className={`flex items-center gap-2 text-[11px] text-slate-300 ${align === "right" ? "flex-row-reverse" : ""}`}>
         <span className="flex items-center gap-0.5">
           <Bomb className="h-3 w-3" />
@@ -1712,11 +2066,36 @@ function MedalToast({ title, sub }: { title: string; sub: string }) {
   );
 }
 
+/** Paint from whoever hit you, on your screen for a moment. */
+function PaintSplat({ x, y, size, rot, color }: { x: number; y: number; size: number; rot: number; color: string }) {
+  const drops = [
+    [72, 28, 12],
+    [22, 78, 9],
+    [86, 70, 7],
+    [14, 30, 6],
+    [58, 92, 8],
+  ];
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      className="pointer-events-none absolute z-10 animate-[paint-splat_1.8s_ease-out_forwards]"
+      style={{ left: `${x}%`, top: `${y}%`, width: size, height: size, ["--rot" as string]: `${rot}deg` }}
+      aria-hidden
+    >
+      <path d="M50 14 C64 12 70 24 80 28 C92 33 88 48 84 56 C80 66 86 78 72 82 C60 86 54 78 44 82 C30 88 18 80 20 66 C22 56 10 50 16 38 C22 26 36 16 50 14 Z" fill={color} />
+      {drops.map(([cx, cy, r], i) => (
+        <circle key={i} cx={cx} cy={cy} r={r} fill={color} />
+      ))}
+      <ellipse cx="42" cy="36" rx="12" ry="7" fill="#ffffff" opacity="0.28" />
+    </svg>
+  );
+}
+
 /** Who got you, with what, and how much they had left; then the respawn count. */
-function DeathCard({ hud }: { hud: Hud }) {
+function DeathCard({ hud, talo }: { hud: Hud; talo?: ReturnType<typeof playerTalo> }) {
   return (
     <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 p-4 text-center">
-      <Skull className="h-10 w-10 text-white/80" />
+      {talo ? <Talo {...talo} expr="triste" /> : <Skull className="h-10 w-10 text-white/80" />}
       <p className="font-display text-3xl text-white drop-shadow">{hud.killer ? (hud.killer === "tú mismo" ? "Te eliminaste solo" : `Te eliminó ${hud.killer}`) : "Te eliminaron"}</p>
       {hud.killer && hud.killer !== "tú mismo" && (
         <p className="rounded-full bg-slate-950/60 px-3 py-1 text-sm text-slate-200">
@@ -1745,18 +2124,35 @@ function HitMarker({ mark }: { mark: { n: number; head: boolean; kill: boolean }
 }
 
 /** Score and time: teams with a bar each toward the goal; free-for-all with your place (or the top 3). */
-function ScorePanel({ state, myId, clock, lastMinute }: { state: FuegoState; myId: string; clock: string; lastMinute: boolean }) {
+function ScorePanel({ state, myId, now, clock, lastMinute }: { state: FuegoState; myId: string; now: number; clock: string; lastMinute: boolean }) {
+  const goal = state.mode === "bandera" ? FLAG_CAPS : state.mode === "escalada" ? LADDER.length : state.mode === "tesoro" ? EGG_TARGET_MS / 1000 : state.goal;
   const time = (
-    <span className={`min-w-14 text-center font-mono text-base font-bold ${lastMinute ? "animate-pulse text-red-400" : "text-slate-200"}`}>{clock || `a ${state.goal}`}</span>
+    <span className={`min-w-14 text-center font-mono text-base font-bold ${lastMinute ? "animate-pulse text-red-400" : "text-slate-200"}`}>{clock || `a ${goal}`}</span>
   );
-  if (state.mode === "equipos") {
+  if (state.mode === "infectados") {
+    const n = (side: string) => Object.values(state.roster).filter((v) => v === side).length;
+    return (
+      <div className="flex items-center gap-3 rounded-2xl bg-slate-950/70 px-4 py-1.5 text-white backdrop-blur">
+        <span className="flex flex-col items-center leading-none">
+          <span className="font-display text-2xl" style={{ color: teamInfo("blue").color }}>{n(SURVIVORS)}</span>
+          <span className="text-[10px] text-slate-400">sobreviven</span>
+        </span>
+        {time}
+        <span className="flex flex-col items-center leading-none">
+          <span className="font-display text-2xl text-lime-400">{n(INFECTED)}</span>
+          <span className="text-[10px] text-slate-400">infectados</span>
+        </span>
+      </div>
+    );
+  }
+  if (isTeamMode(state.mode)) {
     const bar = (team: TeamId, dir: "left" | "right") => (
       <div className="flex w-24 flex-col gap-1">
         <span className={`font-display text-2xl leading-none ${dir === "left" ? "text-left" : "text-right"}`} style={{ color: teamInfo(team).color }}>
           {state.score[team]}
         </span>
         <span className={`flex h-1.5 overflow-hidden rounded-full bg-white/10 ${dir === "right" ? "justify-end" : ""}`}>
-          <span className="block h-full rounded-full" style={{ width: `${Math.min(100, (state.score[team] / state.goal) * 100)}%`, background: teamInfo(team).color }} />
+          <span className="block h-full rounded-full" style={{ width: `${Math.min(100, (state.score[team] / goal) * 100)}%`, background: teamInfo(team).color }} />
         </span>
       </div>
     );
@@ -1769,19 +2165,21 @@ function ScorePanel({ state, myId, clock, lastMinute }: { state: FuegoState; myI
     );
   }
   const order = ranking(state);
+  const pts = (id: string) => scoreOf(state, id, now);
   if (myId && myId in state.roster) {
-    const place = order.findIndex((id) => (state.kills[id] ?? 0) === (state.kills[myId] ?? 0)) + 1;
+    const place = order.findIndex((id) => pts(id) === pts(myId)) + 1;
     const leader = order[0];
+    const unit = state.mode === "tesoro" ? `de ${goal} s` : state.mode === "escalada" ? `escalón ${Math.min(LADDER.length, pts(myId) + 1)} de ${LADDER.length}` : `${place}º de ${order.length}`;
     return (
       <div className="flex items-center gap-3 rounded-2xl bg-slate-950/70 px-4 py-1.5 text-white backdrop-blur">
         <span className="flex flex-col items-center leading-none">
-          <span className="font-display text-2xl text-amber-300">{state.kills[myId] ?? 0}</span>
-          <span className="text-[10px] text-slate-400">{place}º de {order.length}</span>
+          <span className="font-display text-2xl text-amber-300">{pts(myId)}</span>
+          <span className="text-[10px] text-slate-400">{unit}</span>
         </span>
         {time}
         <span className="flex max-w-32 items-center gap-1 truncate text-sm text-slate-200">
           <Crown className="h-3.5 w-3.5 shrink-0 text-amber-300" />
-          {leader === myId ? "Vas primero" : `${fighterName(state, leader, myId)} ${state.kills[leader] ?? 0}`}
+          {leader === myId ? "Vas primero" : `${fighterName(state, leader, myId)} ${pts(leader)}`}
         </span>
       </div>
     );
@@ -1794,7 +2192,7 @@ function ScorePanel({ state, myId, clock, lastMinute }: { state: FuegoState; myI
           {i === 0 && <Crown className="h-3.5 w-3.5 text-amber-300" />}
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: fighterColor(state, id) }} />
           <span className="max-w-24 truncate">{fighterName(state, id)}</span>
-          <span className="font-mono text-amber-300">{state.kills[id] ?? 0}</span>
+          <span className="font-mono text-amber-300">{pts(id)}</span>
         </span>
       ))}
     </div>
@@ -1805,6 +2203,11 @@ function KillFeed({ feed, state, myId, style }: { feed: FeedEntry[]; state: Fueg
   return (
     <ul className="flex flex-col items-end gap-0.5" style={style}>
       {feed.map((e, i) => (
+        e.w === "captura" ? (
+          <li key={`${e.t}-${i}`} className="flex items-center gap-1.5 rounded-md bg-slate-950/70 px-2 py-0.5 text-[11px] text-white">
+            <b style={{ color: fighterColor(state, e.k) }}>{fighterName(state, e.k, myId)}</b> capturó la bandera 🚩
+          </li>
+        ) : (
         <li key={`${e.t}-${i}`} className={`flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] text-white backdrop-blur ${e.k === myId ? "bg-amber-500/40" : e.v === myId ? "bg-red-600/40" : "bg-slate-950/60"}`}>
           <b style={{ color: fighterColor(state, e.k) }}>{fighterName(state, e.k, myId)}</b>
           <span className="text-slate-300">
@@ -1819,6 +2222,7 @@ function KillFeed({ feed, state, myId, style }: { feed: FeedEntry[]; state: Fueg
             </span>
           )}
         </li>
+        )
       ))}
     </ul>
   );
@@ -1905,6 +2309,7 @@ function Scoreboard({ state, myId }: { state: FuegoState; myId: string }) {
         <thead>
           <tr className="text-left text-xs text-slate-400">
             <th className="py-1">Jugador</th>
+            {state.mode === "tesoro" && <th className="w-14 text-right">Huevo</th>}
             <th className="w-14 text-right">Bajas</th>
             <th className="w-16 text-right">Muertes</th>
             <th className="w-14 text-right">Racha</th>
@@ -1914,11 +2319,12 @@ function Scoreboard({ state, myId }: { state: FuegoState; myId: string }) {
           {ids.map((id, i) => (
             <tr key={id} className={id === myId ? "text-amber-300" : ""}>
               <td className="flex items-center gap-2 py-1">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: fighterColor(state, id) }} />
+                <Talo {...playerTalo(id, fighterColor(state, id), 20)} expr={i === 0 && (state.kills[id] ?? 0) > 0 ? "contento" : "normal"} />
                 {fighterName(state, id, myId)}
                 {i === 0 && (state.kills[id] ?? 0) > 0 && <Crown className="h-3.5 w-3.5 text-amber-300" />}
                 {isBot(id) && <span className="text-xs text-slate-500">bot</span>}
               </td>
+              {state.mode === "tesoro" && <td className="text-right font-mono text-amber-300">{scoreOf(state, id, serverNow())} s</td>}
               <td className="text-right font-mono">{state.kills[id] ?? 0}</td>
               <td className="text-right font-mono text-slate-400">{state.deaths[id] ?? 0}</td>
               <td className="text-right font-mono text-slate-400">{state.best[id] ?? 0}</td>
@@ -1936,6 +2342,10 @@ function Results({ roomId, meta, state, myId, presence }: { roomId: string; meta
   const title =
     state.winner === "draw"
       ? "¡Empate!"
+      : state.mode === "infectados"
+        ? state.winner === SURVIVORS
+          ? "🏆 ¡Sobrevivieron!"
+          : "🧟 ¡Ganaron los infectados!"
       : team
         ? mine === state.winner
           ? "🏆 ¡Ganó tu equipo!"
@@ -1952,8 +2362,12 @@ function Results({ roomId, meta, state, myId, presence }: { roomId: string; meta
   const awards: { icon: ReactNode; label: string; who: string; value: string }[] = [];
   if (mvp && (state.kills[mvp] ?? 0) > 0) awards.push({ icon: <Crown className="h-5 w-5 text-amber-300" />, label: "Más bajas", who: mvp, value: `${state.kills[mvp]}` });
   if (streaker && (state.best[streaker] ?? 0) >= 2) awards.push({ icon: <Flame className="h-5 w-5 text-orange-400" />, label: "Mejor racha", who: streaker, value: `${state.best[streaker]} seguidas` });
+  // The winner's talo (or one in the winning team's color).
+  const winnerTalo =
+    state.winner === "draw" ? null : team ? playerTalo(`equipo-${state.winner}`, team.color, 84) : state.winner ? playerTalo(state.winner, fighterColor(state, state.winner), 84) : null;
   return (
     <div className="animate-celebration-in flex w-full max-w-lg flex-col items-center gap-4 rounded-3xl bg-slate-950/90 p-5 text-center shadow-2xl ring-1 ring-white/10 backdrop-blur">
+      {winnerTalo && <Talo {...winnerTalo} expr="ganador" />}
       <p className="font-display text-3xl" style={{ color: team?.color ?? "#fbbf24" }}>
         {title}
       </p>

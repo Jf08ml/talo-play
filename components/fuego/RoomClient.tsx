@@ -4,11 +4,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import {
+  chooseKit,
   chooseTeam,
   getFuegoMeta,
+  kitOf,
   isBot,
   joinFuego,
   normalizeMeta,
+  scoreOf,
   shuffleTeams,
   startMatch,
   subscribeFuego,
@@ -33,8 +36,13 @@ import Pad from "./Pad";
 import Link from "next/link";
 import { roomPath } from "@/lib/games";
 import { SETTINGS } from "./settings";
-import { Bot, MonitorPlay, Shuffle, Smartphone } from "lucide-react";
+import { Bot, MonitorPlay, Shuffle, Smartphone, Zap } from "lucide-react";
 import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
+import { FLAG_CAPS, LADDER, MODE_INFO, isTeamMode } from "@/lib/fuegoModes";
+import { ABILITY_IDS, ABILITY_INFO } from "@/lib/fuegoAbilities";
+import { Talo } from "@/components/Talo";
+import { playerTalo } from "@/lib/talos";
+import { serverNow } from "@/lib/serverTime";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -42,9 +50,19 @@ const LEVEL_LABEL = { facil: "fáciles", normal: "normales", dificil: "difícile
 
 export function settingsSummary(meta: FuegoMeta): string {
   const map = MAPS[meta.map];
-  const mode = meta.mode === "equipos" ? `${meta.size / 2} contra ${meta.size / 2}` : `todos contra todos (${meta.size})`;
-  const where = meta.view === "pantalla" ? " · en pantalla grande" : "";
-  return `${map.name} · ${mode} · a ${meta.goal} bajas · ${meta.minutes} min${meta.bots ? ` · bots ${LEVEL_LABEL[meta.level]}` : ""}${where}`;
+  const mode = isTeamMode(meta.mode) ? `${MODE_INFO[meta.mode].label} (${meta.size / 2} contra ${meta.size / 2})` : `${MODE_INFO[meta.mode].label} (${meta.size})`;
+  const goal =
+    meta.mode === "bandera"
+      ? `a ${FLAG_CAPS} capturas`
+      : meta.mode === "escalada"
+        ? `${LADDER.length} armas`
+        : meta.mode === "tesoro"
+          ? "60 s con el huevo"
+          : meta.mode === "infectados"
+            ? "sobrevivir"
+            : `a ${meta.goal} bajas`;
+  const where = (meta.chaos ? " · con caos" : "") + (meta.view === "pantalla" ? " · en pantalla grande" : "");
+  return `${map.name} · ${mode} · ${goal} · ${meta.minutes} min${meta.bots ? ` · bots ${LEVEL_LABEL[meta.level]}` : ""}${where}`;
 }
 
 /** A Fuego cruzado room: the waiting room (teams if it's a team game), then the match full screen. */
@@ -102,7 +120,8 @@ export default function RoomClient({ roomId }: { roomId: string }) {
     const ids = Object.keys(state.roster);
     const vsBotsOnly = ids.every((id) => id === myId || (awardSide !== "ffa" && state.roster[id] === awardSide) || isBot(id));
     if (awardSide === "ffa") {
-      return { place: placeIn(ids.map((id) => ({ id, score: state.kills[id] ?? 0 })), myId), players: ids.length, vsBotsOnly };
+      const now = serverNow();
+      return { place: placeIn(ids.map((id) => ({ id, score: scoreOf(state, id, now) })), myId), players: ids.length, vsBotsOnly };
     }
     return { place: state.winner === "draw" ? null : state.winner === awardSide ? 1 : 2, players: 2, vsBotsOnly };
   })();
@@ -172,13 +191,14 @@ export default function RoomClient({ roomId }: { roomId: string }) {
                 <div className="flex gap-2.5 rounded-xl bg-sky-500/10 p-3 text-sm text-sky-100 ring-1 ring-sky-400/20">
                   <Smartphone className="mt-0.5 h-5 w-5 shrink-0" />
                   <p>
-                    Cada uno juega desde su teléfono (horizontal) o su computadora con mouse y teclado. Empiezas con fusil, pistola y dos
-                    granadas: las armas pesadas están repartidas por el mapa.
+                    Cada uno juega desde su teléfono (horizontal) o su computadora con mouse y teclado. Empiezas con rociador, pistola y dos
+                    globos de pintura: las armas grandes están repartidas por el mapa.
                   </p>
                 </div>
               )}
-              {meta.mode === "equipos" && <TeamPicker roomId={roomId} state={state} myId={myId} connected={connected} size={meta.size} bots={meta.bots} />}
-              {meta.mode === "todos" && meta.bots && people < meta.size && (
+              <KitPicker roomId={roomId} state={state} myId={myId} color={identity.color} />
+              {isTeamMode(meta.mode) && <TeamPicker roomId={roomId} state={state} myId={myId} connected={connected} size={meta.size} bots={meta.bots} />}
+              {!isTeamMode(meta.mode) && meta.bots && people < meta.size && (
                 <p className="flex items-center justify-center gap-1.5 text-center text-xs text-slate-400">
                   <Bot className="h-3.5 w-3.5" /> Los lugares libres ({meta.size - Math.min(people, meta.size)}) los ocupan bots.
                 </p>
@@ -188,6 +208,37 @@ export default function RoomClient({ roomId }: { roomId: string }) {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+/** Your talo and its ability, picked before the match. */
+function KitPicker({ roomId, state, myId, color }: { roomId: string; state: FuegoState; myId: string; color: string }) {
+  const mine = kitOf(state, myId);
+  return (
+    <div className="flex flex-col gap-2 rounded-xl bg-slate-950/40 p-3 ring-1 ring-white/10">
+      <div className="flex items-center gap-3">
+        <Talo {...playerTalo(myId, color, 44)} expr="contento" />
+        <div>
+          <p className="text-sm font-bold text-white">Tu habilidad: {ABILITY_INFO[mine].label}</p>
+          <p className="text-xs text-slate-400">{ABILITY_INFO[mine].hint} Se usa con C o con su botón.</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-5 gap-1.5">
+        {ABILITY_IDS.map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => chooseKit(roomId, myId, k).catch(console.error)}
+            aria-pressed={k === mine}
+            className={`flex flex-col items-center gap-1 rounded-lg px-1 py-2 text-[11px] font-bold leading-tight ${k === mine ? "text-slate-950" : "bg-slate-900/70 text-slate-200 hover:bg-slate-800"}`}
+            style={k === mine ? { background: ABILITY_INFO[k].color } : undefined}
+          >
+            <Zap className="h-4 w-4" />
+            {ABILITY_INFO[k].label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

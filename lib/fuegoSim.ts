@@ -239,6 +239,8 @@ export interface SoldierInput {
   jump: boolean;
   /** Slower while aiming down the sights. */
   aiming: boolean;
+  /** Chaos events: gravity, jump and run speed multipliers (1 = normal). */
+  mods?: { gravity: number; jump: number; speed: number };
 }
 
 export class Soldier {
@@ -256,6 +258,8 @@ export class Soldier {
   /** Distance walked, for the step sounds. */
   stride = 0;
   landed = 0;
+  /** Abilities: a dash keeps its speed (no steering) this long. */
+  boost = 0;
 
   constructor(x: number, z: number, yaw: number, w?: World) {
     this.x = x;
@@ -266,6 +270,40 @@ export class Soldier {
 
   get speed(): number {
     return Math.hypot(this.vx, this.vz);
+  }
+
+  /** Ability "impulso": a burst of speed along (dirX, dirZ) that isn't steered away for a moment. */
+  dash(dirX: number, dirZ: number, speed: number) {
+    const n = Math.hypot(dirX, dirZ) || 1;
+    this.vx = (dirX / n) * speed;
+    this.vz = (dirZ / n) * speed;
+    this.boost = 0.22;
+    if (this.onGround) {
+      this.vy = 2.5;
+      this.onGround = false;
+    }
+  }
+
+  /** Ability "supersalto". */
+  superJump(v: number) {
+    this.vy = v;
+    this.onGround = false;
+  }
+
+  /** Ability "teletransporte": up to `dist` m ahead, stopping short of walls. Returns false if there was no room. */
+  blink(w: World, yaw: number, dist: number): boolean {
+    const dx = -Math.sin(yaw);
+    const dz = -Math.cos(yaw);
+    const free = rayWorld(w, { ox: this.x, oy: this.y + 1, oz: this.z, dx, dy: 0, dz }, dist + RADIUS);
+    const d = Math.min(dist, free - RADIUS - 0.15);
+    if (d < 1) return false;
+    const [nx, nz] = collide(w, this.x + dx * d, this.z + dz * d, this.y);
+    this.x = nx;
+    this.z = nz;
+    const g = groundAt(w, nx, nz, this.y + STEP);
+    if (g < this.y - 0.05) this.onGround = false;
+    else this.y = g;
+    return true;
   }
 
   step(input: SoldierInput, w: World, dt: number, others: { x: number; y: number; z: number }[] = []) {
@@ -282,19 +320,23 @@ export class Soldier {
       mx /= m;
       mz /= m;
     }
-    const top = RUN_SPEED * (input.aiming ? 0.6 : 1);
+    const mods = input.mods;
+    const top = RUN_SPEED * (input.aiming ? 0.6 : 1) * (mods?.speed ?? 1);
     const wantX = (fx * mz + rx * mx) * top;
     const wantZ = (fz * mz + rz * mx) * top;
     const accel = this.onGround ? 14 : 3;
     const k = 1 - Math.exp(-accel * dt);
-    this.vx += (wantX - this.vx) * k;
-    this.vz += (wantZ - this.vz) * k;
+    if (this.boost > 0) this.boost = Math.max(0, this.boost - dt);
+    else {
+      this.vx += (wantX - this.vx) * k;
+      this.vz += (wantZ - this.vz) * k;
+    }
 
     if (input.jump && this.onGround) {
-      this.vy = JUMP_SPEED;
+      this.vy = JUMP_SPEED * (mods?.jump ?? 1);
       this.onGround = false;
     }
-    this.vy -= GRAVITY * dt;
+    this.vy -= GRAVITY * (mods?.gravity ?? 1) * dt;
 
     let nx = this.x + this.vx * dt;
     let nz = this.z + this.vz * dt;
@@ -376,20 +418,20 @@ export interface WeaponDef {
 }
 
 export const WEAPONS: Record<WeaponId, WeaponDef> = {
-  rifle: { label: "Fusil", every: 0.085, auto: true, mag: 32, reserve: 160, reload: 2, damage: 8, head: 1.3, pellets: 1, spread: 0.035, aimSpread: 0.018, range: 60, falloff: 25, minFactor: 0.6, zoom: 55, kick: 0.006 },
+  rifle: { label: "Rociador", every: 0.085, auto: true, mag: 32, reserve: 160, reload: 2, damage: 8, head: 1.3, pellets: 1, spread: 0.035, aimSpread: 0.018, range: 60, falloff: 25, minFactor: 0.6, zoom: 55, kick: 0.006 },
   pistola: { label: "Pistola", every: 0.26, auto: false, mag: 12, reserve: 48, reload: 1.4, damage: 22, head: 2.2, pellets: 1, spread: 0.012, aimSpread: 0.003, range: 80, falloff: 40, minFactor: 0.7, zoom: 45, kick: 0.02 },
-  escopeta: { label: "Escopeta", every: 0.9, auto: false, mag: 6, reserve: 24, reload: 2.6, damage: 13, head: 1.2, pellets: 9, spread: 0.11, aimSpread: 0.09, range: 22, falloff: 6, minFactor: 0.15, zoom: 62, kick: 0.06 },
+  escopeta: { label: "Salpicadora", every: 0.9, auto: false, mag: 6, reserve: 24, reload: 2.6, damage: 13, head: 1.2, pellets: 9, spread: 0.11, aimSpread: 0.09, range: 22, falloff: 6, minFactor: 0.15, zoom: 62, kick: 0.06 },
   francotirador: { label: "Francotirador", every: 1.1, auto: false, mag: 4, reserve: 16, reload: 2.6, damage: 105, head: 2.5, pellets: 1, spread: 0.06, aimSpread: 0, range: 220, falloff: 220, minFactor: 1, zoom: 14, kick: 0.05 },
-  lanzacohetes: { label: "Lanzacohetes", every: 1.2, auto: false, mag: 2, reserve: 4, reload: 3, damage: 0, head: 1, pellets: 1, spread: 0.01, aimSpread: 0.005, range: 120, falloff: 120, minFactor: 1, zoom: 45, rocket: true, kick: 0.06 },
+  lanzacohetes: { label: "Lanzaglobos", every: 1.2, auto: false, mag: 2, reserve: 4, reload: 3, damage: 0, head: 1, pellets: 1, spread: 0.01, aimSpread: 0.005, range: 120, falloff: 120, minFactor: 1, zoom: 45, rocket: true, kick: 0.06 },
 };
 
 export const PICKUP_LABEL: Record<PickupKind, string> = {
-  rifle: "Fusil",
+  rifle: "Rociador",
   pistola: "Pistola",
-  escopeta: "Escopeta",
+  escopeta: "Salpicadora",
   francotirador: "Francotirador",
-  lanzacohetes: "Lanzacohetes",
-  granadas: "Granadas",
+  lanzacohetes: "Lanzaglobos",
+  granadas: "Globos de pintura",
   botiquin: "Botiquín",
 };
 
@@ -446,6 +488,10 @@ export class Arsenal {
   heat = 0;
   /** Shots fired (others draw a muzzle flash when it changes). */
   shots = 0;
+  /** Chaos: shots don't use ammo. */
+  infinite = false;
+  /** Chaos: the weapons carried before one was forced on everyone. */
+  private saved: { slots: Slot[]; current: number } | null = null;
   private wasFire = false;
   private wasSwap = false;
   private wasGrenade = false;
@@ -471,6 +517,8 @@ export class Arsenal {
 
   /** Picks up a weapon: ammo if you have it, else a free slot, else it replaces the one in hand. Returns false if nothing changed. */
   take(id: WeaponId): boolean {
+    // While a weapon is forced on everyone (chaos), nothing else can be picked up.
+    if (this.saved) return false;
     const mine = this.slots.find((s) => s.id === id);
     const def = WEAPONS[id];
     if (mine) {
@@ -487,6 +535,38 @@ export class Arsenal {
     this.reloading = 0;
     this.switching = 0.35;
     return true;
+  }
+
+  /** Escalada: from now on only this weapon (nothing to give back). */
+  setOnly(id: WeaponId) {
+    this.saved = null;
+    this.slots = [fresh(id)];
+    this.current = 0;
+    this.reloading = 0;
+    this.switching = 0.35;
+  }
+
+  /** Chaos: everyone carries only this weapon for a while (`restore` gives the old ones back). */
+  force(id: WeaponId) {
+    if (this.saved) return;
+    this.saved = { slots: this.slots, current: this.current };
+    this.slots = [fresh(id)];
+    this.current = 0;
+    this.reloading = 0;
+    this.switching = 0.35;
+  }
+
+  restore() {
+    if (!this.saved) return;
+    this.slots = this.saved.slots;
+    this.current = this.saved.current;
+    this.saved = null;
+    this.reloading = 0;
+    this.switching = 0.35;
+  }
+
+  get forced(): boolean {
+    return !!this.saved;
   }
 
   /** Advances the timers and turns the buttons into actions. */
@@ -541,7 +621,7 @@ export class Arsenal {
       if (s.mag === 0) {
         if (pressed(input.fire, this.wasFire)) ev.push({ type: "empty" });
       } else {
-        s.mag--;
+        if (!this.infinite) s.mag--;
         this.cool = def.every;
         this.shots++;
         const spread = (input.aim ? def.aimSpread : def.spread) * (1 + this.heat);
@@ -589,7 +669,7 @@ export interface ShotHit {
 }
 
 /** Where a ray meets a standing soldier: head sphere first, then the body cylinder. */
-function rayTarget(r: Ray, t: Target, maxT: number): { t: number; head: boolean } | null {
+function rayTarget(r: Ray, t: Target, maxT: number, headR = HEAD_R): { t: number; head: boolean } | null {
   // Head.
   const hx = t.x - r.ox;
   const hy = t.y + HEAD_Y - r.oy;
@@ -598,8 +678,8 @@ function rayTarget(r: Ray, t: Target, maxT: number): { t: number; head: boolean 
   let best: { t: number; head: boolean } | null = null;
   if (proj > 0) {
     const d2 = hx * hx + hy * hy + hz * hz - proj * proj;
-    if (d2 < HEAD_R * HEAD_R) {
-      const th = proj - Math.sqrt(HEAD_R * HEAD_R - d2);
+    if (d2 < headR * headR) {
+      const th = proj - Math.sqrt(headR * headR - d2);
       if (th < maxT) best = { t: th, head: true };
     }
   }
@@ -630,14 +710,16 @@ export function castBullet(
   r: Ray,
   weapon: WeaponId,
   targets: Target[],
-  assist = 0
+  assist = 0,
+  /** Head hitbox scale (chaos "ojos saltones"). */
+  headScale = 1
 ): { hit: ShotHit | null; end: [number, number, number]; dist: number; normal: [number, number, number] | null } {
   const def = WEAPONS[weapon];
   const wall = rayWorldHit(w, r, def.range);
   const wallT = wall.t;
   let best: { t: number; head: boolean; id: string } | null = null;
   for (const t of targets) {
-    const h = rayTarget(r, t, wallT);
+    const h = rayTarget(r, t, wallT, HEAD_R * headScale);
     if (h && (!best || h.t < best.t)) best = { ...h, id: t.id };
   }
   if (!best && assist > 0) {
@@ -950,6 +1032,10 @@ export interface BotView {
   items: { id: string; kind: PickupKind; x: number; z: number }[];
   hp: number;
   shield: number;
+  /** The mode's objective (a flag, the egg, its base): where to go when there's nobody to fight, or always with `rush`. */
+  goal?: { x: number; z: number; rush?: boolean } | null;
+  /** Unarmed (infected, the last step of escalada): run at them and punch. */
+  meleeOnly?: boolean;
 }
 
 export interface BotOutput {
@@ -1005,7 +1091,7 @@ export function botThink(
   let pick: string | null = null;
   const wantKit = view.hp < 55;
   const better = (k: PickupKind) => (k === "lanzacohetes" || k === "francotirador" || k === "escopeta") && !arms.has(k as WeaponId);
-  const items = view.items
+  const items = (view.meleeOnly ? [] : view.items)
     .filter((it) => (wantKit && it.kind === "botiquin") || better(it.kind) || (it.kind === "granadas" && arms.grenades < 2))
     .map((it) => ({ it, d: Math.hypot(it.x - me.x, it.z - me.z) }))
     .filter(({ d }) => d < (wantKit ? 45 : 25))
@@ -1029,6 +1115,13 @@ export function botThink(
       goalZ = prey.z;
       goalY = prey.y;
     }
+  }
+
+  // The mode's objective wins over wandering (and over everything when rushing).
+  if (view.goal && (view.goal.rush || !seen) && !(view.meleeOnly && seen)) {
+    goalX = view.goal.x;
+    goalZ = view.goal.z;
+    goalY = topAt(w, goalX, goalZ);
   }
 
   mind.repath -= dt;
@@ -1096,8 +1189,14 @@ export function botThink(
       mind.strafeT = 0.6 + rand() * 1.2;
     }
     const close = arms.weapon === "escopeta" ? 3 : 9;
-    move.mx = mind.strafe * 0.8;
-    move.mz = d > close + 6 ? 0.7 : d < close ? -0.4 : 0;
+    if (view.meleeOnly) {
+      // Straight at them, a little zigzag.
+      move.mz = 1;
+      move.mx = mind.strafe * 0.25;
+    } else if (!view.goal?.rush) {
+      move.mx = mind.strafe * 0.8;
+      move.mz = d > close + 6 ? 0.7 : d < close ? -0.4 : 0;
+    }
     mind.jumpT -= dt;
     if (mind.jumpT <= 0) {
       move.jump = rand() < 0.35;
@@ -1106,14 +1205,14 @@ export function botThink(
     const aimedOff = Math.abs(dYaw);
     const def = WEAPONS[arms.weapon];
     const ready = mind.seenFor > L.react && aimedOff < 0.12 + 1 / Math.max(4, d);
-    if (ready && d < def.range) {
+    if (ready && d < def.range && !view.meleeOnly) {
       // Bursts: shoot most of the time, pausing now and then.
       out.fire = def.auto ? Math.sin(mind.seenFor * 6) > 1 - L.burst * 1.6 : rand() < dt * 3.2;
       out.aim = arms.weapon === "francotirador" || (d > 20 && arms.weapon !== "escopeta");
     }
     if (d < MELEE_RANGE * 0.9) out.melee = true;
     mind.grenadeT -= dt;
-    if (mind.grenadeT <= 0 && d > 8 && d < 22 && arms.grenades > 0) {
+    if (mind.grenadeT <= 0 && d > 8 && d < 22 && arms.grenades > 0 && !view.meleeOnly) {
       out.grenade = true;
       mind.grenadeT = 6 + rand() * 6;
     }

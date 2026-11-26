@@ -12,6 +12,7 @@ import type { ArsenalInput, SoldierInput } from "./fuegoSim";
 
 export interface PadSeen {
   sid: number;
+  h: number;
   ft: number;
   j: number;
   r: number;
@@ -38,6 +39,7 @@ const MAX_PITCH = 1.35;
 function synced(pad: FuegoPad) {
   return {
     sid: pad.sid || 0,
+    h: pad.h || 0,
     ft: pad.ft || 0,
     j: pad.j || 0,
     r: pad.r || 0,
@@ -85,7 +87,7 @@ export function padInput(
   dt: number,
   sens: number,
   onGround: boolean
-): { move: Omit<SoldierInput, "aiming">; arms: Omit<ArsenalInput, "aim">; aim: boolean; pick: boolean } {
+): { move: Omit<SoldierInput, "aiming">; arms: Omit<ArsenalInput, "aim">; aim: boolean; pick: boolean; ability: boolean } {
   // The phone reloaded: start from what it says now, without acting on it.
   if ((pad.sid || 0) !== seen.sid) Object.assign(seen, synced(pad));
   const dlx = (pad.lx || 0) - seen.lx;
@@ -99,8 +101,8 @@ export function padInput(
   seen.pitch += (seen.aimPitch - seen.pitch) * k;
 
   // Counters never go down on the same page; if they do, take them as they are.
-  for (const key of ["ft", "j", "r", "q", "g", "m", "p"] as const) if ((pad[key] || 0) < seen[key]) seen[key] = pad[key] || 0;
-  const took = (key: "ft" | "j" | "r" | "q" | "g" | "m" | "p") => {
+  for (const key of ["h", "ft", "j", "r", "q", "g", "m", "p"] as const) if ((pad[key] || 0) < seen[key]) seen[key] = pad[key] || 0;
+  const took = (key: "h" | "ft" | "j" | "r" | "q" | "g" | "m" | "p") => {
     const now = pad[key] || 0;
     const fresh = now > seen[key];
     seen[key] = now;
@@ -128,5 +130,6 @@ export function padInput(
     },
     aim: !!pad.a,
     pick: took("p"),
+    ability: took("h"),
   };
 }

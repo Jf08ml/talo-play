@@ -18,6 +18,7 @@ import { PRIMARY_BUTTON } from "@/components/ui";
 import { useWakeLock } from "@/components/carreras/Controller";
 import Battle from "./Battle";
 import { settingsSummary } from "./RoomClient";
+import { MODE_INFO, isTeamMode } from "@/lib/fuegoModes";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -94,7 +95,7 @@ function Waiting({ roomId, meta, state, presence }: { roomId: string; meta: Fueg
           setError(
             meta.bots
               ? "Hace falta al menos una persona con el celular conectado."
-              : meta.mode === "equipos"
+              : isTeamMode(meta.mode)
                 ? "Cada equipo necesita al menos una persona (o activa los bots)."
                 : "Hacen falta al menos dos personas (o activa los bots)."
           );
@@ -130,9 +131,10 @@ function Waiting({ roomId, meta, state, presence }: { roomId: string; meta: Fueg
           <p className="text-sm text-white/40">{settingsSummary(meta)}</p>
         </div>
         <div className="flex w-full max-w-xl flex-col gap-4">
-          {meta.mode === "todos" ? (
+          {!isTeamMode(meta.mode) ? (
             <div className="flex min-h-48 flex-col gap-2 rounded-3xl bg-white/[0.05] p-5 ring-2 ring-talo-hero/60">
-              <p className="font-display text-2xl text-talo-hero">Todos contra todos</p>
+              <p className="font-display text-2xl text-talo-hero">{MODE_INFO[meta.mode].label}</p>
+              <p className="text-sm text-white/60">{MODE_INFO[meta.mode].hint}</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                 {people.map((id) => (
                   <span key={id} className="flex items-center gap-2 truncate text-xl font-bold">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
-import { ArrowUpDown, Bomb, Crosshair, Hand, HandMetal, MoveUp, RefreshCw, Target } from "lucide-react";
+import { ArrowUpDown, Bomb, Crosshair, Hand, HandMetal, MoveUp, RefreshCw, Target, Zap } from "lucide-react";
 
 /**
  * What the player is pressing, read by the battle loop every frame. Look
@@ -19,13 +19,15 @@ export interface ControlState {
   grenade: boolean;
   melee: boolean;
   pick: boolean;
+  /** Ability: a one-shot press the loop clears. */
+  ability: boolean;
   board: boolean;
   lookX: number;
   lookY: number;
 }
 
 export function newControls(): ControlState {
-  return { mx: 0, mz: 0, jump: false, fire: false, aim: false, reload: false, swap: false, grenade: false, melee: false, pick: false, board: false, lookX: 0, lookY: 0 };
+  return { mx: 0, mz: 0, jump: false, fire: false, aim: false, reload: false, swap: false, grenade: false, melee: false, pick: false, ability: false, board: false, lookX: 0, lookY: 0 };
 }
 
 /** Radians per pixel dragged (touch) or moved (mouse). */
@@ -78,6 +80,7 @@ export function useDesktopControls(controlsRef: RefObject<ControlState>, target:
       const k = e.key.toLowerCase();
       if (k.startsWith("arrow") || k === " " || k === "tab") e.preventDefault();
       if (k === "e") c.pick = true;
+      if (k === "c" && !e.repeat) c.ability = true;
       keys.add(k);
       sync();
     };
@@ -166,7 +169,10 @@ export function TouchControls({
   aiming,
   onAim,
   fireOnRelease,
+  ability,
 }: {
+  /** The ability's button: name, color and how ready it is (0–1). */
+  ability?: { label: string; color: string; ready: number };
   controlsRef: RefObject<ControlState>;
   canPick: boolean;
   pickLabel: string;
@@ -322,6 +328,21 @@ export function TouchControls({
           </button>
         </div>
       </div>
+      {ability && (
+        <button
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            if (ability.ready >= 1) controlsRef.current.ability = true;
+          }}
+          aria-label={ability.label}
+          className="absolute bottom-40 right-4 flex h-14 w-14 flex-col items-center justify-center overflow-hidden rounded-full text-[9px] font-bold leading-tight text-white ring-2 ring-white/50"
+          style={{ background: ability.ready >= 1 ? ability.color : "rgba(15,23,42,0.6)" }}
+        >
+          <span className="absolute inset-x-0 bottom-0 bg-white/25" style={{ height: `${ability.ready * 100}%` }} />
+          <Zap className="relative h-5 w-5" />
+          <span className="relative">{ability.label}</span>
+        </button>
+      )}
       {canPick && (
         <button
           onPointerDown={(e) => {

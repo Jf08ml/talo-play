@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { ArrowUpDown, Bomb, Crosshair, Hand, HandMetal, Keyboard, MonitorPlay, MoveUp, RefreshCw, ShieldCheck, Skull, Target, Trophy } from "lucide-react";
+import { ArrowUpDown, Bomb, Crosshair, Hand, HandMetal, Keyboard, MonitorPlay, MoveUp, RefreshCw, ShieldCheck, Skull, Target, Trophy, Zap } from "lucide-react";
 import {
   NO_PAD,
   RESPAWN_MS,
@@ -17,9 +17,13 @@ import {
   type FuegoLive,
   type FuegoPad,
   type FuegoState,
+  kitOf,
 } from "@/lib/fuego";
+import { ABILITY_INFO } from "@/lib/fuegoAbilities";
 import { MAX_GRENADES, MAX_HP, MAX_SHIELD, WEAPONS, WEAPON_IDS } from "@/lib/fuegoSim";
 import { serverNow } from "@/lib/serverTime";
+import { CHAOS_INFO, chaosAt } from "@/lib/fuegoChaos";
+import { INFECTED, ladderStep } from "@/lib/fuegoModes";
 import { useWakeLock } from "@/components/carreras/Controller";
 import { TOUCH_LOOK } from "./Controls";
 
@@ -43,7 +47,7 @@ const DEAD = 0.12;
 /** Arrow keys turn the look this fast (rad/s). */
 const KEY_LOOK = 2.2;
 
-type Press = "j" | "r" | "q" | "g" | "m" | "p";
+type Press = "h" | "j" | "r" | "q" | "g" | "m" | "p";
 
 const MOVE_KEYS: Record<string, [number, number]> = { w: [0, 1], s: [0, -1], a: [-1, 0], d: [1, 0] };
 
@@ -58,7 +62,7 @@ function capture(e: ReactPointerEvent<HTMLElement>) {
 const SID = 1 + Math.floor(Math.random() * 1e9);
 
 /** Counters and look per room and player, kept while the page lives (the screen only uses what changed). */
-const counts = new Map<string, Pick<FuegoPad, "ft" | "j" | "r" | "q" | "g" | "m" | "p" | "lx" | "ly">>();
+const counts = new Map<string, Pick<FuegoPad, "h" | "ft" | "j" | "r" | "q" | "g" | "m" | "p" | "lx" | "ly">>();
 
 export default function Pad({ roomId, clientId, state }: { roomId: string; clientId: string; state: FuegoState }) {
   useWakeLock();
@@ -105,7 +109,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
   const send = (patch: Partial<FuegoPad>, urgent = false) => {
     wire.current = { ...wire.current, ...patch };
     const w = wire.current;
-    counts.set(key, { ft: w.ft, j: w.j, r: w.r, q: w.q, g: w.g, m: w.m, p: w.p, lx: w.lx, ly: w.ly });
+    counts.set(key, { h: w.h, ft: w.ft, j: w.j, r: w.r, q: w.q, g: w.g, m: w.m, p: w.p, lx: w.lx, ly: w.ly });
     const go = () => {
       timer.current = null;
       lastAt.current = performance.now();
@@ -199,7 +203,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
       setMove(x / n, y / n);
       trigger(down.has("j"));
     };
-    const presses: Record<string, Press> = { " ": "j", r: "r", q: "q", g: "g", f: "m", e: "p" };
+    const presses: Record<string, Press> = { " ": "j", r: "r", q: "q", g: "g", f: "m", e: "p", c: "h" };
     const onDown = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
       if (e.target instanceof HTMLInputElement) return;
@@ -317,6 +321,9 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
   const counting = state.status === "playing" && t < state.startedAt;
   const respawnIn = !alive && fighting && state.deadAt[clientId] ? Math.max(0, Math.ceil((state.deadAt[clientId] + RESPAWN_MS - t) / 1000)) : 0;
   const killer = state.hits[clientId]?.from ?? "";
+  const chaos = state.status === "playing" ? chaosAt(state, t) : null;
+  // Unarmed (infected, last step of escalada): the big button punches.
+  const bare = (state.mode === "infectados" && side === INFECTED) || (state.mode === "escalada" && ladderStep(state.kills[clientId] ?? 0) === "golpe");
   const btn = "flex flex-col items-center justify-center gap-0.5 rounded-2xl text-[11px] font-bold leading-none active:bg-white/30";
 
   return (
@@ -351,6 +358,12 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
         {alive && guarded(state, clientId, t) && <ShieldCheck className="h-5 w-5 shrink-0 text-cyan-300" aria-label="Protegido" />}
         <MonitorPlay className="h-5 w-5 shrink-0 text-white/40" aria-label="Mira la pantalla grande" />
       </div>
+
+      {chaos && (
+        <p className="rounded-xl px-3 py-1 text-center text-sm font-bold text-white" style={{ background: CHAOS_INFO[chaos.id].color }}>
+          {CHAOS_INFO[chaos.id].label}: {CHAOS_INFO[chaos.id].hint.toLowerCase()} · {Math.max(0, Math.ceil((chaos.end - t) / 1000))} s
+        </p>
+      )}
 
       {state.status === "finished" ? (
         <Over state={state} clientId={clientId} />
@@ -387,6 +400,24 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
                 <span className="px-3 text-sm font-bold">Moverte</span>
               </div>
             )}
+            {/* The ability, by the stick. */}
+            {(() => {
+              const kit = ABILITY_INFO[kitOf(state, clientId)];
+              const ready = (live?.c ?? 100) / 100;
+              return (
+                <button
+                  type="button"
+                  {...tap("h")}
+                  aria-label={kit.label}
+                  className={`${btn} absolute bottom-3 left-3 h-14 w-20 overflow-hidden text-white`}
+                  style={{ background: ready >= 1 ? kit.color : "rgba(255,255,255,0.08)" }}
+                >
+                  <span className="absolute inset-x-0 bottom-0 bg-white/25" style={{ height: `${ready * 100}%` }} />
+                  <Zap className="relative h-5 w-5" />
+                  <span className="relative">{kit.label}</span>
+                </button>
+              );
+            })()}
             {/* Jump within the thumb's reach of the stick too. */}
             <button type="button" {...tap("j")} aria-label="Saltar" className={`${btn} absolute bottom-3 right-3 h-14 w-14 bg-white/[0.14]`}>
               <MoveUp className="h-5 w-5" />
@@ -445,6 +476,17 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
                 >
                   <Target className="h-4 w-4" /> Apuntar
                 </button>
+                {bare ? (
+                <button
+                  type="button"
+                  {...tap("m")}
+                  className="relative flex h-28 w-28 flex-col items-center justify-center rounded-full border-[3px] border-talo-ink font-display text-lg text-talo-ink active:scale-95"
+                  style={{ background: color }}
+                >
+                  <HandMetal className="h-8 w-8" />
+                  Manotazo
+                </button>
+                ) : (
                 <button
                   type="button"
                   {...fireProps}
@@ -455,6 +497,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
                   <Crosshair className="h-8 w-8" />
                   {scoped ? "Suelta" : "Disparar"}
                 </button>
+                )}
               </div>
             </div>
           </div>
@@ -462,7 +505,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
       )}
 
       <p className="pointer-events-none hidden items-center justify-center gap-1.5 text-xs text-white/40 [@media(hover:hover)_and_(pointer:fine)]:flex">
-        <Keyboard className="h-3.5 w-3.5" /> WASD moverte · flechas mirar · J disparar · K apuntar · espacio saltar · R recargar · Q cambiar arma · G granada · F golpe · E agarrar
+        <Keyboard className="h-3.5 w-3.5" /> WASD moverte · flechas mirar · J disparar · K apuntar · C habilidad · espacio saltar · R recargar · Q cambiar arma · G globo · F golpe · E agarrar
       </p>
     </div>
   );
