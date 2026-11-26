@@ -3,24 +3,35 @@
  * Pure (no Firebase, no DOM): each phone runs its own fighter with it (and
  * the bot host runs the bots), the bots' brains live here too.
  *
- * Units are meters and seconds. The arena is a circle on the x/z plane with
- * pillars; red starts at -x and blue at +x. Yaw 0 looks toward -z (like a
+ * Units are meters and seconds. The arena (a map, lib/arenaMaps.ts: the
+ * ground, walls, pillars, the void) is on the x/z plane; red starts at -x
+ * and blue at +x. Yaw 0 looks toward -z (like a
  * three.js camera), so forward is (-sin yaw, -cos yaw) and right is
  * (cos yaw, -sin yaw).
  */
 
 import { mulberry32 } from "./random";
-import type { TeamId } from "./teams";
+import {
+  FALL_DEPTH,
+  MAPS,
+  bladeIncoming,
+  blockedAt,
+  clampToMap,
+  ffaSpawn,
+  isVoid,
+  routeStep,
+  sightBlocked,
+  solidAt,
+  supportAt,
+  teamSpawn,
+  topAt,
+  type ArenaMap,
+} from "./arenaMaps";
 
 const deg = (d: number) => (d * Math.PI) / 180;
 
-export const ARENA_RADIUS = 17;
-export const PILLAR_RADIUS = 0.9;
-/** Pillars, mirrored across x = 0 so neither team has better cover. */
-export const PILLARS: [number, number][] = [30, 90, 150, 210, 270, 330].map((deg) => {
-  const a = (deg * Math.PI) / 180;
-  return [Math.round(Math.cos(a) * 8.5 * 100) / 100, Math.round(Math.sin(a) * 8.5 * 100) / 100];
-});
+/** The default map (the coliseum); the arena's geometry lives in lib/arenaMaps.ts. */
+const COLISEO = MAPS.coliseo;
 
 export const FIGHTER_RADIUS = 0.42;
 export const FIGHTER_HEIGHT = 1.85;
@@ -33,6 +44,8 @@ export const WALK_SPEED = 5.2;
 export const SPRINT = 1.5;
 const SPRINT_STAMINA = 13;
 const GRAVITY = 16;
+/** Walking down a slope or a ramp keeps the feet on it (a bigger drop is a fall). */
+const SNAP_DOWN = 0.3;
 const JUMP_SPEED = 5.6;
 const STAMINA_REGEN = 28;
 const STAMINA_REGEN_BLOCKING = 8;
@@ -243,7 +256,9 @@ export type FighterEvent =
   | { type: "special"; kind: SpecialKind }
   | { type: "specialHit"; kind: SpecialKind }
   /** The bow shoots with this much draw (0–1), `yawOff` to the side of where it looks (the triple arrow). */
-  | { type: "shoot"; draw: number; yawOff?: number };
+  | { type: "shoot"; draw: number; yawOff?: number }
+  /** It fell off the map (the bridge). */
+  | { type: "fell" };
 
 /** How a hit taken lands (besides blocked and the stamina it costs). */
 export interface HitExtra {
@@ -264,7 +279,6 @@ export interface Solid {
   r: number;
 }
 
-export const PILLAR_SOLIDS: Solid[] = PILLARS.map(([x, z]) => ({ x, z, r: PILLAR_RADIUS }));
 
 export function forward(yaw: number): [number, number] {
   return [-Math.sin(yaw), -Math.cos(yaw)];
@@ -279,26 +293,6 @@ export function angleDiff(a: number, b: number): number {
   if (d > Math.PI) d -= Math.PI * 2;
   if (d < -Math.PI) d += Math.PI * 2;
   return d;
-}
-
-/** Keeps a point inside the arena wall and out of the solids. */
-function pushOut(p: { x: number; z: number }, radius: number, solids: Solid[]) {
-  const limit = ARENA_RADIUS - radius;
-  const d = Math.hypot(p.x, p.z);
-  if (d > limit) {
-    p.x *= limit / d;
-    p.z *= limit / d;
-  }
-  for (const s of solids) {
-    const dx = p.x - s.x;
-    const dz = p.z - s.z;
-    const dist = Math.hypot(dx, dz);
-    const min = s.r + radius;
-    if (dist < min && dist > 1e-6) {
-      p.x = s.x + (dx / dist) * min;
-      p.z = s.z + (dz / dist) * min;
-    }
-  }
 }
 
 /** One fighter, simulated by its own phone (or by the bot host). */
@@ -341,6 +335,14 @@ export class Fighter {
   private attackWas = false;
   private jumpWas = false;
   private dodgeWas = false;
+  /** On the ground (not jumping or falling), the ground's height under it, and whether it fell into the void. */
+  grounded = true;
+  floor = 0;
+  fell = false;
+  /** The map's push multiplier (knockback is stronger on the bridge). */
+  private pushMul = 1;
+  /** Set on the ground of its spot (a walkway, a slope) at its first step. */
+  private placed = false;
 
   constructor(
     public x: number,
@@ -351,7 +353,7 @@ export class Fighter {
   }
 
   get onGround(): boolean {
-    return this.y <= 0 && this.vy <= 0;
+    return this.grounded;
   }
 
   /** Seconds since a block that can still parry started (Infinity when not blocking or it can't). */
@@ -372,8 +374,15 @@ export class Fighter {
     events.push({ type: "windup" });
   }
 
-  step(input: FighterInput, gear: Gear, dt: number, solids: Solid[]): FighterEvent[] {
+  /** One step on `map`; `solids` are the other fighters (the map's pillars and trunks are added). */
+  step(input: FighterInput, gear: Gear, dt: number, solids: Solid[], map: ArenaMap = COLISEO): FighterEvent[] {
     const events: FighterEvent[] = [];
+    this.pushMul = map.pushMul;
+    if (!this.placed) {
+      this.placed = true;
+      const top = topAt(map, this.x, this.z);
+      if (Number.isFinite(top) && Math.abs(top - this.y) > 0.4) this.y = top;
+    }
     const weapon = WEAPONS[gear.w];
     this.yaw = input.yaw;
     this.pitch = Math.max(-1.3, Math.min(1.3, input.pitch));
@@ -558,9 +567,15 @@ export class Fighter {
     this.kz *= decay;
     const px = this.x;
     const pz = this.z;
-    this.x += vx * dt;
-    this.z += vz * dt;
-    pushOut(this, FIGHTER_RADIUS, solids);
+    // Walls and boxes stop each axis on its own (so you slide along them); stuck inside one, you may leave.
+    const stuck = blockedAt(map, this.x, this.z, this.y, FIGHTER_RADIUS);
+    const nx = this.x + vx * dt;
+    if (stuck || !blockedAt(map, nx, this.z, this.y, FIGHTER_RADIUS)) this.x = nx;
+    else this.kx = 0;
+    const nz = this.z + vz * dt;
+    if (stuck || !blockedAt(map, this.x, nz, this.y, FIGHTER_RADIUS)) this.z = nz;
+    else this.kz = 0;
+    clampToMap(map, this, FIGHTER_RADIUS, solids.length ? [...map.circles, ...solids] : map.circles);
     this.speed = Math.hypot(this.x - px, this.z - pz) / dt;
 
     // Stamina comes back unless swinging, running or dodging.
@@ -571,18 +586,33 @@ export class Fighter {
     const jump = input.jump && !this.jumpWas;
     this.jumpWas = input.jump;
     const busy = this.act === "stagger" || this.act === "dodge" || this.act === "kick" || this.act === "special";
-    if (jump && this.onGround && !busy && this.stamina >= JUMP_STAMINA) {
+    if (jump && this.grounded && !busy && this.stamina >= JUMP_STAMINA) {
       this.vy = JUMP_SPEED;
       this.stamina -= JUMP_STAMINA;
       events.push({ type: "jump" });
     }
-    if (this.y > 0 || this.vy > 0) {
-      this.vy -= GRAVITY * dt;
-      this.y += this.vy * dt;
-      if (this.y <= 0) {
-        this.y = 0;
-        this.vy = 0;
+    // The ground under the feet: walk up small steps, follow slopes down, fall off ledges (and into the void).
+    const floor = supportAt(map, this.x, this.z, this.y);
+    this.floor = floor;
+    if (this.vy > 0 || this.y > floor + 1e-4) {
+      if (this.grounded && this.vy <= 0 && this.y - floor <= SNAP_DOWN) {
+        this.y = floor;
+      } else {
+        this.vy -= GRAVITY * dt;
+        this.y += this.vy * dt;
+        if (this.y <= floor) {
+          this.y = floor;
+          this.vy = 0;
+        }
       }
+    } else {
+      this.y = floor;
+      this.vy = 0;
+    }
+    this.grounded = this.y <= floor + 1e-4 && this.vy <= 0;
+    if (!Number.isFinite(floor) && this.y < -FALL_DEPTH && !this.fell) {
+      this.fell = true;
+      events.push({ type: "fell" });
     }
     return events;
   }
@@ -595,6 +625,7 @@ export class Fighter {
     const dx = this.x - fromX;
     const dz = this.z - fromZ;
     const d = Math.hypot(dx, dz) || 1;
+    const mul = this.pushMul;
     if (extra.parried) {
       // My parry: just a little step back.
       this.kx += (dx / d) * KNOCKBACK * 0.2;
@@ -605,7 +636,7 @@ export class Fighter {
       // The guard is knocked aside: it drops and I reel.
       this.stamina = Math.max(0, this.stamina - drain);
       this.blocking = false;
-      const push = extra.push ?? KICK_PUSH;
+      const push = (extra.push ?? KICK_PUSH) * mul;
       this.kx += (dx / d) * push;
       this.kz += (dz / d) * push;
       if (this.act !== "special" && this.act !== "dodge") this.start("stagger", extra.stagger ?? KICK_GUARD_BREAK);
@@ -615,8 +646,8 @@ export class Fighter {
     }
     if (blocked) {
       this.stamina -= drain;
-      this.kx += (dx / d) * KNOCKBACK * 0.45;
-      this.kz += (dz / d) * KNOCKBACK * 0.45;
+      this.kx += (dx / d) * KNOCKBACK * 0.45 * mul;
+      this.kz += (dz / d) * KNOCKBACK * 0.45 * mul;
       if (this.stamina <= 0) {
         this.stamina = 0;
         this.blocking = false;
@@ -626,7 +657,7 @@ export class Fighter {
     }
     // Mid-special the knight doesn't flinch (it still gets pushed, a little).
     const armored = this.act === "special";
-    const push = (extra.push ?? KNOCKBACK) * (armored ? 0.3 : 1);
+    const push = (extra.push ?? KNOCKBACK) * (armored ? 0.3 : 1) * mul;
     this.kx += (dx / d) * push;
     this.kz += (dz / d) * push;
     if (armored || this.act === "dodge") return;
@@ -634,6 +665,33 @@ export class Fighter {
     if (this.act !== "recover" || extra.kick || extra.stagger) this.start("stagger", extra.stagger ?? (extra.kick ? KICK_FLINCH : FLINCH_SECONDS));
     this.queued = false;
     this.draw = 0;
+  }
+
+  /** A trap's push (the blade): away, and a short flinch. */
+  shove(vx: number, vz: number) {
+    this.kx += vx;
+    this.kz += vz;
+    if (this.act !== "special" && this.act !== "dodge") this.start("stagger", FLINCH_SECONDS);
+    this.queued = false;
+    this.draw = 0;
+  }
+
+  /** Back on its feet somewhere else (a respawn, a new wave). */
+  reset(x: number, z: number, yaw: number) {
+    this.x = x;
+    this.z = z;
+    this.y = 0;
+    this.vy = 0;
+    this.kx = 0;
+    this.kz = 0;
+    this.yaw = yaw;
+    this.grounded = true;
+    this.fell = false;
+    this.placed = false;
+    this.stamina = MAX_STAMINA;
+    this.blocking = false;
+    this.draw = 0;
+    this.start("idle", 0);
   }
 
   /** My blow was parried: knocked back and wide open for a moment. */
@@ -655,7 +713,8 @@ export class Fighter {
 /** Another fighter as this client sees it (from its pose). */
 export interface FighterView {
   id: string;
-  team: TeamId;
+  /** Its side: the team, or its own id in «Todos contra todos». */
+  team: string;
   x: number;
   y: number;
   z: number;
@@ -697,20 +756,8 @@ function guarded(target: FighterView, fromX: number, fromZ: number, arrow: boole
   return Math.abs(angleDiff(toward, target.yaw)) <= (target.shield ? SHIELD_ARC : BLOCK_ARC) / 2;
 }
 
-/** Does the straight line between two points pass through a pillar? */
-function pillarBetween(ax: number, az: number, bx: number, bz: number): boolean {
-  for (const [px, pz] of PILLARS) {
-    const dx = bx - ax;
-    const dz = bz - az;
-    const len2 = dx * dx + dz * dz || 1;
-    const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / len2));
-    if (Math.hypot(ax + dx * t - px, az + dz * t - pz) < PILLAR_RADIUS * 0.8) return true;
-  }
-  return false;
-}
-
 /** What a melee swing from `me` hits: every enemy in reach and in front (a wide swing can hit two). */
-export function meleeStrikes(me: FighterView, gear: Gear, others: FighterView[]): Strike[] {
+export function meleeStrikes(me: FighterView, gear: Gear, others: FighterView[], map: ArenaMap = COLISEO): Strike[] {
   const w = WEAPONS[gear.w];
   const out: Strike[] = [];
   for (const t of others) {
@@ -720,7 +767,7 @@ export function meleeStrikes(me: FighterView, gear: Gear, others: FighterView[])
     const dist = Math.hypot(dx, dz);
     if (dist > w.reach + FIGHTER_RADIUS || Math.abs(t.y - me.y) > 1.4) continue;
     if (dist > 0.7 && Math.abs(angleDiff(yawTo(dx, dz), me.yaw)) > w.arc / 2 + Math.atan2(FIGHTER_RADIUS, dist)) continue;
-    if (pillarBetween(me.x, me.z, t.x, t.z)) continue;
+    if (sightBlocked(map, me.x, me.z, t.x, t.z, Math.min(me.y, t.y))) continue;
     const blocked = guarded(t, me.x, me.z, false);
     if (blocked && canParry(t)) {
       out.push({ target: t.id, blocked, parried: true, damage: 0, drain: 0 });
@@ -750,22 +797,22 @@ export function lateParry(st: Strike, t: FighterView, fromX: number, fromZ: numb
 }
 
 /** The distance to `t` if it's an enemy in reach and in front (same rules as a swing), else null. */
-function inFront(me: FighterView, t: FighterView, reach: number, arc: number, maxDy = 1.4): number | null {
+function inFront(me: FighterView, t: FighterView, reach: number, arc: number, map: ArenaMap, maxDy = 1.4): number | null {
   if (!t.alive || t.dodging || t.team === me.team || t.id === me.id) return null;
   const dx = t.x - me.x;
   const dz = t.z - me.z;
   const dist = Math.hypot(dx, dz);
   if (dist > reach + FIGHTER_RADIUS || Math.abs(t.y - me.y) > maxDy) return null;
   if (arc < Math.PI * 2 && dist > 0.7 && Math.abs(angleDiff(yawTo(dx, dz), me.yaw)) > arc / 2 + Math.atan2(FIGHTER_RADIUS, dist)) return null;
-  if (pillarBetween(me.x, me.z, t.x, t.z)) return null;
+  if (sightBlocked(map, me.x, me.z, t.x, t.z, Math.min(me.y, t.y))) return null;
   return dist;
 }
 
 /** What a kick hits: no guard stops it (a raised one is knocked aside); a dodge does. */
-export function kickStrikes(me: FighterView, others: FighterView[]): Strike[] {
+export function kickStrikes(me: FighterView, others: FighterView[], map: ArenaMap = COLISEO): Strike[] {
   const out: Strike[] = [];
   for (const t of others) {
-    if (inFront(me, t, KICK_REACH, KICK_ARC, 0.8) === null) continue;
+    if (inFront(me, t, KICK_REACH, KICK_ARC, map, 0.8) === null) continue;
     const breaks = t.blocking;
     out.push({
       target: t.id,
@@ -787,14 +834,14 @@ export function kickStrikes(me: FighterView, others: FighterView[]): Strike[] {
  * The spin and the lunge: blocked like a swing (more goes through) and they
  * can be parried.
  */
-export function specialStrikes(me: FighterView, kind: SpecialKind, others: FighterView[]): Strike[] {
+export function specialStrikes(me: FighterView, kind: SpecialKind, others: FighterView[], map: ArenaMap = COLISEO): Strike[] {
   const sp = SPECIALS[kind];
   const out: Strike[] = [];
   if (kind === "triple") return out;
   const slam = kind === "terremoto";
   for (const t of others) {
     if (slam && t.y - me.y > SLAM_JUMP) continue;
-    const dist = inFront(me, t, sp.reach, sp.arc);
+    const dist = inFront(me, t, sp.reach, sp.arc, map);
     if (dist === null) continue;
     if (slam) {
       out.push({
@@ -867,12 +914,11 @@ export type ArrowResult = { stop: false } | { stop: true; strike?: Strike };
  * ground, the wall, a pillar or a fighter of the other team (the shooter's
  * phone decides the hit, like melee). Heads take more damage.
  */
-export function flyArrow(a: Arrow, t0: number, t1: number, shooterTeam: TeamId, others: FighterView[]): ArrowResult {
+export function flyArrow(a: Arrow, t0: number, t1: number, shooterTeam: string, others: FighterView[], map: ArenaMap = COLISEO): ArrowResult {
   const steps = Math.max(1, Math.ceil((t1 - t0) / 0.01));
   for (let k = 1; k <= steps; k++) {
     const [x, y, z] = arrowAt(a, t0 + ((t1 - t0) * k) / steps);
-    if (y <= 0 || Math.hypot(x, z) >= ARENA_RADIUS || t1 > 4) return { stop: true };
-    for (const [px, pz] of PILLARS) if (Math.hypot(x - px, z - pz) < PILLAR_RADIUS) return { stop: true };
+    if (t1 > 4 || solidAt(map, x, y, z)) return { stop: true };
     for (const t of others) {
       if (!t.alive || t.dodging || t.team === shooterTeam) continue;
       if (Math.hypot(x - t.x, z - t.z) > FIGHTER_RADIUS + 0.05 || y < t.y || y > t.y + FIGHTER_HEIGHT) continue;
@@ -887,11 +933,10 @@ export function flyArrow(a: Arrow, t0: number, t1: number, shooterTeam: TeamId, 
 
 // ---- Spawns and items -----------------------------------------------------------
 
-/** Where fighter `i` of a team of `n` starts, facing the middle. */
-export function spawnPoint(team: TeamId, i: number, n: number): { x: number; z: number; yaw: number } {
-  const side = team === "red" ? -1 : 1;
-  const z = (i - (n - 1) / 2) * 2.6;
-  return { x: side * (ARENA_RADIUS - 2.5), z, yaw: yawTo(-side, 0) };
+/** Where fighter `i` of a team of `n` starts, facing the middle (`ffa`: its own spot, «Todos contra todos»). */
+export function spawnPoint(team: string, i: number, n: number, map: ArenaMap = COLISEO, ffa = false): { x: number; z: number; yaw: number } {
+  if (ffa) return ffaSpawn(map, Math.max(0, i));
+  return teamSpawn(map, team === "red" ? -1 : 1, Math.max(0, i), Math.max(1, n));
 }
 
 export interface ArenaItem {
@@ -909,7 +954,7 @@ export const RESPAWN_PREFIX = "p";
  * always a sword and a shield, and four of the rest. With `potions`, two
  * mirrored pairs of potions.
  */
-export function roundItems(seed: number, round: number, potions = false): Record<string, ArenaItem> {
+export function roundItems(seed: number, round: number, potions = false, map: ArenaMap = COLISEO): Record<string, ArenaItem> {
   const rand = mulberry32((seed ^ Math.imul(round + 1, 0x85ebca6b)) >>> 0);
   const shuffle = <T,>(list: T[]) => {
     for (let i = list.length - 1; i > 0; i--) {
@@ -921,26 +966,15 @@ export function roundItems(seed: number, round: number, potions = false): Record
   const rest = shuffle<ItemKind>(["lanza", "maza", "arco", "mangual", "martillo", "espada"]).slice(0, 4);
   const pairs = shuffle<ItemKind>(["espada", "escudo", ...rest]);
   // Spots on the red half (x < 0); blue's are their mirror.
-  const spots: [number, number][] = [
-    [-11, 6.5],
-    [-11, -6.5],
-    [-5.5, 3],
-    [-5.5, -3],
-    [-4, 11],
-    [-4, -11],
-  ];
+  const spots = map.items;
   const items: Record<string, ArenaItem> = {};
   spots.forEach(([x, z], i) => {
     items[`i${i}r`] = { kind: pairs[i], x, z };
     items[`i${i}b`] = { kind: pairs[i], x: -x, z: -z };
   });
-  items.c = { kind: (["hacha", "martillo", "hacha", "maza"] as ItemKind[])[Math.floor(rand() * 4)], x: 0, z: 0 };
+  items.c = { kind: (["hacha", "martillo", "hacha", "maza"] as ItemKind[])[Math.floor(rand() * 4)], x: map.center[0], z: map.center[1] };
   if (potions) {
-    const potionSpots: [number, number][] = [
-      [-8.5, 0],
-      [-1.5, 13.5],
-    ];
-    potionSpots.forEach(([x, z], i) => {
+    map.potions.forEach(([x, z], i) => {
       items[`${RESPAWN_PREFIX}${i}r`] = { kind: "pocion", x, z };
       items[`${RESPAWN_PREFIX}${i}b`] = { kind: "pocion", x: -x, z: -z };
     });
@@ -979,10 +1013,16 @@ export interface BotMind {
   parryIn: number;
   /** Seconds before it considers kicking again (on top of the kick's own cooldown). */
   kickWait: number;
+  /** 0–1: how sharp it is (reactions, parries, how often it waits). 1 = the usual bot. */
+  skill: number;
+  /** Where its route goes next (around walls, up a ramp), the goal it was for, and when to look again. */
+  way: [number, number] | null;
+  wayFor: [number, number];
+  wayT: number;
 }
 
-export function newMind(): BotMind {
-  return { wait: 0.5, strafe: 0, strafeT: 0, blockT: 0, seen: {}, releaseAt: 0.8, chain: 0, pressFor: -1, parryIn: -1, kickWait: 1 };
+export function newMind(skill = 1): BotMind {
+  return { wait: 0.5, strafe: 0, strafeT: 0, blockT: 0, seen: {}, releaseAt: 0.8, chain: 0, pressFor: -1, parryIn: -1, kickWait: 1, skill, way: null, wayFor: [0, 0], wayT: 0 };
 }
 
 /** What a bot sees of an enemy: its view plus what it's doing and with what. */
@@ -1000,18 +1040,33 @@ export interface BotWorld {
   /** Server time now (to time a parry) and the bot's special meter. */
   now?: number;
   special?: number;
+  /** The map (default: the coliseum). */
+  map?: ArenaMap;
+  /** Something that hurts at (x, z) now or soon: a trap, outside the ring, a rain circle. */
+  danger?: (x: number, z: number) => boolean;
+  /** «Rey de la colina»: the zone to hold. */
+  hill?: { x: number; z: number; r: number };
+  /** How far it sees (fog). */
+  sight?: number;
+  /** Seconds into the round (it jumps the trap pit's blade when it comes). */
+  t?: number;
 }
 
 /** How often a bot tries a perfect parry on a swing it sees coming (else block, dodge or take it). */
 const BOT_PARRY = 0.22;
 /** How often a bot kicks a raised guard in reach, per decision. */
 const BOT_KICK_GUARD = 0.55;
+/** Directions a bot tries when the way ahead is bad (radians off what it wanted). */
+const DETOURS = [0.5, -0.5, 1, -1, 1.5, -1.5, 2.2, -2.2, Math.PI];
 
 /**
  * A bot's input for this step: go for a better weapon (or a potion when
  * hurt) if one is near, then close in running (or keep its distance with
  * the bow), strafe, attack in short combos when in reach, and block or dodge
- * some of the swings it sees coming. `pick` = an item to grab.
+ * some of the swings it sees coming. On the map it takes routes around walls
+ * and up ramps, jumps onto low crates, keeps away from the void, traps and
+ * marked danger, and on the bridge it kicks rivals standing with the void
+ * behind them. `pick` = an item to grab.
  */
 export function botInput(
   f: Fighter,
@@ -1022,13 +1077,16 @@ export function botInput(
   dt: number,
   rand: () => number
 ): { input: FighterInput; pick?: string } {
+  const map = world.map ?? COLISEO;
+  const skill = mind.skill ?? 1;
   const input: FighterInput = { ...IDLE_INPUT, yaw: f.yaw, pitch: 0 };
+  const sight = world.sight ?? Infinity;
   const alive = world.enemies.filter((e) => e.alive);
   let target: BotEnemy | null = null;
   let targetDist = Infinity;
   for (const e of alive) {
     const d = Math.hypot(e.x - f.x, e.z - f.z);
-    if (d < targetDist) {
+    if (d < targetDist && d <= sight) {
       target = e;
       targetDist = d;
     }
@@ -1042,16 +1100,36 @@ export function botInput(
     if (!wants(gear, it.kind, hp)) continue;
     const d = Math.hypot(it.x - f.x, it.z - f.z);
     const range = it.kind === "pocion" ? 14 : 7;
-    if (d < itemDist && (d < range || d < targetDist * 0.8)) {
+    if (d < itemDist && (d < range || d < targetDist * 0.8) && !world.danger?.(it.x, it.z)) {
       itemDist = d;
       goal = it;
       if (d < PICK_RADIUS * 0.8) pick = it.id;
     }
   }
+  // The hill: hold it unless a fight is right here.
+  const hill = world.hill;
+  if (hill && !(goal && itemDist < 5) && targetDist > 4.5 && Math.hypot(hill.x - f.x, hill.z - f.z) > hill.r * 0.6) {
+    goal = hill;
+    itemDist = Math.hypot(hill.x - f.x, hill.z - f.z);
+    pick = undefined;
+  }
+  // Nobody in sight (fog, or all hidden): toward the middle.
+  if (!target && !goal) goal = { x: map.hill.x, z: map.hill.z };
 
   const turnTo = (yaw: number, rate: number) => {
     const d = angleDiff(yaw, f.yaw);
-    input.yaw = f.yaw + Math.max(-rate * dt, Math.min(rate * dt, d));
+    const r = rate * (0.6 + 0.4 * skill);
+    input.yaw = f.yaw + Math.max(-r * dt, Math.min(r * dt, d));
+  };
+  /** The next spot on the way to (x, z): straight, or around walls and up ramps. */
+  mind.wayT -= dt;
+  const wayTo = (x: number, z: number, y: number): [number, number] => {
+    if (mind.wayT <= 0 || Math.hypot(mind.wayFor[0] - x, mind.wayFor[1] - z) > 2) {
+      mind.way = map.nav.length || map.blocks.length ? routeStep(map, f.x, f.z, f.y, x, z, y) : null;
+      mind.wayFor = [x, z];
+      mind.wayT = 0.4;
+    }
+    return mind.way ?? [x, z];
   };
 
   mind.strafeT -= dt;
@@ -1067,25 +1145,33 @@ export function botInput(
     const near =
       kind === "terremoto" ? targetDist < SPECIALS.terremoto.reach * 0.85 :
       kind === "torbellino" ? targetDist < SPECIALS.torbellino.reach * 0.85 :
-      kind === "estocada" ? targetDist < SPECIALS.estocada.reach + 2.5 && facing < 0.25 :
+      kind === "estocada" ? targetDist < SPECIALS.estocada.reach + 2.5 && facing < 0.25 && !isVoid(map, f.x + Math.sin(-f.yaw) * 3, f.z - Math.cos(f.yaw) * 3, f.y) :
       targetDist < 22 && facing < 0.15;
     if (near && rand() < dt * 3) input.special = true;
   }
 
   if (goal && !pick && (!target || itemDist < targetDist)) {
-    turnTo(yawTo(goal.x - f.x, goal.z - f.z), 8);
-    input.mz = 1;
+    const [wx, wz] = wayTo(goal.x, goal.z, f.y);
+    turnTo(yawTo(wx - f.x, wz - f.z), 8);
+    input.mz = itemDist < 0.6 ? 0 : 1;
     input.sprint = itemDist > 4 && f.stamina > 40;
   } else if (target) {
     const w = WEAPONS[gear.w];
     const dx = target.x - f.x;
     const dz = target.z - f.z;
-    if (w.ranged) {
-      // Lead the target a little and aim up for the drop.
+    // Far, or out of reach of a straight walk: follow the route first.
+    const way = targetDist > 2.5 ? wayTo(target.x, target.z, target.y) : null;
+    const detour = way && Math.hypot(way[0] - target.x, way[1] - target.z) > 0.5;
+    if (detour) {
+      turnTo(yawTo(way[0] - f.x, way[1] - f.z), 8);
+      input.mz = 1;
+      input.sprint = f.stamina > 45;
+    } else if (w.ranged) {
+      // Lead the target a little and aim up for the drop (and at its height).
       const flight = targetDist / 40;
       const aim = yawTo(dx + (rand() - 0.5) * 0.6, dz + (rand() - 0.5) * 0.6);
       turnTo(aim, 6);
-      input.pitch = Math.atan2(ARROW_GRAVITY * flight * flight * 0.5, targetDist) + 0.02;
+      input.pitch = Math.atan2(ARROW_GRAVITY * flight * flight * 0.5 + (target.y - f.y), targetDist) + 0.02;
       input.mz = targetDist < 7 ? -1 : targetDist > 13 ? 1 : 0;
       input.mx = mind.strafe;
       if (targetDist < 4 && f.stamina > 40 && rand() < 0.02) input.dodge = true;
@@ -1094,7 +1180,7 @@ export function botInput(
       else if (f.act === "idle" && facing && mind.wait <= 0) {
         input.attack = true;
         mind.releaseAt = 0.55 + rand() * 0.45;
-        mind.wait = 0.25 + rand() * 0.5;
+        mind.wait = 0.25 + rand() * 0.5 + (1 - skill) * 0.8;
       }
     } else {
       turnTo(yawTo(dx, dz), 7);
@@ -1102,6 +1188,10 @@ export function botInput(
       input.mz = targetDist > close ? 1 : targetDist < w.reach * 0.45 ? -0.6 : 0;
       input.sprint = targetDist > 7 && f.stamina > 50;
       input.mx = targetDist < 6 ? mind.strafe * 0.8 : 0;
+      // The void right behind the target (the bridge): a kick would throw it off.
+      const ux = dx / (targetDist || 1);
+      const uz = dz / (targetDist || 1);
+      const pushable = !!map.chasm && isVoid(map, target.x + ux * 1.7, target.z + uz * 1.7, target.y);
       // A swing it sees coming: parry it, block it, dodge it, or (sometimes) take it.
       if (target.act === "windup" && mind.seen[target.id] !== target.actAt) {
         mind.seen[target.id] = target.actAt;
@@ -1111,10 +1201,10 @@ export function botInput(
           const r = rand();
           // When the blow lands: what's left of the wind-up.
           const left = target.actLen !== undefined && world.now !== undefined ? target.actLen - (world.now - target.actAt) / 1000 : -1;
-          if (r < BOT_PARRY && left > 0.15 && mind.blockT <= 0) {
+          if (r < BOT_PARRY * skill && left > 0.15 && mind.blockT <= 0) {
             // Let go of any guard now and raise it again just before the blow (a little early or late at times).
             mind.parryIn = Math.max(0.02, left - 0.12 + (rand() - 0.5) * 0.12);
-          } else if (r < (gear.sh ? 0.6 : 0.4)) mind.blockT = WEAPONS[target.weapon].windup + 0.2;
+          } else if (r < (gear.sh ? 0.6 : 0.4) * (0.5 + 0.5 * skill)) mind.blockT = WEAPONS[target.weapon].windup + 0.2;
           else if (r < 0.7 && f.stamina > 35) {
             input.dodge = true;
             input.mx = rand() < 0.5 ? -1 : 1;
@@ -1128,7 +1218,7 @@ export function botInput(
         const kind = specialOf(target.weapon);
         if (targetDist < SPECIALS[kind].reach + 1.5 && f.stamina > 25) {
           const r = rand();
-          if (r < 0.55) {
+          if (r < 0.55 * skill) {
             input.dodge = true;
             input.mx = rand() < 0.5 ? -1 : 1;
             input.mz = -1;
@@ -1150,9 +1240,9 @@ export function botInput(
         targetDist < KICK_REACH + 0.25 &&
         Math.abs(angleDiff(yawTo(dx, dz), f.yaw)) < 0.5
       ) {
-        // Kick a raised guard open often, and now and then just to push.
+        // Kick a raised guard open often, someone with the void behind almost always, and now and then just to push.
         mind.kickWait = 0.6 + rand() * 0.8;
-        if (rand() < (target.blocking ? BOT_KICK_GUARD : 0.12)) input.kick = true;
+        if (rand() < (pushable ? 0.8 : target.blocking ? BOT_KICK_GUARD : 0.12)) input.kick = true;
       } else if (f.act === "recover" && mind.chain > 0) {
         // Keep the flurry going: one press per swing, once the recovery accepts it.
         if (mind.pressFor !== f.combo && f.actT > f.actLen * 0.25) {
@@ -1168,24 +1258,111 @@ export function botInput(
         f.stamina > w.stamina
       ) {
         input.attack = true;
-        mind.chain = rand() < 0.5 ? 1 + Math.floor(rand() * 2) : 0;
-        mind.wait = 0.2 + rand() * 0.6;
+        mind.chain = rand() < 0.5 * skill ? 1 + Math.floor(rand() * 2) : 0;
+        mind.wait = 0.2 + rand() * 0.6 + (1 - skill) * 0.7;
       }
+      // On the bridge, close in rather than strafe toward an edge.
+      if (map.chasm && pushable) input.mx = 0;
     }
   }
   mind.wait -= dt;
 
-  // Steer around a pillar right ahead.
+  // Steer around a pillar or a trunk right ahead.
   const [fx, fz] = forward(input.yaw);
-  for (const [px, pz] of PILLARS) {
-    const ax = px - f.x;
-    const az = pz - f.z;
+  for (const c of map.circles) {
+    const ax = c.x - f.x;
+    const az = c.z - f.z;
     const along = ax * fx + az * fz;
-    if (along > 0 && along < 2.2 && Math.abs(ax * -fz + az * fx) < PILLAR_RADIUS + FIGHTER_RADIUS + 0.2 && input.mz > 0) {
+    if (along > 0 && along < 2.2 && Math.abs(ax * -fz + az * fx) < c.r + FIGHTER_RADIUS + 0.2 && input.mz > 0) {
       input.mx = ax * -fz + az * fx > 0 ? -1 : 1;
     }
   }
+
+  steerSafe(f, input, map, world.danger);
+  // The blade sweeping in: over it.
+  if (world.t !== undefined && f.grounded && map.traps.length && bladeIncoming(map, world.t, f.x, f.z) && rand() < 0.4 + 0.55 * skill) input.jump = true;
   return { input, pick };
+}
+
+/**
+ * Keeps a bot's move (and dodge) off the void, out of walls and danger: if
+ * the way it wants is bad, the nearest good direction (or standing still);
+ * a low crate in the way is jumped; standing in danger, it runs out.
+ */
+function steerSafe(f: Fighter, input: FighterInput, map: ArenaMap, danger?: (x: number, z: number) => boolean) {
+  const [fx, fz] = forward(input.yaw);
+  const rx = -fz;
+  const rz = fx;
+  const bad = (x: number, z: number) => isVoid(map, x, z, f.y) || !!danger?.(x, z);
+  const wall = (x: number, z: number) => blockedAt(map, x, z, f.y, FIGHTER_RADIUS);
+  const ok = (dx: number, dz: number, far: number) => {
+    for (const d of [0.7, far]) {
+      const x = f.x + dx * d;
+      const z = f.z + dz * d;
+      if (bad(x, z) || wall(x, z)) return false;
+    }
+    return true;
+  };
+  let wx = fx * input.mz + rx * input.mx;
+  let wz = fz * input.mz + rz * input.mx;
+  const len = Math.hypot(wx, wz);
+  const inDanger = !!danger?.(f.x, f.z);
+  if (inDanger) {
+    // Out, whichever way is safe and closest to what it wanted.
+    const base = len > 0.1 ? Math.atan2(wz, wx) : Math.atan2(-f.z, -f.x);
+    for (const off of [0, ...DETOURS]) {
+      const a = base + off;
+      if (ok(Math.cos(a), Math.sin(a), 2.6)) {
+        wx = Math.cos(a);
+        wz = Math.sin(a);
+        input.sprint = f.stamina > 20;
+        break;
+      }
+    }
+  } else if (len > 0.1) {
+    const ux = wx / len;
+    const uz = wz / len;
+    // A low crate right ahead: jump onto it.
+    const ax = f.x + ux * 0.75;
+    const az = f.z + uz * 0.75;
+    if (wall(ax, az) && f.grounded && !bad(ax, az)) {
+      const top = supportAt(map, ax, az, f.y + 1.0);
+      if (top > f.y + 0.2 && !blockedAt(map, ax, az, f.y + 0.98, FIGHTER_RADIUS)) input.jump = true;
+    }
+    if (!ok(ux, uz, 1.5) && !input.jump) {
+      let found = false;
+      const base = Math.atan2(uz, ux);
+      for (const off of DETOURS) {
+        const a = base + off;
+        if (ok(Math.cos(a), Math.sin(a), 1.5)) {
+          wx = Math.cos(a) * len;
+          wz = Math.sin(a) * len;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        wx = 0;
+        wz = 0;
+      }
+    }
+  }
+  input.mz = wx * fx + wz * fz;
+  input.mx = wx * rx + wz * rz;
+  if (input.mz <= 0.3) input.sprint = false;
+  // A dodge must land somewhere safe.
+  if (input.dodge) {
+    let mx = input.mx;
+    let mz = input.mz;
+    if (Math.hypot(mx, mz) < 0.2) {
+      mx = 0;
+      mz = -1;
+    }
+    const l = Math.hypot(mx, mz);
+    const dx = (fx * mz + rx * mx) / l;
+    const dz = (fz * mz + rz * mx) / l;
+    if (!ok(dx, dz, 2.8)) input.dodge = false;
+  }
 }
 
 export const BOT_NAMES = ["Sir Tornillo", "Lady Chispa", "Don Yunque", "Sir Bulón", "Lady Remache", "Don Cerrojo"];

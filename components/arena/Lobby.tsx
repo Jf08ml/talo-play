@@ -13,7 +13,7 @@ import { SETTINGS } from "./settings";
 
 type Tab = "online" | "amigos";
 
-/** «En línea» (a public arena, battles one after another) or a room with friends (team size, rounds, bots, healing, where it's seen). */
+/** «En línea» (a public arena, battles one after another) or a room with friends (mode, map, team size, rounds, bots, events, healing, where it's seen). */
 export default function ArenaLobby() {
   const [tab, setTab] = useState<Tab>("online");
   return (
@@ -59,8 +59,8 @@ function OnlineCard() {
       <div>
         <h2 className="font-display text-lg text-slate-100">Batallas con gente de todos lados</h2>
         <p className="mt-1 text-sm text-slate-400">
-          Entras a una arena y peleas al toque, en equipos de 2 contra 2 o más, al mejor de 3 rondas. Las batallas van una detrás de otra; si llegas a mitad de una, miras
-          y entras en la siguiente.
+          Entras a una arena y peleas al toque: cada batalla es de equipos, todos contra todos o rey de la colina, en una arena al azar y con eventos. Las batallas van
+          una detrás de otra; si llegas a mitad de una, miras y entras en la siguiente.
         </p>
       </div>
       {count !== null && count > 0 && (

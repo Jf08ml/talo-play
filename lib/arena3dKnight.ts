@@ -411,7 +411,7 @@ export function weaponMesh(kind: WeaponId): THREE.Group {
   return g;
 }
 
-export function shieldMesh(team: TeamId | null): THREE.Group {
+export function shieldMesh(team: TeamId | null, color?: number): THREE.Group {
   const g = new THREE.Group();
   // A slightly domed round shield, its front facing -z.
   const R = 0.34;
@@ -420,7 +420,7 @@ export function shieldMesh(team: TeamId | null): THREE.Group {
   const dome = new THREE.SphereGeometry(sphereR, 22, 3, 0, Math.PI * 2, 0, theta);
   dome.rotateX(-Math.PI / 2);
   dome.translate(0, 0, sphereR * Math.cos(theta) - 0.01);
-  const face = new THREE.Mesh(dome, lambert(team ? TEAM_COLORS[team] : WOOD, { side: THREE.DoubleSide }));
+  const face = new THREE.Mesh(dome, lambert(color ?? (team ? TEAM_COLORS[team] : WOOD), { side: THREE.DoubleSide }));
   const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.024, 6, 26), phong(DARK_STEEL));
   rim.position.z = -0.005;
   const boss = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(-Math.PI / 2), phong(GOLD));
@@ -532,6 +532,8 @@ interface Anim {
 
 export interface Knight {
   team: TeamId;
+  /** Its cloth and shield color (the team's, or its own in «todos contra todos»). */
+  tint: number;
   root: THREE.Group;
   body: THREE.Group;
   hips: THREE.Group;
@@ -578,13 +580,13 @@ export interface Knight {
 
 const armT = (x: number, y: number, z: number, elbow: number, wrist = 0, roll = 0, push = 0): ArmT => ({ x, y, z, elbow, wrist, roll, push });
 
-export function knightMesh(team: TeamId, geos: KnightGeos): Omit<Knight, "tag" | "tagKey" | "label" | "pose" | "hp"> {
+export function knightMesh(team: TeamId, geos: KnightGeos, tint: number = TEAM_COLORS[team]): Omit<Knight, "tag" | "tagKey" | "label" | "pose" | "hp"> {
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
   const armor = phong(STEEL, 90);
   const darkArmor = phong(DARK_STEEL, 40);
-  const cloth = lambert(TEAM_COLORS[team], { side: THREE.DoubleSide });
+  const cloth = lambert(tint, { side: THREE.DoubleSide });
   const leather = lambert(LEATHER);
   const gold = phong(GOLD);
   const black = lambert(0x0b0b0f, { side: THREE.DoubleSide });
@@ -671,6 +673,7 @@ export function knightMesh(team: TeamId, geos: KnightGeos): Omit<Knight, "tag" |
   const rest = armT(0.12, 0, 0.1, 0.25);
   return {
     team,
+    tint,
     root,
     body,
     hips,
@@ -755,7 +758,7 @@ export function equipKnight(k: Knight, gear: Gear) {
       k.shield = null;
     } else {
       // Center grip: the face across the forearm, facing where the forearm points.
-      k.shield = shieldMesh(k.team);
+      k.shield = shieldMesh(k.team, k.tint);
       k.shield.rotation.x = -Math.PI / 2;
       k.shield.position.set(0, -0.07, 0);
       k.offHand.add(k.shield);

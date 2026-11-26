@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Keyboard, MonitorPlay, Shield, Sparkles, Swords } from "lucide-react";
-import { NO_PAD, openPad, teamInfo, type ArenaPad, type ArenaState } from "@/lib/arena";
+import { MODE_INFO, NO_PAD, fighterColor, fighterName, openPad, teamInfo, wavesSurvived, type ArenaPad, type ArenaState } from "@/lib/arena";
 import { MAX_HP, SPECIALS, SPECIAL_MAX, WEAPONS, specialOf } from "@/lib/arenaSim";
 import { useWakeLock } from "@/components/carreras/Controller";
 import { TOUCH_LOOK } from "./Controls";
@@ -217,7 +217,20 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
   };
 
   const team = state.roster[clientId];
-  const color = team ? teamInfo(team).color : "#94a3b8";
+  const color = team ? fighterColor(state, clientId) : "#94a3b8";
+  const label = !team ? "Mirando" : state.mode === "equipos" || state.mode === "rey" ? teamInfo(team).label : MODE_INFO[state.mode].label;
+  const over =
+    state.mode === "todos"
+      ? state.champion
+        ? state.champion === clientId
+          ? "¡Ganaste!"
+          : `¡Ganó ${fighterName(state, state.champion)}!`
+        : "Terminó el combate"
+      : state.mode === "supervivencia"
+        ? `Aguantaron ${wavesSurvived(state)} ${wavesSurvived(state) === 1 ? "oleada" : "oleadas"}`
+        : state.winner
+          ? `¡Ganó el ${teamInfo(state.winner).label}!`
+          : "Terminó el combate";
   const hp = state.hp[clientId] ?? 0;
   const gear = state.gear[clientId];
   const fighting = state.status === "fighting";
@@ -249,7 +262,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
         <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: color }} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between text-sm font-bold">
-            <span>{team ? teamInfo(team).label : "Mirando"}</span>
+            <span>{label}</span>
             <span className="flex items-center gap-1.5 text-white/70">
               {gear && WEAPONS[gear.w].label}
               {gear?.sh && <Shield className="h-3.5 w-3.5 text-sky-300" />}
@@ -275,14 +288,20 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
       {state.status === "finished" ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
           <Swords className="h-10 w-10 text-talo-hero" />
-          <p className="font-display text-2xl">{state.winner ? `¡Ganó el ${teamInfo(state.winner).label}!` : "Terminó el combate"}</p>
+          <p className="font-display text-2xl">{over}</p>
           <p className="text-sm text-white/60">La revancha se arma desde la pantalla grande.</p>
         </div>
       ) : down ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
           <Swords className="h-10 w-10 text-white/40" />
-          <p className="font-display text-2xl">Te eliminaron</p>
-          <p className="text-sm text-white/60">Mira la pantalla: en la próxima ronda vuelves a pelear.</p>
+          <p className="font-display text-2xl">{state.mode === "rey" ? "Vuelves en un momento" : "Te eliminaron"}</p>
+          <p className="text-sm text-white/60">
+            {state.mode === "rey"
+              ? "Mira la pantalla: en unos segundos estás de nuevo en pie."
+              : state.mode === "supervivencia"
+                ? "Mira la pantalla: si tus compañeros superan la oleada, vuelves a pelear."
+                : "Mira la pantalla: en la próxima ronda vuelves a pelear."}
+          </p>
         </div>
       ) : !team ? (
         <div className="flex flex-1 items-center justify-center p-6 text-center text-white/60">Estás mirando este combate en la pantalla grande. Entras en el próximo.</div>

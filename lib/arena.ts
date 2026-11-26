@@ -3,27 +3,46 @@ import { getDb } from "./firebase";
 import { generateRoomCode } from "./ids";
 import { serverNow } from "./serverTime";
 import { transactState } from "./transact";
-import { makeSeed, seededShuffle } from "./random";
-import { RIVAL_NAMES } from "./boardBot";
-import { TEAMS, type TeamId } from "./teams";
+import { makeSeed } from "./random";
+import type { TeamId } from "./teams";
+import type { ArenaItem, Strike } from "./arenaSim";
 import {
-  BOT_NAMES,
-  MAX_HP,
-  POTION_HEAL,
-  RESPAWN_PREFIX,
-  SPECIAL_MAX,
-  START_GEAR,
-  WEAPONS,
-  roundItems,
-  type ArenaItem,
-  type Gear,
-  type ItemKind,
-  type Strike,
-} from "./arenaSim";
+  ONLINE_MAX_PEOPLE,
+  ONLINE_NEXT_MS,
+  chooseTeamState,
+  envHitState,
+  eventItemsState,
+  fallState,
+  forfeitState,
+  hillTickState,
+  joinState,
+  nextOnlineState,
+  nextRoundState,
+  normalizeState,
+  pickItemState,
+  regenerateState,
+  respawnItemsState,
+  respawnState,
+  shuffleState,
+  spendSpecialState,
+  startMatchState,
+  strikeState,
+  timeoutState,
+  type ArenaMeta,
+  type ArenaPlayer,
+  type ArenaSettings,
+  type ArenaState,
+  type ArenaPose,
+  type ArenaArrow,
+} from "./arenaRules";
+
+export * from "./arenaRules";
 
 /**
- * Arena medieval: red against blue, 1v1 to 3v3, best of 3 or 5 rounds; each
- * round is to the last one standing. There's no host simulating the fight:
+ * Arena medieval: knights in a 3D arena, by teams, each for themselves, on a
+ * hill or against waves of bots (lib/arenaRules.ts has the state and its
+ * rules; lib/arenaMaps.ts the maps and events). There's no host simulating
+ * the fight:
  *
  * - Each phone runs its own fighter (`lib/arenaSim.ts`) and publishes its
  *   pose at `arena/poses/{fighterId}` (~15 Hz, removed on disconnect).
@@ -34,6 +53,10 @@ import {
  *   too: the pose says when the target's block started (`bt`), so a block
  *   raised just before the blow is a parry — the attacker's own fighter
  *   reels, and the target sees `pr` in its hit.
+ * - The map's damage (traps, the arrow rain, the closing ring, falling off
+ *   the bridge) is written by whoever runs the fighter it hurts (its phone,
+ *   or the bot host / big screen for bots), once per source and tick
+ *   (`envHit`, `fallOff`), so it never lands twice.
  * - The special meter (`special`) fills inside `strike` (hits landed,
  *   blocks, parries) and is spent with `spendSpecial` when a special starts.
  * - Arrows: the shooter's phone flies its arrow and decides the hit; the
@@ -47,254 +70,6 @@ import {
  * `round`. A fighter whose player left counts as fallen (`forfeit`).
  */
 
-export const COUNTDOWN_MS = 3500;
-/** A round with nobody winning ends on time: the team with more health left wins it. */
-export const ROUND_SECONDS = 150;
-/** How long the round's result stays on screen. */
-export const ROUND_END_MS = 4500;
-export const SIZE_OPTIONS = [1, 2, 3] as const;
-/** Rounds to win the match: best of 3 or 5. */
-export const WINS_OPTIONS = [2, 3] as const;
-/** A potion comes back to its place this long after being taken. */
-export const POTION_RESPAWN_MS = 20000;
-/** Regeneration: starts this long after the last hit taken, a few points at a time. */
-export const REGEN_DELAY_MS = 6000;
-export const REGEN_STEP = 4;
-export const REGEN_EVERY_MS = 1000;
-
-export type ArenaStatus = "waiting" | "fighting" | "roundEnd" | "finished";
-
-export interface ArenaMeta {
-  game: "arena";
-  hostId?: string;
-  /** Fighters per team. */
-  size: number;
-  /** Rounds to win. */
-  wins: number;
-  /** Fill empty places with bots. */
-  bots: boolean;
-  /** Potions on the floor (they come back after a while). */
-  potions: boolean;
-  /** Health slowly comes back when nobody hits you for a while. */
-  regen: boolean;
-  /**
-   * Where the fight is seen: each on their phone (default), or on a big
-   * screen (`/arena-medieval/{id}/pantalla`, the authority) with the phones as pads.
-   */
-  view: ArenaView;
-  /** A public arena (`ONLINE_WORLDS`). */
-  online?: boolean;
-  createdAt: number | object;
-}
-
-export type ArenaView = "telefono" | "pantalla";
-
-export interface ArenaPlayer {
-  name: string;
-  color: string;
-}
-
-/** The last hit a fighter took, for its own phone to react (`n` counts them). */
-export interface HitNote {
-  n: number;
-  from: string;
-  /** Blocked, and the stamina it costs. */
-  b: boolean;
-  d: number;
-  /** Where the attacker was (pushes the target away from there). */
-  x: number;
-  z: number;
-  /** Server time of the hit (regeneration waits after it). */
-  t: number;
-  /**
-   * Only when they apply (older clients ignore them): I parried it (`b` is
-   * set too), a kick, my guard was knocked aside, part of a special, and the
-   * knockback (m/s) and stagger (s) when not the usual.
-   */
-  pr?: 1;
-  kk?: 1;
-  g?: 1;
-  sp?: 1;
-  pw?: number;
-  st?: number;
-}
-
-// How much the special meter fills (see `SPECIAL_MAX`).
-/** Landing a clean blow, per point of damage (arrows: half). */
-export const SPECIAL_PER_DAMAGE = 0.7;
-/** A blow that landed on a guard, a kick that landed. */
-export const SPECIAL_ON_BLOCKED = 3;
-export const SPECIAL_ON_KICK = 5;
-/** Stopping a blow with your guard, and with a perfect parry. */
-export const SPECIAL_BLOCKING = 7;
-export const SPECIAL_PARRY = 22;
-
-export interface ArenaState {
-  status: ArenaStatus;
-  gameNo: number;
-  round: number;
-  /** Per match: lays out the weapons of each round. */
-  seed: number;
-  /** Rounds needed to win this match. */
-  need: number;
-  players: Record<string, ArenaPlayer>;
-  /** Team each person picked in the waiting room (absent = watching). */
-  teams: Record<string, TeamId>;
-  /** Fighters of this match (people and bots) and their team. */
-  roster: Record<string, TeamId>;
-  /** Bot names, by fighter id. */
-  bots: Record<string, string>;
-  /** Server time the round's fight starts (after the countdown). */
-  startedAt: number;
-  hp: Record<string, number>;
-  gear: Record<string, Gear>;
-  items: Record<string, ArenaItem>;
-  itemSeq: number;
-  /** Potions taken, back at their place at `at` (server time). */
-  respawns: Record<string, ArenaItem & { at: number }>;
-  /** This match's healing rules (copied from the room's settings). */
-  potions: boolean;
-  regen: boolean;
-  /** Last regeneration tick per fighter (server time). */
-  healAt: Record<string, number>;
-  hits: Record<string, HitNote>;
-  score: Record<TeamId, number>;
-  roundWinner: TeamId | "draw" | "";
-  roundEndedAt: number;
-  winner: TeamId | "";
-  /** This match's knockouts per fighter. */
-  kills: Record<string, number>;
-  /** The special meter per fighter (0–`SPECIAL_MAX`), kept through the rounds of a match. */
-  special: Record<string, number>;
-  /** Matches won per person. */
-  wins: Record<string, number>;
-  /**
-   * A public arena (`ONLINE_WORLDS`): matches chain by themselves with
-   * whoever is there, bots filling the places under people's names.
-   */
-  online: boolean;
-  /** Online: when the next match may start (server time). */
-  nextAt: number;
-}
-
-/** A fighter's pose, written by whoever runs it. */
-export interface ArenaPose {
-  /** Round it belongs to (`roundKey`). */
-  k: number;
-  x: number;
-  y: number;
-  z: number;
-  yw: number;
-  pt: number;
-  /** Act index (`ACTS`), the server time it started and how long it lasts, blocking, bow draw, walking speed. */
-  a: number;
-  at: number;
-  al: number;
-  /** Swing number in a combo (odd ones come from the other side), and running. */
-  cb: number;
-  rn: number;
-  b: number;
-  /** Server time the current block started, when it can still parry (0: it can't). Absent on older clients. */
-  bt?: number;
-  dr: number;
-  sp: number;
-  /** Server time of the sample. */
-  t: number;
-}
-
-/** An arrow in flight, for everyone else to draw. */
-export interface ArenaArrow {
-  k: number;
-  o: string;
-  x: number;
-  y: number;
-  z: number;
-  vx: number;
-  vy: number;
-  vz: number;
-  /** Server time it left the bow. */
-  t: number;
-}
-
-export function roundKey(state: Pick<ArenaState, "gameNo" | "round">): number {
-  return state.gameNo * 1000 + state.round;
-}
-
-export function normalizeMeta(raw: Partial<ArenaMeta>): ArenaMeta {
-  return {
-    game: "arena",
-    hostId: raw.hostId,
-    size: Math.max(1, Math.min(3, raw.size ?? 1)),
-    wins: raw.wins === 3 ? 3 : 2,
-    bots: raw.bots ?? true,
-    potions: raw.potions ?? true,
-    regen: raw.regen ?? false,
-    view: raw.view === "pantalla" ? "pantalla" : "telefono",
-    createdAt: raw.createdAt ?? 0,
-  };
-}
-
-function normalizeGear(raw: Partial<Gear> | undefined): Gear {
-  // A weapon this version doesn't know (a newer client's) counts as the dagger.
-  return { w: raw?.w && raw.w in WEAPONS ? raw.w : START_GEAR.w, sh: !!raw?.sh };
-}
-
-function normalizeState(raw: Partial<ArenaState> | null): ArenaState | null {
-  if (!raw || !raw.status) return null;
-  const gear: Record<string, Gear> = {};
-  for (const [id, g] of Object.entries(raw.gear ?? {})) gear[id] = normalizeGear(g);
-  return {
-    status: raw.status,
-    gameNo: raw.gameNo ?? 0,
-    round: raw.round ?? 0,
-    seed: raw.seed ?? 0,
-    need: raw.need ?? 2,
-    players: raw.players ?? {},
-    teams: raw.teams ?? {},
-    roster: raw.roster ?? {},
-    bots: raw.bots ?? {},
-    startedAt: raw.startedAt ?? 0,
-    hp: raw.hp ?? {},
-    gear,
-    items: raw.items ?? {},
-    itemSeq: raw.itemSeq ?? 0,
-    respawns: raw.respawns ?? {},
-    potions: raw.potions ?? false,
-    regen: raw.regen ?? false,
-    healAt: raw.healAt ?? {},
-    hits: raw.hits ?? {},
-    score: { red: raw.score?.red ?? 0, blue: raw.score?.blue ?? 0 },
-    roundWinner: raw.roundWinner ?? "",
-    roundEndedAt: raw.roundEndedAt ?? 0,
-    winner: raw.winner ?? "",
-    kills: raw.kills ?? {},
-    special: raw.special ?? {},
-    wins: raw.wins ?? {},
-    online: raw.online ?? false,
-    nextAt: raw.nextAt ?? 0,
-  };
-}
-
-export const isBot = (id: string) => id.startsWith("bot");
-
-export function fighterName(state: ArenaState, id: string, myId = ""): string {
-  if (id === myId) return "Tú";
-  return state.bots[id] ?? state.players[id]?.name ?? "Caballero";
-}
-
-/** A team's fighters, people first, in a fixed order (it decides where each one starts). */
-export function teamFighters(state: Pick<ArenaState, "roster">, team: TeamId): string[] {
-  return Object.keys(state.roster)
-    .filter((id) => state.roster[id] === team)
-    .sort((a, b) => Number(isBot(a)) - Number(isBot(b)) || a.localeCompare(b));
-}
-
-export function alive(state: ArenaState, id: string): boolean {
-  return id in state.roster && (state.hp[id] ?? 0) > 0;
-}
-
-export const teamInfo = (id: TeamId) => TEAMS.find((t) => t.id === id)!;
-
 // ---- Firebase ------------------------------------------------------------
 
 const base = (roomId: string) => `rooms/${roomId}/arena`;
@@ -303,8 +78,6 @@ const statePath = (roomId: string) => `${base(roomId)}/state`;
 function mutate(roomId: string, fn: (state: ArenaState) => ArenaState | null) {
   return transactState(statePath(roomId), normalizeState, fn);
 }
-
-export type ArenaSettings = Pick<ArenaMeta, "size" | "wins" | "bots" | "potions" | "regen" | "view">;
 
 export async function createArenaRoom(hostId: string, settings: ArenaSettings): Promise<string> {
   const roomId = generateRoomCode();
@@ -326,325 +99,83 @@ export function subscribeArena(roomId: string, cb: (state: ArenaState | null) =>
   return onValue(ref(getDb(), statePath(roomId)), (snap) => cb(normalizeState(snap.val())));
 }
 
-function teamCount(s: ArenaState, team: TeamId): number {
-  return Object.values(s.teams).filter((t) => t === team).length;
-}
+type Capacity = Pick<ArenaMeta, "mode" | "size" | "ffa">;
 
-/** Registers the player and, before the match, puts them on the team with fewer people (if there's room). */
-export function joinArena(roomId: string, clientId: string, player: ArenaPlayer, size: number) {
-  return mutate(roomId, (s) => {
-    const known = s.players[clientId];
-    const red = teamCount(s, "red");
-    const blue = teamCount(s, "blue");
-    const team: TeamId | null = red <= blue ? (red < size ? "red" : null) : blue < size ? "blue" : null;
-    const assign = s.status === "waiting" && !s.teams[clientId] && !known && team;
-    if (!assign && known?.name === player.name && known?.color === player.color) return null;
-    return {
-      ...s,
-      players: { ...s.players, [clientId]: player },
-      teams: assign ? { ...s.teams, [clientId]: team } : s.teams,
-    };
-  });
+/** Registers the player and, before the match, puts them on a team with room. */
+export function joinArena(roomId: string, clientId: string, player: ArenaPlayer, meta: Capacity) {
+  return mutate(roomId, (s) => joinState(s, clientId, player, meta));
 }
 
 /** Picks a team (null = just watch), while waiting, if it has room. */
-export function chooseTeam(roomId: string, clientId: string, team: TeamId | null, size: number) {
-  return mutate(roomId, (s) => {
-    if (s.status !== "waiting" || s.teams[clientId] === (team ?? undefined)) return null;
-    if (team && teamCount(s, team) >= size) return null;
-    const teams = { ...s.teams };
-    if (team) teams[clientId] = team;
-    else delete teams[clientId];
-    return { ...s, teams };
-  });
+export function chooseTeam(roomId: string, clientId: string, team: TeamId | null, meta: Capacity) {
+  return mutate(roomId, (s) => chooseTeamState(s, clientId, team, meta));
 }
 
 /** Everyone connected, split into two even teams at random. */
 export function shuffleTeams(roomId: string, connected: string[], size: number) {
-  return mutate(roomId, (s) => {
-    if (s.status !== "waiting") return null;
-    const ids = connected.filter((id) => s.players[id]).sort(() => Math.random() - 0.5).slice(0, size * 2);
-    const teams: Record<string, TeamId> = {};
-    ids.forEach((id, i) => (teams[id] = i % 2 ? "blue" : "red"));
-    return { ...s, teams };
-  });
+  return mutate(roomId, (s) => shuffleState(s, connected, size));
 }
 
-function setupRound(s: ArenaState, round: number): ArenaState {
-  const hp: Record<string, number> = {};
-  const gear: Record<string, Gear> = {};
-  for (const id of Object.keys(s.roster)) {
-    hp[id] = MAX_HP;
-    gear[id] = { ...START_GEAR };
-  }
-  return {
-    ...s,
-    status: "fighting",
-    round,
-    startedAt: serverNow() + COUNTDOWN_MS,
-    hp,
-    gear,
-    items: roundItems(s.seed, round, s.potions),
-    itemSeq: 0,
-    respawns: {},
-    healAt: {},
-    hits: {},
-    roundWinner: "",
-    roundEndedAt: 0,
-  };
-}
-
-/**
- * Starts a match with the connected people on each team (at most `size`
- * each), plus bots to fill the places when `bots` is on. Each team needs
- * somebody, and at least one person has to fight.
- */
 export function startMatch(roomId: string, settings: ArenaSettings, connected: string[]) {
-  return mutate(roomId, (s) => {
-    if (s.status !== "waiting" && s.status !== "finished") return null;
-    const roster: Record<string, TeamId> = {};
-    const bots: Record<string, string> = {};
-    let botNo = 0;
-    for (const team of ["red", "blue"] as TeamId[]) {
-      const people = Object.keys(s.teams)
-        .filter((id) => s.teams[id] === team && connected.includes(id))
-        .slice(0, settings.size);
-      for (const id of people) roster[id] = team;
-      if (settings.bots) {
-        for (let k = people.length; k < settings.size; k++) {
-          const id = `bot${botNo}`;
-          bots[id] = BOT_NAMES[botNo % BOT_NAMES.length];
-          roster[id] = team;
-          botNo++;
-        }
-      }
-    }
-    const ids = Object.keys(roster);
-    const people = ids.filter((id) => !isBot(id));
-    if (!people.length || !ids.some((id) => roster[id] === "red") || !ids.some((id) => roster[id] === "blue")) return null;
-    const next: ArenaState = {
-      ...s,
-      gameNo: s.gameNo + 1,
-      seed: makeSeed(),
-      need: settings.wins,
-      potions: settings.potions,
-      regen: settings.regen,
-      roster,
-      bots,
-      score: { red: 0, blue: 0 },
-      kills: {},
-      special: {},
-      winner: "",
-    };
-    return setupRound(next, 1);
-  });
+  const seed = makeSeed();
+  return mutate(roomId, (s) => startMatchState(s, settings, connected, serverNow(), seed));
 }
 
-/** Whether a team is still standing; when one isn't, the round goes to the other. */
-function checkRoundEnd(s: ArenaState): ArenaState {
-  if (s.status !== "fighting") return s;
-  const standing = (team: TeamId) => Object.keys(s.roster).some((id) => s.roster[id] === team && (s.hp[id] ?? 0) > 0);
-  const red = standing("red");
-  const blue = standing("blue");
-  if (red && blue) return s;
-  return endRound(s, red ? "red" : blue ? "blue" : "draw");
+export function strike(roomId: string, key: number, attacker: string, attackerAt: { x: number; z: number }, strikes: (Strike & { x: number; z: number })[], ranged = false) {
+  return mutate(roomId, (s) => strikeState(s, key, attacker, attackerAt, strikes, ranged, serverNow()));
 }
 
-function endRound(s: ArenaState, winner: TeamId | "draw"): ArenaState {
-  const score = { ...s.score };
-  if (winner !== "draw") score[winner] += 1;
-  return { ...s, status: "roundEnd", roundWinner: winner, roundEndedAt: serverNow(), score };
-}
-
-/** Drops what a fallen (or switching) fighter carried as items at (x, z). */
-function dropGear(s: ArenaState, items: Record<string, ArenaItem>, gear: Gear, x: number, z: number): number {
-  let seq = s.itemSeq;
-  const drop = (kind: ItemKind, dx: number) => {
-    items[`d${seq++}`] = { kind, x: Math.round((x + dx) * 100) / 100, z: Math.round(z * 100) / 100 };
-  };
-  if (gear.w !== "daga") drop(gear.w, -0.4);
-  if (gear.sh) drop("escudo", 0.4);
-  return seq;
-}
-
-function inRound(s: ArenaState, key: number): boolean {
-  return s.status === "fighting" && roundKey(s) === key && serverNow() >= s.startedAt - 300;
-}
-
-/**
- * `attacker`'s swing (or arrow) hit these targets. Each one must still be
- * standing and on the other team; `where` is where each target was (to drop
- * its weapons if it falls).
- */
-export function strike(
-  roomId: string,
-  key: number,
-  attacker: string,
-  attackerAt: { x: number; z: number },
-  strikes: (Strike & { x: number; z: number })[],
-  ranged = false
-) {
-  return mutate(roomId, (s) => {
-    if (!inRound(s, key)) return null;
-    // An arrow still counts if its shooter fell while it flew.
-    if (!(attacker in s.roster) || (!ranged && !alive(s, attacker))) return null;
-    const hp = { ...s.hp };
-    const hits = { ...s.hits };
-    const kills = { ...s.kills };
-    const items = { ...s.items };
-    const special = { ...s.special };
-    const fill = (id: string, amount: number) => {
-      if (amount > 0) special[id] = Math.min(SPECIAL_MAX, Math.round((special[id] ?? 0) + amount));
-    };
-    let itemSeq = s.itemSeq;
-    let changed = false;
-    for (const st of strikes) {
-      const t = st.target;
-      if (!alive(s, t) || s.roster[t] === s.roster[attacker] || (hp[t] ?? 0) <= 0) continue;
-      changed = true;
-      const damage = st.parried ? 0 : Math.max(0, Math.round(st.damage));
-      hp[t] = Math.max(0, (hp[t] ?? 0) - damage);
-      const note: HitNote = {
-        n: (hits[t]?.n ?? 0) + 1,
-        from: attacker,
-        b: st.blocked || !!st.parried,
-        d: st.parried ? 0 : Math.round(st.drain),
-        x: Math.round(attackerAt.x * 100) / 100,
-        z: Math.round(attackerAt.z * 100) / 100,
-        t: Math.round(serverNow()),
-      };
-      // Only the fields that apply (the database takes no undefined).
-      if (st.parried) note.pr = 1;
-      if (st.kick) note.kk = 1;
-      if (st.guardBreak) note.g = 1;
-      if (st.special) note.sp = 1;
-      if (st.push !== undefined) note.pw = Math.round(st.push * 10) / 10;
-      if (st.stagger !== undefined) note.st = Math.round(st.stagger * 100) / 100;
-      hits[t] = note;
-      // The meter: the defender for a guard or a parry, the attacker for what it landed (specials don't count).
-      if (st.parried) fill(t, SPECIAL_PARRY);
-      else if (st.blocked) fill(t, SPECIAL_BLOCKING);
-      if (!st.special && !st.parried) {
-        if (st.kick) fill(attacker, SPECIAL_ON_KICK);
-        else if (st.blocked) fill(attacker, SPECIAL_ON_BLOCKED);
-        else fill(attacker, damage * SPECIAL_PER_DAMAGE * (ranged ? 0.5 : 1));
-      }
-      if (hp[t] === 0) {
-        kills[attacker] = (kills[attacker] ?? 0) + 1;
-        itemSeq = dropGear({ ...s, itemSeq }, items, s.gear[t] ?? START_GEAR, st.x, st.z);
-      }
-    }
-    if (!changed) return null;
-    return checkRoundEnd({ ...s, hp, hits, kills, items, itemSeq, special });
-  });
-}
-
-/** A special starts: its meter must be full, and empties. */
 export function spendSpecial(roomId: string, key: number, id: string) {
-  return mutate(roomId, (s) => {
-    if (!inRound(s, key) || !alive(s, id) || (s.special[id] ?? 0) < SPECIAL_MAX) return null;
-    return { ...s, special: { ...s.special, [id]: 0 } };
-  });
+  return mutate(roomId, (s) => spendSpecialState(s, key, id, serverNow()));
 }
 
-/** A fighter whose player left falls where it was (its weapons stay there). */
 export function forfeit(roomId: string, key: number, id: string, x: number, z: number) {
-  return mutate(roomId, (s) => {
-    if (s.status !== "fighting" || roundKey(s) !== key || !alive(s, id)) return null;
-    const items = { ...s.items };
-    const itemSeq = dropGear(s, items, s.gear[id] ?? START_GEAR, x, z);
-    return checkRoundEnd({ ...s, hp: { ...s.hp, [id]: 0 }, items, itemSeq });
-  });
+  return mutate(roomId, (s) => forfeitState(s, key, id, x, z, serverNow()));
 }
 
-/**
- * Picks up an item: a shield goes in the other hand, a weapon replaces the
- * one in hand (which is left on the floor at (x, z), unless it's the dagger),
- * a potion is drunk on the spot (only when hurt) and comes back later.
- */
+/** Map damage on `id` (by whoever runs it): once per source and tick. */
+export function envHit(roomId: string, key: number, id: string, src: string, tag: number, damage: number, x: number, z: number) {
+  return mutate(roomId, (s) => envHitState(s, key, id, src, tag, damage, x, z, serverNow()));
+}
+
+/** `id` fell off the map (by whoever runs it). */
+export function fallOff(roomId: string, key: number, id: string) {
+  return mutate(roomId, (s) => fallState(s, key, id, serverNow()));
+}
+
+/** «Rey»: `id` gets up again (by whoever runs it). */
+export function respawnFighter(roomId: string, key: number, id: string) {
+  return mutate(roomId, (s) => respawnState(s, key, id, serverNow()));
+}
+
+/** «Rey»: a second on the hill for `holder`. */
+export function hillTick(roomId: string, key: number, sec: number, holder: string) {
+  return mutate(roomId, (s) => hillTickState(s, key, sec, holder, serverNow()));
+}
+
+/** «La tribuna tira armas»: event `n`'s weapons land (any client; once). */
+export function dropEventItems(roomId: string, key: number, n: number, items: Record<string, ArenaItem>) {
+  return mutate(roomId, (s) => eventItemsState(s, key, n, items, serverNow()));
+}
+
 export function pickItem(roomId: string, key: number, id: string, itemId: string, x: number, z: number) {
-  return mutate(roomId, (s) => {
-    if (!inRound(s, key) || !alive(s, id)) return null;
-    const item = s.items[itemId];
-    if (!item) return null;
-    const gear = s.gear[id] ?? START_GEAR;
-    const items = { ...s.items };
-    delete items[itemId];
-    let itemSeq = s.itemSeq;
-    if (item.kind === "pocion") {
-      const hp = s.hp[id] ?? 0;
-      if (hp >= MAX_HP) return null;
-      const respawns = itemId.startsWith(RESPAWN_PREFIX)
-        ? { ...s.respawns, [itemId]: { ...item, at: serverNow() + POTION_RESPAWN_MS } }
-        : s.respawns;
-      return { ...s, items, respawns, hp: { ...s.hp, [id]: Math.min(MAX_HP, hp + POTION_HEAL) } };
-    }
-    let next: Gear;
-    if (item.kind === "escudo") {
-      if (gear.sh) return null;
-      next = { ...gear, sh: true };
-    } else {
-      if (gear.w !== "daga") itemSeq = dropGear(s, items, { w: gear.w, sh: false }, x, z);
-      next = { ...gear, w: item.kind };
-    }
-    return { ...s, items, itemSeq, gear: { ...s.gear, [id]: next } };
-  });
+  return mutate(roomId, (s) => pickItemState(s, key, id, itemId, x, z, serverNow()));
 }
 
-/** Potions whose time came are back at their places. */
 export function respawnItems(roomId: string, key: number) {
-  return mutate(roomId, (s) => {
-    if (!inRound(s, key)) return null;
-    const now = serverNow();
-    const due = Object.entries(s.respawns).filter(([, r]) => r.at <= now);
-    if (!due.length) return null;
-    const items = { ...s.items };
-    const respawns = { ...s.respawns };
-    for (const [id, { kind, x, z }] of due) {
-      items[id] = { kind, x, z };
-      delete respawns[id];
-    }
-    return { ...s, items, respawns };
-  });
+  return mutate(roomId, (s) => respawnItemsState(s, key, serverNow()));
 }
 
-/** Regeneration (when the match has it): a few points back, if `id` hasn't been hit for a while. */
 export function regenerate(roomId: string, key: number, id: string) {
-  return mutate(roomId, (s) => {
-    if (!s.regen || !inRound(s, key) || !alive(s, id)) return null;
-    const now = serverNow();
-    const hp = s.hp[id] ?? 0;
-    if (hp >= MAX_HP || now - (s.hits[id]?.t ?? 0) < REGEN_DELAY_MS || now - (s.healAt[id] ?? 0) < REGEN_EVERY_MS - 100) return null;
-    return { ...s, hp: { ...s.hp, [id]: Math.min(MAX_HP, hp + REGEN_STEP) }, healAt: { ...s.healAt, [id]: now } };
-  });
+  return mutate(roomId, (s) => regenerateState(s, key, id, serverNow()));
 }
 
-/** Out of time: the team with more health left takes the round (equal = nobody). */
 export function timeoutRound(roomId: string, key: number) {
-  return mutate(roomId, (s) => {
-    if (s.status !== "fighting" || roundKey(s) !== key || serverNow() < s.startedAt + ROUND_SECONDS * 1000) return null;
-    const total = (team: TeamId) =>
-      Object.keys(s.roster)
-        .filter((id) => s.roster[id] === team)
-        .reduce((sum, id) => sum + (s.hp[id] ?? 0), 0);
-    const red = total("red");
-    const blue = total("blue");
-    return endRound(s, red > blue ? "red" : blue > red ? "blue" : "draw");
-  });
+  return mutate(roomId, (s) => timeoutState(s, key, serverNow()));
 }
 
-/** After a round's result: the next round, or the end of the match. */
 export function nextRound(roomId: string, key: number) {
-  return mutate(roomId, (s) => {
-    if (s.status !== "roundEnd" || roundKey(s) !== key || serverNow() < s.roundEndedAt + ROUND_END_MS - 300) return null;
-    const champion = (["red", "blue"] as TeamId[]).find((t) => s.score[t] >= s.need);
-    if (!champion) return setupRound(s, s.round + 1);
-    const wins = { ...s.wins };
-    for (const id of Object.keys(s.roster)) {
-      if (s.roster[id] === champion && !isBot(id)) wins[id] = (wins[id] ?? 0) + 1;
-    }
-    return { ...s, status: "finished", winner: champion, wins, nextAt: serverNow() + ONLINE_NEXT_MS };
-  });
+  return mutate(roomId, (s) => nextRoundState(s, key, serverNow(), ONLINE_NEXT_MS));
 }
 
 /** Back to the waiting room (to change teams), also to leave a match halfway. */
@@ -668,6 +199,11 @@ export function openPose(roomId: string, fighterId: string, owned: boolean) {
       remove(r).catch(console.error);
     },
   };
+}
+
+/** A bot that left the match (a past wave): its pose goes too (the bot host does it). */
+export function dropPose(roomId: string, fighterId: string) {
+  remove(ref(getDb(), `${base(roomId)}/poses/${fighterId}`)).catch(console.error);
 }
 
 export function subscribePoses(roomId: string, cb: (poses: Record<string, ArenaPose>) => void): Unsubscribe {
@@ -742,15 +278,11 @@ export function subscribePads(roomId: string, cb: (pads: Record<string, ArenaPad
  * people and never labelled as bots. Latecomers watch until the next match.
  */
 export const ONLINE_WORLDS = ["ARENA1", "ARENA2", "ARENA3", "ARENA4"];
-export const ONLINE_MAX_PEOPLE = 6;
-/** After a match, the results show this long before the next one. */
-export const ONLINE_NEXT_MS = 9000;
-const ONLINE_WINS = 2;
 
 async function ensureWorld(roomId: string) {
   const db = getDb();
   await runTransaction(ref(db, `rooms/${roomId}/meta`), (cur: Partial<ArenaMeta> | null) =>
-    cur ? undefined : { game: "arena", size: 2, wins: ONLINE_WINS, bots: true, potions: true, regen: false, view: "telefono", online: true, createdAt: serverNow() }
+    cur ? undefined : { game: "arena", size: 2, wins: 2, bots: true, potions: true, regen: false, view: "telefono", mode: "equipos", map: "azar", events: true, ffa: 4, online: true, createdAt: serverNow() }
   );
   await runTransaction(ref(db, statePath(roomId)), (cur: Partial<ArenaState> | null) =>
     cur ? undefined : { status: "waiting", online: true, gameNo: 0, nextAt: 0 }
@@ -775,48 +307,8 @@ export async function enterOnline(): Promise<string> {
   return id;
 }
 
-/** The next match of a public arena, with the people `connected` now. */
+/** The next match of a public arena, with the people `connected` now (mode and map at random). */
 export function nextOnlineMatch(roomId: string, connected: string[]) {
-  return mutate(roomId, (s) => {
-    if (!s.online) return null;
-    // A battle in progress only gives way when none of its people is still here (only bots left fighting).
-    const inProgress = s.status === "fighting" || s.status === "roundEnd";
-    if (inProgress && Object.keys(s.roster).some((id) => !isBot(id) && connected.includes(id))) return null;
-    if (s.status === "finished" && serverNow() < s.nextAt) return null;
-    const seed = makeSeed();
-    const people = seededShuffle(connected.filter((id) => s.players[id] && !isBot(id)), seed).slice(0, ONLINE_MAX_PEOPLE);
-    if (!people.length) return null;
-    const size = Math.max(2, Math.min(3, Math.ceil(people.length / 2)));
-    const roster: Record<string, TeamId> = {};
-    people.forEach((id, i) => (roster[id] = i % 2 ? "blue" : "red"));
-    // Bots under people's names, never the name of someone here.
-    const taken = new Set(people.map((id) => s.players[id]?.name.trim().toLowerCase()));
-    const names = seededShuffle(RIVAL_NAMES, seed + 1).filter((n) => !taken.has(n.toLowerCase()));
-    const bots: Record<string, string> = {};
-    let botNo = 0;
-    for (const team of ["red", "blue"] as TeamId[]) {
-      const have = Object.values(roster).filter((t) => t === team).length;
-      for (let k = have; k < size; k++) {
-        const id = `bot${botNo}`;
-        bots[id] = names[botNo % names.length];
-        roster[id] = team;
-        botNo++;
-      }
-    }
-    const next: ArenaState = {
-      ...s,
-      gameNo: s.gameNo + 1,
-      seed,
-      need: ONLINE_WINS,
-      potions: true,
-      regen: false,
-      roster,
-      bots,
-      score: { red: 0, blue: 0 },
-      kills: {},
-      special: {},
-      winner: "",
-    };
-    return setupRound(next, 1);
-  });
+  const seed = makeSeed();
+  return mutate(roomId, (s) => nextOnlineState(s, connected, serverNow(), seed));
 }

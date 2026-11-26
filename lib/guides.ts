@@ -845,8 +845,38 @@ export const GUIDES: Record<GameId, Guide> = {
     ],
   },
   arena: {
-    goal: "Que tu equipo sea el último en pie en cada ronda, hasta ganar las rondas pedidas.",
+    goal: "Según el modo: que tu equipo quede en pie, ser el último caballero en pie, dominar la colina o aguantar la mayor cantidad de oleadas.",
     sections: [
+      {
+        title: "Modos",
+        text: [
+          "Equipos: rojo contra azul por rondas. Gana la ronda el equipo que queda en pie (si se acaba el tiempo, el que tiene más vida).",
+          "Todos contra todos: de 3 a 8 caballeros, cada uno por su cuenta y cada uno con su color. Gana la ronda el último en pie (si se acaba el tiempo, el que derribó a más) y la partida quien gana las rondas pedidas.",
+          "Rey de la colina: hay una zona marcada en el centro. Cada segundo que tu equipo la tiene solo suma un punto; si hay caballeros de los dos equipos, está en disputa y no suma nadie. Gana el primero en llegar a 45 o el que tiene más al terminar los 3 minutos. Si caes, vuelves a pelear a los pocos segundos desde tu lado.",
+          "Supervivencia: hasta 4 personas juntas contra oleadas de bots, cada vez más y mejor armados. Entre oleadas se recupera vida y los caídos vuelven a pelear. Termina cuando caen todos: el puntaje son las oleadas que aguantaron.",
+        ],
+      },
+      {
+        title: "Arenas",
+        text: [
+          "Coliseo: la arena redonda, con columnas para cubrirte.",
+          "Puente: un puente angosto sobre el abismo. La baranda tiene huecos: si te empujan por uno, caes y quedas afuera (y cuenta para quien te empujó). Las patadas, los golpes y el terremoto empujan más que en otras arenas.",
+          "Patio del castillo: muros, cajas para cubrirte (a las bajas se puede subir de un salto) y pasarelas altas a los costados, a las que se sube por rampas. Desde arriba, el arco es muy útil.",
+          "Bosque: un claro con troncos gruesos y rocas para esconderte, y el suelo desparejo.",
+          "Foso de trampas: rejillas de fuego que se encienden y se apagan (brillan justo antes) y una cuchilla que gira en el centro: sáltala cuando llegue.",
+          "Al crear la sala puedes elegir la arena o «Al azar» (una distinta cada partida).",
+        ],
+      },
+      {
+        title: "Eventos",
+        text: [
+          "Si la sala tiene eventos (en línea siempre), de vez en cuando pasa algo en medio de la ronda y se anuncia con un cartel:",
+          "Lluvia de flechas: aparecen círculos rojos en el piso y a los pocos segundos caen flechas ahí. Sal de los círculos o levanta un escudo.",
+          "La tribuna tira armas: caen armas nuevas en la arena.",
+          "La arena se achica: un anillo de fuego se va cerrando; afuera pierdes vida de a poco. Después se vuelve a abrir.",
+          "Niebla: por un rato no se ve más allá de unos metros.",
+        ],
+      },
       {
         title: "Armas",
         text: [
@@ -880,7 +910,7 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "En línea",
         text: [
-          "Elige «En línea» y entras a una arena pública: peleas al toque con gente de todos lados, en dos equipos de 2 contra 2 o más, al mejor de 3 rondas. Las batallas van una detrás de otra; si llegas a mitad de una, miras y entras en la siguiente.",
+          "Elige «En línea» y entras a una arena pública: peleas al toque con gente de todos lados. Cada batalla tiene un modo (equipos, todos contra todos o rey de la colina) y una arena al azar, con eventos. Las batallas van una detrás de otra; si llegas a mitad de una, miras y entras en la siguiente.",
         ],
       },
       {

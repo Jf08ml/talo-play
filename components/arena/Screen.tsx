@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Bot, Smartphone } from "lucide-react";
 import { isFirebaseConfigured } from "@/lib/firebase";
-import { normalizeMeta, startMatch, subscribeArena, type ArenaMeta, type ArenaState } from "@/lib/arena";
+import { MODE_INFO, SURVIVAL_MAX, normalizeMeta, startMatch, subscribeArena, type ArenaMeta, type ArenaState } from "@/lib/arena";
 import { subscribePresence, type PresenceMap } from "@/lib/presence";
 import { roomPath } from "@/lib/games";
 import { watchRoomMeta } from "@/lib/roomSettings";
@@ -90,7 +90,14 @@ function Waiting({ roomId, meta, state, presence }: { roomId: string; meta: Aren
     setError("");
     startMatch(roomId, meta, connected)
       .then((r) => {
-        if (r && !r.committed) setError(meta.bots ? "Hace falta al menos una persona en un equipo." : "Cada equipo necesita al menos una persona (o activa los bots).");
+        if (r && !r.committed)
+          setError(
+            meta.mode === "todos" || meta.mode === "supervivencia"
+              ? "Hace falta al menos una persona (y, sin bots, dos caballeros)."
+              : meta.bots
+                ? "Hace falta al menos una persona en un equipo."
+                : "Cada equipo necesita al menos una persona (o activa los bots)."
+          );
       })
       .catch(console.error)
       .finally(() => setBusy(false));
@@ -120,6 +127,24 @@ function Waiting({ roomId, meta, state, presence }: { roomId: string; meta: Aren
           <p className="text-sm text-white/40">{settingsSummary(meta)}</p>
         </div>
         <div className="flex w-full max-w-xl flex-col gap-4">
+          {meta.mode === "todos" || meta.mode === "supervivencia" ? (
+            <div className="flex min-h-48 flex-col gap-2 rounded-3xl bg-white/[0.05] p-5 ring-2 ring-talo-hero/60">
+              <p className="font-display text-2xl text-talo-hero">{MODE_INFO[meta.mode].label}</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                {people.map((id) => (
+                  <span key={id} className="truncate text-xl font-bold">
+                    {state.players[id]?.name ?? "?"}
+                  </span>
+                ))}
+              </div>
+              {meta.mode === "todos" && meta.bots && meta.ffa > people.length && (
+                <span className="flex items-center gap-1.5 text-base text-white/50">
+                  <Bot className="h-4 w-4" /> + {meta.ffa - people.length} {meta.ffa - people.length === 1 ? "bot" : "bots"}
+                </span>
+              )}
+              {meta.mode === "supervivencia" && <span className="text-base text-white/50">Hasta {SURVIVAL_MAX} personas contra oleadas de bots.</span>}
+            </div>
+          ) : (
           <div className="grid grid-cols-2 content-start gap-4">
             {TEAMS.map((t) => {
               const list = inTeam(t.id);
@@ -143,6 +168,7 @@ function Waiting({ roomId, meta, state, presence }: { roomId: string; meta: Aren
               );
             })}
           </div>
+          )}
           {error && <p className="text-center text-base text-red-300">{error}</p>}
           <button disabled={!people.length || busy} onClick={start} className={`w-full text-xl ${PRIMARY_BUTTON}`}>
             {people.length ? "¡A pelear!" : "Esperando jugadores…"}

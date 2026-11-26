@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import {
+  MODE_INFO,
+  SURVIVAL_MAX,
+  awardOutcome,
   chooseTeam,
   getArenaMeta,
   isBot,
@@ -33,15 +36,25 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import Battle from "./Battle";
 import Pad from "./Pad";
 import { SETTINGS } from "./settings";
+import { MAPS } from "@/lib/arenaMaps";
 import { Bot, Eye, Shuffle, Smartphone } from "lucide-react";
 import { useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
 export function settingsSummary(meta: ArenaMeta): string {
-  const extras = [meta.bots && "con bots", meta.potions && "pociones", meta.regen && "regeneración"].filter(Boolean);
+  const extras = [meta.bots && meta.mode !== "supervivencia" && "con bots", meta.events && "eventos", meta.potions && "pociones", meta.regen && "regeneración"].filter(Boolean);
   const where = meta.view === "pantalla" ? " · en pantalla grande" : "";
-  return `${meta.size} contra ${meta.size} · al mejor de ${meta.wins * 2 - 1} rondas${extras.map((e) => ` · ${e}`).join("")}${where}`;
+  const arena = meta.map === "azar" ? "arena al azar" : MAPS[meta.map].label;
+  const how =
+    meta.mode === "todos"
+      ? `Todos contra todos · ${meta.ffa} caballeros · gana quien gane ${meta.wins} rondas`
+      : meta.mode === "rey"
+        ? `Rey de la colina · ${meta.size} contra ${meta.size}`
+        : meta.mode === "supervivencia"
+          ? `Supervivencia · hasta ${SURVIVAL_MAX} contra oleadas`
+          : `${meta.size} contra ${meta.size} · al mejor de ${meta.wins * 2 - 1} rondas`;
+  return `${how} · ${arena}${extras.map((e) => ` · ${e}`).join("")}${where}`;
 }
 
 /** An arena room: teams while waiting, then the battle full screen. */
@@ -87,27 +100,16 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
   const hasState = state !== null;
   const size = meta?.size ?? 1;
+  const mode = meta?.mode ?? "equipos";
+  const ffa = meta?.ffa ?? 4;
   useEffect(() => {
     if (!hasState || !identity.clientId || !identity.name) return;
-    joinArena(roomId, identity.clientId, { name: identity.name, color: identity.color }, size).catch(console.error);
-  }, [hasState, roomId, identity.clientId, identity.name, identity.color, size]);
+    joinArena(roomId, identity.clientId, { name: identity.name, color: identity.color }, { size, mode, ffa }).catch(console.error);
+  }, [hasState, roomId, identity.clientId, identity.name, identity.color, size, mode, ffa]);
 
-  // Ranking: my team's result once the match (all its rounds) is over. Two teams, so the
-  // places are the teams; bots are shown as bots.
-  const awardTeam = state?.roster[myId];
-  useAwardMatch(
-    "arena",
-    roomId,
-    state?.gameNo ?? 0,
-    state?.status === "finished" && state.winner && awardTeam
-      ? {
-          place: awardTeam === state.winner ? 1 : 2,
-          players: 2,
-          // Public arenas' bots pass for people: they count like anyone there.
-          vsBotsOnly: !state.online && Object.keys(state.roster).every((id) => state.roster[id] === awardTeam || isBot(id)),
-        }
-      : null
-  );
+  // Ranking, once the match (all its rounds) is over: teams are 1st or 2nd of two («equipos»,
+  // «rey»), «todos» places everyone by rounds won and knockouts, «supervivencia» has no places.
+  useAwardMatch("arena", roomId, state?.gameNo ?? 0, state ? awardOutcome(state, myId) : null);
 
   // Public arena: the next match starts by itself with whoever is here.
   const online = !!state?.online;
@@ -185,8 +187,8 @@ export default function RoomClient({ roomId }: { roomId: string }) {
               <div className="flex gap-2.5 rounded-xl bg-amber-500/10 p-3 text-sm text-amber-100 ring-1 ring-amber-400/20">
                 <Smartphone className="mt-0.5 h-5 w-5 shrink-0" />
                 <p>
-                  Cada uno pelea desde su teléfono (horizontal) o su computadora con mouse y teclado. Las armas están tiradas por la arena:
-                  ¡corre a buscarlas!
+                  {MODE_INFO[meta.mode].label}: {MODE_INFO[meta.mode].hint} Cada uno pelea desde su teléfono (horizontal) o su computadora con mouse y
+                  teclado. Las armas están tiradas por la arena: ¡corre a buscarlas!
                 </p>
               </div>
               <TeamPicker roomId={roomId} meta={meta} state={state} myId={myId} connected={connected} presenceLoaded={presenceLoaded} />
@@ -213,6 +215,9 @@ function TeamPicker({
   connected: string[];
   presenceLoaded: boolean;
 }) {
+  if (meta.mode === "todos" || meta.mode === "supervivencia") {
+    return <FighterPicker roomId={roomId} meta={meta} state={state} myId={myId} connected={connected} presenceLoaded={presenceLoaded} />;
+  }
   const here = (id: string) => !presenceLoaded || connected.includes(id);
   const members = (team: TeamId) => Object.keys(state.teams).filter((id) => state.teams[id] === team && here(id));
   const mine = state.teams[myId] ?? null;
@@ -250,7 +255,7 @@ function TeamPicker({
               })}
               {mine !== t.id && (
                 <button
-                  onClick={() => chooseTeam(roomId, myId, t.id, meta.size)}
+                  onClick={() => chooseTeam(roomId, myId, t.id, meta)}
                   disabled={full}
                   className="rounded-md border px-3 py-1 text-xs font-medium disabled:opacity-40"
                   style={{ borderColor: t.color, color: t.color }}
@@ -264,7 +269,7 @@ function TeamPicker({
       </div>
       <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
         {mine && (
-          <button onClick={() => chooseTeam(roomId, myId, null, meta.size)} className="flex items-center gap-1 text-slate-500 hover:text-slate-300">
+          <button onClick={() => chooseTeam(roomId, myId, null, meta)} className="flex items-center gap-1 text-slate-500 hover:text-slate-300">
             <Eye className="h-3.5 w-3.5" /> Prefiero mirar
           </button>
         )}
@@ -287,6 +292,78 @@ function TeamPicker({
           : meta.bots
             ? "Elige un equipo para pelear."
             : `Hace falta al menos uno en cada equipo (${teamInfo("red").label.toLowerCase()} y ${teamInfo("blue").label.toLowerCase()}).`}
+      </p>
+    </div>
+  );
+}
+
+/** «Todos contra todos» and «Supervivencia»: no teams, just who fights (up to the mode's places) and who watches. */
+function FighterPicker({
+  roomId,
+  meta,
+  state,
+  myId,
+  connected,
+  presenceLoaded,
+}: {
+  roomId: string;
+  meta: ArenaMeta;
+  state: ArenaState;
+  myId: string;
+  connected: string[];
+  presenceLoaded: boolean;
+}) {
+  const here = (id: string) => !presenceLoaded || connected.includes(id);
+  const fighting = Object.keys(state.teams).filter(here);
+  const watchers = Object.keys(state.players).filter((id) => !state.teams[id] && here(id));
+  const survival = meta.mode === "supervivencia";
+  const places = survival ? SURVIVAL_MAX : meta.ffa;
+  const mine = !!state.teams[myId];
+  const full = Object.keys(state.teams).length >= places;
+  const bots = survival ? 0 : meta.bots ? Math.max(0, places - fighting.length) : 0;
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-1.5 rounded-xl border border-amber-400/40 bg-slate-950/40 p-3">
+        <p className="text-center text-sm font-semibold text-amber-200">{survival ? "Defensores" : "Caballeros"}</p>
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+          {fighting.map((id) => (
+            <p key={id} className="truncate rounded-lg bg-slate-900/70 px-2 py-1.5 text-center text-sm text-slate-100">
+              {id === myId ? "Tú" : state.players[id]?.name}
+            </p>
+          ))}
+          {Array.from({ length: bots }, (_, i) => (
+            <p key={`b${i}`} className="flex items-center justify-center gap-1 rounded-lg bg-slate-900/70 px-2 py-1.5 text-center text-sm text-slate-500">
+              <Bot className="h-3.5 w-3.5" /> bot
+            </p>
+          ))}
+        </div>
+        {mine ? (
+          <button onClick={() => chooseTeam(roomId, myId, null, meta)} className="mx-auto flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300">
+            <Eye className="h-3.5 w-3.5" /> Prefiero mirar
+          </button>
+        ) : (
+          <button
+            onClick={() => chooseTeam(roomId, myId, "red", meta)}
+            disabled={full}
+            className="mx-auto rounded-md border border-amber-300 px-3 py-1 text-xs font-medium text-amber-200 disabled:opacity-40"
+          >
+            {full ? "Completo" : "Pelear"}
+          </button>
+        )}
+      </div>
+      {watchers.length > 0 && (
+        <p className="text-center text-xs text-slate-500">
+          Mirando: {watchers.map((id) => (id === myId ? "tú" : state.players[id]?.name)).join(", ")}
+        </p>
+      )}
+      <p className="text-center text-xs text-slate-500">
+        {survival
+          ? `Hasta ${SURVIVAL_MAX} personas juntas contra oleadas de bots.`
+          : fighting.length + bots >= 2
+            ? bots
+              ? "Los lugares libres los ocupan bots."
+              : "¡Listos para la batalla!"
+            : "Hacen falta al menos dos caballeros (o activa los bots)."}
       </p>
     </div>
   );

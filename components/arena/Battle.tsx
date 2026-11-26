@@ -3,15 +3,31 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  ENV,
+  HILL_TARGET,
   REGEN_DELAY_MS,
   REGEN_EVERY_MS,
+  RESPAWN_MS,
   ROUND_END_MS,
-  ROUND_SECONDS,
+  allFighters,
   alive,
   backToWaiting,
+  dropEventItems,
+  dropPose,
+  envHit,
+  fallOff,
+  ffaRanking,
+  fighterColor,
   fighterName,
   forfeit,
+  hillTick,
   isBot,
+  respawnFighter,
+  roundSeconds,
+  sideOf,
+  spawnOf,
+  waveSkill,
+  wavesSurvived,
   nextRound,
   openPose,
   pickItem,
@@ -39,12 +55,12 @@ import {
   ACTS,
   FIGHTER_RADIUS,
   Fighter,
+  IDLE_INPUT,
   ITEM_LABEL,
   KICK_COOLDOWN,
   MAX_HP,
   MAX_STAMINA,
   PICK_RADIUS,
-  PILLAR_SOLIDS,
   SPECIALS,
   SPECIAL_MAX,
   START_GEAR,
@@ -69,7 +85,27 @@ import {
   type Gear,
   type Strike,
 } from "@/lib/arenaSim";
-import { ArenaScene, type ArenaCamera, type KnightPose } from "@/lib/arena3d";
+import { ArenaScene, type ArenaCamera, type KnightPose, type WorldFx } from "@/lib/arena3d";
+import {
+  EVENT_INFO,
+  EVENT_LEAD,
+  RAIN_DAMAGE,
+  RAIN_R,
+  RING_DAMAGE,
+  eventAt,
+  eventItems,
+  fogAt,
+  getMap,
+  hillHolder,
+  rainDrops,
+  ringRadius,
+  roundEvents,
+  topAt,
+  trapDanger,
+  trapHits,
+  type ArenaEvent,
+  type RainDrop,
+} from "@/lib/arenaMaps";
 import { newPadSeen, padInput, type PadSeen } from "@/lib/arenaPad";
 import { ArenaAudio } from "@/lib/arenaAudio";
 import { serverNow } from "@/lib/serverTime";
@@ -112,7 +148,7 @@ interface LocalArrow {
   /** Seconds of flight already checked. */
   done: number;
   owner: string;
-  team: TeamId;
+  team: string;
   down: () => void;
 }
 
@@ -249,6 +285,9 @@ export default function Battle({
   const [hurt, setHurt] = useState(false);
   const [healed, setHealed] = useState(false);
   const [callout, setCallout] = useState<{ text: string; color: string; n: number } | null>(null);
+  /** A mid-round event's banner, and the hill's holder («rey»). */
+  const [banner, setBanner] = useState<{ title: string; sub: string; n: number } | null>(null);
+  const [holder, setHolder] = useState("");
   const [clock, setClock] = useState(0);
   const spectateRef = useRef(0);
   const fine = useFinePointer();
@@ -288,7 +327,8 @@ export default function Battle({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !quality) return;
-    const scene = new ArenaScene(canvas, { quality });
+    const map = getMap(stateRef.current.map);
+    const scene = new ArenaScene(canvas, { quality, map: map.id });
     // On a TV the names are read from the couch (big over the whole arena, normal in a split view).
     let tagScale = 0;
     const audio = audioRef.current;
@@ -327,6 +367,16 @@ export default function Battle({
     let healTimer: ReturnType<typeof setTimeout> | undefined;
     let calloutTimer: ReturnType<typeof setTimeout> | undefined;
     let calloutN = 0;
+    let bannerTimer: ReturnType<typeof setTimeout> | undefined;
+    /** This round's events, the rain's drops of the one on (by its number), and the last frame's round clock. */
+    let events: ArenaEvent[] = [];
+    let rain: { n: number; drops: RainDrop[] } | null = null;
+    let lastT = -Infinity;
+    let shownEvent = -1;
+    let lastHolder = "";
+    /** Map damage already sent (fighter:source:tick), and who was standing last frame (to notice a «rey» comeback or a new wave). */
+    const envSent = new Set<string>();
+    const wasAlive = new Map<string, boolean>();
     const say = (text: string, color: string) => {
       setCallout({ text, color, n: ++calloutN });
       clearTimeout(calloutTimer);
@@ -352,13 +402,18 @@ export default function Battle({
     };
 
     const gearOf = (s: ArenaState, id: string): Gear => s.gear[id] ?? START_GEAR;
+    /** Where a fighter starts (or comes back) on this map. */
+    const spawnFor = (s: ArenaState, id: string) => {
+      const sp = spawnOf(s, id);
+      return spawnPoint(sp.team, sp.index, sp.count, map, sp.ffa);
+    };
 
     /** How a fighter looks to this client right now. */
     const viewOf = (
       s: ArenaState,
       id: string
     ): FighterView & { act: string; actAt: number; actLen: number; draw: number; speed: number; pitch: number; combo: number; running: boolean } => {
-      const team = s.roster[id];
+      const team = sideOf(s, id);
       const local = id === myId ? me : bots.get(id)?.f;
       if (local) {
         return {
@@ -519,10 +574,10 @@ export default function Battle({
     };
 
     /** Someone's swing landed or an arrow left: work out the hits and write them. */
-    const handleEvents = (s: ArenaState, id: string, f: Fighter, events: FighterEvent[]) => {
+    const handleEvents = (s: ArenaState, id: string, f: Fighter, evs: FighterEvent[]) => {
       const gear = gearOf(s, id);
-      const team = s.roster[id];
-      for (const ev of events) {
+      const team = sideOf(s, id);
+      for (const ev of evs) {
         const [vol, pan] = where(f.x, f.z);
         if (ev.type === "windup") {
           const heavy = gear.w === "hacha" || gear.w === "maza" || gear.w === "martillo" ? 0.8 : gear.w === "mangual" ? 0.55 : gear.w === "daga" ? 0 : 0.35;
@@ -531,11 +586,11 @@ export default function Battle({
         if (ev.type === "dodge") audio?.swing(0.1, vol * 0.7, pan);
         if (ev.type === "strike") {
           const views = Object.keys(s.roster).map((o) => viewOf(s, o));
-          blow(id, f, meleeStrikes(viewOf(s, id), gear, views), views);
+          blow(id, f, meleeStrikes(viewOf(s, id), gear, views, map), views);
         }
         if (ev.type === "kickHit") {
           const views = Object.keys(s.roster).map((o) => viewOf(s, o));
-          landed(id, f, kickStrikes(viewOf(s, id), views), views);
+          landed(id, f, kickStrikes(viewOf(s, id), views, map), views);
         }
         if (ev.type === "special") {
           spentAt.set(id, performance.now());
@@ -543,7 +598,7 @@ export default function Battle({
         }
         if (ev.type === "specialHit") {
           const views = Object.keys(s.roster).map((o) => viewOf(s, o));
-          const hits = specialStrikes(viewOf(s, id), ev.kind, views);
+          const hits = specialStrikes(viewOf(s, id), ev.kind, views, map);
           // The slam can't be parried.
           if (ev.kind === "terremoto") landed(id, f, hits, views);
           else blow(id, f, hits, views);
@@ -554,6 +609,11 @@ export default function Battle({
           const t0 = serverNow();
           const down = shootArrow(roomId, { k: key, o: id, x: a.x, y: a.y, z: a.z, vx: a.vx, vy: a.vy, vz: a.vz, t: Math.round(t0) });
           myArrows.push({ id: arrowNo++, a, t0, done: 0, owner: id, team, down });
+        }
+        if (ev.type === "fell") {
+          // Off the bridge: out (whoever pushed counts it).
+          once(`fall:${id}:${key}`, () => fallOff(roomId, key, id), 2500);
+          if (id === myId) say("¡Al abismo!", "#fca5a5");
         }
       }
     };
@@ -582,9 +642,14 @@ export default function Battle({
         bots.clear();
         for (const a of myArrows.splice(0)) a.down();
         for (const [id, h] of Object.entries(s.hits)) seenHits.set(id, h.n);
+        events = s.events ? roundEvents(map, s.seed, k, Math.min(900, roundSeconds(s))) : [];
+        rain = null;
+        lastT = -Infinity;
+        shownEvent = -1;
+        envSent.clear();
+        wasAlive.clear();
         if (myId in s.roster) {
-          const team = s.roster[myId];
-          const sp = spawnPoint(team, teamFighters(s, team).indexOf(myId), teamFighters(s, team).length);
+          const sp = spawnFor(s, myId);
           me = new Fighter(sp.x, sp.z, sp.yaw);
           look.yaw = sp.yaw;
           look.pitch = 0;
@@ -603,17 +668,23 @@ export default function Battle({
       const botHost = screen || (loaded && people[0] === myId);
       const botIds = screen ? ids : ids.filter(isBot);
       if (botHost && s.status !== "waiting") {
+        // Bots that left the match (a beaten wave): gone, with their poses.
+        for (const [id, run] of bots) {
+          if (id in s.roster) continue;
+          run.send.close();
+          bots.delete(id);
+          if (!screen) dropPose(roomId, id);
+        }
         for (const id of botIds) {
           if (bots.has(id)) continue;
-          const team = s.roster[id];
-          const list = teamFighters(s, team);
           const p = poses[id];
-          const sp = spawnPoint(team, list.indexOf(id), list.length);
+          const sp = spawnFor(s, id);
           const f = p && p.k === key ? new Fighter(p.x, p.z, p.yw) : new Fighter(sp.x, sp.z, sp.yaw);
+          if (p && p.k === key) f.y = p.y;
           const pad = pads[id] ?? NO_PAD;
           bots.set(id, {
             f,
-            mind: newMind(),
+            mind: newMind(s.mode === "supervivencia" && isBot(id) ? waveSkill(s.wave) : 1),
             actAt: now,
             lastT: 0,
             pickAt: 0,
@@ -644,7 +715,8 @@ export default function Battle({
         if (h.n <= seen) continue;
         seenHits.set(id, h.n);
         const local = id === myId ? me : bots.get(id)?.f;
-        local?.receive(h.b, h.d, h.x, h.z, { parried: !!h.pr, guardBreak: !!h.g, kick: !!h.kk, push: h.pw, stagger: h.st });
+        // The map's hits were already felt by whoever runs the fighter (they wrote them).
+        if (h.from !== ENV) local?.receive(h.b, h.d, h.x, h.z, { parried: !!h.pr, guardBreak: !!h.g, kick: !!h.kk, push: h.pw, stagger: h.st });
         if (id === myId) {
           scene.jolt(h.pr ? 0.4 : h.b ? 0.5 : 1);
           if (h.pr) say("¡Parada perfecta!", "#fde047");
@@ -657,10 +729,27 @@ export default function Battle({
           }
         }
         // The attacker's own phone already showed it.
-        if (h.from !== myId && !bots.has(h.from)) {
+        if (h.from === ENV) {
+          if (!(id === myId || bots.has(id))) scene.hitFlash(id);
+        } else if (h.from !== myId && !bots.has(h.from)) {
           const v = viewOf(s, id);
           showHit(v.x, v.y, v.z, id, { parried: !!h.pr, kick: !!h.kk, blocked: h.b, guardBreak: !!h.g });
         }
+      }
+
+      // Back on their feet («rey» after a while, the fallen between waves): where they start again.
+      for (const id of ids) {
+        const up = alive(s, id);
+        const was = wasAlive.get(id);
+        wasAlive.set(id, up);
+        if (!up || was !== false) continue;
+        deadAt.delete(id);
+        const sp = spawnFor(s, id);
+        if (id === myId && me) {
+          me.reset(sp.x, sp.z, sp.yaw);
+          look.yaw = sp.yaw;
+          look.pitch = 0;
+        } else bots.get(id)?.f.reset(sp.x, sp.z, sp.yaw);
       }
 
       // Falls.
@@ -697,19 +786,59 @@ export default function Battle({
         lastGear = myGear;
       }
 
+      // The round's clock on the map: the traps, and the events (banner, weapons, rain, ring, fog).
+      const roundT = s.status === "waiting" ? -1 : (now - s.startedAt) / 1000;
+      const live = s.status === "fighting" && now >= s.startedAt;
+      const ev = live && events.length ? eventAt(events, roundT, EVENT_LEAD) : null;
+      if (ev && ev.n !== shownEvent) {
+        shownEvent = ev.n;
+        const info = EVENT_INFO[ev.kind];
+        setBanner({ title: info.title, sub: info.sub, n: ev.n });
+        clearTimeout(bannerTimer);
+        bannerTimer = setTimeout(() => setBanner(null), 4200);
+        audio?.horn();
+        audio?.cheer(0.6);
+        scene.cheer();
+      }
+      if (ev?.kind === "armas" && roundT >= ev.at && s.evDrop < ev.n) {
+        const drop = eventItems(map, s.seed, ev);
+        once(`armas:${key}:${ev.n}`, () => dropEventItems(roomId, key, ev.n, drop), 3000);
+      }
+      if (ev?.kind === "lluvia" && rain?.n !== ev.n) rain = { n: ev.n, drops: rainDrops(map, s.seed, ev) };
+      const ringR = live && events.length ? ringRadius(map, events, roundT) : null;
+      const fogNow = events.length && s.status !== "waiting" ? fogAt(events, roundT) : 0;
+      const rainShown: WorldFx["rain"] = [];
+      const landing: RainDrop[] = [];
+      if (rain && live) {
+        for (const d of rain.drops) {
+          if (roundT >= d.t - EVENT_LEAD && roundT < d.t) rainShown.push({ x: d.x, y: topAt(map, d.x, d.z), z: d.z, k: 1 - (d.t - roundT) / EVENT_LEAD });
+          if (d.t > lastT && d.t <= roundT) landing.push(d);
+        }
+      }
+      lastT = roundT;
+      for (const d of landing) {
+        const y = topAt(map, d.x, d.z);
+        scene.burst(d.x, (Number.isFinite(y) ? y : 0) + 0.1, d.z, "dust");
+        const [vol, pan] = where(d.x, d.z);
+        audio?.thunk(vol, pan);
+      }
+      /** For bots: what hurts there now or soon. */
+      const dangerAt = (x: number, z: number) =>
+        trapDanger(map, roundT, x, z, 1.2, s.mode === "rey") || (ringR !== null && Math.hypot(x, z) > ringR - 1.2) || rainShown.some((d) => Math.hypot(x - d.x, z - d.z) < RAIN_R + 0.6);
+
       // Physics, at a fixed step.
       const myAlive = !!me && alive(s, myId);
       if (fighting) {
         acc += dt;
         while (acc >= STEP) {
           acc -= STEP;
-          const solidsFor = (self: string) => [
-            ...PILLAR_SOLIDS,
-            ...ids.filter((o) => o !== self && alive(s, o)).map((o) => {
-              const v = viewOf(s, o);
-              return { x: v.x, z: v.z, r: FIGHTER_RADIUS };
-            }),
-          ];
+          const solidsFor = (self: string) =>
+            ids
+              .filter((o) => o !== self && alive(s, o))
+              .map((o) => {
+                const v = viewOf(s, o);
+                return { x: v.x, z: v.z, r: FIGHTER_RADIUS };
+              });
           if (me && myAlive) {
             const input: FighterInput = {
               mx: c.mx,
@@ -725,24 +854,41 @@ export default function Battle({
               special: c.special && specialReady(s, myId),
             };
             const before = me.act;
-            const evs = me.step(input, gearOf(s, myId), STEP, solidsFor(myId));
+            const evs = me.step(input, gearOf(s, myId), STEP, solidsFor(myId), map);
             // A new act (or the same one again, like a second flinch): note when it started.
             if (me.act !== before || me.actT < myLastT) myActAt = serverNow() - me.actT * 1000;
             myLastT = me.actT;
             handleEvents(s, myId, me, evs);
           }
+          // Fallen into the abyss: keep falling.
+          if (me && !myAlive && me.y < -0.2) me.step(IDLE_INPUT, gearOf(s, myId), STEP, [], map);
           for (const [id, run] of bots) {
-            if (!alive(s, id)) continue;
-            const team = s.roster[id];
+            if (!alive(s, id)) {
+              if (run.f.y < -0.2) run.f.step({ ...IDLE_INPUT, yaw: run.f.yaw }, gearOf(s, id), STEP, [], map);
+              continue;
+            }
+            // «Supervivencia»: the next wave waits at its gate.
+            if (s.mode === "supervivencia" && s.roster[id] === "blue" && serverNow() < s.waveAt) continue;
+            const team = sideOf(s, id);
             const enemies: BotEnemy[] = ids
-              .filter((o) => s.roster[o] !== team)
+              .filter((o) => sideOf(s, o) !== team)
               .map((o) => {
                 const v = viewOf(s, o);
                 return { ...v, act: v.act as BotEnemy["act"], actAt: v.actAt, actLen: v.actLen, weapon: gearOf(s, o).w };
               });
             const items = Object.entries(s.items).map(([iid, it]) => ({ id: iid, ...it }));
             const ready = specialReady(s, id);
-            const world = { enemies, items, now: serverNow(), special: ready ? SPECIAL_MAX : 0 };
+            const world = {
+              enemies,
+              items,
+              now: serverNow(),
+              special: ready ? SPECIAL_MAX : 0,
+              map,
+              danger: dangerAt,
+              hill: s.mode === "rey" ? map.hill : undefined,
+              sight: fogNow > 0.4 ? 11 : undefined,
+              t: roundT,
+            };
             const { input, pick } = run.remote
               ? padInput(run.f, run.remote, pads[id] ?? NO_PAD, world, STEP, ready)
               : botInput(run.f, gearOf(s, id), s.hp[id] ?? 0, run.mind, world, STEP, Math.random);
@@ -752,7 +898,7 @@ export default function Battle({
               pickItem(roomId, key, id, pick, run.f.x, run.f.z).catch(console.error);
             }
             const before = run.f.act;
-            const evs = run.f.step(input, gearOf(s, id), STEP, solidsFor(id));
+            const evs = run.f.step(input, gearOf(s, id), STEP, solidsFor(id), map);
             if (run.f.act !== before || run.f.actT < run.lastT) run.actAt = serverNow() - run.f.actT * 1000;
             run.lastT = run.f.actT;
             handleEvents(s, id, run.f, evs);
@@ -769,12 +915,71 @@ export default function Battle({
 
       settleBlows(s);
 
+      /**
+       * The map's damage on the fighters this client runs (me, my bots; the
+       * big screen: everyone): traps, outside the ring, the rain landing.
+       * Each source and tick is sent once; the transaction keeps it once.
+       */
+      const hurtLocal = (id: string, f: Fighter) => {
+        if (!live || !alive(s, id)) return;
+        const lift = Number.isFinite(f.floor) ? f.y - f.floor : 99;
+        const send = (src: string, tag: number, damage: number) => {
+          const k = `${id}:${src}:${tag}`;
+          if (envSent.has(k)) return false;
+          envSent.add(k);
+          envHit(roomId, key, id, src, tag, damage, f.x, f.z).catch(console.error);
+          return true;
+        };
+        for (const h of trapHits(map, roundT, f.x, f.z, lift, FIGHTER_RADIUS)) {
+          if (send(h.src, h.tag, h.damage) && h.push) {
+            f.shove(h.push[0], h.push[1]);
+            const [vol, pan] = where(f.x, f.z);
+            audio?.clang(vol * 0.8, pan);
+            scene.burst(f.x, f.y + 0.5, f.z, "hit");
+          }
+        }
+        if (ringR !== null && Math.hypot(f.x, f.z) > ringR) send("ring", Math.floor(roundT), RING_DAMAGE);
+        for (const d of landing) {
+          if (Math.hypot(f.x - d.x, f.z - d.z) <= RAIN_R && lift < 2.5 && !(f.blocking && gearOf(s, id).sh)) send("rain", Math.round(d.t * 1000), RAIN_DAMAGE);
+        }
+      };
+      if (me) hurtLocal(myId, me);
+      for (const [id, run] of bots) hurtLocal(id, run.f);
+
+      // «Rey»: who holds the hill; the bot host (or the big screen) counts its seconds, anyone if nobody has for a while.
+      const hold =
+        s.mode === "rey" && s.status === "fighting"
+          ? hillHolder(
+              map,
+              ids.map((id) => {
+                const v = viewOf(s, id);
+                return { side: sideOf(s, id), x: v.x, z: v.z, y: v.y, alive: v.alive };
+              })
+            )
+          : "";
+      if (hold !== lastHolder) {
+        lastHolder = hold;
+        setHolder(hold);
+      }
+      if (live && s.mode === "rey" && (hold === "red" || hold === "blue")) {
+        const sec = Math.floor(roundT);
+        if ((screen || botHost || sec - s.hillSec > 3) && sec > s.hillSec) once(`hill:${key}:${sec}`, () => hillTick(roomId, key, sec, hold), 5000);
+      }
+      // «Rey»: the fallen I run get up again after a while.
+      if (s.mode === "rey" && live) {
+        for (const id of [myId, ...bots.keys()]) {
+          const at = s.downAt[id];
+          if (at === undefined || alive(s, id) || now < at + RESPAWN_MS) continue;
+          once(`respawn:${id}:${at}`, () => respawnFighter(roomId, key, id), 1500);
+        }
+      }
+
       // Arrows I (or my bots) shot: fly them and decide what they hit.
       for (let i = myArrows.length - 1; i >= 0; i--) {
         const ar = myArrows[i];
         const tNow = (serverNow() - ar.t0) / 1000;
         const views = ids.map((o) => viewOf(s, o));
-        const res = flyArrow(ar.a, ar.done, tNow, ar.team, views);
+        const res = flyArrow(ar.a, ar.done, tNow, ar.team, views, map);
         ar.done = tNow;
         if (!res.stop) continue;
         ar.down();
@@ -822,9 +1027,7 @@ export default function Battle({
         const p = poses[id];
         let g = ghosts.get(id);
         if (!g) {
-          const team = s.roster[id];
-          const list = teamFighters(s, team);
-          const sp = spawnPoint(team, list.indexOf(id), list.length);
+          const sp = spawnFor(s, id);
           g = { x: sp.x, y: 0, z: sp.z, yaw: sp.yaw, pitch: 0, vx: 0, vz: 0, lastT: 0, pose: null };
           ghosts.set(id, g);
         }
@@ -873,7 +1076,7 @@ export default function Battle({
           }
         }
       }
-      if (s.status === "fighting" && now > s.startedAt + ROUND_SECONDS * 1000) once("timeout", () => timeoutRound(roomId, key));
+      if (s.status === "fighting" && now > s.startedAt + roundSeconds(s) * 1000) once("timeout", () => timeoutRound(roomId, key));
       if (s.status === "roundEnd" && now > s.roundEndedAt + ROUND_END_MS) once("next", () => nextRound(roomId, key));
       if (fighting && Object.values(s.respawns).some((r) => r.at <= now)) once("respawn", () => respawnItems(roomId, key));
       if (fighting && s.regen) {
@@ -899,8 +1102,11 @@ export default function Battle({
       }
 
       // Draw.
+      scene.setWorld({ t: roundT, hill: s.mode === "rey" ? hold : undefined, ring: ringR, fog: fogNow, rain: rainShown });
       scene.setFighters(
-        Object.fromEntries(ids.map((id) => [id, { team: s.roster[id], label: id === myId ? "Tú" : fighterName(s, id) }]))
+        Object.fromEntries(
+          ids.map((id) => [id, { team: s.roster[id], label: id === myId ? "Tú" : fighterName(s, id), color: s.mode === "todos" ? fighterColor(s, id) : undefined }])
+        )
       );
       for (const id of ids) {
         const v = viewOf(s, id);
@@ -958,9 +1164,9 @@ export default function Battle({
       if (me && (myAlive || (myFallAt !== undefined && performance.now() - myFallAt < DEATH_VIEW_MS) || !fighting)) {
         follow = myId;
       } else {
-        const myTeam = s.roster[myId];
+        const myTeam = sideOf(s, myId);
         const standing = ids.filter((id) => alive(s, id));
-        const mates = standing.filter((id) => s.roster[id] === myTeam);
+        const mates = standing.filter((id) => sideOf(s, id) === myTeam);
         const pool = mates.length ? mates : standing.length ? standing : ids;
         if (pool.length) {
           follow = pool[spectateRef.current % pool.length];
@@ -1066,6 +1272,7 @@ export default function Battle({
       clearTimeout(hurtTimer);
       clearTimeout(healTimer);
       clearTimeout(calloutTimer);
+      clearTimeout(bannerTimer);
       unsubPoses();
       unsubArrows();
       unsubPads();
@@ -1080,7 +1287,10 @@ export default function Battle({
   const counting = state.status === "fighting" && now < state.startedAt;
   const count = Math.ceil((state.startedAt - now) / 1000);
   const justStarted = state.status === "fighting" && now >= state.startedAt && now - state.startedAt < 1200;
-  const roundLeft = state.startedAt + ROUND_SECONDS * 1000 - now;
+  const roundLeft = state.startedAt + roundSeconds(state) * 1000 - now;
+  const mode = state.mode;
+  const respawnIn = mode === "rey" && inRoster && hud && !hud.alive && state.downAt[myId] !== undefined ? Math.max(0, Math.ceil((state.downAt[myId] + RESPAWN_MS - now) / 1000)) : null;
+  const wavePause = mode === "supervivencia" && state.status === "fighting" && state.wave > 1 && now < state.waveAt ? Math.ceil((state.waveAt - now) / 1000) : null;
   const bow = hud?.gear.w === "arco";
   const specialFull = !!hud && hud.special >= SPECIAL_MAX;
   const specialName = hud ? SPECIALS[specialOf(hud.gear.w)].label : "";
@@ -1094,7 +1304,7 @@ export default function Battle({
         <div className="pointer-events-none absolute inset-0 z-10">
           {splitPeople(state).map((id, i, all) => {
             const [x, y, w, h] = splitRects(all.length)[i];
-            const team = state.roster[id];
+            const color = fighterColor(state, id);
             const hp = state.hp[id] ?? 0;
             return (
               <div
@@ -1103,15 +1313,17 @@ export default function Battle({
                 style={{ left: `${x * 100}%`, top: `${y * 100}%`, width: `${w * 100}%`, height: `${h * 100}%` }}
               >
                 <div className={`absolute flex w-64 flex-col gap-1.5 rounded-2xl bg-slate-950/70 px-4 py-2.5 backdrop-blur ${y > 0 ? "left-4 top-4" : "bottom-4 left-4"}`}>
-                  <span className="truncate text-xl font-bold" style={{ color: teamInfo(team).color }}>
+                  <span className="truncate text-xl font-bold" style={{ color }}>
                     {fighterName(state, id)}
                   </span>
                   <span className="h-2.5 overflow-hidden rounded-full bg-white/15">
-                    <span className="block h-full rounded-full transition-all" style={{ width: `${(hp / MAX_HP) * 100}%`, background: teamInfo(team).color }} />
+                    <span className="block h-full rounded-full transition-all" style={{ width: `${(hp / MAX_HP) * 100}%`, background: color }} />
                   </span>
                 </div>
                 {state.status === "fighting" && hp <= 0 && (
-                  <p className="absolute inset-0 flex items-center justify-center font-display text-4xl text-white/80">Eliminado</p>
+                  <p className="absolute inset-0 flex items-center justify-center font-display text-4xl text-white/80">
+                    {mode === "rey" ? "Vuelve en un momento" : "Eliminado"}
+                  </p>
                 )}
               </div>
             );
@@ -1164,19 +1376,17 @@ export default function Battle({
           <Link href="/" aria-label="Volver a Talo" className="w-fit rounded-xl bg-slate-950/60 p-2 backdrop-blur">
             <TaloMark className="h-5 w-5" />
           </Link>
-          {!(screen && splitPeople(state).length) && <TeamBars state={state} team="red" myId={myId} />}
+          {!(screen && splitPeople(state).length) && <SideBars state={state} side="left" myId={myId} />}
         </div>
 
         <div className="flex flex-col items-center gap-1">
-          <div className="flex items-center gap-3 rounded-2xl bg-slate-950/70 px-4 py-1.5 font-display text-2xl font-bold text-white backdrop-blur">
-            <span style={{ color: teamInfo("red").color }}>{state.score.red}</span>
-            <span className="text-sm font-medium text-slate-300">
-              Ronda {state.round}
-              {state.status === "fighting" && !counting && <> · {formatClock(roundLeft)}</>}
-            </span>
-            <span style={{ color: teamInfo("blue").color }}>{state.score.blue}</span>
-          </div>
-          <p className="rounded-full bg-slate-950/50 px-2 text-[11px] text-slate-200">Gana el primero en llegar a {state.need}</p>
+          <ScoreBoard state={state} myId={myId} clock={state.status === "fighting" && !counting && Number.isFinite(roundLeft) ? formatClock(roundLeft) : ""} holder={holder} />
+          {banner && (
+            <div key={banner.n} className="animate-celebration-in mt-2 flex flex-col items-center rounded-2xl bg-slate-950/75 px-5 py-2.5 text-center backdrop-blur">
+              <span className="font-display text-2xl text-amber-300 drop-shadow sm:text-3xl">{banner.title}</span>
+              <span className="text-xs text-slate-200 sm:text-sm">{banner.sub}</span>
+            </div>
+          )}
         </div>
 
         <div className="pointer-events-auto flex flex-col items-end gap-1.5">
@@ -1192,7 +1402,7 @@ export default function Battle({
             )}
             <FullscreenButton className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur" />
           </div>
-          {!(screen && splitPeople(state).length) && <TeamBars state={state} team="blue" myId={myId} />}
+          {!(screen && splitPeople(state).length) && <SideBars state={state} side="right" myId={myId} />}
         </div>
       </div>
 
@@ -1270,8 +1480,23 @@ export default function Battle({
         </div>
       )}
 
+      {/* «Rey»: back soon. «Supervivencia»: between waves. */}
+      {respawnIn !== null && state.status === "fighting" && !screen && (
+        <div className="pointer-events-none absolute inset-x-0 top-[38%] z-20 flex justify-center">
+          <p className="rounded-2xl bg-slate-950/70 px-6 py-3 font-display text-3xl text-white backdrop-blur">{respawnIn > 0 ? `Vuelves en ${respawnIn}` : "¡De vuelta!"}</p>
+        </div>
+      )}
+      {wavePause !== null && (
+        <div className="pointer-events-none absolute inset-x-0 top-[30%] z-20 flex flex-col items-center gap-1 text-center">
+          <p className="animate-celebration-in font-display text-4xl text-lime-300 drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] sm:text-5xl">¡Oleada {state.wave - 1} superada!</p>
+          <p className="rounded-full bg-slate-950/70 px-4 py-1 text-sm text-white backdrop-blur">
+            Se viene la oleada {state.wave} en {wavePause} s · los caídos vuelven a pelear
+          </p>
+        </div>
+      )}
+
       {/* Watching (fell, or not fighting this match). */}
-      {!screen && hud && !hud.alive && state.status === "fighting" && hud.watching && (
+      {!screen && hud && !hud.alive && state.status === "fighting" && hud.watching && respawnIn === null && (
         <div className="absolute inset-x-0 bottom-6 z-20 flex justify-center">
           <div className="flex items-center gap-2 rounded-xl bg-slate-950/75 px-4 py-2 text-sm text-white backdrop-blur">
             <span>
@@ -1286,12 +1511,7 @@ export default function Battle({
 
       {state.status === "roundEnd" && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-          <p
-            className="animate-celebration-in rounded-3xl bg-slate-950/70 px-8 py-5 text-center font-display text-4xl font-bold backdrop-blur"
-            style={{ color: state.roundWinner === "draw" ? "#e2e8f0" : teamInfo(state.roundWinner as TeamId).color }}
-          >
-            {state.roundWinner === "draw" ? "Ronda empatada" : `¡Ronda para el ${teamInfo(state.roundWinner as TeamId).label}!`}
-          </p>
+          <RoundBanner state={state} myId={myId} />
         </div>
       )}
 
@@ -1304,22 +1524,22 @@ export default function Battle({
   );
 }
 
-/** A team's fighters with their health, in a corner. */
-function TeamBars({ state, team, myId }: { state: ArenaState; team: TeamId; myId: string }) {
-  const ids = teamFighters(state, team);
-  const color = teamInfo(team).color;
+/** Fighters with their health, in a corner. */
+function Bars({ state, ids, color, right, myId }: { state: ArenaState; ids: string[]; color: (id: string) => string; right: boolean; myId: string }) {
   return (
-    <div className={`flex flex-col gap-1 ${team === "blue" ? "items-end" : ""}`}>
+    <div className={`flex flex-col gap-1 ${right ? "items-end" : ""}`}>
       {ids.map((id) => {
         const hp = state.hp[id] ?? 0;
+        const c = color(id);
+        const back = state.mode === "rey" && hp <= 0 && state.downAt[id] !== undefined;
         return (
           <div key={id} className="w-28 rounded-lg bg-slate-950/55 px-1.5 py-1 backdrop-blur sm:w-36">
-            <p className={`truncate text-[11px] font-semibold ${hp > 0 ? "text-white" : "text-slate-500 line-through"}`} style={{ color: hp > 0 ? color : undefined }}>
+            <p className={`truncate text-[11px] font-semibold ${hp > 0 ? "text-white" : back ? "text-slate-400" : "text-slate-500 line-through"}`} style={{ color: hp > 0 ? c : undefined }}>
               {fighterName(state, id, myId)}
-              {isBot(id) && !state.online && <span className="font-normal text-slate-400"> · bot</span>}
+              {isBot(id) && !state.online && state.mode !== "supervivencia" && <span className="font-normal text-slate-400"> · bot</span>}
             </p>
             <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-slate-800">
-              <div className="h-full rounded-full transition-all" style={{ width: `${hp}%`, backgroundColor: color }} />
+              <div className="h-full rounded-full transition-all" style={{ width: `${hp}%`, backgroundColor: c }} />
             </div>
           </div>
         );
@@ -1328,7 +1548,120 @@ function TeamBars({ state, team, myId }: { state: ArenaState; team: TeamId; myId
   );
 }
 
-/** The end of the match: who won, knockouts, and play again or change teams. */
+/** One corner's fighters: a team (red left, blue right), or in «todos» half of everyone each. */
+function SideBars({ state, side, myId }: { state: ArenaState; side: "left" | "right"; myId: string }) {
+  if (state.mode === "todos") {
+    const all = allFighters(state);
+    const half = Math.ceil(all.length / 2);
+    return <Bars state={state} ids={side === "left" ? all.slice(0, half) : all.slice(half)} color={(id) => fighterColor(state, id)} right={side === "right"} myId={myId} />;
+  }
+  const team: TeamId = side === "left" ? "red" : "blue";
+  let ids = teamFighters(state, team);
+  // «Supervivencia»: the wave's bots standing (the fallen ones aren't worth a line).
+  if (state.mode === "supervivencia" && team === "blue") ids = ids.filter((id) => (state.hp[id] ?? 0) > 0);
+  return <Bars state={state} ids={ids} color={() => teamInfo(team).color} right={side === "right"} myId={myId} />;
+}
+
+/** The score at the top, by mode: rounds, the hill's seconds, or the wave. */
+function ScoreBoard({ state, myId, clock, holder }: { state: ArenaState; myId: string; clock: string; holder: string }) {
+  const box = "flex items-center gap-3 rounded-2xl bg-slate-950/70 px-4 py-1.5 font-display text-2xl font-bold text-white backdrop-blur";
+  const note = "rounded-full bg-slate-950/50 px-2 text-[11px] text-slate-200";
+  if (state.mode === "todos") {
+    const mine = state.fscore[myId] ?? 0;
+    return (
+      <>
+        <div className={box}>
+          <span className="text-sm font-medium text-slate-300">
+            Ronda {state.round}
+            {clock && <> · {clock}</>}
+          </span>
+        </div>
+        <p className={note}>
+          Todos contra todos · gana quien gane {state.need} {state.need === 1 ? "ronda" : "rondas"}
+          {myId in state.roster ? ` · llevas ${mine}` : ""}
+        </p>
+      </>
+    );
+  }
+  if (state.mode === "rey") {
+    const zone = holder === "red" || holder === "blue" ? `La zona es del ${teamInfo(holder).label}` : holder === "contest" ? "La zona está en disputa" : "La zona está libre";
+    return (
+      <>
+        <div className={box}>
+          <span style={{ color: teamInfo("red").color }}>{state.hill.red}</span>
+          <span className="text-sm font-medium text-slate-300">
+            Rey de la colina
+            {clock && <> · {clock}</>}
+          </span>
+          <span style={{ color: teamInfo("blue").color }}>{state.hill.blue}</span>
+        </div>
+        <div className="flex w-56 gap-1">
+          {(["red", "blue"] as TeamId[]).map((t) => (
+            <div key={t} className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-900/80">
+              <div className="h-full rounded-full transition-all" style={{ width: `${(Math.min(HILL_TARGET, state.hill[t]) / HILL_TARGET) * 100}%`, background: teamInfo(t).color }} />
+            </div>
+          ))}
+        </div>
+        <p className={note}>
+          {zone} · gana el primero en llegar a {HILL_TARGET}
+        </p>
+      </>
+    );
+  }
+  if (state.mode === "supervivencia") {
+    const left = Object.keys(state.roster).filter((id) => state.roster[id] === "blue" && (state.hp[id] ?? 0) > 0).length;
+    return (
+      <>
+        <div className={box}>
+          <span className="text-sm font-medium text-slate-300">Oleada</span>
+          <span className="text-amber-300">{state.wave}</span>
+        </div>
+        <p className={note}>
+          Supervivencia · {left} {left === 1 ? "enemigo" : "enemigos"} en pie
+        </p>
+      </>
+    );
+  }
+  return (
+    <>
+      <div className={box}>
+        <span style={{ color: teamInfo("red").color }}>{state.score.red}</span>
+        <span className="text-sm font-medium text-slate-300">
+          Ronda {state.round}
+          {clock && <> · {clock}</>}
+        </span>
+        <span style={{ color: teamInfo("blue").color }}>{state.score.blue}</span>
+      </div>
+      <p className={note}>Gana el primero en llegar a {state.need}</p>
+    </>
+  );
+}
+
+/** The round's result, by mode. */
+function RoundBanner({ state, myId }: { state: ArenaState; myId: string }) {
+  let text: string;
+  let color = "#e2e8f0";
+  if (state.mode === "todos") {
+    text = state.champ ? (state.champ === myId ? "¡Ganaste la ronda!" : `¡${fighterName(state, state.champ)} gana la ronda!`) : "Ronda sin ganador";
+    if (state.champ) color = fighterColor(state, state.champ);
+  } else if (state.mode === "supervivencia") {
+    const n = wavesSurvived(state);
+    text = `Cayeron todos · ${n} ${n === 1 ? "oleada" : "oleadas"}`;
+  } else if (state.roundWinner === "draw" || !state.roundWinner) {
+    text = "Ronda empatada";
+  } else {
+    const t = teamInfo(state.roundWinner);
+    color = t.color;
+    text = state.mode === "rey" ? `¡El ${t.label} es el rey de la colina!` : `¡Ronda para el ${t.label}!`;
+  }
+  return (
+    <p className="animate-celebration-in rounded-3xl bg-slate-950/70 px-8 py-5 text-center font-display text-4xl font-bold backdrop-blur" style={{ color }}>
+      {text}
+    </p>
+  );
+}
+
+/** The end of the match: who won (by mode), knockouts, and play again or change teams. */
 function Results({
   roomId,
   meta,
@@ -1342,28 +1675,54 @@ function Results({
   myId: string;
   presence: PresenceMap;
 }) {
+  const mode = state.mode;
   const winner = state.winner ? teamInfo(state.winner) : null;
   const mine = state.roster[myId];
-  const title = !winner ? "Terminó la batalla" : mine ? (mine === state.winner ? "🏆 ¡Ganaron!" : "Perdieron esta vez") : `🏆 ¡Ganó el ${winner.label}!`;
-  const ids = Object.keys(state.roster).sort((a, b) => (state.kills[b] ?? 0) - (state.kills[a] ?? 0));
+  let title: string;
+  let color = winner?.color ?? "#e2e8f0";
+  let sub: string;
+  let ids = Object.keys(state.roster).sort((a, b) => (state.kills[b] ?? 0) - (state.kills[a] ?? 0));
+  const places = new Map<string, number>();
+  if (mode === "todos") {
+    const champ = state.champion;
+    title = !champ ? "Terminó la batalla" : champ === myId ? "🏆 ¡Ganaste!" : `🏆 ¡Ganó ${fighterName(state, champ)}!`;
+    color = champ ? fighterColor(state, champ) : "#e2e8f0";
+    sub = "Todos contra todos";
+    const ranking = ffaRanking(state);
+    ids = ranking.map((r) => r.id);
+    for (const r of ranking) places.set(r.id, r.place);
+  } else if (mode === "supervivencia") {
+    const n = wavesSurvived(state);
+    const people = ids.filter((id) => !isBot(id));
+    title = `${people.length > 1 ? "Sobrevivieron" : "Sobreviviste"} ${n} ${n === 1 ? "oleada" : "oleadas"}`;
+    color = "#bef264";
+    sub = `Cayeron en la oleada ${state.wave}`;
+    ids = people;
+  } else {
+    title = !winner ? "Terminó la batalla" : mine ? (mine === state.winner ? "🏆 ¡Ganaron!" : "Perdieron esta vez") : `🏆 ¡Ganó el ${winner.label}!`;
+    sub =
+      mode === "rey"
+        ? `Rey de la colina · ${teamInfo("red").label} ${state.hill.red} – ${state.hill.blue} ${teamInfo("blue").label}`
+        : `${winner?.label ?? ""} ${state.score[state.winner || "red"]} – ${state.score[state.winner === "red" ? "blue" : "red"]}`;
+  }
   const connected = Object.keys(presence);
   return (
     <div className="animate-celebration-in flex w-full max-w-sm flex-col items-center gap-4 rounded-3xl bg-slate-950/90 p-5 text-center shadow-2xl ring-1 ring-white/10 backdrop-blur">
-      <p className="font-display text-3xl font-bold" style={{ color: winner?.color ?? "#e2e8f0" }}>
+      <p className="font-display text-3xl font-bold" style={{ color }}>
         {title}
       </p>
-      <p className="text-sm text-slate-400">
-        {winner?.label} {state.score[state.winner || "red"]} – {state.score[state.winner === "red" ? "blue" : "red"]}
-      </p>
+      <p className="text-sm text-slate-400">{sub}</p>
       <ol className="flex w-full flex-col gap-1.5">
         {ids.map((id) => (
           <li key={id} className="flex items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2 text-sm">
-            <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: teamInfo(state.roster[id]).color }} />
+            {places.has(id) && <span className="w-5 shrink-0 font-mono text-slate-400">{places.get(id)}.</span>}
+            <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: fighterColor(state, id) }} />
             <span className="min-w-0 flex-1 truncate text-left text-slate-100">
               {fighterName(state, id, myId)}
               {isBot(id) && !state.online && <span className="text-slate-500"> · bot</span>}
               {!isBot(id) && state.wins[id] ? <span className="text-slate-500"> · {state.wins[id]} ganadas</span> : null}
             </span>
+            {mode === "todos" && <span className="font-mono text-amber-200">★ {state.fscore[id] ?? 0}</span>}
             <span className="font-mono text-slate-300">⚔ {state.kills[id] ?? 0}</span>
           </li>
         ))}
@@ -1373,7 +1732,7 @@ function Results({
       ) : (
         <div className="flex w-full max-w-xs flex-col gap-2">
           <button onClick={() => startMatch(roomId, meta, connected)} className={PRIMARY_BUTTON}>
-            Revancha
+            {mode === "supervivencia" ? "Otra vez" : "Revancha"}
           </button>
           <button onClick={() => backToWaiting(roomId, state.gameNo)} className={SECONDARY_BUTTON}>
             Cambiar equipos o configuración
@@ -1383,7 +1742,6 @@ function Results({
     </div>
   );
 }
-
 
 /** Public arena: when the next battle starts, and a way out. */
 function NextBattle({ nextAt }: { nextAt: number }) {
