@@ -229,3 +229,67 @@ export function botLook(seed: number, level: number): ArenaLook {
   };
   return { plume: pick(PLUMES), emblem: pick(EMBLEMS), helm: pick(HELMS), title: pick(TITLES) };
 }
+
+// ---- Change notices, the hidden rating and the first visit -------------------------------
+
+/** Fired on `window` when the saved progress changes (the room re-sends my look and level). */
+export const PROGRESS_EVENT = "arena-progress";
+
+/** Saves and tells the page (the lobby card, the room's player info). */
+export function storeProgress(p: ArenaProgress) {
+  saveProgress(p);
+  try {
+    window.dispatchEvent(new Event(PROGRESS_EVENT));
+  } catch {}
+}
+
+/** Two copies of the progress (this browser's, the account's): the one with more experience wins. */
+export function mergeProgress(local: ArenaProgress, remote: Partial<ArenaProgress> | null): ArenaProgress {
+  if (!remote || typeof remote.xp !== "number" || remote.xp <= local.xp) return local;
+  const day = today();
+  const r: ArenaProgress = {
+    ...local,
+    ...remote,
+    xp: remote.xp,
+    look: { ...DEFAULT_LOOK, ...remote.look },
+    challenges: remote.day === day ? (remote.challenges ?? {}) : local.challenges,
+    done: remote.day === day ? (remote.done ?? []) : local.done,
+    day,
+  };
+  return r;
+}
+
+const RATING_KEY = "arena.habilidad";
+
+/** My hidden skill rating (never shown; public arenas tune their bots to it). */
+export function loadRating(fallback: number): number {
+  try {
+    const n = Number(localStorage.getItem(RATING_KEY));
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function saveRating(r: number) {
+  try {
+    localStorage.setItem(RATING_KEY, String(Math.round(r)));
+  } catch {}
+}
+
+const FIRST_KEY = "arena.primeraVez";
+
+/** Days since this browser first played Arena (saved on the first call; for the retention metric). */
+export function daysSinceFirst(): number {
+  try {
+    const now = Date.now();
+    const saved = Number(localStorage.getItem(FIRST_KEY));
+    if (!saved) {
+      localStorage.setItem(FIRST_KEY, String(now));
+      return 0;
+    }
+    return Math.max(0, Math.floor((now - saved) / 86400000));
+  } catch {
+    return 0;
+  }
+}

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
-import { Footprints, Hand, MoveUp, Shield, Sparkles, Swords, Wind } from "lucide-react";
+import { Footprints, Hand, MoveUp, Shield, Smile, Sparkles, Swords, Wind } from "lucide-react";
 import { SPECIAL_MAX } from "@/lib/arenaSim";
+import { EMOTES } from "@/lib/arenaLooks";
 
 /**
  * What the player is pressing, read by the battle loop every frame. Look
@@ -21,12 +22,14 @@ export interface ControlState {
   special: boolean;
   pick: boolean;
   camera: boolean;
+  /** A gesture asked for (`EMOTES` index + 1; 0 none), one-shot like `pick`. */
+  emote: number;
   lookX: number;
   lookY: number;
 }
 
 export function newControls(): ControlState {
-  return { mx: 0, mz: 0, jump: false, attack: false, block: false, sprint: false, dodge: false, kick: false, special: false, pick: false, camera: false, lookX: 0, lookY: 0 };
+  return { mx: 0, mz: 0, jump: false, attack: false, block: false, sprint: false, dodge: false, kick: false, special: false, pick: false, camera: false, emote: 0, lookX: 0, lookY: 0 };
 }
 
 /** Radians per pixel dragged (touch) or moved (mouse). */
@@ -52,7 +55,7 @@ export function useFinePointer(): boolean {
  * with the mouse; WASD or arrows to move, Shift to run, click to attack
  * (again during the swing for a combo; hold with the bow), right click or F
  * to block, R or the middle button to kick, X for the special, Q to dodge,
- * space to jump, E to pick up, V to switch the camera.
+ * space to jump, E to pick up, V to switch the camera, 1–4 for the gestures.
  * The pointer is only captured while `canLock` (fighting and standing):
  * it's let go at the end of a round, when you fall and with Esc, so the
  * buttons on screen can be clicked. Returns whether it's locked.
@@ -92,6 +95,7 @@ export function useDesktopControls(
       if (k.startsWith("arrow") || k === " ") e.preventDefault();
       if (k === "e") c.pick = true;
       if (k === "v" && !e.repeat) c.camera = true;
+      if (!e.repeat && k >= "1" && k <= String(EMOTES.length) && k.length === 1) c.emote = Number(k);
       keys.add(k);
       syncMove();
     };
@@ -195,6 +199,7 @@ export function TouchControls({
   kick: number;
 }) {
   const [stick, setStick] = useState<{ x: number; y: number; dx: number; dy: number } | null>(null);
+  const [emotes, setEmotes] = useState(false);
   const stickId = useRef<number | null>(null);
   const lookIds = useRef(new Map<number, { x: number; y: number }>());
 
@@ -293,6 +298,38 @@ export function TouchControls({
           mover
         </div>
       )}
+
+      {/* Gestures: a small button that opens the four. */}
+      <div className="absolute right-5 top-28 flex flex-col items-end gap-2">
+        <button
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            setEmotes((v) => !v);
+          }}
+          aria-label="Gestos"
+          className={`flex h-11 w-11 items-center justify-center rounded-full text-white ring-2 ${emotes ? "bg-white/40 ring-white/80" : "bg-white/15 ring-white/40"}`}
+        >
+          <Smile className="h-5 w-5" />
+        </button>
+        {emotes && (
+          <div className="flex gap-1.5 rounded-full bg-slate-950/70 p-1.5">
+            {EMOTES.map((em, i) => (
+              <button
+                key={em.id}
+                onPointerDown={(e) => {
+                  e.stopPropagation();
+                  controlsRef.current.emote = i + 1;
+                  setEmotes(false);
+                }}
+                aria-label={em.label}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-xl active:bg-white/40"
+              >
+                {em.emoji}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {canPick && (
         <button

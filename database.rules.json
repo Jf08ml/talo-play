@@ -61,6 +61,13 @@
         }
       }
     },
+    "arenaProgress": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid",
+        ".validate": "newData.hasChildren(['xp']) && newData.child('xp').isNumber() && newData.child('xp').val() >= 0 && newData.child('xp').val() <= 10000000"
+      }
+    },
     "profiles": {
       "$uid": {
         ".read": "auth != null",

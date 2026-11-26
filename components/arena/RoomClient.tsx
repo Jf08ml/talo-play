@@ -39,6 +39,8 @@ import { SETTINGS } from "./settings";
 import { MAPS } from "@/lib/arenaMaps";
 import { Bot, Eye, Shuffle, Smartphone } from "lucide-react";
 import { useAwardMatch } from "@/hooks/useAwardMatch";
+import { PROGRESS_EVENT, levelOf, loadProgress, loadRating, validLook } from "@/lib/arenaProgress";
+import { DEFAULT_RATING } from "@/lib/arena";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -102,10 +104,20 @@ export default function RoomClient({ roomId }: { roomId: string }) {
   const size = meta?.size ?? 1;
   const mode = meta?.mode ?? "equipos";
   const ffa = meta?.ffa ?? 4;
+  // My knight's look and level (and the hidden rating) go with my player info, again whenever they change.
+  const [progressNo, setProgressNo] = useState(0);
+  useEffect(() => {
+    const bump = () => setProgressNo((n) => n + 1);
+    window.addEventListener(PROGRESS_EVENT, bump);
+    return () => window.removeEventListener(PROGRESS_EVENT, bump);
+  }, []);
   useEffect(() => {
     if (!hasState || !identity.clientId || !identity.name) return;
-    joinArena(roomId, identity.clientId, { name: identity.name, color: identity.color }, { size, mode, ffa }).catch(console.error);
-  }, [hasState, roomId, identity.clientId, identity.name, identity.color, size, mode, ffa]);
+    const p = loadProgress();
+    const lv = levelOf(p.xp).level;
+    const player = { name: identity.name, color: identity.color, look: validLook(p.look, lv), lv, sk: Math.round(loadRating(DEFAULT_RATING)) };
+    joinArena(roomId, identity.clientId, player, { size, mode, ffa }).catch(console.error);
+  }, [hasState, roomId, identity.clientId, identity.name, identity.color, size, mode, ffa, progressNo]);
 
   // Ranking, once the match (all its rounds) is over: teams are 1st or 2nd of two («equipos»,
   // «rey»), «todos» places everyone by rounds won and knockouts, «supervivencia» has no places.

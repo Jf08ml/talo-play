@@ -904,7 +904,23 @@ export const GUIDES: Record<GameId, Guide> = {
         title: "Controles",
         text: [
           "Celular: joystick a la izquierda para moverte, arrastra la pantalla para mirar, y botones para atacar, bloquear, esquivar, saltar, patear, el golpe especial (se ilumina cuando está listo) y agarrar.",
-          "Computadora: haz clic en la arena. WASD para moverte, mouse para mirar, Shift para correr, clic para atacar, clic derecho o F para bloquear, R o la rueda del mouse para patear, X para el golpe especial, Q para esquivar, espacio para saltar, E para agarrar y V para cambiar la cámara.",
+          "Computadora: haz clic en la arena. WASD para moverte, mouse para mirar, Shift para correr, clic para atacar, clic derecho o F para bloquear, R o la rueda del mouse para patear, X para el golpe especial, Q para esquivar, espacio para saltar, E para agarrar, 1 a 4 para los gestos y V para cambiar la cámara.",
+        ],
+      },
+      {
+        title: "Niveles y desafíos",
+        text: [
+          "Cada batalla te da experiencia: más si ganas, derribas, haces paradas perfectas, bloqueas y pegas. Con la experiencia subes de nivel, y tu nivel aparece sobre tu caballero.",
+          "Cada día hay tres desafíos nuevos (los mismos para todos), como «Gana 2 batallas» o «Derriba a 2 con el hacha». Cumplirlos da experiencia extra. Los ves en la página del juego, en «Tu caballero».",
+          "Al subir de nivel se desbloquean penachos, emblemas para el escudo, cascos (cresta, cuernos, corona, alado) y títulos. Elígelos en «Personalizar»: solo cambian cómo te ven, no dan ventaja. Tu progreso queda en este dispositivo y, si entras con tu cuenta, también en ella.",
+          "Al final de cada batalla ves los derribos, el daño, los bloqueos y las paradas de cada uno, quién fue el mejor (MVP) y cuánta experiencia ganaste.",
+        ],
+      },
+      {
+        title: "Gestos y anunciador",
+        text: [
+          "Saluda, festeja, búrlate o haz una reverencia: con las teclas 1 a 4, con el botón de la carita en el celular o con los gestos del control en pantalla grande. Todos ven a tu caballero hacerlo, con un globito arriba. No se puede en medio de un golpe y hay que esperar un poco entre uno y otro.",
+          "Un anunciador canta los grandes momentos: el comienzo, el primer derribo, los dobles y triples, tus rachas, el último en pie, las remontadas y quién gana cada ronda. Si tu dispositivo tiene una voz en español, también lo dice en voz alta. Se silencia con el botón de sonido.",
         ],
       },
       {

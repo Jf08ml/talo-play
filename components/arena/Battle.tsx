@@ -9,9 +9,14 @@ import {
   REGEN_EVERY_MS,
   RESPAWN_MS,
   ROUND_END_MS,
+  DEFAULT_RATING,
   allFighters,
   alive,
+  awardOutcome,
   backToWaiting,
+  fighterLook,
+  matchMvp,
+  nextRating,
   dropEventItems,
   dropPose,
   envHit,
@@ -85,7 +90,26 @@ import {
   type Gear,
   type Strike,
 } from "@/lib/arenaSim";
-import { ArenaScene, type ArenaCamera, type KnightPose, type WorldFx } from "@/lib/arena3d";
+import { ArenaScene, type ArenaCamera, type FighterInfo, type KnightPose, type WorldFx } from "@/lib/arena3d";
+import type { KnightLook } from "@/lib/arena3dKnight";
+import {
+  PLUMES,
+  TITLES,
+  applyMatch,
+  daysSinceFirst,
+  levelOf,
+  loadProgress,
+  loadRating,
+  saveRating,
+  storeProgress,
+  type ArenaLook,
+  type MatchStats,
+} from "@/lib/arenaProgress";
+import { phrase, setAnnouncerMuted, speak, type Announcement } from "@/lib/arenaAnnouncer";
+import { EMOTES, EMOTE_COOLDOWN_MS, EMOTE_SECONDS } from "@/lib/arenaLooks";
+import { pushProgress } from "@/lib/arenaProgressSync";
+import { trackEvent } from "@/lib/analytics";
+import { useAccount } from "@/components/AccountProvider";
 import {
   EVENT_INFO,
   EVENT_LEAD,
@@ -117,7 +141,7 @@ import QualityButton from "@/components/QualityButton";
 import { TaloMark } from "@/components/TaloLogo";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { MOUSE_LOOK, TOUCH_LOOK, TouchControls, newControls, useDesktopControls, useFinePointer, type ControlState } from "./Controls";
-import { Eye, MousePointerClick, RotateCw, Shield, Sparkles, Users, Volume2, VolumeX } from "lucide-react";
+import { Check, Crown, Eye, Flame, MousePointerClick, RotateCw, Shield, Sparkles, Swords, Users, Volume2, VolumeX } from "lucide-react";
 import FullscreenButton from "@/components/FullscreenButton";
 
 const STEP = 1 / 60;
@@ -161,7 +185,58 @@ interface BotRun {
   send: ReturnType<typeof openPose>;
   /** Big screen: a person driven by their phone's pad (presses already used). */
   remote?: PadSeen;
+  /** The gesture it's doing (none: `em` 0), and one it means to do at `emoteAt` (performance time, 0 none). */
+  emote: EmoteOn;
+  emoteAt: number;
+  emoteKind: number;
 }
+
+/** A gesture playing: which (`EMOTES` index + 1, 0 none) and when it started (server time). */
+interface EmoteOn {
+  em: number;
+  et: number;
+}
+
+/** What I did in this match that only my phone knows (the rest is in the room's state). */
+interface LocalStats {
+  kicks: number;
+  specials: number;
+  potions: number;
+  koWith: Record<string, number>;
+  falls: number;
+  startedAt: number;
+}
+
+const newLocalStats = (): LocalStats => ({ kicks: 0, specials: 0, potions: 0, koWith: {}, falls: 0, startedAt: typeof performance === "undefined" ? 0 : performance.now() });
+
+/** What a match gave me (shown on the results; kept so a reload still shows it). */
+export interface MatchSummary {
+  gained: number;
+  fromXp: number;
+  toXp: number;
+  levelsUp: number;
+  completed: { id: string; text: string; xp: number }[];
+}
+
+const SUMMARY_KEY = "arena.ultimaPartida";
+
+/** Whether `id` won the match (teams/«todos»: first place; «supervivencia»: 3 waves or more). */
+function wonMatch(s: ArenaState, id: string): boolean {
+  if (s.mode === "supervivencia") return id in s.roster && wavesSurvived(s) >= 3;
+  return awardOutcome(s, id)?.place === 1;
+}
+
+/** A look for the 3D knight: the plume's color ("" = the cloth's). */
+const toKnightLook = (l: ArenaLook): KnightLook => ({ plume: PLUMES.find((p) => p.id === l.plume)?.color ?? "", emblem: l.emblem, helm: l.helm });
+
+/** The announcer's banner colors, flat. */
+const TONE_CLASS: Record<Announcement["tone"], string> = {
+  gold: "bg-talo-hero text-talo-ink",
+  red: "bg-rose-600 text-white",
+  blue: "bg-sky-600 text-white",
+  white: "bg-white text-talo-ink",
+  green: "bg-lime-400 text-talo-ink",
+};
 
 /** Big screen, split: the views' rectangles (fractions, from the top-left) for 1–4 people. */
 export function splitRects(n: number): [number, number, number, number][] {
@@ -289,6 +364,23 @@ export default function Battle({
   const [banner, setBanner] = useState<{ title: string; sub: string; n: number } | null>(null);
   const [holder, setHolder] = useState("");
   const [clock, setClock] = useState(0);
+  /** The announcer's banner, my gesture's bubble (first person), and what the match gave me. */
+  const [announcement, setAnnouncement] = useState<{ text: string; tone: Announcement["tone"]; n: number } | null>(null);
+  const [myEmote, setMyEmote] = useState<{ emoji: string; n: number } | null>(null);
+  const [summary, setSummary] = useState<MatchSummary | null>(null);
+  const matchRef = useRef<LocalStats>(newLocalStats());
+  const annRef = useRef<{ n: number; timer?: ReturnType<typeof setTimeout> }>({ n: 0 });
+  /** Says a moment out loud and, with `banner`, shows it big in the middle for a moment. */
+  const announceRef = useRef((a: Announcement, banner = true) => {
+    speak(a);
+    if (!banner) return;
+    const st = annRef.current;
+    setAnnouncement({ text: a.text, tone: a.tone, n: ++st.n });
+    clearTimeout(st.timer);
+    st.timer = setTimeout(() => setAnnouncement(null), 1700);
+  });
+  const { user } = useAccount();
+  const uid = user?.uid;
   const spectateRef = useRef(0);
   const fine = useFinePointer();
   const canFight = state.status === "fighting" && !!hud?.alive && myId in state.roster;
@@ -319,10 +411,87 @@ export default function Battle({
   }, []);
   useEffect(() => {
     audioRef.current?.setMuted(sound === "off");
+    setAnnouncerMuted(sound === "off");
   }, [sound]);
+  useEffect(() => {
+    const ann = annRef.current;
+    return () => {
+      clearTimeout(ann.timer);
+      setAnnouncerMuted(true);
+      setAnnouncerMuted(false);
+    };
+  }, []);
 
   const inRoster = myId in state.roster;
   const gameNo = state.gameNo;
+  useEffect(() => {
+    matchRef.current = newLocalStats();
+  }, [gameNo]);
+
+  // The match is over: my experience, challenges and hidden rating, once per match (like the ranking).
+  const finished = state.status === "finished";
+  useEffect(() => {
+    if (screen || !finished) return;
+    const s = stateRef.current;
+    if (!(myId in s.roster)) return;
+    const k = `${roomId}:${s.gameNo}`;
+    let saved: { k: string; summary: MatchSummary } | null = null;
+    try {
+      saved = JSON.parse(localStorage.getItem(SUMMARY_KEY) ?? "null");
+    } catch {}
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    if (saved?.k === k) {
+      timers.push(setTimeout(() => setSummary(saved.summary), 0));
+      return () => timers.forEach(clearTimeout);
+    }
+    const local = matchRef.current;
+    const won = wonMatch(s, myId);
+    const stats: MatchStats = {
+      played: true,
+      won,
+      kos: s.kills[myId] ?? 0,
+      blocks: s.blk[myId] ?? 0,
+      parries: s.par[myId] ?? 0,
+      kicks: local.kicks,
+      specials: local.specials,
+      potions: local.potions,
+      koWith: local.koWith,
+      damage: s.dmg[myId] ?? 0,
+    };
+    const before = loadProgress();
+    const { next, gained, completed, levelsUp } = applyMatch(before, stats);
+    storeProgress(next);
+    if (uid) pushProgress(uid, next);
+    if (s.mode !== "supervivencia") saveRating(nextRating(loadRating(DEFAULT_RATING), won, stats.kos, local.falls));
+    const result: MatchSummary = { gained, fromXp: before.xp, toXp: next.xp, levelsUp, completed: completed.map((c) => ({ id: c.id, text: c.text, xp: c.xp })) };
+    try {
+      localStorage.setItem(SUMMARY_KEY, JSON.stringify({ k, summary: result }));
+    } catch {}
+    const level = levelOf(next.xp).level;
+    trackEvent("arena_match_end", {
+      game: "arena",
+      mode: s.mode,
+      map: s.map,
+      won,
+      duration_s: Math.round((performance.now() - local.startedAt) / 1000),
+      level,
+      days_since_first: daysSinceFirst(),
+      online: s.online,
+    });
+    for (const c of completed) trackEvent("arena_challenge_done", { game: "arena", challenge: c.id, level });
+    timers.push(setTimeout(() => setSummary(result), 0));
+    // After «¡Victoria!»: the level and the challenges, one at a time.
+    let at = 2600;
+    if (levelsUp > 0) {
+      timers.push(setTimeout(() => announceRef.current(phrase("levelUp", { extra: String(level) })), at));
+      at += 2000;
+    }
+    for (const c of completed) {
+      timers.push(setTimeout(() => announceRef.current(phrase("challenge", { extra: c.text })), at));
+      at += 2200;
+    }
+    return () => timers.forEach(clearTimeout);
+  }, [finished, gameNo, roomId, myId, screen, uid]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -392,6 +561,32 @@ export default function Battle({
     let specFollow: string | null = null;
     let specYaw = 0;
     const mySend = myId in stateRef.current.roster ? openPose(roomId, myId, true) : null;
+    const announce = announceRef.current;
+    /** The announcer's bookkeeping: knockouts seen, recent ones per fighter, my streak, last-standing calls, the round's worst moment. */
+    const prevKills = new Map<string, number>(Object.entries(stateRef.current.kills));
+    const koTimes = new Map<string, number[]>();
+    let myStreak = 0;
+    const lastStand = new Set<string>();
+    let minDiff = 0;
+    /** My gesture, when the next one may start, and the HUD bubble's timer. */
+    let myEmoteOn: EmoteOn = { em: 0, et: 0 };
+    let emoteReadyAt = 0;
+    let emoteN = 0;
+    let emoteTimer: ReturnType<typeof setTimeout> | undefined;
+    /** The fighters' info for the scene, rebuilt when the state changes. */
+    let infoOf: ArenaState | null = null;
+    let info: Record<string, FighterInfo> = {};
+    /** A bot I run means to gesture in a moment (after a knockout, a round won), like people do. */
+    const botGesture = (id: string, kinds: number[], chance: number) => {
+      const run = bots.get(id);
+      if (!run || !isBot(id) || run.emoteAt || Math.random() > chance) return;
+      run.emoteAt = performance.now() + 500 + Math.random() * 1200;
+      run.emoteKind = kinds[Math.floor(Math.random() * kinds.length)];
+    };
+    /** Whether a gesture may play now (standing, free, not mid-swing). */
+    const canGesture = (f: Fighter, s: ArenaState, id: string) =>
+      alive(s, id) && f.act === "idle" && !f.blocking && f.onGround && (s.status === "fighting" || s.status === "roundEnd");
+    const gestureOver = (f: Fighter, on: EmoteOn) => !!on.em && (f.act !== "idle" || f.blocking || serverNow() - on.et > EMOTE_SECONDS * 1000);
 
     /** Calls a state change once in a while (every client may; transactions keep it single). */
     const once = (name: string, fn: () => unknown, every = 1500) => {
@@ -412,11 +607,14 @@ export default function Battle({
     const viewOf = (
       s: ArenaState,
       id: string
-    ): FighterView & { act: string; actAt: number; actLen: number; draw: number; speed: number; pitch: number; combo: number; running: boolean } => {
+    ): FighterView & { act: string; actAt: number; actLen: number; draw: number; speed: number; pitch: number; combo: number; running: boolean; em: number; et: number } => {
       const team = sideOf(s, id);
       const local = id === myId ? me : bots.get(id)?.f;
       if (local) {
+        const on = id === myId ? myEmoteOn : bots.get(id)!.emote;
         return {
+          em: on.em,
+          et: on.et,
           id,
           team,
           x: local.x,
@@ -441,6 +639,8 @@ export default function Battle({
       const g = ghosts.get(id);
       const p = g?.pose;
       return {
+        em: p?.em ?? 0,
+        et: p?.et ?? 0,
         id,
         team,
         x: g?.x ?? 0,
@@ -480,7 +680,8 @@ export default function Battle({
       return [1 / (1 + d / 7), pan * 0.8];
     };
 
-    const poseFor = (f: Fighter, actAt: number): ArenaPose => ({
+    const poseFor = (f: Fighter, actAt: number, on?: EmoteOn): ArenaPose => ({
+      ...(on?.em ? { em: on.em, et: Math.round(on.et) } : {}),
       k: key,
       x: Math.round(f.x * 100) / 100,
       y: Math.round(f.y * 100) / 100,
@@ -539,6 +740,7 @@ export default function Battle({
         scene.jolt(hits.some((h) => h.special) ? 1.1 : 0.6);
         if (hits.some((h) => h.guardBreak)) say("¡Guardia rota!", "#fde68a");
       }
+      if (id === myId && hits.some((h) => h.kick && !h.parried)) matchRef.current.kicks++;
       strike(roomId, key, id, { x: f.x, z: f.z }, withPlaces(hits, views)).catch(console.error);
     };
 
@@ -595,6 +797,10 @@ export default function Battle({
         if (ev.type === "special") {
           spentAt.set(id, performance.now());
           spendSpecial(roomId, key, id).catch(console.error);
+          if (id === myId) {
+            matchRef.current.specials++;
+            announce(phrase("special"));
+          }
         }
         if (ev.type === "specialHit") {
           const views = Object.keys(s.roster).map((o) => viewOf(s, o));
@@ -648,6 +854,8 @@ export default function Battle({
         shownEvent = -1;
         envSent.clear();
         wasAlive.clear();
+        minDiff = 0;
+        myEmoteOn = { em: 0, et: 0 };
         if (myId in s.roster) {
           const sp = spawnFor(s, myId);
           me = new Fighter(sp.x, sp.z, sp.yaw);
@@ -684,12 +892,16 @@ export default function Battle({
           const pad = pads[id] ?? NO_PAD;
           bots.set(id, {
             f,
-            mind: newMind(s.mode === "supervivencia" && isBot(id) ? waveSkill(s.wave) : 1),
+            // Public arenas tune their bots to the people there (`botSk`); waves get sharper.
+            mind: newMind(s.mode === "supervivencia" && isBot(id) ? waveSkill(s.wave) : (s.botSk[id] ?? 1)),
             actAt: now,
             lastT: 0,
             pickAt: 0,
             send: screen ? NO_SEND : openPose(roomId, id, false),
             remote: screen && !isBot(id) ? newPadSeen(pad, f.yaw) : undefined,
+            emote: p && p.k === key && p.em ? { em: p.em, et: p.et ?? 0 } : { em: 0, et: 0 },
+            emoteAt: 0,
+            emoteKind: 0,
           });
         }
       } else if (bots.size) {
@@ -708,6 +920,27 @@ export default function Battle({
         c.camera = false;
         toggleCameraRef.current();
       }
+      // Gestures: mine (keys 1–4, the touch menu), with a cooldown and only when free.
+      if (c.emote) {
+        const n = c.emote;
+        c.emote = 0;
+        if (me && canGesture(me, s, myId) && performance.now() >= emoteReadyAt && EMOTES[n - 1]) {
+          myEmoteOn = { em: n, et: serverNow() };
+          emoteReadyAt = performance.now() + EMOTE_COOLDOWN_MS;
+          setMyEmote({ emoji: EMOTES[n - 1].emoji, n: ++emoteN });
+          clearTimeout(emoteTimer);
+          emoteTimer = setTimeout(() => setMyEmote(null), EMOTE_SECONDS * 1000);
+        }
+      }
+      if (me && gestureOver(me, myEmoteOn)) myEmoteOn = { em: 0, et: 0 };
+      for (const run of bots.values()) {
+        if (gestureOver(run.f, run.emote)) run.emote = { em: 0, et: 0 };
+      }
+      for (const [id, run] of bots) {
+        if (!run.emoteAt || performance.now() < run.emoteAt) continue;
+        run.emoteAt = 0;
+        if (canGesture(run.f, s, id)) run.emote = { em: run.emoteKind, et: serverNow() };
+      }
 
       // Hits taken: flinch, lose stamina, see and hear them.
       for (const [id, h] of Object.entries(s.hits)) {
@@ -719,7 +952,7 @@ export default function Battle({
         if (h.from !== ENV) local?.receive(h.b, h.d, h.x, h.z, { parried: !!h.pr, guardBreak: !!h.g, kick: !!h.kk, push: h.pw, stagger: h.st });
         if (id === myId) {
           scene.jolt(h.pr ? 0.4 : h.b ? 0.5 : 1);
-          if (h.pr) say("¡Parada perfecta!", "#fde047");
+          if (h.pr) announce(phrase("parry"));
           else if (h.g) say("¡Te rompieron la guardia!", "#fca5a5");
           if (!h.b) {
             audio?.hurt();
@@ -752,10 +985,45 @@ export default function Battle({
         } else bots.get(id)?.f.reset(sp.x, sp.z, sp.yaw);
       }
 
+      // Knockouts (anyone's, falls credited included): the announcer, my weapon's count, my streak.
+      let koTotal = 0;
+      for (const v of prevKills.values()) koTotal += v;
+      for (const [id, n] of Object.entries(s.kills)) {
+        const was = prevKills.get(id) ?? 0;
+        if (n <= was) continue;
+        prevKills.set(id, n);
+        const at = performance.now();
+        const times = (koTimes.get(id) ?? []).filter((t0) => at - t0 < 4500);
+        for (let i = was; i < n; i++) times.push(at);
+        koTimes.set(id, times);
+        if (id === myId) {
+          myStreak += n - was;
+          const w = gearOf(s, myId).w;
+          matchRef.current.koWith[w] = (matchRef.current.koWith[w] ?? 0) + (n - was);
+        }
+        botGesture(id, [2, 3, 1], 0.35);
+        const call =
+          times.length >= 3
+            ? phrase("tripleKo")
+            : times.length === 2
+              ? phrase("doubleKo")
+              : id === myId && [3, 5, 7, 10, 15].includes(myStreak)
+                ? phrase("streak", { n: myStreak })
+                : koTotal === 0
+                  ? phrase("firstKo")
+                  : null;
+        if (call) announce(call);
+        koTotal += n - was;
+      }
+
       // Falls.
       for (const id of ids) {
         if (alive(s, id) || deadAt.has(id)) continue;
         deadAt.set(id, performance.now());
+        if (id === myId && s.status === "fighting") {
+          matchRef.current.falls++;
+          myStreak = 0;
+        }
         if (s.status === "fighting" || s.status === "roundEnd") {
           const v = viewOf(s, id);
           const [vol, pan] = where(v.x, v.z);
@@ -770,13 +1038,36 @@ export default function Battle({
       const count = s.status === "fighting" && now < s.startedAt ? Math.ceil((s.startedAt - now) / 1000) : 0;
       if (count !== lastCount) {
         if (count > 0 && count <= 3) audio?.beep();
-        if (count === 0 && lastCount > 0) audio?.horn();
+        if (count === 0 && lastCount > 0) {
+          audio?.horn();
+          // «¡A pelear!» is already big on screen: just said.
+          announce(phrase("fight"), false);
+        }
         lastCount = count;
       }
       if (s.status !== lastStatus) {
         if (s.status === "roundEnd" || s.status === "finished") {
           audio?.cheer(1);
           scene.cheer();
+        }
+        // The round's and the match's result, said (their banners are on screen already).
+        if (lastStatus && s.status === "roundEnd" && s.mode !== "supervivencia") {
+          const mine = s.roster[myId];
+          if (s.mode === "todos") {
+            if (s.champ && s.champ === myId) announce(phrase("roundWin"), false);
+            else if (mine) announce(phrase("roundLoss"), false);
+          } else if (!s.roundWinner || s.roundWinner === "draw") announce(phrase("roundDraw"), false);
+          else if (mine === s.roundWinner && s.mode === "equipos" && minDiff <= -2) announce(phrase("comeback"));
+          else announce(phrase(mine && mine !== s.roundWinner ? "roundLoss" : "roundWin", { team: teamInfo(s.roundWinner).label }), false);
+          // Bots of the side that won now and then celebrate (or bow).
+          for (const id of bots.keys()) if (sideOf(s, id) === (s.mode === "todos" ? s.champ : s.roundWinner)) botGesture(id, [2, 4, 1], 0.45);
+        }
+        if (lastStatus && s.status === "finished") {
+          if (screen) {
+            const text =
+              s.mode === "todos" ? "¡Tenemos campeón!" : s.mode === "supervivencia" ? "Fin de la batalla" : s.winner ? `¡Gana el ${teamInfo(s.winner).label}!` : "Fin de la batalla";
+            announce({ ...phrase("victory"), text }, false);
+          } else if (myId in s.roster) announce(phrase(wonMatch(s, myId) ? "victory" : "defeat"), false);
         }
         lastStatus = s.status;
       }
@@ -828,6 +1119,25 @@ export default function Battle({
 
       // Physics, at a fixed step.
       const myAlive = !!me && alive(s, myId);
+
+      // «¡Último en pie!» (my team's last, once per team and round), and the round's worst moment for a comeback.
+      if (live && s.mode !== "rey" && s.mode !== "todos") {
+        for (const team of ["red", "blue"] as TeamId[]) {
+          if (s.mode === "supervivencia" && team === "blue") continue;
+          const list = ids.filter((id) => s.roster[id] === team);
+          const up = list.filter((id) => alive(s, id));
+          const rivals = ids.filter((id) => s.roster[id] !== team && alive(s, id));
+          const tag = `${key}:${team}`;
+          if (list.length < 2 || up.length !== 1 || !rivals.length || lastStand.has(tag)) continue;
+          lastStand.add(tag);
+          if (screen || s.roster[myId] === team) announce(phrase("lastStanding"));
+        }
+        const mine = s.roster[myId];
+        if (mine && s.mode === "equipos") {
+          const upOf = (t: TeamId) => ids.filter((id) => s.roster[id] === t && alive(s, id)).length;
+          minDiff = Math.min(minDiff, upOf(mine) - upOf(mine === "red" ? "blue" : "red"));
+        }
+      }
       if (fighting) {
         acc += dt;
         while (acc >= STEP) {
@@ -889,9 +1199,10 @@ export default function Battle({
               sight: fogNow > 0.4 ? 11 : undefined,
               t: roundT,
             };
-            const { input, pick } = run.remote
+            const { input, pick, emote } = run.remote
               ? padInput(run.f, run.remote, pads[id] ?? NO_PAD, world, STEP, ready)
-              : botInput(run.f, gearOf(s, id), s.hp[id] ?? 0, run.mind, world, STEP, Math.random);
+              : { ...botInput(run.f, gearOf(s, id), s.hp[id] ?? 0, run.mind, world, STEP, Math.random), emote: 0 };
+            if (emote && EMOTES[emote - 1] && canGesture(run.f, s, id) && !run.emote.em) run.emote = { em: emote, et: serverNow() };
             input.special = input.special && ready;
             if (pick && performance.now() - run.pickAt > 800) {
               run.pickAt = performance.now();
@@ -1016,7 +1327,12 @@ export default function Battle({
         c.pick = false;
         if (near && me && performance.now() - pickPending > 500) {
           pickPending = performance.now();
-          pickItem(roomId, key, myId, near, me.x, me.z).catch(console.error);
+          const potion = s.items[near]?.kind === "pocion";
+          pickItem(roomId, key, myId, near, me.x, me.z)
+            .then((r) => {
+              if (potion && r.committed) matchRef.current.potions++;
+            })
+            .catch(console.error);
         }
       }
 
@@ -1097,17 +1413,22 @@ export default function Battle({
       // Publish my pose and my bots'.
       if (t - lastPose >= POSE_MS) {
         lastPose = t;
-        if (me && mySend) mySend.send(poseFor(me, myActAt));
-        for (const run of bots.values()) run.send.send(poseFor(run.f, run.actAt));
+        if (me && mySend) mySend.send(poseFor(me, myActAt, myEmoteOn));
+        for (const run of bots.values()) run.send.send(poseFor(run.f, run.actAt, run.emote));
       }
 
       // Draw.
       scene.setWorld({ t: roundT, hill: s.mode === "rey" ? hold : undefined, ring: ringR, fog: fogNow, rain: rainShown });
-      scene.setFighters(
-        Object.fromEntries(
-          ids.map((id) => [id, { team: s.roster[id], label: id === myId ? "Tú" : fighterName(s, id), color: s.mode === "todos" ? fighterColor(s, id) : undefined }])
-        )
-      );
+      if (s !== infoOf) {
+        infoOf = s;
+        info = Object.fromEntries(
+          ids.map((id) => {
+            const { look, lv } = fighterLook(s, id);
+            return [id, { team: s.roster[id], label: id === myId ? "Tú" : fighterName(s, id), color: s.mode === "todos" ? fighterColor(s, id) : undefined, look: toKnightLook(look), lv }];
+          })
+        );
+      }
+      scene.setFighters(info);
       for (const id of ids) {
         const v = viewOf(s, id);
         const pose: KnightPose = {
@@ -1126,6 +1447,8 @@ export default function Battle({
           combo: v.combo,
           alive: v.alive,
           gear: gearOf(s, id),
+          emote: v.em || undefined,
+          emoteT: v.em ? (now - v.et) / 1000 : undefined,
         };
         if (id === myId && me) {
           pose.actT = me.actT;
@@ -1273,6 +1596,7 @@ export default function Battle({
       clearTimeout(healTimer);
       clearTimeout(calloutTimer);
       clearTimeout(bannerTimer);
+      clearTimeout(emoteTimer);
       unsubPoses();
       unsubArrows();
       unsubPads();
@@ -1357,6 +1681,22 @@ export default function Battle({
             {callout.text}
           </span>
         </div>
+      )}
+
+      {/* The announcer: a short phrase, big in the middle. */}
+      {announcement && (
+        <div className="pointer-events-none absolute inset-x-0 top-[31%] z-20 flex justify-center px-4" style={screen ? { zoom: 1.6 } : undefined}>
+          <span key={announcement.n} className={`animate-celebration-in rounded-2xl px-5 py-2 text-center font-display text-3xl sm:text-4xl ${TONE_CLASS[announcement.tone]}`}>
+            {announcement.text}
+          </span>
+        </div>
+      )}
+
+      {/* My gesture (in first person I don't see my knight). */}
+      {myEmote && camera === "primera" && !screen && (
+        <span key={myEmote.n} className="animate-celebration-in pointer-events-none absolute left-1/2 top-[40%] z-20 -translate-x-1/2 rounded-full bg-white px-3 py-1.5 text-3xl">
+          {myEmote.emoji}
+        </span>
       )}
 
       {/* Crosshair. */}
@@ -1455,7 +1795,7 @@ export default function Battle({
         <div className="pointer-events-none absolute inset-x-0 bottom-28 z-20 flex justify-center px-4">
           <p className="flex max-w-3xl items-center gap-2 rounded-xl bg-slate-950/75 px-4 py-2 text-sm text-white backdrop-blur">
             <MousePointerClick className="h-4 w-4" />
-            Haz clic en la arena para pelear · WASD moverte · Shift correr · clic atacar (de nuevo = combo) · clic derecho o F bloquear (justo antes del golpe = parada perfecta) · R o rueda patear · X golpe especial · Q esquivar · E agarrar · espacio saltar · V cámara · Esc soltar el mouse
+            Haz clic en la arena para pelear · WASD moverte · Shift correr · clic atacar (de nuevo = combo) · clic derecho o F bloquear (justo antes del golpe = parada perfecta) · R o rueda patear · X golpe especial · Q esquivar · E agarrar · espacio saltar · 1–4 gestos · V cámara · Esc soltar el mouse
           </p>
         </div>
       )}
@@ -1517,7 +1857,7 @@ export default function Battle({
 
       {state.status === "finished" && (
         <div className="absolute inset-0 z-30 flex items-center justify-center overflow-y-auto bg-slate-950/40 p-4">
-          <Results roomId={roomId} meta={meta} state={state} myId={myId} presence={presence} />
+          <Results roomId={roomId} meta={meta} state={state} myId={myId} presence={presence} summary={inRoster && !screen ? summary : null} />
         </div>
       )}
     </div>
@@ -1661,19 +2001,21 @@ function RoundBanner({ state, myId }: { state: ArenaState; myId: string }) {
   );
 }
 
-/** The end of the match: who won (by mode), knockouts, and play again or change teams. */
+/** The end of the match: who won (by mode), each fighter's numbers with the MVP, what I gained, and play again or change teams. */
 function Results({
   roomId,
   meta,
   state,
   myId,
   presence,
+  summary,
 }: {
   roomId: string;
   meta: ArenaMeta;
   state: ArenaState;
   myId: string;
   presence: PresenceMap;
+  summary: MatchSummary | null;
 }) {
   const mode = state.mode;
   const winner = state.winner ? teamInfo(state.winner) : null;
@@ -1681,11 +2023,11 @@ function Results({
   let title: string;
   let color = winner?.color ?? "#e2e8f0";
   let sub: string;
-  let ids = Object.keys(state.roster).sort((a, b) => (state.kills[b] ?? 0) - (state.kills[a] ?? 0));
+  let ids = Object.keys(state.roster).sort((a, b) => (state.kills[b] ?? 0) - (state.kills[a] ?? 0) || (state.dmg[b] ?? 0) - (state.dmg[a] ?? 0));
   const places = new Map<string, number>();
   if (mode === "todos") {
     const champ = state.champion;
-    title = !champ ? "Terminó la batalla" : champ === myId ? "🏆 ¡Ganaste!" : `🏆 ¡Ganó ${fighterName(state, champ)}!`;
+    title = !champ ? "Terminó la batalla" : champ === myId ? "¡Ganaste!" : `¡Ganó ${fighterName(state, champ)}!`;
     color = champ ? fighterColor(state, champ) : "#e2e8f0";
     sub = "Todos contra todos";
     const ranking = ffaRanking(state);
@@ -1699,33 +2041,63 @@ function Results({
     sub = `Cayeron en la oleada ${state.wave}`;
     ids = people;
   } else {
-    title = !winner ? "Terminó la batalla" : mine ? (mine === state.winner ? "🏆 ¡Ganaron!" : "Perdieron esta vez") : `🏆 ¡Ganó el ${winner.label}!`;
+    title = !winner ? "Terminó la batalla" : mine ? (mine === state.winner ? "¡Ganaron!" : "Perdieron esta vez") : `¡Ganó el ${winner.label}!`;
     sub =
       mode === "rey"
         ? `Rey de la colina · ${teamInfo("red").label} ${state.hill.red} – ${state.hill.blue} ${teamInfo("blue").label}`
         : `${winner?.label ?? ""} ${state.score[state.winner || "red"]} – ${state.score[state.winner === "red" ? "blue" : "red"]}`;
   }
+  const mvp = matchMvp(state);
   const connected = Object.keys(presence);
   return (
-    <div className="animate-celebration-in flex w-full max-w-sm flex-col items-center gap-4 rounded-3xl bg-slate-950/90 p-5 text-center shadow-2xl ring-1 ring-white/10 backdrop-blur">
+    <div className="animate-celebration-in flex max-h-full w-full max-w-md flex-col items-center gap-3 overflow-y-auto rounded-3xl bg-slate-950/90 p-4 text-center shadow-2xl ring-1 ring-white/10 backdrop-blur sm:p-5">
       <p className="font-display text-3xl font-bold" style={{ color }}>
         {title}
       </p>
-      <p className="text-sm text-slate-400">{sub}</p>
-      <ol className="flex w-full flex-col gap-1.5">
-        {ids.map((id) => (
-          <li key={id} className="flex items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2 text-sm">
-            {places.has(id) && <span className="w-5 shrink-0 font-mono text-slate-400">{places.get(id)}.</span>}
-            <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: fighterColor(state, id) }} />
-            <span className="min-w-0 flex-1 truncate text-left text-slate-100">
-              {fighterName(state, id, myId)}
-              {isBot(id) && !state.online && <span className="text-slate-500"> · bot</span>}
-              {!isBot(id) && state.wins[id] ? <span className="text-slate-500"> · {state.wins[id]} ganadas</span> : null}
-            </span>
-            {mode === "todos" && <span className="font-mono text-amber-200">★ {state.fscore[id] ?? 0}</span>}
-            <span className="font-mono text-slate-300">⚔ {state.kills[id] ?? 0}</span>
-          </li>
-        ))}
+      <p className="-mt-2 text-sm text-slate-400">{sub}</p>
+      {summary && <MySummary summary={summary} />}
+      <ol className="flex w-full flex-col gap-1">
+        {ids.map((id) => {
+          const { look, lv } = fighterLook(state, id);
+          const titleLabel = lv > 0 ? TITLES.find((t) => t.id === look.title)?.label : "";
+          return (
+            <li key={id} className={`flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-sm ${id === mvp ? "bg-talo-hero/15 ring-1 ring-talo-hero/60" : "bg-slate-900/80"}`}>
+              {places.has(id) && <span className="w-4 shrink-0 font-mono text-xs text-slate-400">{places.get(id)}.</span>}
+              <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: fighterColor(state, id) }} />
+              <span className="min-w-0 flex-1 text-left">
+                <span className="flex items-center gap-1.5 truncate text-slate-100">
+                  <span className="truncate">{fighterName(state, id, myId)}</span>
+                  {id === mvp && (
+                    <span className="flex shrink-0 items-center gap-0.5 rounded-md bg-talo-hero px-1.5 text-[10px] font-bold text-talo-ink">
+                      <Crown className="h-3 w-3" /> MVP
+                    </span>
+                  )}
+                </span>
+                <span className="block truncate text-[11px] text-slate-500">
+                  {lv > 0 && `Nv ${lv}${titleLabel ? ` · ${titleLabel}` : ""}`}
+                  {isBot(id) && !state.online && mode !== "supervivencia" && `${lv > 0 ? " · " : ""}bot`}
+                  {!isBot(id) && state.wins[id] ? ` · ${state.wins[id]} ganadas` : ""}
+                </span>
+              </span>
+              <span className="grid shrink-0 grid-cols-[auto_auto_auto] items-center gap-x-2 font-mono text-xs text-slate-300">
+                {mode === "todos" ? <span className="text-amber-200">★ {state.fscore[id] ?? 0}</span> : <span />}
+                <span className="flex items-center gap-0.5" title="Derribos">
+                  <Swords className="h-3 w-3 text-rose-300" /> {state.kills[id] ?? 0}
+                </span>
+                <span className="flex items-center gap-0.5" title="Daño">
+                  <Flame className="h-3 w-3 text-orange-300" /> {state.dmg[id] ?? 0}
+                </span>
+                <span />
+                <span className="flex items-center gap-0.5 text-slate-400" title="Bloqueos">
+                  <Shield className="h-3 w-3 text-sky-300" /> {state.blk[id] ?? 0}
+                </span>
+                <span className="flex items-center gap-0.5 text-slate-400" title="Paradas perfectas">
+                  <Sparkles className="h-3 w-3 text-yellow-200" /> {state.par[id] ?? 0}
+                </span>
+              </span>
+            </li>
+          );
+        })}
       </ol>
       {state.online ? (
         <NextBattle nextAt={state.nextAt} />
@@ -1739,6 +2111,40 @@ function Results({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** What the match gave me: experience (the bar fills up to where I am now), a new level, the challenges done. */
+function MySummary({ summary }: { summary: MatchSummary }) {
+  const to = levelOf(summary.toXp);
+  const from = levelOf(summary.fromXp);
+  const start = summary.levelsUp > 0 ? 0 : (from.into / from.need) * 100;
+  const [width, setWidth] = useState(start);
+  useEffect(() => {
+    const t = setTimeout(() => setWidth((to.into / to.need) * 100), 350);
+    return () => clearTimeout(t);
+  }, [to.into, to.need]);
+  return (
+    <div className="flex w-full flex-col gap-1.5 rounded-2xl bg-white/[0.06] p-3 text-left">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="font-display text-lg text-talo-hero">+{summary.gained} XP</span>
+        <span className="text-sm text-slate-200">
+          {summary.levelsUp > 0 ? <b className="text-talo-hero">¡Nivel {to.level}!</b> : `Nivel ${to.level}`}
+          <span className="ml-1.5 font-mono text-xs text-slate-400">
+            {to.into}/{to.need}
+          </span>
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+        <div className="h-full rounded-full bg-talo-hero transition-[width] duration-1000 ease-out" style={{ width: `${width}%` }} />
+      </div>
+      {summary.completed.map((c) => (
+        <p key={c.id} className="flex items-center gap-1.5 text-xs text-lime-200">
+          <Check className="h-3.5 w-3.5 shrink-0" /> Desafío cumplido: {c.text}
+          <span className="ml-auto font-mono text-lime-300">+{c.xp}</span>
+        </p>
+      ))}
     </div>
   );
 }

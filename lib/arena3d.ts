@@ -36,9 +36,12 @@ import {
   swingFlail,
   swinging,
   weaponMesh,
+  PLAIN_LOOK,
   type Knight,
+  type KnightLook,
   type KnightPose,
 } from "./arena3dKnight";
+import { EMOTES, EMOTE_SECONDS } from "./arenaLooks";
 import { Impacts, Particles, Shockwaves, SwingTrail } from "./arena3dFx";
 import { GroundFx, buildMap, buildTrapsFor, canvasTexture, sandTexture, stoneTexture, type WorldFx } from "./arena3dMaps";
 import { getMap, supportAt, topAt, type ArenaMap, type ArenaMapId } from "./arenaMaps";
@@ -124,22 +127,33 @@ function glowTexture(): THREE.CanvasTexture {
   return t;
 }
 
-/** Name over a knight's head, with a health bar. */
-function tagTexture(name: string, color: string, hp: number): THREE.CanvasTexture {
+/** Name over a knight's head (with its level, «Nv 7», when it has one), with a health bar. */
+function tagTexture(name: string, color: string, hp: number, lv = 0): THREE.CanvasTexture {
   return canvasTexture(
     256,
     80,
     (ctx) => {
       ctx.font = "bold 30px system-ui, sans-serif";
-      const w = Math.min(248, ctx.measureText(name).width + 24);
+      const nameW = ctx.measureText(name).width;
+      ctx.font = "bold 20px system-ui, sans-serif";
+      const lvText = lv > 0 ? `Nv ${lv}` : "";
+      const lvW = lvText ? ctx.measureText(lvText).width + 10 : 0;
+      const w = Math.min(248, nameW + lvW + 24);
       ctx.fillStyle = "rgba(2,6,23,0.7)";
       ctx.beginPath();
       ctx.roundRect(128 - w / 2, 4, w, 44, 12);
       ctx.fill();
+      ctx.textBaseline = "middle";
+      const left = 128 - w / 2 + 12;
+      if (lvText) {
+        ctx.fillStyle = "#fde047";
+        ctx.textAlign = "left";
+        ctx.fillText(lvText, left, 28);
+      }
+      ctx.font = "bold 30px system-ui, sans-serif";
       ctx.fillStyle = color;
       ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(name, 128, 27, 232);
+      ctx.fillText(name, lvText ? left + lvW + Math.min(nameW, w - lvW - 24) / 2 : 128, 27, Math.max(40, w - lvW - 24));
       ctx.fillStyle = "rgba(2,6,23,0.75)";
       ctx.fillRect(48, 56, 160, 16);
       ctx.fillStyle = hp > 50 ? "#4ade80" : hp > 25 ? "#facc15" : "#f87171";
@@ -151,6 +165,54 @@ function tagTexture(name: string, color: string, hp: number): THREE.CanvasTextur
 
 /** How high an item floats over the sand. */
 const itemHeight = (kind: ItemKind) => (kind === "escudo" || kind === "arco" ? 0.75 : kind === "pocion" ? 0.45 : 0.35);
+
+/** What the scene needs to know about a fighter. */
+export interface FighterInfo {
+  team: TeamId;
+  label: string;
+  color?: string;
+  /** How it's dressed and its level (0/absent: no level on its tag). */
+  look?: KnightLook;
+  lv?: number;
+}
+
+/** A knight in the scene: its level, the look it was built with, and its gesture bubble. */
+type SceneKnight = Knight & { lv: number; lookKey: string; bubble: THREE.Sprite; bubbleOf: number };
+
+const lookKey = (l: KnightLook | undefined) => (l ? `${l.plume}|${l.emblem}|${l.helm}` : "");
+
+const bubbleTextures = new Map<number, THREE.CanvasTexture>();
+/** A gesture's bubble: its emoji on a white round bubble with a tail (made once per gesture). */
+function bubbleTexture(emote: number): THREE.CanvasTexture {
+  const known = bubbleTextures.get(emote);
+  if (known) return known;
+  const t = canvasTexture(
+    128,
+    128,
+    (ctx) => {
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = "#111111";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(64, 56, 46, 0, Math.PI * 2);
+      ctx.moveTo(52, 98);
+      ctx.lineTo(64, 122);
+      ctx.lineTo(76, 98);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(50, 92, 28, 10);
+      ctx.font = "56px system-ui, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(EMOTES[emote - 1]?.emoji ?? "", 64, 60);
+    },
+    false
+  );
+  t.name = "shared";
+  bubbleTextures.set(emote, t);
+  return t;
+}
 
 // ---- First-person hands ---------------------------------------------------------
 
@@ -270,7 +332,7 @@ export class ArenaScene {
   private handScene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(72, 1, 0.05, 400);
   private glow: THREE.Texture;
-  private knights = new Map<string, Knight>();
+  private knights = new Map<string, SceneKnight>();
   private items = new Map<string, { kind: ItemKind; group: THREE.Group }>();
   private arrows = new Map<string, THREE.Group>();
   private sparks = new Particles(420, true, 9, 1.2);
@@ -656,11 +718,11 @@ export class ArenaScene {
     }
   }
 
-  /** Makes the scene's knights match `info` (id → team and name). */
-  setFighters(info: Record<string, { team: TeamId; label: string; color?: string }>) {
+  /** Makes the scene's knights match `info` (id → team, name, and how it's dressed and its level). */
+  setFighters(info: Record<string, FighterInfo>) {
     for (const [id, k] of this.knights) {
       const want = info[id]?.color ? parseInt(info[id].color!.slice(1), 16) : TEAM_COLORS[info[id]?.team ?? k.team];
-      if (!(id in info) || info[id].team !== k.team || want !== k.tint) {
+      if (!(id in info) || info[id].team !== k.team || want !== k.tint || lookKey(info[id].look) !== k.lookKey) {
         this.scene.remove(k.root, k.shadow);
         disposeTree(k.root);
         disposeTree(k.shadow);
@@ -679,9 +741,10 @@ export class ArenaScene {
       const known = this.knights.get(id);
       if (known) {
         known.label = f.label;
+        known.lv = f.lv ?? 0;
         continue;
       }
-      const parts = knightMesh(f.team, this.geos, f.color ? parseInt(f.color.slice(1), 16) : TEAM_COLORS[f.team]);
+      const parts = knightMesh(f.team, this.geos, f.color ? parseInt(f.color.slice(1), 16) : TEAM_COLORS[f.team], f.look ?? PLAIN_LOOK);
       const tag = new THREE.Sprite(new THREE.SpriteMaterial({ depthWrite: false, transparent: true }));
       this.placeTag(tag);
       parts.root.add(tag);
@@ -694,7 +757,10 @@ export class ArenaScene {
         (parts.shadow.material as THREE.MeshBasicMaterial).map = this.glow;
       }
       this.scene.add(parts.root, parts.shadow);
-      this.knights.set(id, { ...parts, tag, tagKey: "", label: f.label, pose: null, hp: 100 });
+      const bubble = new THREE.Sprite(new THREE.SpriteMaterial({ depthWrite: false, transparent: true }));
+      bubble.visible = false;
+      parts.root.add(bubble);
+      this.knights.set(id, { ...parts, tag, tagKey: "", label: f.label, pose: null, hp: 100, lv: f.lv ?? 0, lookKey: lookKey(f.look), bubble, bubbleOf: 0 });
       const trail = new SwingTrail(this.trailColor);
       this.trails.set(id, trail);
       this.scene.add(trail.mesh);
@@ -704,6 +770,24 @@ export class ArenaScene {
   private placeTag(tag: THREE.Sprite) {
     tag.scale.set(1.3 * this.tagScale, 0.41 * this.tagScale, 1);
     tag.position.y = 2.35 + (this.tagScale - 1) * 0.25;
+  }
+
+  /** A gesture's bubble over the head: shown while it plays, popping in. */
+  private updateBubble(k: SceneKnight, p: KnightPose) {
+    const t = p.emoteT ?? 99;
+    const on = !!p.emote && p.alive && t < EMOTE_SECONDS && p.act === "idle" && !p.blocking;
+    k.bubble.visible = on;
+    if (!on) return;
+    if (k.bubbleOf !== p.emote) {
+      k.bubbleOf = p.emote!;
+      const mat = k.bubble.material as THREE.SpriteMaterial;
+      mat.map = bubbleTexture(p.emote!);
+      mat.needsUpdate = true;
+    }
+    const pop = Math.min(easeOutBack(clamp01(t / 0.25)), clamp01((EMOTE_SECONDS - t) / 0.25));
+    const s = 0.62 * Math.max(0.01, pop) * Math.max(1, this.tagScale * 0.8);
+    k.bubble.scale.set(s, s, 1);
+    k.bubble.position.y = 2.35 + (this.tagScale - 1) * 0.25 + 0.55 * Math.max(1, this.tagScale) + 0.05 * Math.sin(t * 6);
   }
 
   /** Makes the floating name and health tags bigger (a TV far away) or smaller. */
@@ -1076,15 +1160,16 @@ export class ArenaScene {
         }
         trail.update(this.time);
       }
-      const key = `${k.label}:${Math.round(k.hp)}:${p.alive}`;
+      const key = `${k.label}:${Math.round(k.hp)}:${p.alive}:${k.lv}`;
       if (key !== k.tagKey) {
         k.tagKey = key;
         const mat = k.tag.material as THREE.SpriteMaterial;
         mat.map?.dispose();
-        mat.map = tagTexture(k.label, k.tint === TEAM_COLORS[k.team] ? TEAM_LIGHT[k.team] : `#${k.tint.toString(16).padStart(6, "0")}`, k.hp);
+        mat.map = tagTexture(k.label, k.tint === TEAM_COLORS[k.team] ? TEAM_LIGHT[k.team] : `#${k.tint.toString(16).padStart(6, "0")}`, k.hp, k.lv);
         mat.needsUpdate = true;
       }
       k.tag.visible = p.alive;
+      this.updateBubble(k, p);
     }
     for (const [, it] of this.items) {
       const spin = it.group.children[0];
@@ -1132,8 +1217,8 @@ export class ArenaScene {
   }
 
   /** First-person hands: the held weapon (and shield or bow), moving with the pose. */
-  private updateHands(p: KnightPose, team: TeamId, dt: number) {
-    const kind = `${p.gear.w}:${p.gear.sh}`;
+  private updateHands(p: KnightPose, team: TeamId, dt: number, emblem = "ninguno") {
+    const kind = `${p.gear.w}:${p.gear.sh}:${emblem}`;
     if (kind !== this.handKind) {
       this.handKind = kind;
       for (const g of [this.handRight, this.handLeft]) {
@@ -1158,7 +1243,7 @@ export class ArenaScene {
         this.handRight.add(w, fist());
         this.handWeapon = w;
         if (p.gear.sh) {
-          this.handShield = shieldMesh(team);
+          this.handShield = shieldMesh(team, undefined, emblem);
           this.handShield.scale.setScalar(0.85);
           this.handLeft.add(this.handShield);
         } else {
@@ -1337,7 +1422,7 @@ export class ArenaScene {
     this.draw(cam, view, dt);
     if (k) k.tag.visible = tagShown;
     if (firstPerson && p && k) {
-      this.updateHands(p, k.team, dt);
+      this.updateHands(p, k.team, dt, k.emblem);
       cam.updateMatrixWorld();
       this.hands.position.copy(cam.position);
       this.hands.quaternion.copy(cam.quaternion);

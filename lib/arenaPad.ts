@@ -16,6 +16,7 @@ export interface PadSeen {
   p: number;
   k: number;
   s: number;
+  e: number;
   lx: number;
   ly: number;
   /**
@@ -36,7 +37,7 @@ const LOOK_GLIDE = 22;
 const LOOK_RESET = 6;
 
 export function newPadSeen(pad: ArenaPad, yaw: number): PadSeen {
-  return { j: pad.j || 0, d: pad.d || 0, p: pad.p || 0, k: pad.k || 0, s: pad.s || 0, lx: pad.lx || 0, ly: pad.ly || 0, yaw, pitch: 0, aimYaw: yaw, aimPitch: 0 };
+  return { j: pad.j || 0, d: pad.d || 0, p: pad.p || 0, k: pad.k || 0, s: pad.s || 0, e: pad.e || 0, lx: pad.lx || 0, ly: pad.ly || 0, yaw, pitch: 0, aimYaw: yaw, aimPitch: 0 };
 }
 
 /**
@@ -50,7 +51,7 @@ export function padInput(
   world: BotWorld,
   dt: number,
   specialReady = false
-): { input: FighterInput; pick: string | null } {
+): { input: FighterInput; pick: string | null; emote: number } {
   // Look: take what was dragged since the last step, then glide toward it.
   const dlx = (pad.lx || 0) - seen.lx;
   const dly = (pad.ly || 0) - seen.ly;
@@ -67,7 +68,9 @@ export function padInput(
   const mag = Math.min(1, Math.hypot(mx, mz));
 
   // Presses since the last step (a reloaded phone starts its counters again).
-  for (const k of ["j", "d", "p", "k", "s"] as const) if ((pad[k] || 0) < seen[k]) seen[k] = pad[k] || 0;
+  for (const k of ["j", "d", "p", "k", "s", "e"] as const) if ((pad[k] || 0) < seen[k]) seen[k] = pad[k] || 0;
+  const emote = (pad.e || 0) > seen.e ? pad.ek || 0 : 0;
+  seen.e = pad.e || 0;
   const jump = (pad.j || 0) > seen.j;
   const dodge = (pad.d || 0) > seen.d;
   const pickPressed = (pad.p || 0) > seen.p;
@@ -107,5 +110,6 @@ export function padInput(
       special,
     },
     pick,
+    emote,
   };
 }

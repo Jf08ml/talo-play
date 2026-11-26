@@ -5,6 +5,7 @@ import { Keyboard, MonitorPlay, Shield, Sparkles, Swords } from "lucide-react";
 import { MODE_INFO, NO_PAD, fighterColor, fighterName, openPad, teamInfo, wavesSurvived, type ArenaPad, type ArenaState } from "@/lib/arena";
 import { MAX_HP, SPECIALS, SPECIAL_MAX, WEAPONS, specialOf } from "@/lib/arenaSim";
 import { useWakeLock } from "@/components/carreras/Controller";
+import { EMOTES } from "@/lib/arenaLooks";
 import { TOUCH_LOOK } from "./Controls";
 
 /**
@@ -41,7 +42,7 @@ function capture(e: ReactPointerEvent<HTMLElement>) {
 }
 
 /** Presses and look per room and player, kept while the page lives (the screen only uses what changed). */
-const counts = new Map<string, Pick<ArenaPad, "j" | "d" | "p" | "k" | "s" | "lx" | "ly">>();
+const counts = new Map<string, Pick<ArenaPad, "j" | "d" | "p" | "k" | "s" | "e" | "lx" | "ly">>();
 
 export default function Pad({ roomId, clientId, state }: { roomId: string; clientId: string; state: ArenaState }) {
   useWakeLock();
@@ -70,7 +71,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
   const send = (patch: Partial<ArenaPad>, urgent = false) => {
     wire.current = { ...wire.current, ...patch };
     const w = wire.current;
-    counts.set(key, { j: w.j, d: w.d, p: w.p, k: w.k, s: w.s, lx: w.lx, ly: w.ly });
+    counts.set(key, { j: w.j, d: w.d, p: w.p, k: w.k, s: w.s, e: w.e, lx: w.lx, ly: w.ly });
     const go = () => {
       timer.current = null;
       lastAt.current = performance.now();
@@ -98,6 +99,11 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
   };
   const press = (c: "j" | "d" | "p" | "k" | "s") => {
     send({ [c]: (wire.current[c] ?? 0) + 1 }, true);
+    navigator.vibrate?.(12);
+  };
+  /** A gesture (1–4), counted like the presses. */
+  const gesture = (n: number) => {
+    send({ e: (wire.current.e ?? 0) + 1, ek: n }, true);
     navigator.vibrate?.(12);
   };
 
@@ -147,6 +153,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
       else if (!e.repeat && k === "e") press("p");
       else if (!e.repeat && k === "i") press("k");
       else if (!e.repeat && k === "o") press("s");
+      else if (!e.repeat && k.length === 1 && k >= "1" && k <= String(EMOTES.length)) gesture(Number(k));
       else if (!(k in MOVE_KEYS) && k !== "j" && k !== "k" && !k.startsWith("arrow")) return;
       e.preventDefault();
       down.add(k);
@@ -338,6 +345,24 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
             className="relative flex-1 overflow-hidden rounded-[24px] bg-white/[0.03] ring-1 ring-white/[0.08]"
           >
             <span className="pointer-events-none absolute left-4 top-3 text-sm font-bold text-white/35">Arrastra aquí para mirar</span>
+            {/* Gestures, seen on the TV over your knight. */}
+            <div className="absolute right-3 top-2.5 flex gap-1.5">
+              {EMOTES.map((em, i) => (
+                <button
+                  key={em.id}
+                  type="button"
+                  aria-label={em.label}
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    gesture(i + 1);
+                  }}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.08] text-lg active:bg-white/25"
+                >
+                  {em.emoji}
+                </button>
+              ))}
+            </div>
             <div className="absolute bottom-3 right-3 flex items-end gap-3">
               <div className="flex flex-col gap-2">
                 <button
@@ -385,7 +410,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
       )}
 
       <p className="pointer-events-none hidden items-center justify-center gap-1.5 text-xs text-white/40 [@media(hover:hover)_and_(pointer:fine)]:flex">
-        <Keyboard className="h-3.5 w-3.5" /> WASD moverte · flechas mirar · J atacar · K bloquear · L esquivar · I patada · O especial · espacio saltar · E agarrar
+        <Keyboard className="h-3.5 w-3.5" /> WASD moverte · flechas mirar · J atacar · K bloquear · L esquivar · I patada · O especial · espacio saltar · E agarrar · 1–4 gestos
       </p>
     </div>
   );

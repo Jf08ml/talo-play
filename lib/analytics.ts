@@ -22,6 +22,8 @@ import { countDailyRoom } from "./dailyStats";
  * - `install_app`: the «Instalar Talo» button (`step`: prompt / ios / accepted).
  * - `push_toggle`: notifications turned on or off on a device.
  * - `quick_play`: a game picked in the home's «Jugar ya» (`random` = from «Sorpréndeme»).
+ * - `arena_match_end`: an Arena medieval match I fought ended (`days_since_first` = days since this
+ *   browser first played it, to measure returning players); `arena_challenge_done`: a daily challenge done.
  *
  * `create_room` also counts the room in our own per-day stats (lib/dailyStats.ts).
  * Page views are sent by `PageViews` (components/PageViews.tsx), not here.
@@ -46,6 +48,8 @@ type Events = {
   quick_play: { game: GameId; random: boolean };
   install_app: { step: "prompt" | "ios" | "accepted" };
   push_toggle: { on: boolean };
+  arena_match_end: { game: "arena"; mode: string; map: string; won: boolean; duration_s: number; level: number; days_since_first: number; online: boolean };
+  arena_challenge_done: { game: "arena"; challenge: string; level: number };
 };
 
 export function trackEvent<E extends keyof Events>(name: E, params: Events[E]): void {

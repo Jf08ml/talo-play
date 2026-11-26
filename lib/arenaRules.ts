@@ -17,6 +17,7 @@ import {
   type WeaponId,
 } from "./arenaSim";
 import { MAP_IDS, getMap, pickMap, type ArenaMapId, type MapChoice } from "./arenaMaps";
+import { DEFAULT_LOOK, botLook, validLook, type ArenaLook } from "./arenaProgress";
 
 /**
  * Arena medieval's shared state and its rules, pure (no Firebase): every
@@ -114,6 +115,14 @@ export type ArenaSettings = Pick<ArenaMeta, "size" | "wins" | "bots" | "potions"
 export interface ArenaPlayer {
   name: string;
   color: string;
+  /**
+   * Optional (absent on older clients): the knight's look and level
+   * (lib/arenaProgress.ts), and a hidden skill rating (`DEFAULT_RATING`
+   * = new) that public arenas tune their bots to. Never shown.
+   */
+  look?: ArenaLook;
+  lv?: number;
+  sk?: number;
 }
 
 /** The last hit a fighter took, for its own phone to react (`n` counts them). */
@@ -224,6 +233,15 @@ export interface ArenaState {
   by: Record<string, { f: string; t: number }>;
   /** The last event whose weapons already dropped (−1: none). */
   evDrop: number;
+
+  // Added with the match summary and the bots' looks (absent on older rooms and clients).
+  /** This match's damage dealt, blows stopped with the guard and perfect parries, per fighter. */
+  dmg: Record<string, number>;
+  blk: Record<string, number>;
+  par: Record<string, number>;
+  /** Bots' level (shown on their tag, like people's) and skill (`BotMind.skill`; absent = 1). */
+  botLv: Record<string, number>;
+  botSk: Record<string, number>;
 }
 
 /** A fighter's pose, written by whoever runs it. */
@@ -249,6 +267,9 @@ export interface ArenaPose {
   sp: number;
   /** Server time of the sample. */
   t: number;
+  /** A gesture (lib/arenaLooks.ts `EMOTES` index + 1) and the server time it started. Absent on older clients. */
+  em?: number;
+  et?: number;
 }
 
 /** An arrow in flight, for everyone else to draw. */
@@ -343,6 +364,11 @@ export function normalizeState(raw: Partial<ArenaState> | null): ArenaState | nu
     env: raw.env ?? {},
     by: raw.by ?? {},
     evDrop: raw.evDrop ?? -1,
+    dmg: raw.dmg ?? {},
+    blk: raw.blk ?? {},
+    par: raw.par ?? {},
+    botLv: raw.botLv ?? {},
+    botSk: raw.botSk ?? {},
   };
 }
 
@@ -427,7 +453,13 @@ export function joinState(s: ArenaState, clientId: string, player: ArenaPlayer, 
   const other: TeamId = want === "red" ? "blue" : "red";
   const team: TeamId | null = hasRoom(s, want, meta) ? want : meta.mode === "supervivencia" ? null : hasRoom(s, other, meta) ? other : null;
   const assign = s.status === "waiting" && !s.teams[clientId] && !known && team;
-  if (!assign && known?.name === player.name && known?.color === player.color) return null;
+  const same =
+    known?.name === player.name &&
+    known?.color === player.color &&
+    JSON.stringify(known?.look ?? null) === JSON.stringify(player.look ?? null) &&
+    known?.lv === player.lv &&
+    known?.sk === player.sk;
+  if (!assign && same) return null;
   return {
     ...s,
     players: { ...s.players, [clientId]: player },
@@ -599,6 +631,11 @@ export function startMatchState(s: ArenaState, settings: ArenaSettings, connecte
     score: { red: 0, blue: 0 },
     kills: {},
     special: {},
+    dmg: {},
+    blk: {},
+    par: {},
+    botLv: botLevels(Object.keys(bots), seed, 1, 12),
+    botSk: {},
     winner: "",
     mode,
     map: pickMap(settings.map, seed),
@@ -709,7 +746,7 @@ export function strikeState(
   if (!inRound(s0, key, now)) return null;
   // An arrow still counts if its shooter fell while it flew.
   if (!(attacker in s0.roster) || (!ranged && !alive(s0, attacker))) return null;
-  let s: ArenaState = { ...s0, hp: { ...s0.hp }, hits: { ...s0.hits }, special: { ...s0.special }, by: { ...s0.by } };
+  let s: ArenaState = { ...s0, hp: { ...s0.hp }, hits: { ...s0.hits }, special: { ...s0.special }, by: { ...s0.by }, dmg: { ...s0.dmg }, blk: { ...s0.blk }, par: { ...s0.par } };
   const fill = (id: string, amount: number) => {
     if (amount > 0) s.special[id] = Math.min(SPECIAL_MAX, Math.round((s.special[id] ?? 0) + amount));
   };
@@ -720,6 +757,10 @@ export function strikeState(
     changed = true;
     const damage = st.parried ? 0 : Math.max(0, Math.round(st.damage));
     const left = Math.max(0, (s.hp[t] ?? 0) - damage);
+    const took = (s.hp[t] ?? 0) - left;
+    if (took > 0) s.dmg[attacker] = (s.dmg[attacker] ?? 0) + took;
+    if (st.parried) s.par[t] = (s.par[t] ?? 0) + 1;
+    else if (st.blocked) s.blk[t] = (s.blk[t] ?? 0) + 1;
     s.hp[t] = left;
     const note: HitNote = {
       n: (s.hits[t]?.n ?? 0) + 1,
@@ -1008,6 +1049,10 @@ export function nextOnlineState(s: ArenaState, connected: string[], now: number,
     score: { red: 0, blue: 0 },
     kills: {},
     special: {},
+    dmg: {},
+    blk: {},
+    par: {},
+    ...onlineBots(s, people, Object.keys(bots), seed),
     winner: "",
     mode,
     map,
@@ -1018,4 +1063,82 @@ export function nextOnlineState(s: ArenaState, connected: string[], now: number,
     waveAt: 0,
   };
   return setupRound(next, 1, now);
+}
+
+// ---- Looks, levels and the bots' hidden skill -------------------------------------------
+
+/** A new player's hidden rating (see `nextRating`). */
+export const DEFAULT_RATING = 1000;
+
+/** A rating as a bot's `skill` (0.3 easy … 1 the sharpest): a new player meets bots at about 0.6. */
+export function skillFor(rating: number): number {
+  return Math.max(0.3, Math.min(1, 0.3 + (rating - 700) / 1000));
+}
+
+/**
+ * My rating after a match: up when I win and knock out more than I fall,
+ * down otherwise, in small steps (a couple of bad matches soften the next
+ * bots, a good run toughens them).
+ */
+export function nextRating(rating: number, won: boolean, kos: number, falls: number): number {
+  const delta = (won ? 22 : -16) + Math.max(-12, Math.min(12, (kos - falls) * 4));
+  return Math.max(400, Math.min(2000, Math.round(rating + delta)));
+}
+
+function hashId(seed: number, id: string): number {
+  let h = (seed ^ 0x9e3779b9) >>> 0;
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 0x01000193) >>> 0;
+  return h;
+}
+
+/** Bots' levels for a match: from `min` to `max`, seeded. */
+function botLevels(ids: string[], seed: number, min: number, max: number): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const id of ids) out[id] = min + (hashId(seed, id) % Math.max(1, max - min + 1));
+  return out;
+}
+
+/**
+ * A public arena's bots: levels around the people's (so they pass for
+ * people) and skill around the people's ratings, each a bit different.
+ */
+function onlineBots(s: ArenaState, people: string[], botIds: string[], seed: number): Pick<ArenaState, "botLv" | "botSk"> {
+  const avg = (xs: number[], d: number) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : d);
+  const lv = avg(people.map((id) => s.players[id]?.lv ?? 1), 3);
+  const sk = skillFor(avg(people.map((id) => s.players[id]?.sk ?? DEFAULT_RATING), DEFAULT_RATING));
+  const botLv: Record<string, number> = {};
+  const botSk: Record<string, number> = {};
+  for (const id of botIds) {
+    const r = mulberry32(hashId(seed, id))();
+    botLv[id] = Math.max(1, Math.round(lv + (r - 0.45) * 8));
+    botSk[id] = Math.round(Math.max(0.25, Math.min(1, sk + (r - 0.5) * 0.18)) * 100) / 100;
+  }
+  return { botLv, botSk };
+}
+
+/**
+ * How a fighter looks and its level (0 = none shown): people's own (only
+ * what their level unlocks), bots' made up from the match's seed. A wave's
+ * bandits («supervivencia») have no level.
+ */
+export function fighterLook(state: ArenaState, id: string): { look: ArenaLook; lv: number } {
+  if (isBot(id)) {
+    if (state.mode === "supervivencia") return { look: DEFAULT_LOOK, lv: 0 };
+    const lv = state.botLv[id] ?? 1 + (hashId(state.seed, id) % 10);
+    return { look: botLook(hashId(state.seed + 7, id), lv), lv };
+  }
+  const p = state.players[id];
+  const lv = Math.max(0, Math.floor(p?.lv ?? 0));
+  return { look: p?.look ? validLook({ ...DEFAULT_LOOK, ...p.look }, Math.max(1, lv)) : DEFAULT_LOOK, lv };
+}
+
+/**
+ * The match's best: most knockouts, then damage dealt (null if nobody did
+ * anything). «Supervivencia» only counts the people.
+ */
+export function matchMvp(state: ArenaState): string | null {
+  const ids = Object.keys(state.roster).filter((id) => !(state.mode === "supervivencia" && isBot(id)));
+  const score = (id: string) => (state.kills[id] ?? 0) * 100000 + (state.dmg[id] ?? 0);
+  const best = ids.sort((a, b) => score(b) - score(a) || a.localeCompare(b))[0];
+  return best && score(best) > 0 ? best : null;
 }

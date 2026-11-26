@@ -10,6 +10,7 @@ import { enterOnline, onlineCount } from "@/lib/arena";
 import { roomPath } from "@/lib/games";
 import { trackEvent } from "@/lib/analytics";
 import { SETTINGS } from "./settings";
+import KnightCard from "./KnightCard";
 
 type Tab = "online" | "amigos";
 
@@ -19,6 +20,7 @@ export default function ArenaLobby() {
   return (
     <GameLobby game="arena">
       <div className="flex flex-col gap-3">
+        <KnightCard />
         <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-900/80 p-1 ring-1 ring-slate-700/60">
           <button onClick={() => setTab("online")} className={`flex items-center justify-center gap-1.5 ${segmentClass(tab === "online")}`}>
             <Globe className="h-4 w-4" /> En línea

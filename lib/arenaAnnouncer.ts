@@ -106,13 +106,17 @@ export function speak(a: Announcement) {
   if (!voice) return;
   const now = performance.now();
   if (now < speakingUntil && !a.priority) return;
-  if (a.priority) speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(a.text.replace(/[¡!]/g, ""));
-  u.voice = voice;
-  u.lang = voice.lang;
-  u.rate = 1.12;
-  u.pitch = a.tone === "red" ? 0.85 : 0.95;
-  u.volume = 1;
-  speakingUntil = now + 300 + a.text.length * 70;
-  speechSynthesis.speak(u);
+  try {
+    if (a.priority) speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(a.text.replace(/[¡!]/g, ""));
+    u.voice = voice;
+    u.lang = voice.lang;
+    u.rate = 1.12;
+    u.pitch = a.tone === "red" ? 0.85 : 0.95;
+    u.volume = 1;
+    speakingUntil = now + 300 + a.text.length * 70;
+    speechSynthesis.speak(u);
+  } catch {
+    // No voice here: the banner is enough.
+  }
 }

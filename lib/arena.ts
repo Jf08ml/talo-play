@@ -247,9 +247,12 @@ export interface ArenaPad {
   /** Absent on older phones. */
   k?: number;
   s?: number;
+  /** Gestures asked for so far, and which one the last was (`EMOTES` index + 1). Absent on older phones. */
+  e?: number;
+  ek?: number;
 }
 
-export const NO_PAD: ArenaPad = { x: 0, y: 0, lx: 0, ly: 0, a: 0, b: 0, j: 0, d: 0, p: 0, k: 0, s: 0 };
+export const NO_PAD: ArenaPad = { x: 0, y: 0, lx: 0, ly: 0, a: 0, b: 0, j: 0, d: 0, p: 0, k: 0, s: 0, e: 0, ek: 0 };
 
 /** Where my pad goes; it's removed when the phone disconnects. */
 export function openPad(roomId: string, clientId: string) {

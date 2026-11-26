@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { TeamId } from "./teams";
 import { KICK_HIT, KICK_SECONDS, SPECIALS, WEAPONS, specialOf, type Act, type Gear, type ItemKind, type WeaponId } from "./arenaSim";
+import { EMBLEM_PATHS, EMOTES, EMOTE_SECONDS } from "./arenaLooks";
 
 /**
  * Arena medieval's knights, weapons and items (three.js, browser only), and
@@ -38,6 +39,116 @@ export interface KnightPose {
   combo: number;
   alive: boolean;
   gear: Gear;
+  /** A gesture playing (lib/arenaLooks.ts `EMOTES` index + 1, 0/absent none) and seconds into it. */
+  emote?: number;
+  emoteT?: number;
+}
+
+/**
+ * How a knight is dressed (lib/arenaProgress.ts): the plume's color ("" =
+ * the cloth's), the emblem on its chest and shield, and the helmet's extra.
+ */
+export interface KnightLook {
+  plume: string;
+  emblem: string;
+  helm: string;
+}
+
+export const PLAIN_LOOK: KnightLook = { plume: "", emblem: "ninguno", helm: "yelmo" };
+
+/** Shared textures and geometries (never disposed with a knight). */
+const SHARED = "shared";
+const emblemTextures = new Map<string, THREE.CanvasTexture>();
+
+/** An emblem drawn in pale gold with a dark outline, on a transparent square (made once per emblem). */
+export function emblemTexture(id: string): THREE.CanvasTexture | null {
+  const path = EMBLEM_PATHS[id];
+  if (!path || typeof document === "undefined") return null;
+  const known = emblemTextures.get(id);
+  if (known) return known;
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const ctx = c.getContext("2d")!;
+  ctx.translate(14, 14);
+
+  const p = new Path2D(path);
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 9;
+  ctx.strokeStyle = "#1f1408";
+  ctx.stroke(p);
+  ctx.fillStyle = "#fde68a";
+  ctx.fill(p, "evenodd");
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.name = SHARED;
+  emblemTextures.set(id, t);
+  return t;
+}
+
+let decalGeo: THREE.PlaneGeometry | null = null;
+/** A flat square facing -z (the knight's front), for emblems. */
+function emblemDecal(id: string, size: number): THREE.Mesh | null {
+  const map = emblemTexture(id);
+  if (!map) return null;
+  if (!decalGeo) {
+    decalGeo = new THREE.PlaneGeometry(1, 1).rotateY(Math.PI);
+    decalGeo.userData.shared = true;
+  }
+  const m = new THREE.Mesh(decalGeo, new THREE.MeshLambertMaterial({ map, transparent: true, alphaTest: 0.4, depthWrite: false }));
+  m.scale.setScalar(size);
+  m.renderOrder = 2;
+  return m;
+}
+
+let helmGeos: Record<"crest" | "horns" | "crown" | "wings", THREE.BufferGeometry> | null = null;
+/** The helmets' extras, built once: a crest, horns, an iron crown and wings. */
+function helmExtras() {
+  if (helmGeos) return helmGeos;
+  // A crest from the brow to the nape (front is -z, so the shape's x runs to the back).
+  const crest = new THREE.Shape();
+  crest.moveTo(-0.17, -0.02);
+  crest.quadraticCurveTo(-0.15, 0.17, 0.03, 0.19);
+  crest.quadraticCurveTo(0.2, 0.17, 0.26, -0.12);
+  crest.lineTo(0.15, -0.04);
+  crest.lineTo(-0.08, 0.0);
+  crest.closePath();
+  const crestG = new THREE.ExtrudeGeometry(crest, { depth: 0.035, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.01, bevelSegments: 1, curveSegments: 6 });
+  crestG.translate(0, 0, -0.0175);
+  crestG.rotateY(-Math.PI / 2);
+  crestG.translate(0, 0.33, 0);
+  // Horns: out and then up, both sides.
+  const horn = (side: number) => {
+    const base = new THREE.ConeGeometry(0.045, 0.17, 8).translate(0, 0.085, 0).rotateZ(-side * 1.15).translate(side * 0.13, 0.24, 0.01);
+    const tip = new THREE.ConeGeometry(0.03, 0.13, 8).translate(0, 0.065, 0).rotateZ(-side * 0.25).translate(side * 0.272, 0.305, 0.01);
+    return [base, tip];
+  };
+  const horns = merge([...horn(1), ...horn(-1)]);
+  // An iron crown with points, around the top of the helm.
+  const spikes: THREE.BufferGeometry[] = [new THREE.CylinderGeometry(0.143, 0.152, 0.055, 18, 1, true).translate(0, 0.275, 0)];
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 7) * Math.PI * 2;
+    spikes.push(new THREE.ConeGeometry(0.024, 0.085, 4).translate(Math.sin(a) * 0.145, 0.34, Math.cos(a) * 0.145));
+  }
+  const crown = merge(spikes);
+  // Wings on the sides, swept back and up.
+  const wing = new THREE.Shape();
+  wing.moveTo(0, 0);
+  wing.quadraticCurveTo(0.06, 0.2, 0.25, 0.3);
+  wing.lineTo(0.19, 0.2);
+  wing.lineTo(0.24, 0.17);
+  wing.lineTo(0.15, 0.1);
+  wing.lineTo(0.2, 0.05);
+  wing.lineTo(0.07, 0.02);
+  wing.closePath();
+  const wingSide = (side: number) =>
+    new THREE.ExtrudeGeometry(wing, { depth: 0.016, bevelEnabled: false, curveSegments: 5 })
+      .translate(0, 0, -0.008)
+      .rotateY(-Math.PI / 2 + side * 0.28)
+      .translate(side * 0.158, 0.17, 0.02);
+  const wings = merge([wingSide(1), wingSide(-1)]);
+  helmGeos = { crest: crestG, horns, crown, wings };
+  for (const g of Object.values(helmGeos)) g.userData.shared = true;
+  return helmGeos;
 }
 
 export const lambert = (color: number, extra: THREE.MeshLambertMaterialParameters = {}) => new THREE.MeshLambertMaterial({ color, ...extra });
@@ -411,7 +522,7 @@ export function weaponMesh(kind: WeaponId): THREE.Group {
   return g;
 }
 
-export function shieldMesh(team: TeamId | null, color?: number): THREE.Group {
+export function shieldMesh(team: TeamId | null, color?: number, emblem = "ninguno"): THREE.Group {
   const g = new THREE.Group();
   // A slightly domed round shield, its front facing -z.
   const R = 0.34;
@@ -430,7 +541,12 @@ export function shieldMesh(team: TeamId | null, color?: number): THREE.Group {
   band.position.z = -0.045;
   const band2 = band.clone();
   band2.rotation.z = Math.PI / 2;
-  g.add(face, rim, band, band2, boss);
+  // With an emblem, it takes the place of the cross and the boss.
+  const decal = emblemDecal(emblem, 0.4);
+  if (decal) {
+    decal.position.z = -0.082;
+    g.add(face, rim, decal);
+  } else g.add(face, rim, band, band2, boss);
   return g;
 }
 
@@ -534,6 +650,8 @@ export interface Knight {
   team: TeamId;
   /** Its cloth and shield color (the team's, or its own in «todos contra todos»). */
   tint: number;
+  /** Its emblem (on the chest and the shield). */
+  emblem: string;
   root: THREE.Group;
   body: THREE.Group;
   hips: THREE.Group;
@@ -580,7 +698,7 @@ export interface Knight {
 
 const armT = (x: number, y: number, z: number, elbow: number, wrist = 0, roll = 0, push = 0): ArmT => ({ x, y, z, elbow, wrist, roll, push });
 
-export function knightMesh(team: TeamId, geos: KnightGeos, tint: number = TEAM_COLORS[team]): Omit<Knight, "tag" | "tagKey" | "label" | "pose" | "hp"> {
+export function knightMesh(team: TeamId, geos: KnightGeos, tint: number = TEAM_COLORS[team], look: KnightLook = PLAIN_LOOK): Omit<Knight, "tag" | "tagKey" | "label" | "pose" | "hp"> {
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
@@ -635,6 +753,11 @@ export function knightMesh(team: TeamId, geos: KnightGeos, tint: number = TEAM_C
   mesh(geos.torsoSteel, armor, torso);
   mesh(geos.torsoCloth, cloth, torso);
   mesh(geos.torsoGold, gold, torso);
+  const chest = emblemDecal(look.emblem, 0.13);
+  if (chest) {
+    chest.position.set(0, 0.2, -0.222);
+    torso.add(chest);
+  }
 
   const head = new THREE.Group();
   head.position.y = 0.66;
@@ -642,7 +765,13 @@ export function knightMesh(team: TeamId, geos: KnightGeos, tint: number = TEAM_C
   mesh(geos.helm, armor, head);
   mesh(geos.helmGold, gold, head);
   mesh(geos.visor, black, head);
-  mesh(geos.plume, cloth, head);
+  const plumeMat = look.plume ? lambert(parseInt(look.plume.slice(1), 16), { side: THREE.DoubleSide }) : cloth;
+  const extras = look.helm !== "yelmo" ? helmExtras() : null;
+  if (look.helm === "cresta") mesh(extras!.crest, plumeMat, head);
+  else mesh(geos.plume, plumeMat, head);
+  if (look.helm === "cuernos") mesh(extras!.horns, lambert(0xe9dfc6), head);
+  if (look.helm === "corona") mesh(extras!.crown, gold, head);
+  if (look.helm === "alado") mesh(extras!.wings, phong(0xe5e7eb, 60), head);
 
   const arms: ArmRig[] = [];
   let hand = new THREE.Group();
@@ -674,6 +803,7 @@ export function knightMesh(team: TeamId, geos: KnightGeos, tint: number = TEAM_C
   return {
     team,
     tint,
+    emblem: look.emblem,
     root,
     body,
     hips,
@@ -758,7 +888,7 @@ export function equipKnight(k: Knight, gear: Gear) {
       k.shield = null;
     } else {
       // Center grip: the face across the forearm, facing where the forearm points.
-      k.shield = shieldMesh(k.team, k.tint);
+      k.shield = shieldMesh(k.team, k.tint, k.emblem);
       k.shield.rotation.x = -Math.PI / 2;
       k.shield.position.set(0, -0.07, 0);
       k.offHand.add(k.shield);
@@ -1119,6 +1249,40 @@ export function animateKnight(k: Knight, p: KnightPose, dt: number, time: number
     armK = 26;
   }
 
+  // A gesture, only standing still and free (any act cuts it).
+  const emT = p.emoteT ?? 99;
+  if (p.alive && p.emote && emT < EMOTE_SECONDS && p.act === "idle" && !p.blocking) {
+    const e = Math.min(ease(clamp01(emT / 0.25)), ease(clamp01((EMOTE_SECONDS - emT) / 0.35)));
+    const id = EMOTES[p.emote - 1]?.id;
+    if (id === "saludo") {
+      r = mixArm(r, armT(2.55, 0.25, 0.55 + 0.4 * Math.sin(emT * 13), 0.55, -0.4), e);
+      headY += 0.15 * e;
+      torsoZ += 0.06 * e;
+    } else if (id === "festejo") {
+      const hop = Math.abs(Math.sin(emT * 8));
+      r = mixArm(r, armT(2.95, 0.1, 0.35 + 0.15 * Math.sin(emT * 16), 0.35, -1.2), e);
+      l = mixArm(l, armT(2.95, 0.1, 0.35 - 0.15 * Math.sin(emT * 16), 0.35), e);
+      rise += 0.09 * hop * e;
+      torsoX -= 0.12 * e;
+      headX -= 0.2 * e;
+    } else if (id === "burla") {
+      r = mixArm(r, armT(0.15, -0.7, 0.95, 2.0, 0.4), e);
+      l = mixArm(l, armT(0.15, -0.7, 0.95, 2.0), e);
+      torsoZ += 0.22 * Math.sin(emT * 7) * e;
+      headY += 0.45 * Math.sin(emT * 11) * e;
+      hipYaw += 0.2 * Math.sin(emT * 7) * e;
+    } else if (id === "reverencia") {
+      const bow = ease(clamp01((emT - 0.15) / 0.45)) * e;
+      r = mixArm(r, armT(0.95, 0.75, 0.15, 1.6, -0.4), e);
+      l = mixArm(l, armT(0.35, -0.3, 0.55, 0.15), e);
+      torsoX += 0.8 * bow;
+      headX += 0.35 * bow;
+      stance0 = lerp(stance0, 0.35, e);
+      stance1 = lerp(stance1, -0.2, e);
+    }
+    armK = 18;
+  }
+
   // Springs: being hit rocks the torso back; landing squashes the legs.
   const sk = Math.min(dt, 0.05);
   k.hitV += (-140 * k.hitX - 11 * k.hitV) * sk;
@@ -1332,7 +1496,7 @@ export function disposeTree(root: THREE.Object3D) {
     const mats = m.material ? (Array.isArray(m.material) ? m.material : [m.material]) : [];
     for (const mat of mats) {
       const map = (mat as THREE.MeshBasicMaterial).map;
-      if (map && map.name !== "glow") map.dispose();
+      if (map && map.name !== "glow" && map.name !== SHARED) map.dispose();
       mat.dispose();
     }
   });
