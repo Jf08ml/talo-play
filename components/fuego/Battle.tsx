@@ -112,9 +112,10 @@ import type { TeamId } from "@/lib/teams";
 import { useWakeLock } from "@/components/carreras/Controller";
 import { TaloMark } from "@/components/TaloLogo";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
-import { MOUSE_LOOK, TOUCH_LOOK, TouchControls, newControls, useDesktopControls, useFinePointer, type ControlState } from "./Controls";
-import { Bomb, Crown, Flame, ListOrdered, MousePointerClick, RotateCw, ShieldCheck, Skull, Volume2, VolumeX, Zap } from "lucide-react";
+import { ControlsEditor, MOUSE_LOOK, TOUCH_LOOK, TouchControls, newControls, releaseControls, useDesktopControls, useFinePointer, type ControlState } from "./Controls";
+import { Bomb, Crown, Flame, ListOrdered, MousePointerClick, RotateCw, ShieldCheck, SlidersHorizontal, Skull, Volume2, VolumeX, Zap } from "lucide-react";
 import FullscreenButton from "@/components/FullscreenButton";
+import { DEFAULT_TOUCH, loadTouch, saveTouch, type TouchSettings } from "./touchLayout";
 import { Talo } from "@/components/Talo";
 import { playerTalo } from "@/lib/talos";
 
@@ -420,6 +421,17 @@ export default function Battle({
   const [quality, toggleQuality] = useQuality(QUALITY_KEY);
   const [toast, setToast] = useState<Toast | null>(null);
   const [aimToggle, setAimToggle] = useState(false);
+  // Touch layout, sensitivity and options (remembered per device), and the editor open or not.
+  const [touch, setTouch] = useState<TouchSettings>(() => (typeof window === "undefined" ? DEFAULT_TOUCH : loadTouch()));
+  const touchRef = useRef(touch);
+  const [editing, setEditing] = useState(false);
+  const changeTouch = (t: TouchSettings) => {
+    setTouch(t);
+    saveTouch(t);
+  };
+  useEffect(() => {
+    touchRef.current = touch;
+  }, [touch]);
   const aimToggleRef = useRef(false);
   const [board, setBoard] = useState(false);
   const fine = useFinePointer();
@@ -497,6 +509,8 @@ export default function Battle({
     let lastHudKey = "";
     let lastViewsKey = "";
     let lastStride = 0;
+    // Auto-fire with a semi-automatic weapon: the trigger pulses so it keeps shooting.
+    let autoPulse = false;
     let myRoll = 0;
     let lastCount = -1;
     let shieldWas = MAX_SHIELD;
@@ -974,6 +988,7 @@ export default function Battle({
           myDead = true;
           deathAt = performance.now();
           myDeath = deathOf(s, myId, now);
+          if (!fine) releaseControls(c);
           myLastKiller = myDeath.killer !== myId ? myDeath.killer : "";
           if (me) deathSpot = { x: me.x, y: me.y, z: me.z, yaw: look.yaw };
           if (s.mode === "bandera" || s.mode === "tesoro") once("drop:me", () => placeDropped(roomId, key, myId, deathSpot.x, deathSpot.z), 500);
@@ -988,6 +1003,8 @@ export default function Battle({
           look.yaw = sp.yaw;
           look.pitch = 0;
           myDead = false;
+          // Back with nothing held (a finger left on the stick when dying must not keep walking).
+          if (!fine) releaseControls(c);
           myDeath = null;
           shieldWas = MAX_SHIELD;
           setAimToggle(false);
@@ -1038,14 +1055,16 @@ export default function Battle({
       }
 
       // Look around (touch looks slower over an enemy: a little aim help).
-      let sens = fine ? MOUSE_LOOK : TOUCH_LOOK;
+      let sens = fine ? MOUSE_LOOK : TOUCH_LOOK * touchRef.current.sens;
       const prevYaw = look.yaw;
       const prevPitch = look.pitch;
       const aiming = s.status === "playing" && !myDead && (fine ? c.aim : aimToggleRef.current);
       const zoomFov = aiming ? WEAPONS[arms.weapon].zoom : BASE_FOV;
       // Zoomed in, the view turns slower; on touch only a little slower, or the scope can't be aimed.
-      sens *= fine ? zoomFov / BASE_FOV : Math.sqrt(zoomFov / BASE_FOV);
-      if (!fine && me && !myDead && !aiming && overEnemy(s, myId, me, look.yaw, look.pitch)) sens *= 0.55;
+      sens *= fine ? zoomFov / BASE_FOV : Math.sqrt(zoomFov / BASE_FOV) * (aiming ? touchRef.current.aimSens : 1);
+      // On touch: the crosshair over a rival slows the view (aim help) and, if chosen, shoots by itself.
+      const overTarget = !fine && !!me && !myDead && overEnemy(s, myId, me, look.yaw, look.pitch);
+      if (overTarget && !aiming) sens *= 0.55;
       look.yaw -= c.lookX * sens;
       look.pitch = Math.max(-1.35, Math.min(1.35, look.pitch - c.lookY * sens));
       c.lookX = 0;
@@ -1138,7 +1157,10 @@ export default function Battle({
               me.landed = 0;
             }
             const bare = unarmedIn(s, myId);
-            const evs = arms.step({ fire: c.fire && !bare, aim: aiming && !bare, reload: c.reload, swap: c.swap && !bare, grenade: c.grenade && !bare, melee: c.melee || (bare && c.fire) }, STEP);
+            autoPulse = !autoPulse;
+            const auto =
+              touchRef.current.autoFire && overTarget && !bare && arms.weapon !== "francotirador" && arms.weapon !== "lanzacohetes" && (WEAPONS[arms.weapon].auto || autoPulse);
+            const evs = arms.step({ fire: (c.fire || auto) && !bare, aim: aiming && !bare, reload: c.reload, swap: c.swap && !bare, grenade: c.grenade && !bare, melee: c.melee || (bare && c.fire) }, STEP);
             const r = handleEvents(s, myId, me, arms, evs, true);
             if (r.end) myEnd = r.end;
             if (r.m) myMelee++;
@@ -1785,8 +1807,19 @@ export default function Battle({
           onAim={() => setAimToggle((v) => !v)}
           fireOnRelease={hud.zoomed}
           ability={{ label: ABILITY_INFO[hud.ability.kit].label, color: ABILITY_INFO[hud.ability.kit].color, ready: hud.ability.ready }}
+          settings={touch}
+          weapons={{
+            label: WEAPONS[hud.weapon].label,
+            mag: hud.mag,
+            reserve: hud.reserve,
+            other: hud.other ? WEAPONS[hud.other].label : null,
+            grenades: hud.grenades,
+            reloading: hud.reloading,
+          }}
         />
       )}
+
+      {editing && <ControlsEditor settings={touch} onChange={changeTouch} onClose={() => setEditing(false)} />}
 
       {/* Crosshair, hit marker and the weapon in reach. */}
       {inRoster && hud?.alive && state.status === "playing" && !hud.zoomed && <Crosshair weapon={hud.weapon} aiming={hud.aiming} />}
@@ -1831,6 +1864,18 @@ export default function Battle({
             <button onClick={() => setBoard((v) => !v)} aria-label="Tabla" className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur">
               <ListOrdered className="h-4 w-4" />
             </button>
+            {!fine && inRoster && (
+              <button
+                onClick={() => {
+                  releaseControls(controlsRef.current);
+                  setEditing(true);
+                }}
+                aria-label="Ajustar controles"
+                className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur"
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+              </button>
+            )}
             <FullscreenButton className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur" />
           </div>
           <KillFeed feed={feed} state={state} myId={myId} style={big} />
@@ -1843,9 +1888,12 @@ export default function Battle({
           <div className={`pointer-events-none absolute left-1/2 z-20 w-64 -translate-x-1/2 ${fine ? "bottom-4" : "top-[5.75rem]"}`}>
             <Bars shield={hud.shield} hp={hud.hp} guard={hud.guard} />
           </div>
-          <div className={`pointer-events-none absolute z-20 ${fine ? "bottom-4 right-4" : "bottom-44 left-4"}`}>
-            <WeaponPanel hud={hud} keys={fine} align={fine ? "right" : "left"} />
-          </div>
+          {/* On touch the weapon panel is one of the controls (tap it to switch). */}
+          {fine && (
+            <div className="pointer-events-none absolute bottom-4 right-4 z-20">
+              <WeaponPanel hud={hud} keys align="right" />
+            </div>
+          )}
         </>
       )}
 

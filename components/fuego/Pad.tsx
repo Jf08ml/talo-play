@@ -71,7 +71,8 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
   const padRef = useRef<ReturnType<typeof openPad> | null>(null);
   const lastAt = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [stick, setStick] = useState<{ ox: number; oy: number; x: number; y: number } | null>(null);
+  // The stick remembers which life it was touched in: after dying it no longer counts (nor is drawn).
+  const [stick, setStick] = useState<{ ox: number; oy: number; x: number; y: number; life: number } | null>(null);
   const [firing, setFiring] = useState(false);
   const [aim, setAim] = useState(false);
   const [live, setLive] = useState<FuegoLive | null>(null);
@@ -82,6 +83,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
   const aimRef = useRef(false);
 
   const fighting = state.status === "playing" && clientId in state.roster;
+  const lives = state.deaths[clientId] ?? 0;
   const alive = fighting && isAlive(state, clientId);
   const weapon = live ? (WEAPON_IDS[live.w] ?? "rifle") : "rifle";
   const scoped = alive && aim && weapon === "francotirador";
@@ -151,9 +153,13 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
     send({ a: next ? 1 : 0 }, true);
   };
 
-  // Dead or out of the match: let go of the trigger and the scope.
+  // Dead or out of the match: let go of the stick, the trigger and the scope. The stick's zone
+  // disappears with the finger still on it, so its release never arrives.
   useEffect(() => {
     if (alive) return;
+    stickId.current = null;
+    looks.current.clear();
+    if (wire.current.x || wire.current.y) send({ x: 0, y: 0 }, true);
     if (aimRef.current) toggleAim(false);
     if (wire.current.f) send({ f: 0 }, true);
     firingRef.current = false;
@@ -239,7 +245,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
     stickId.current = e.pointerId;
     capture(e);
     const r = e.currentTarget.getBoundingClientRect();
-    setStick({ ox: e.clientX - r.left, oy: e.clientY - r.top, x: 0, y: 0 });
+    setStick({ ox: e.clientX - r.left, oy: e.clientY - r.top, x: 0, y: 0, life: lives });
   };
   const stickMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerId !== stickId.current || !stick) return;
@@ -389,7 +395,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
             onPointerCancel={stickUp}
             className="relative flex-[5] overflow-hidden rounded-[24px] bg-white/[0.06] ring-1 ring-white/[0.08]"
           >
-            {stick ? (
+            {stick && stick.life === lives ? (
               <>
                 <span className="absolute h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/25" style={{ left: stick.ox, top: stick.oy }} />
                 <span className="absolute h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-talo-ink" style={{ left: stick.ox + stick.x, top: stick.oy + stick.y, background: color }} />
