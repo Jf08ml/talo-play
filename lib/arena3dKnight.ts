@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { TeamId } from "./teams";
-import { WEAPONS, type Act, type Gear, type ItemKind, type WeaponId } from "./arenaSim";
+import { KICK_HIT, KICK_SECONDS, SPECIALS, WEAPONS, specialOf, type Act, type Gear, type ItemKind, type WeaponId } from "./arenaSim";
 
 /**
  * Arena medieval's knights, weapons and items (three.js, browser only), and
@@ -304,6 +304,54 @@ export function weaponMesh(kind: WeaponId): THREE.Group {
       add(new THREE.CylinderGeometry(0.028, 0.028, 0.14, 8).rotateX(Math.PI / 2), leather, 0, 0, 0.03);
       g.userData.tip = new THREE.Vector3(0.22, 0, -0.74);
       g.userData.base = new THREE.Vector3(0, 0, -0.45);
+      break;
+    }
+    case "martillo": {
+      // A war hammer: a long shaft, a heavy square head with a flat face (+x) and a back spike.
+      add(new THREE.CylinderGeometry(0.024, 0.03, 1.0, 8).rotateX(Math.PI / 2), wood, 0, 0, -0.38);
+      add(new THREE.CylinderGeometry(0.029, 0.029, 0.16, 8).rotateX(Math.PI / 2), leather, 0, 0, 0.04);
+      const dark = phong(DARK_STEEL, 70);
+      add(new THREE.BoxGeometry(0.3, 0.13, 0.15), dark, 0.02, 0, -0.87);
+      add(new THREE.CylinderGeometry(0.09, 0.08, 0.05, 12).rotateZ(Math.PI / 2), steel, 0.19, 0, -0.87);
+      add(new THREE.ConeGeometry(0.045, 0.2, 6).rotateZ(Math.PI / 2), steel, -0.21, 0, -0.87);
+      add(new THREE.ConeGeometry(0.03, 0.12, 6).rotateX(-Math.PI / 2), steel, 0, 0, -1.0);
+      for (const z of [-0.8, -0.94]) add(new THREE.BoxGeometry(0.31, 0.14, 0.012), gold, 0.02, 0, z);
+      g.userData.tip = new THREE.Vector3(0.22, 0, -0.87);
+      g.userData.base = new THREE.Vector3(0, 0, -0.6);
+      break;
+    }
+    case "mangual": {
+      // A flail: a short handle, a chain from its end and a spiked ball (its chain swings, see `swingFlail`).
+      add(new THREE.CylinderGeometry(0.022, 0.026, 0.42, 8).rotateX(Math.PI / 2), wood, 0, 0, -0.12);
+      add(new THREE.CylinderGeometry(0.027, 0.027, 0.12, 8).rotateX(Math.PI / 2), leather, 0, 0, 0.03);
+      add(new THREE.SphereGeometry(0.03, 10, 8), gold, 0, 0, 0.1);
+      add(new THREE.CylinderGeometry(0.03, 0.03, 0.04, 8).rotateX(Math.PI / 2), phong(DARK_STEEL), 0, 0, -0.34);
+      const chain = new THREE.Group();
+      chain.position.z = -0.36;
+      const link = new THREE.TorusGeometry(0.02, 0.006, 4, 8);
+      const linkMat = phong(DARK_STEEL, 90);
+      for (let i = 0; i < 5; i++) {
+        const m = new THREE.Mesh(i ? link.clone() : link, linkMat);
+        m.position.z = -0.03 - i * 0.045;
+        m.rotation.set(0, Math.PI / 2, i % 2 ? Math.PI / 2 : 0);
+        chain.add(m);
+      }
+      const spikes: THREE.BufferGeometry[] = [new THREE.SphereGeometry(0.075, 12, 9)];
+      const dirs: [number, number, number][] = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1], [0.7, 0.7, 0], [-0.7, -0.7, 0], [0.7, 0, 0.7], [-0.7, 0, -0.7]];
+      for (const [x, y, z] of dirs) {
+        const c = new THREE.ConeGeometry(0.018, 0.06, 5);
+        c.translate(0, 0.095, 0);
+        c.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(x, y, z).normalize()));
+        spikes.push(c);
+      }
+      const ball = new THREE.Mesh(merge(spikes), phong(DARK_STEEL, 60));
+      ball.position.z = -0.33;
+      chain.add(ball);
+      g.add(chain);
+      g.userData.flail = chain;
+      g.userData.tipObj = ball;
+      g.userData.tip = new THREE.Vector3(0, 0, -0.69);
+      g.userData.base = new THREE.Vector3(0, 0, -0.4);
       break;
     }
     case "maza": {
@@ -758,6 +806,17 @@ const SHIELD_GUARD = armT(0.5, 0.45, 0.12, 1.05, 0);
 const SHIELD_BLOCK = armT(0.95, 0.6, 0.15, 0.95, 0);
 const FIST_GUARD = armT(0.35, 0.3, 0.15, 1.35, 0);
 const SPEAR_SUPPORT = armT(0.95, 0.6, 0.1, 0.55, 0);
+// Kick: arms out for balance.
+const KICK_ARM_R = armT(0.45, -0.25, 0.75, 1.0, -0.5);
+const KICK_ARM_L = armT(0.55, -0.1, 0.7, 0.9);
+// Specials: the spin (arms out wide), the slam (both hands up, then down to the ground), the lunge (all the way out).
+const SPIN_OUT = armT(0.35, 0.55, 1.45, 0.15, -1.6, 0, -0.05);
+const SPIN_OFF = armT(0.3, 0.2, 1.35, 0.35);
+const SLAM_UP = armT(3.0, 0.3, 0.2, 1.15, -1.4, 0, 0.1);
+const SLAM_UP_L = armT(3.0, 0.75, 0.25, 1.15);
+const SLAM_DOWN = armT(0.15, 0.4, 0.1, 0.05, -0.8, 0, -0.15);
+const SLAM_DOWN_L = armT(0.35, 0.8, 0.15, 0.2);
+const LUNGE_OUT = armT(1.55, 0.08, 0.05, 0.0, -1.9, 0, -0.4);
 
 export interface KnightEvents {
   /** Feet that touched the ground this frame (bit 1 left, bit 2 right). */
@@ -823,7 +882,7 @@ export function animateKnight(k: Knight, p: KnightPose, dt: number, time: number
   const side = p.combo % 2 ? -1 : 1;
   const family: "slash" | "chop" | "thrust" | "bow" = weapon.ranged
     ? "bow"
-    : kind === "hacha" || kind === "maza"
+    : kind === "hacha" || kind === "maza" || kind === "martillo" || kind === "mangual"
       ? "chop"
       : kind === "lanza" || (kind === "daga" && p.combo % 3 === 2)
         ? "thrust"
@@ -859,10 +918,100 @@ export function animateKnight(k: Knight, p: KnightPose, dt: number, time: number
     return [THRUST_WOUND, THRUST_SWUNG];
   };
 
-  if (family === "bow") {
+  // A kick (right leg, applied with the legs below) and the body spinning (the whirlwind).
+  let kickAmt = 0;
+  let kickExt = 0;
+  let spin = 0;
+  let rise = 0;
+  const spKind = specialOf(kind);
+  const sp = SPECIALS[spKind];
+  // Seconds into the special's wind-up (0–1), its blow (0–1) and its recovery (0–1).
+  const spW = p.act === "special" ? clamp01(p.actT / sp.windup) : 0;
+  const spA = p.act === "special" ? clamp01((p.actT - sp.windup) / sp.active) : 0;
+  const spR = p.act === "special" ? clamp01((p.actT - sp.windup - sp.active) / sp.recover) : 0;
+
+  if (p.act === "kick") {
+    const kt = p.actT / KICK_SECONDS;
+    const hitT = KICK_HIT / KICK_SECONDS;
+    const back = ease(clamp01((kt - 0.55) / 0.45));
+    kickAmt = ease(clamp01(kt / (hitT * 0.7))) * (1 - back);
+    kickExt = clamp01((kt - hitT * 0.55) / (hitT * 0.5)) * (1 - back);
+    r = mixArm(r, KICK_ARM_R, kickAmt);
+    l = mixArm(l, p.gear.sh ? SHIELD_GUARD : KICK_ARM_L, kickAmt);
+    torsoX += 0.3 * kickAmt + 0.1 * kickExt;
+    headX -= 0.15 * kickAmt;
+    stance0 = 0.05;
+    crouch += 0.05 * kickAmt;
+    bodyZ = -0.12 * kickExt;
+    armK = 30;
+  } else if (p.act === "special" && spKind === "torbellino") {
+    const w = easeInOutCubic(spW);
+    r = mixArm(r, SLASH_WOUND, w);
+    torsoYaw = -1.1 * w;
+    hipYaw = -0.4 * w;
+    crouch += 0.12 * w;
+    stance0 = 0.3;
+    stance1 = -0.25;
+    spread = 0.14;
+    if (spA > 0) {
+      // Two full turns (to the right), arms flung out.
+      spin = -Math.PI * 4 * easeInOutCubic(spA);
+      r = mixArm(SPIN_OUT, r, spR);
+      l = mixArm(SPIN_OFF, l, spR);
+      torsoYaw = lerp(0.2, 0, spR);
+      hipYaw = 0;
+      crouch += 0.05;
+    }
+    armK = 30;
+  } else if (p.act === "special" && spKind === "terremoto") {
+    const w = easeInOutCubic(spW);
+    if (spA <= 0) {
+      // Both hands up, leaning back and rising on the toes.
+      r = mixArm(r, SLAM_UP, w);
+      l = mixArm(l, SLAM_UP_L, w);
+      torsoX += 0.3 * w;
+      headX += 0.15 * w;
+      rise = 0.14 * ease(clamp01((spW - 0.45) / 0.55));
+      crouch += 0.12 * Math.sin(Math.min(1, spW * 2) * Math.PI) * (spW < 0.5 ? 1 : 0);
+    } else {
+      // Down into the ground, deep.
+      const down = ease(clamp01(spA * 2)) * (1 - ease(spR));
+      r = mixArm(mixArm(SLAM_UP, SLAM_DOWN, ease(clamp01(spA * 2))), r, ease(spR));
+      l = mixArm(mixArm(SLAM_UP_L, SLAM_DOWN_L, ease(clamp01(spA * 2))), l, ease(spR));
+      torsoX -= 0.6 * down;
+      headX -= 0.2 * down;
+      crouch += 0.36 * down;
+      stance0 = 0.45 * down + 0.2 * (1 - down);
+      stance1 = -0.35 * down;
+      spread = 0.16;
+    }
+    armK = spA > 0 ? 45 : 22;
+  } else if (p.act === "special" && spKind === "estocada") {
+    const w = easeInOutCubic(spW);
+    r = mixArm(r, THRUST_WOUND, w);
+    if (!p.gear.sh) l = mixArm(l, armT(0.7, 0.7, 0.1, 1.0), w);
+    torsoYaw = -0.7 * w;
+    hipYaw = -0.3 * w;
+    crouch += 0.16 * w;
+    stance0 = 0.45 * w;
+    stance1 = -0.4 * w;
+    spread = 0.12;
+    if (spA > 0) {
+      const out = easeOutBack(clamp01(spA * 1.6), 1.2) * (1 - ease(spR));
+      r = mixArm(mixArm(THRUST_WOUND, LUNGE_OUT, out), r, ease(spR));
+      if (!p.gear.sh) l = mixArm(armT(1.35, 0.5, 0.1, 0.25), l, ease(spR));
+      torsoYaw = lerp(0.5, 0, ease(spR));
+      torsoX -= 0.35 * out;
+      bodyZ = -0.3 * out;
+      stance0 = 0.75 * (1 - ease(spR)) + 0.2 * ease(spR);
+      stance1 = -0.6 * (1 - ease(spR));
+    }
+    armK = spA > 0 ? 40 : 24;
+  } else if (family === "bow") {
     const aim = Math.PI / 2;
     l = armT(aim, -0.15, 0, 0.05);
-    const drawing = p.act === "draw" ? p.draw : 0;
+    // The triple arrow: a quick full draw, then the release.
+    const drawing = p.act === "draw" ? p.draw : p.act === "special" && spA <= 0 ? ease(spW) : 0;
     r = mixArm(armT(aim - 0.25, 0.9, 0.2, 0.7), armT(0.05, -0.35, 1.45, 2.35), ease(drawing));
     torsoX += p.pitch * 0.45;
     headX = p.pitch * 0.25;
@@ -991,6 +1140,12 @@ export function animateKnight(k: Knight, p: KnightPose, dt: number, time: number
   let knee1 = 2 * bend + 0.12 + lift1 * amp * 1.7 + Math.max(0, stance1 * -0.4);
   let thighZ0 = -spread + amp * 0.55 * s0 * dirS;
   let thighZ1 = spread + amp * 0.55 * s1 * dirS;
+  if (kickAmt > 0) {
+    // The right leg: knee chambered up, then the foot straight out.
+    thighX1 = lerp(thighX1, 1.1 + 0.4 * kickExt, kickAmt);
+    knee1 = lerp(knee1, 1.95 * (1 - kickExt) + 0.1, kickAmt);
+    thighZ1 = lerp(thighZ1, 0.04, kickAmt);
+  }
   if (air) {
     // Tuck the legs in the air.
     const tuck = clamp01(p.y / 0.3);
@@ -1078,8 +1233,8 @@ export function animateKnight(k: Knight, p: KnightPose, dt: number, time: number
   a.headY = lerp(a.headY, headY, kBody);
 
   // Apply.
-  k.body.position.set(a.bodyX, bob - a.crouch + fallY, a.bodyZ);
-  k.body.rotation.set(p.alive ? a.tiltX : fallRot, 0, p.alive ? a.tiltZ : 0);
+  k.body.position.set(a.bodyX, bob - a.crouch + fallY + rise, a.bodyZ);
+  k.body.rotation.set(p.alive ? a.tiltX : fallRot, p.alive ? spin : 0, p.alive ? a.tiltZ : 0);
   k.hips.rotation.set(0, a.hipYaw, a.hipRoll);
   k.torso.position.y = HIP_Y;
   k.torso.rotation.set(a.torsoX, a.torsoYaw, a.torsoZ);
@@ -1125,9 +1280,46 @@ export function animateKnight(k: Knight, p: KnightPose, dt: number, time: number
 
 /** Whether the knight's weapon is in the fast part of a swing (for the trail). */
 export function swinging(p: KnightPose): number {
-  if (WEAPONS[p.gear.w].ranged || !p.alive || p.act !== "recover" || p.actLen <= 0) return 0;
+  if (WEAPONS[p.gear.w].ranged || !p.alive || p.actLen <= 0) return 0;
+  if (p.act === "special") {
+    // The special's blow (the slam's from late in its wind-up).
+    const kind = specialOf(p.gear.w);
+    const sp = SPECIALS[kind];
+    const from = kind === "terremoto" ? sp.windup - 0.12 : sp.windup;
+    const a = (p.actT - from) / (sp.active + (kind === "terremoto" ? 0.2 : 0.1));
+    return a >= 0 && a < 1 ? 1 - a * a * 0.6 : 0;
+  }
+  if (p.act !== "recover") return 0;
   const t = p.actT / p.actLen;
   return t < 0.45 ? 1 - Math.pow(t / 0.45, 2) : 0;
+}
+
+const DOWN = new THREE.Vector3(0, -1, 0);
+const tmpQ = new THREE.Quaternion();
+const tmpV = new THREE.Vector3();
+const tmpF = new THREE.Vector3();
+const AXIS = new THREE.Vector3(0, 0, -1);
+
+/**
+ * A flail's chain: it hangs toward the ground, lagging behind the handle, and
+ * flies straight out while the weapon swings (`swing` 0–1). Needs the
+ * weapon's world matrix up to date. Cheap: one direction eased per frame.
+ */
+export function swingFlail(weapon: THREE.Group, swing: number, dt: number) {
+  const chain = weapon.userData.flail as THREE.Group | undefined;
+  if (!chain) return;
+  weapon.getWorldQuaternion(tmpQ);
+  tmpF.copy(AXIS).applyQuaternion(tmpQ);
+  const want = tmpV.copy(tmpF).lerp(DOWN, swing > 0 ? 0.05 : 0.8).normalize();
+  let dir = weapon.userData.flailDir as THREE.Vector3 | undefined;
+  if (!dir) {
+    dir = want.clone();
+    weapon.userData.flailDir = dir;
+  }
+  dir.lerp(want, 1 - Math.exp(-dt * (swing > 0 ? 30 : 9))).normalize();
+  // Into the weapon's own frame.
+  const local = tmpV.copy(dir).applyQuaternion(tmpQ.invert());
+  chain.quaternion.setFromUnitVectors(AXIS, local);
 }
 
 export function disposeTree(root: THREE.Object3D) {

@@ -19,6 +19,7 @@ import {
   respawnItems,
   roundKey,
   shootArrow,
+  spendSpecial,
   startMatch,
   strike,
   subscribeArrows,
@@ -39,19 +40,26 @@ import {
   FIGHTER_RADIUS,
   Fighter,
   ITEM_LABEL,
+  KICK_COOLDOWN,
   MAX_HP,
   MAX_STAMINA,
   PICK_RADIUS,
   PILLAR_SOLIDS,
+  SPECIALS,
+  SPECIAL_MAX,
   START_GEAR,
   WEAPONS,
   arrowAt,
   botInput,
   flyArrow,
+  kickStrikes,
+  lateParry,
   launchArrow,
   meleeStrikes,
   newMind,
   spawnPoint,
+  specialOf,
+  specialStrikes,
   type Arrow,
   type BotEnemy,
   type BotMind,
@@ -73,7 +81,7 @@ import QualityButton from "@/components/QualityButton";
 import { TaloMark } from "@/components/TaloLogo";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { MOUSE_LOOK, TOUCH_LOOK, TouchControls, newControls, useDesktopControls, useFinePointer, type ControlState } from "./Controls";
-import { Eye, MousePointerClick, RotateCw, Shield, Users, Volume2, VolumeX } from "lucide-react";
+import { Eye, MousePointerClick, RotateCw, Shield, Sparkles, Users, Volume2, VolumeX } from "lucide-react";
 import FullscreenButton from "@/components/FullscreenButton";
 
 const STEP = 1 / 60;
@@ -148,6 +156,31 @@ interface Hud {
   alive: boolean;
   watching: string;
   draw: number;
+  /** Special meter (0–`SPECIAL_MAX`) and the kick's readiness (0–1, 1 = ready). */
+  special: number;
+  kick: number;
+}
+
+/** How long a callout ("¡Parada perfecta!") stays on screen. */
+const CALLOUT_MS = 1100;
+/**
+ * A blow on someone run by another phone is settled this long after it
+ * lands, so a guard raised just before it (in server time) has time to
+ * arrive over the network and count as a perfect parry.
+ */
+const PARRY_GRACE_MS = 150;
+
+/** A blow waiting for `PARRY_GRACE_MS` before it's written. */
+interface PendingBlow {
+  at: number;
+  key: number;
+  id: string;
+  /** Server time it landed, and where the attacker stood. */
+  strikeAt: number;
+  fromX: number;
+  fromZ: number;
+  hits: Strike[];
+  views: FighterView[];
 }
 
 const SOUND_KEY = "arena.sound";
@@ -215,6 +248,7 @@ export default function Battle({
   const [hud, setHud] = useState<Hud | null>(null);
   const [hurt, setHurt] = useState(false);
   const [healed, setHealed] = useState(false);
+  const [callout, setCallout] = useState<{ text: string; color: string; n: number } | null>(null);
   const [clock, setClock] = useState(0);
   const spectateRef = useRef(0);
   const fine = useFinePointer();
@@ -291,6 +325,16 @@ export default function Battle({
     let pickPending = 0;
     let hurtTimer: ReturnType<typeof setTimeout> | undefined;
     let healTimer: ReturnType<typeof setTimeout> | undefined;
+    let calloutTimer: ReturnType<typeof setTimeout> | undefined;
+    let calloutN = 0;
+    const say = (text: string, color: string) => {
+      setCallout({ text, color, n: ++calloutN });
+      clearTimeout(calloutTimer);
+      calloutTimer = setTimeout(() => setCallout(null), CALLOUT_MS);
+    };
+    /** When each fighter last started a special (so a full meter isn't used twice before the state catches up). */
+    const spentAt = new Map<string, number>();
+    const pending: PendingBlow[] = [];
     let lastHp = -1;
     /** First-person feel: tilt when strafing, wider view when running or dodging. */
     const feel = { roll: 0, fov: 72 };
@@ -336,6 +380,7 @@ export default function Battle({
           combo: local.combo,
           running: local.sprinting,
           dodging: local.act === "dodge",
+          blockAge: local.parryAge,
         };
       }
       const g = ghosts.get(id);
@@ -359,8 +404,14 @@ export default function Battle({
         combo: p?.cb ?? 0,
         running: !!p?.rn,
         dodging: !!p && ACTS[p.a] === "dodge",
+        // When its block started (if it can still parry), seen from now.
+        blockAge: p?.b && p.bt ? Math.max(0, (serverNow() - p.bt) / 1000) : undefined,
       };
     };
+
+    /** Whether `id` may start its special: a full meter, not just spent. */
+    const specialReady = (s: ArenaState, id: string) =>
+      (s.special[id] ?? 0) >= SPECIAL_MAX && performance.now() - (spentAt.get(id) ?? -Infinity) > 2500;
 
     /** Volume and pan of a sound at (x, z) for the camera's fighter. */
     let earX = 0;
@@ -385,6 +436,7 @@ export default function Battle({
       at: Math.round(actAt),
       al: Math.round(f.actLen * 1000) / 1000,
       b: f.blocking ? 1 : 0,
+      bt: Number.isFinite(f.parryAge) ? Math.round(serverNow() - f.parryAge * 1000) : 0,
       dr: Math.round(f.draw * 100) / 100,
       sp: Math.round(f.speed * 10) / 10,
       cb: f.combo,
@@ -392,32 +444,113 @@ export default function Battle({
       t: Math.round(serverNow()),
     });
 
+    /** How a hit looks and sounds where it lands. */
+    const showHit = (x: number, y: number, z: number, id: string, h: { parried?: boolean; kick?: boolean; blocked: boolean; guardBreak?: boolean }) => {
+      const [vol, pan] = where(x, z);
+      if (h.parried) {
+        scene.burst(x, y + 1.3, z, "parry");
+        audio?.parry(vol, pan);
+      } else if (h.kick) {
+        scene.burst(x, y + 1.0, z, "kick");
+        scene.hitFlash(id);
+        audio?.kickHit(vol, pan);
+        if (h.guardBreak) audio?.clang(vol * 0.7, pan);
+      } else if (h.blocked) {
+        scene.burst(x, y + 1.3, z, "block");
+        audio?.clang(vol, pan);
+      } else {
+        scene.burst(x, y + 1.3, z, "hit");
+        scene.hitFlash(id);
+        audio?.thud(vol, pan);
+      }
+    };
+
+    /** Blows that landed (a swing, a kick, a special): show them, reel back if parried, and write them. */
+    const landed = (id: string, f: Fighter, hits: Strike[], views: FighterView[]) => {
+      if (!hits.length) return;
+      for (const h of hits) {
+        const t = views.find((v) => v.id === h.target)!;
+        showHit(t.x, t.y, t.z, h.target, h);
+      }
+      const parrier = hits.find((h) => h.parried);
+      if (parrier) {
+        const t = views.find((v) => v.id === parrier.target)!;
+        f.parried(t.x, t.z);
+        if (id === myId) {
+          scene.jolt(0.9);
+          say("¡Te pararon!", "#fca5a5");
+        }
+      } else if (id === myId) {
+        scene.jolt(hits.some((h) => h.special) ? 1.1 : 0.6);
+        if (hits.some((h) => h.guardBreak)) say("¡Guardia rota!", "#fde68a");
+      }
+      strike(roomId, key, id, { x: f.x, z: f.z }, withPlaces(hits, views)).catch(console.error);
+    };
+
+    /**
+     * A blow that a guard could stop: settled now, or — if it cleanly hits
+     * someone another phone runs — after `PARRY_GRACE_MS`, in case their
+     * parry is still on its way.
+     */
+    const blow = (id: string, f: Fighter, hits: Strike[], views: FighterView[]) => {
+      if (hits.some((h) => !h.blocked && ghosts.has(h.target))) {
+        pending.push({ at: performance.now() + PARRY_GRACE_MS, key, id, strikeAt: serverNow(), fromX: f.x, fromZ: f.z, hits, views });
+      } else landed(id, f, hits, views);
+    };
+
+    /** Blows whose grace is over: a parry if the target's guard went up just before, else as decided. */
+    const settleBlows = (s: ArenaState) => {
+      for (let i = pending.length - 1; i >= 0; i--) {
+        const pb = pending[i];
+        if (performance.now() < pb.at && pb.key === key) continue;
+        pending.splice(i, 1);
+        const f = pb.id === myId ? me : bots.get(pb.id)?.f;
+        if (!f || pb.key !== key) continue;
+        const hits = pb.hits.map((h) => {
+          const p = ghosts.get(h.target)?.pose;
+          if (h.blocked || !p?.b || !p.bt) return h;
+          // How long before the blow the guard went up (a little after = clock slack, not a parry).
+          const age = (pb.strikeAt - p.bt) / 1000;
+          if (age < -0.03) return h;
+          return lateParry(h, { ...viewOf(s, h.target), blocking: true, blockAge: Math.max(0, age) }, pb.fromX, pb.fromZ);
+        });
+        landed(pb.id, f, hits, pb.views);
+      }
+    };
+
     /** Someone's swing landed or an arrow left: work out the hits and write them. */
     const handleEvents = (s: ArenaState, id: string, f: Fighter, events: FighterEvent[]) => {
       const gear = gearOf(s, id);
       const team = s.roster[id];
       for (const ev of events) {
         const [vol, pan] = where(f.x, f.z);
-        if (ev.type === "windup") audio?.swing(gear.w === "hacha" || gear.w === "maza" ? 0.8 : gear.w === "daga" ? 0 : 0.35, vol, pan);
+        if (ev.type === "windup") {
+          const heavy = gear.w === "hacha" || gear.w === "maza" || gear.w === "martillo" ? 0.8 : gear.w === "mangual" ? 0.55 : gear.w === "daga" ? 0 : 0.35;
+          audio?.swing(heavy, vol, pan);
+        }
         if (ev.type === "dodge") audio?.swing(0.1, vol * 0.7, pan);
         if (ev.type === "strike") {
           const views = Object.keys(s.roster).map((o) => viewOf(s, o));
-          const hits = meleeStrikes(viewOf(s, id), gear, views);
-          if (!hits.length) continue;
-          for (const h of hits) {
-            const t = views.find((v) => v.id === h.target)!;
-            scene.burst(t.x, t.y + 1.3, t.z, h.blocked ? "block" : "hit");
-            if (!h.blocked) scene.hitFlash(h.target);
-            const [v2, p2] = where(t.x, t.z);
-            if (h.blocked) audio?.clang(v2, p2);
-            else audio?.thud(v2, p2);
-          }
-          if (id === myId) scene.jolt(0.6);
-          strike(roomId, key, id, { x: f.x, z: f.z }, withPlaces(hits, views)).catch(console.error);
+          blow(id, f, meleeStrikes(viewOf(s, id), gear, views), views);
+        }
+        if (ev.type === "kickHit") {
+          const views = Object.keys(s.roster).map((o) => viewOf(s, o));
+          landed(id, f, kickStrikes(viewOf(s, id), views), views);
+        }
+        if (ev.type === "special") {
+          spentAt.set(id, performance.now());
+          spendSpecial(roomId, key, id).catch(console.error);
+        }
+        if (ev.type === "specialHit") {
+          const views = Object.keys(s.roster).map((o) => viewOf(s, o));
+          const hits = specialStrikes(viewOf(s, id), ev.kind, views);
+          // The slam can't be parried.
+          if (ev.kind === "terremoto") landed(id, f, hits, views);
+          else blow(id, f, hits, views);
         }
         if (ev.type === "shoot") {
           audio?.bow(vol, pan);
-          const a = launchArrow(f, ev.draw);
+          const a = launchArrow(f, ev.draw, ev.yawOff);
           const t0 = serverNow();
           const down = shootArrow(roomId, { k: key, o: id, x: a.x, y: a.y, z: a.z, vx: a.vx, vy: a.vy, vz: a.vz, t: Math.round(t0) });
           myArrows.push({ id: arrowNo++, a, t0, done: 0, owner: id, team, down });
@@ -511,9 +644,11 @@ export default function Battle({
         if (h.n <= seen) continue;
         seenHits.set(id, h.n);
         const local = id === myId ? me : bots.get(id)?.f;
-        local?.receive(h.b, h.d, h.x, h.z);
+        local?.receive(h.b, h.d, h.x, h.z, { parried: !!h.pr, guardBreak: !!h.g, kick: !!h.kk, push: h.pw, stagger: h.st });
         if (id === myId) {
-          scene.jolt(h.b ? 0.5 : 1);
+          scene.jolt(h.pr ? 0.4 : h.b ? 0.5 : 1);
+          if (h.pr) say("¡Parada perfecta!", "#fde047");
+          else if (h.g) say("¡Te rompieron la guardia!", "#fca5a5");
           if (!h.b) {
             audio?.hurt();
             setHurt(true);
@@ -524,11 +659,7 @@ export default function Battle({
         // The attacker's own phone already showed it.
         if (h.from !== myId && !bots.has(h.from)) {
           const v = viewOf(s, id);
-          scene.burst(v.x, v.y + 1.3, v.z, h.b ? "block" : "hit");
-          if (!h.b) scene.hitFlash(id);
-          const [vol, pan] = where(v.x, v.z);
-          if (h.b) audio?.clang(vol, pan);
-          else audio?.thud(vol, pan);
+          showHit(v.x, v.y, v.z, id, { parried: !!h.pr, kick: !!h.kk, blocked: h.b, guardBreak: !!h.g });
         }
       }
 
@@ -590,6 +721,8 @@ export default function Battle({
               block: c.block,
               sprint: c.sprint || (!fine && c.mz > 0.6 && Math.hypot(c.mx, c.mz) > 0.92),
               dodge: c.dodge,
+              kick: c.kick,
+              special: c.special && specialReady(s, myId),
             };
             const before = me.act;
             const evs = me.step(input, gearOf(s, myId), STEP, solidsFor(myId));
@@ -605,12 +738,15 @@ export default function Battle({
               .filter((o) => s.roster[o] !== team)
               .map((o) => {
                 const v = viewOf(s, o);
-                return { ...v, act: v.act as BotEnemy["act"], actAt: v.actAt, weapon: gearOf(s, o).w };
+                return { ...v, act: v.act as BotEnemy["act"], actAt: v.actAt, actLen: v.actLen, weapon: gearOf(s, o).w };
               });
             const items = Object.entries(s.items).map(([iid, it]) => ({ id: iid, ...it }));
+            const ready = specialReady(s, id);
+            const world = { enemies, items, now: serverNow(), special: ready ? SPECIAL_MAX : 0 };
             const { input, pick } = run.remote
-              ? padInput(run.f, run.remote, pads[id] ?? NO_PAD, { enemies, items }, STEP)
-              : botInput(run.f, gearOf(s, id), s.hp[id] ?? 0, run.mind, { enemies, items }, STEP, Math.random);
+              ? padInput(run.f, run.remote, pads[id] ?? NO_PAD, world, STEP, ready)
+              : botInput(run.f, gearOf(s, id), s.hp[id] ?? 0, run.mind, world, STEP, Math.random);
+            input.special = input.special && ready;
             if (pick && performance.now() - run.pickAt > 800) {
               run.pickAt = performance.now();
               pickItem(roomId, key, id, pick, run.f.x, run.f.z).catch(console.error);
@@ -630,6 +766,8 @@ export default function Battle({
           me.pitch = look.pitch;
         }
       }
+
+      settleBlows(s);
 
       // Arrows I (or my bots) shot: fly them and decide what they hit.
       for (let i = myArrows.length - 1; i >= 0; i--) {
@@ -832,7 +970,8 @@ export default function Battle({
       const fv = follow ? viewOf(s, follow) : null;
       const fe = 1 - Math.exp(-dt * 8);
       feel.roll += ((myAlive ? -c.mx * 0.035 : 0) - feel.roll) * fe;
-      feel.fov += (72 + (me?.sprinting ? 9 : 0) + (me?.act === "dodge" ? 12 : 0) - feel.fov) * fe;
+      const lunging = me?.act === "special" && me.specialKind === "estocada" && me.actT >= SPECIALS.estocada.windup;
+      feel.fov += (72 + (me?.sprinting ? 9 : 0) + (me?.act === "dodge" || lunging ? 12 : 0) - feel.fov) * fe;
       // Watching someone else: the camera turns slower than their knight (bots turn sharply,
       // and remote poses arrive in bursts), so it glides instead of jerking.
       if (follow !== myId && fv) {
@@ -875,6 +1014,27 @@ export default function Battle({
         }
       } else scene.render(follow, mode, camLook, dt);
 
+      // Kicks and specials seen this frame (anyone's): their sounds, and the slam shakes the ground nearby.
+      for (const fx of scene.takeFx()) {
+        const [vol, pan] = where(fx.x, fx.z);
+        const mine = fx.id === myId || bots.has(fx.id);
+        if (fx.kind === "kick") audio?.kick(vol, pan);
+        else if (fx.kind === "special" && fx.special) audio?.charge(SPECIALS[fx.special].windup, vol, pan);
+        else if (fx.kind === "specialHit") {
+          if (fx.special === "terremoto") {
+            audio?.slam(vol, pan);
+            const d = Math.hypot(fx.x - earX, fx.z - earZ);
+            if (d < 7) scene.jolt(1.2 * (1 - d / 7));
+            if (!screen) {
+              audio?.cheer(0.3);
+              scene.cheer();
+            }
+          } else if (fx.special === "torbellino") audio?.whirl(vol, pan);
+          else if (fx.special === "estocada") audio?.lunge(vol, pan);
+          else if (fx.special === "triple" && !mine) audio?.bow(vol, pan);
+        }
+      }
+
       // HUD, ten times a second.
       if (t - hudAt > 100) {
         hudAt = t;
@@ -888,6 +1048,8 @@ export default function Battle({
           alive: myAlive,
           watching,
           draw: me?.act === "draw" ? Math.round(me.draw * 10) / 10 : 0,
+          special: s.special[myId] ?? 0,
+          kick: me ? Math.round((1 - me.kickCd / KICK_COOLDOWN) * 10) / 10 : 1,
         };
         const hk = JSON.stringify(next);
         if (hk !== lastHud) {
@@ -903,6 +1065,7 @@ export default function Battle({
       cancelAnimationFrame(frame);
       clearTimeout(hurtTimer);
       clearTimeout(healTimer);
+      clearTimeout(calloutTimer);
       unsubPoses();
       unsubArrows();
       unsubPads();
@@ -919,6 +1082,8 @@ export default function Battle({
   const justStarted = state.status === "fighting" && now >= state.startedAt && now - state.startedAt < 1200;
   const roundLeft = state.startedAt + ROUND_SECONDS * 1000 - now;
   const bow = hud?.gear.w === "arco";
+  const specialFull = !!hud && hud.special >= SPECIAL_MAX;
+  const specialName = hud ? SPECIALS[specialOf(hud.gear.w)].label : "";
 
   return (
     <div ref={wrapRef} className="fixed inset-0 z-40 select-none overflow-hidden bg-[#f2c48d]" style={{ touchAction: "none" }}>
@@ -966,7 +1131,20 @@ export default function Battle({
       />
 
       {inRoster && hud?.alive && state.status === "fighting" && !fine && (
-        <TouchControls controlsRef={controlsRef} canPick={!!hud.near} pickLabel={hud.nearLabel} bow={bow} />
+        <TouchControls controlsRef={controlsRef} canPick={!!hud.near} pickLabel={hud.nearLabel} bow={bow} special={hud.special} kick={hud.kick} />
+      )}
+
+      {/* Parries, broken guards. */}
+      {callout && !screen && (
+        <div className="pointer-events-none absolute inset-x-0 top-[22%] z-20 flex justify-center">
+          <span
+            key={callout.n}
+            className="animate-celebration-in font-display text-4xl drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)] sm:text-5xl"
+            style={{ color: callout.color }}
+          >
+            {callout.text}
+          </span>
+        </div>
       )}
 
       {/* Crosshair. */}
@@ -1038,6 +1216,22 @@ export default function Battle({
           <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-800">
             <div className="h-full rounded-full bg-amber-300" style={{ width: `${(hud.stamina / MAX_STAMINA) * 100}%` }} />
           </div>
+          {/* The special meter: fills with hits, blocks and parries. */}
+          <div className="mt-1.5 flex items-center gap-1.5">
+            <Sparkles className={`h-3 w-3 shrink-0 ${specialFull ? "text-yellow-300" : "text-violet-300"}`} />
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-800">
+              <div
+                className={`h-full rounded-full transition-all ${specialFull ? "animate-pulse bg-yellow-300" : "bg-violet-400"}`}
+                style={{ width: `${(Math.min(SPECIAL_MAX, hud.special) / SPECIAL_MAX) * 100}%` }}
+              />
+            </div>
+          </div>
+          {specialFull && hud.alive && (
+            <p className="mt-1 text-xs font-semibold text-yellow-200">
+              {fine ? "X: " : ""}
+              {specialName} listo
+            </p>
+          )}
           {bow && hud.draw > 0 && (
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-800">
               <div className="h-full rounded-full bg-sky-300" style={{ width: `${hud.draw * 100}%` }} />
@@ -1048,10 +1242,10 @@ export default function Battle({
       )}
 
       {fine && inRoster && !locked && state.status === "fighting" && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-24 z-20 flex justify-center">
-          <p className="flex items-center gap-2 rounded-xl bg-slate-950/75 px-4 py-2 text-sm text-white backdrop-blur">
+        <div className="pointer-events-none absolute inset-x-0 bottom-28 z-20 flex justify-center px-4">
+          <p className="flex max-w-3xl items-center gap-2 rounded-xl bg-slate-950/75 px-4 py-2 text-sm text-white backdrop-blur">
             <MousePointerClick className="h-4 w-4" />
-            Haz clic en la arena para pelear · WASD moverte · Shift correr · clic atacar (de nuevo = combo) · clic derecho o F bloquear · Q esquivar · E agarrar · espacio saltar · V cámara · Esc soltar el mouse
+            Haz clic en la arena para pelear · WASD moverte · Shift correr · clic atacar (de nuevo = combo) · clic derecho o F bloquear (justo antes del golpe = parada perfecta) · R o rueda patear · X golpe especial · Q esquivar · E agarrar · espacio saltar · V cámara · Esc soltar el mouse
           </p>
         </div>
       )}

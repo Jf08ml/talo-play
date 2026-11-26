@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
-import { Hand, MoveUp, Shield, Swords, Wind } from "lucide-react";
+import { Footprints, Hand, MoveUp, Shield, Sparkles, Swords, Wind } from "lucide-react";
+import { SPECIAL_MAX } from "@/lib/arenaSim";
 
 /**
  * What the player is pressing, read by the battle loop every frame. Look
@@ -16,6 +17,8 @@ export interface ControlState {
   block: boolean;
   sprint: boolean;
   dodge: boolean;
+  kick: boolean;
+  special: boolean;
   pick: boolean;
   camera: boolean;
   lookX: number;
@@ -23,7 +26,7 @@ export interface ControlState {
 }
 
 export function newControls(): ControlState {
-  return { mx: 0, mz: 0, jump: false, attack: false, block: false, sprint: false, dodge: false, pick: false, camera: false, lookX: 0, lookY: 0 };
+  return { mx: 0, mz: 0, jump: false, attack: false, block: false, sprint: false, dodge: false, kick: false, special: false, pick: false, camera: false, lookX: 0, lookY: 0 };
 }
 
 /** Radians per pixel dragged (touch) or moved (mouse). */
@@ -48,7 +51,8 @@ export function useFinePointer(): boolean {
  * Mouse and keyboard: click the arena to lock the pointer and look around
  * with the mouse; WASD or arrows to move, Shift to run, click to attack
  * (again during the swing for a combo; hold with the bow), right click or F
- * to block, Q to dodge, space to jump, E to pick up, V to switch the camera.
+ * to block, R or the middle button to kick, X for the special, Q to dodge,
+ * space to jump, E to pick up, V to switch the camera.
  * The pointer is only captured while `canLock` (fighting and standing):
  * it's let go at the end of a round, when you fall and with Esc, so the
  * buttons on screen can be clicked. Returns whether it's locked.
@@ -77,9 +81,12 @@ export function useDesktopControls(
       c.jump = has(" ");
       c.sprint = has("shift");
       c.dodge = has("q", "c");
+      c.kick = has("r") || mouseKick;
+      c.special = has("x");
       c.block = has("f") || mouseBlock;
     };
     let mouseBlock = false;
+    let mouseKick = false;
     const down = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
       if (k.startsWith("arrow") || k === " ") e.preventDefault();
@@ -103,6 +110,11 @@ export function useDesktopControls(
         return;
       }
       if (e.button === 0) c.attack = true;
+      if (e.button === 1) {
+        e.preventDefault();
+        mouseKick = true;
+        syncMove();
+      }
       if (e.button === 2) {
         mouseBlock = true;
         syncMove();
@@ -110,6 +122,10 @@ export function useDesktopControls(
     };
     const mup = (e: MouseEvent) => {
       if (e.button === 0) c.attack = false;
+      if (e.button === 1) {
+        mouseKick = false;
+        syncMove();
+      }
       if (e.button === 2) {
         mouseBlock = false;
         syncMove();
@@ -122,6 +138,7 @@ export function useDesktopControls(
       if (!on) {
         c.attack = false;
         mouseBlock = false;
+        mouseKick = false;
         syncMove();
       }
     };
@@ -129,6 +146,7 @@ export function useDesktopControls(
       keys.clear();
       c.attack = false;
       mouseBlock = false;
+      mouseKick = false;
       syncMove();
     };
     window.addEventListener("keydown", down);
@@ -156,19 +174,25 @@ export function useDesktopControls(
 
 /**
  * Touch controls over the arena: a joystick wherever the left thumb lands,
- * drag anywhere on the right to look, and buttons to attack, block, jump and
- * pick up (only when something is in reach).
+ * drag anywhere on the right to look, and buttons to attack, block, dodge,
+ * jump, kick, the special (its ring fills with the meter; `special` 0–100)
+ * and pick up (only when something is in reach). `kick` is the kick's
+ * readiness (0–1).
  */
 export function TouchControls({
   controlsRef,
   canPick,
   pickLabel,
   bow,
+  special,
+  kick,
 }: {
   controlsRef: RefObject<ControlState>;
   canPick: boolean;
   pickLabel: string;
   bow: boolean;
+  special: number;
+  kick: number;
 }) {
   const [stick, setStick] = useState<{ x: number; y: number; dx: number; dy: number } | null>(null);
   const stickId = useRef<number | null>(null);
@@ -222,7 +246,7 @@ export function TouchControls({
    * `data-look`, dragging that same finger also turns the camera, so you can
    * keep swinging or blocking while you aim.
    */
-  type HoldKey = "attack" | "block" | "jump" | "dodge";
+  type HoldKey = "attack" | "block" | "jump" | "dodge" | "kick" | "special";
   const holdKey = (e: ReactPointerEvent<HTMLButtonElement>) => e.currentTarget.dataset.hold as HoldKey;
   const holdDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
     e.stopPropagation();
@@ -244,6 +268,8 @@ export function TouchControls({
     lookIds.current.delete(e.pointerId);
   };
   const held = { onPointerDown: holdDown, onPointerMove: holdMove, onPointerUp: holdUp, onPointerCancel: holdUp };
+  const full = special >= SPECIAL_MAX;
+  const fill = Math.round((Math.min(SPECIAL_MAX, special) / SPECIAL_MAX) * 100);
 
   return (
     <div
@@ -266,6 +292,18 @@ export function TouchControls({
         <div className="pointer-events-none absolute bottom-10 left-10 flex h-28 w-28 items-center justify-center rounded-full border-2 border-dashed border-white/25 text-[10px] text-white/50">
           mover
         </div>
+      )}
+
+      {canPick && (
+        <button
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            controlsRef.current.pick = true;
+          }}
+          className="absolute bottom-[13.5rem] right-5 flex h-12 items-center justify-center gap-1 rounded-full bg-amber-500/60 px-3 text-xs font-semibold text-white ring-2 ring-amber-200/70 active:bg-amber-500/90"
+        >
+          <Hand className="h-4 w-4" /> {pickLabel}
+        </button>
       )}
 
       <div className="absolute bottom-5 right-5 grid grid-cols-3 items-end gap-3">
@@ -304,17 +342,27 @@ export function TouchControls({
         >
           <MoveUp className="h-6 w-6" />
         </button>
-        {canPick && (
-          <button
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              controlsRef.current.pick = true;
-            }}
-            className="flex h-14 items-center justify-center gap-1 rounded-full bg-amber-500/60 px-3 text-xs font-semibold text-white ring-2 ring-amber-200/70 active:bg-amber-500/90"
-          >
-            <Hand className="h-4 w-4" /> {pickLabel}
-          </button>
-        )}
+        <button
+          {...held}
+          data-hold="kick"
+          aria-label="Patear"
+          className="flex h-14 w-14 items-center justify-center justify-self-center rounded-full bg-orange-500/35 text-white ring-2 ring-orange-300/60 transition-opacity active:bg-orange-500/70"
+          style={{ opacity: kick >= 1 ? 1 : 0.35 + kick * 0.4 }}
+        >
+          <Footprints className="h-6 w-6" />
+        </button>
+        {/* The special: its ring fills with the meter and lights up when full. */}
+        <button
+          {...held}
+          data-hold="special"
+          aria-label="Golpe especial"
+          className={`flex h-16 w-16 items-center justify-center justify-self-center rounded-full p-1 ${full ? "animate-pulse" : ""}`}
+          style={{ background: `conic-gradient(${full ? "#fde047" : "#a78bfa"} ${fill}%, rgba(255,255,255,0.15) 0)` }}
+        >
+          <span className={`flex h-full w-full items-center justify-center rounded-full ${full ? "bg-yellow-400/80 text-slate-950" : "bg-slate-950/70 text-white/50"}`}>
+            <Sparkles className="h-6 w-6" />
+          </span>
+        </button>
       </div>
     </div>
   );

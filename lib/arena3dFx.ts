@@ -292,3 +292,49 @@ export class Impacts {
     }
   }
 }
+
+/**
+ * Shock rings lying flat (a slam on the sand, a whirlwind around a knight):
+ * a ring that opens and fades. A small pool, made up front.
+ */
+export class Shockwaves {
+  readonly group = new THREE.Group();
+  private rings: { m: THREE.Mesh; t: number; life: number; size: number }[] = [];
+  private next = 0;
+
+  constructor(count = 6) {
+    const geo = new THREE.RingGeometry(0.82, 1, 48).rotateX(-Math.PI / 2);
+    for (let i = 0; i < count; i++) {
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+      m.visible = false;
+      m.renderOrder = 4;
+      this.rings.push({ m, t: 1, life: 1, size: 1 });
+      this.group.add(m);
+    }
+  }
+
+  spawn(x: number, y: number, z: number, color: THREE.Color, size: number, life: number) {
+    const r = this.rings[this.next];
+    this.next = (this.next + 1) % this.rings.length;
+    r.m.position.set(x, y, z);
+    (r.m.material as THREE.MeshBasicMaterial).color.copy(color);
+    r.t = 0;
+    r.life = life;
+    r.size = size;
+    r.m.visible = true;
+  }
+
+  update(dt: number) {
+    for (const r of this.rings) {
+      if (!r.m.visible) continue;
+      r.t += dt;
+      const k = r.t / r.life;
+      if (k >= 1) {
+        r.m.visible = false;
+        continue;
+      }
+      r.m.scale.setScalar(r.size * (0.2 + 0.8 * (1 - Math.pow(1 - k, 3))));
+      (r.m.material as THREE.MeshBasicMaterial).opacity = (1 - k) * 0.85;
+    }
+  }
+}

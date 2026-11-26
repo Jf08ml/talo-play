@@ -11,7 +11,9 @@ import {
   MAX_HP,
   POTION_HEAL,
   RESPAWN_PREFIX,
+  SPECIAL_MAX,
   START_GEAR,
+  WEAPONS,
   roundItems,
   type ArenaItem,
   type Gear,
@@ -27,7 +29,13 @@ import {
  *   pose at `arena/poses/{fighterId}` (~15 Hz, removed on disconnect).
  * - Whoever swings decides what it hits, from the poses it sees, and writes
  *   the damage with `strike` (a transaction on `arena/state`). The target's
- *   phone notices `hits[itself]` and flinches or loses stamina.
+ *   phone notices `hits[itself]` and flinches or loses stamina. Kicks and
+ *   specials work the same way. A perfect parry is decided by the attacker
+ *   too: the pose says when the target's block started (`bt`), so a block
+ *   raised just before the blow is a parry — the attacker's own fighter
+ *   reels, and the target sees `pr` in its hit.
+ * - The special meter (`special`) fills inside `strike` (hits landed,
+ *   blocks, parries) and is spent with `spendSpecial` when a special starts.
  * - Arrows: the shooter's phone flies its arrow and decides the hit; the
  *   others draw it from `arena/arrows` (launch point, velocity and time).
  * - Bots are fighters too ("bot0"…): the bot host (the connected player with
@@ -98,7 +106,28 @@ export interface HitNote {
   z: number;
   /** Server time of the hit (regeneration waits after it). */
   t: number;
+  /**
+   * Only when they apply (older clients ignore them): I parried it (`b` is
+   * set too), a kick, my guard was knocked aside, part of a special, and the
+   * knockback (m/s) and stagger (s) when not the usual.
+   */
+  pr?: 1;
+  kk?: 1;
+  g?: 1;
+  sp?: 1;
+  pw?: number;
+  st?: number;
 }
+
+// How much the special meter fills (see `SPECIAL_MAX`).
+/** Landing a clean blow, per point of damage (arrows: half). */
+export const SPECIAL_PER_DAMAGE = 0.7;
+/** A blow that landed on a guard, a kick that landed. */
+export const SPECIAL_ON_BLOCKED = 3;
+export const SPECIAL_ON_KICK = 5;
+/** Stopping a blow with your guard, and with a perfect parry. */
+export const SPECIAL_BLOCKING = 7;
+export const SPECIAL_PARRY = 22;
 
 export interface ArenaState {
   status: ArenaStatus;
@@ -135,6 +164,8 @@ export interface ArenaState {
   winner: TeamId | "";
   /** This match's knockouts per fighter. */
   kills: Record<string, number>;
+  /** The special meter per fighter (0–`SPECIAL_MAX`), kept through the rounds of a match. */
+  special: Record<string, number>;
   /** Matches won per person. */
   wins: Record<string, number>;
   /**
@@ -163,6 +194,8 @@ export interface ArenaPose {
   cb: number;
   rn: number;
   b: number;
+  /** Server time the current block started, when it can still parry (0: it can't). Absent on older clients. */
+  bt?: number;
   dr: number;
   sp: number;
   /** Server time of the sample. */
@@ -202,7 +235,8 @@ export function normalizeMeta(raw: Partial<ArenaMeta>): ArenaMeta {
 }
 
 function normalizeGear(raw: Partial<Gear> | undefined): Gear {
-  return { w: raw?.w ?? START_GEAR.w, sh: !!raw?.sh };
+  // A weapon this version doesn't know (a newer client's) counts as the dagger.
+  return { w: raw?.w && raw.w in WEAPONS ? raw.w : START_GEAR.w, sh: !!raw?.sh };
 }
 
 function normalizeState(raw: Partial<ArenaState> | null): ArenaState | null {
@@ -234,6 +268,7 @@ function normalizeState(raw: Partial<ArenaState> | null): ArenaState | null {
     roundEndedAt: raw.roundEndedAt ?? 0,
     winner: raw.winner ?? "",
     kills: raw.kills ?? {},
+    special: raw.special ?? {},
     wins: raw.wins ?? {},
     online: raw.online ?? false,
     nextAt: raw.nextAt ?? 0,
@@ -398,6 +433,7 @@ export function startMatch(roomId: string, settings: ArenaSettings, connected: s
       bots,
       score: { red: 0, blue: 0 },
       kills: {},
+      special: {},
       winner: "",
     };
     return setupRound(next, 1);
@@ -456,29 +492,58 @@ export function strike(
     const hits = { ...s.hits };
     const kills = { ...s.kills };
     const items = { ...s.items };
+    const special = { ...s.special };
+    const fill = (id: string, amount: number) => {
+      if (amount > 0) special[id] = Math.min(SPECIAL_MAX, Math.round((special[id] ?? 0) + amount));
+    };
     let itemSeq = s.itemSeq;
     let changed = false;
     for (const st of strikes) {
       const t = st.target;
       if (!alive(s, t) || s.roster[t] === s.roster[attacker] || (hp[t] ?? 0) <= 0) continue;
       changed = true;
-      hp[t] = Math.max(0, (hp[t] ?? 0) - Math.max(0, Math.round(st.damage)));
-      hits[t] = {
+      const damage = st.parried ? 0 : Math.max(0, Math.round(st.damage));
+      hp[t] = Math.max(0, (hp[t] ?? 0) - damage);
+      const note: HitNote = {
         n: (hits[t]?.n ?? 0) + 1,
         from: attacker,
-        b: st.blocked,
-        d: Math.round(st.drain),
+        b: st.blocked || !!st.parried,
+        d: st.parried ? 0 : Math.round(st.drain),
         x: Math.round(attackerAt.x * 100) / 100,
         z: Math.round(attackerAt.z * 100) / 100,
         t: Math.round(serverNow()),
       };
+      // Only the fields that apply (the database takes no undefined).
+      if (st.parried) note.pr = 1;
+      if (st.kick) note.kk = 1;
+      if (st.guardBreak) note.g = 1;
+      if (st.special) note.sp = 1;
+      if (st.push !== undefined) note.pw = Math.round(st.push * 10) / 10;
+      if (st.stagger !== undefined) note.st = Math.round(st.stagger * 100) / 100;
+      hits[t] = note;
+      // The meter: the defender for a guard or a parry, the attacker for what it landed (specials don't count).
+      if (st.parried) fill(t, SPECIAL_PARRY);
+      else if (st.blocked) fill(t, SPECIAL_BLOCKING);
+      if (!st.special && !st.parried) {
+        if (st.kick) fill(attacker, SPECIAL_ON_KICK);
+        else if (st.blocked) fill(attacker, SPECIAL_ON_BLOCKED);
+        else fill(attacker, damage * SPECIAL_PER_DAMAGE * (ranged ? 0.5 : 1));
+      }
       if (hp[t] === 0) {
         kills[attacker] = (kills[attacker] ?? 0) + 1;
         itemSeq = dropGear({ ...s, itemSeq }, items, s.gear[t] ?? START_GEAR, st.x, st.z);
       }
     }
     if (!changed) return null;
-    return checkRoundEnd({ ...s, hp, hits, kills, items, itemSeq });
+    return checkRoundEnd({ ...s, hp, hits, kills, items, itemSeq, special });
+  });
+}
+
+/** A special starts: its meter must be full, and empties. */
+export function spendSpecial(roomId: string, key: number, id: string) {
+  return mutate(roomId, (s) => {
+    if (!inRound(s, key) || !alive(s, id) || (s.special[id] ?? 0) < SPECIAL_MAX) return null;
+    return { ...s, special: { ...s.special, [id]: 0 } };
   });
 }
 
@@ -630,8 +695,8 @@ export function subscribeArrows(roomId: string, cb: (arrows: Record<string, Aren
  * A phone's pad on the big screen (`arena/input/{clientId}`): the stick
  * (x strafe, y forward, −1…1), the look dragged so far (`lx`/`ly`, radians,
  * accumulated), the buttons held (attack, block) and presses counted (jump,
- * dodge, pick up), so a tap between two samples is never lost. The screen
- * turns it into a fighter's input (`lib/arenaPad.ts`).
+ * dodge, pick up, kick `k`, special `s`), so a tap between two samples is
+ * never lost. The screen turns it into a fighter's input (`lib/arenaPad.ts`).
  */
 export interface ArenaPad {
   x: number;
@@ -643,9 +708,12 @@ export interface ArenaPad {
   j: number;
   d: number;
   p: number;
+  /** Absent on older phones. */
+  k?: number;
+  s?: number;
 }
 
-export const NO_PAD: ArenaPad = { x: 0, y: 0, lx: 0, ly: 0, a: 0, b: 0, j: 0, d: 0, p: 0 };
+export const NO_PAD: ArenaPad = { x: 0, y: 0, lx: 0, ly: 0, a: 0, b: 0, j: 0, d: 0, p: 0, k: 0, s: 0 };
 
 /** Where my pad goes; it's removed when the phone disconnects. */
 export function openPad(roomId: string, clientId: string) {
@@ -746,6 +814,7 @@ export function nextOnlineMatch(roomId: string, connected: string[]) {
       bots,
       score: { red: 0, blue: 0 },
       kills: {},
+      special: {},
       winner: "",
     };
     return setupRound(next, 1);

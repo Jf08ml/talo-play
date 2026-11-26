@@ -12,6 +12,8 @@
 import { mulberry32 } from "./random";
 import type { TeamId } from "./teams";
 
+const deg = (d: number) => (d * Math.PI) / 180;
+
 export const ARENA_RADIUS = 17;
 export const PILLAR_RADIUS = 0.9;
 /** Pillars, mirrored across x = 0 so neither team has better cover. */
@@ -50,7 +52,41 @@ const LUNGE = 3.2;
 const COMBO_CUT = 0.45;
 const COMBO_WINDUP = 0.7;
 
-export type WeaponId = "daga" | "espada" | "hacha" | "maza" | "lanza" | "arco";
+/**
+ * Parada perfecta: a block that started at most this long before a melee
+ * strike lands parries it (no damage, no stamina lost) and leaves the
+ * attacker reeling for `PARRY_STAGGER`. Blocks started within `PARRY_REARM`
+ * of letting go of the last one don't count, so tapping block over and over
+ * doesn't fish for parries.
+ */
+export const PARRY_WINDOW = 0.22;
+const PARRY_REARM = 0.45;
+export const PARRY_STAGGER = 0.85;
+
+/**
+ * Patada: short, quick and weak, but no guard stops it — a kick into a raised
+ * guard drops it and the defender reels (`KICK_GUARD_BREAK`). It can be
+ * dodged. One every `KICK_COOLDOWN` seconds.
+ */
+export const KICK_SECONDS = 0.5;
+/** When the foot lands, into the kick. */
+export const KICK_HIT = 0.17;
+export const KICK_COOLDOWN = 2.5;
+export const KICK_REACH = 1.45;
+const KICK_ARC = deg(80);
+export const KICK_DAMAGE = 6;
+const KICK_STAMINA = 12;
+/** The kick carries the kicker forward a little (m/s, fading), like a swing's lunge. */
+const KICK_STEP = 3;
+const KICK_PUSH = 8.5;
+const KICK_FLINCH = 0.4;
+const KICK_GUARD_BREAK = 0.85;
+const KICK_GUARD_DRAIN = 20;
+
+/** The special meter: full at this, filled by hits landed, blocks and parries (see `strike` in lib/arena.ts). */
+export const SPECIAL_MAX = 100;
+
+export type WeaponId = "daga" | "espada" | "hacha" | "maza" | "lanza" | "arco" | "martillo" | "mangual";
 export type ItemKind = WeaponId | "escudo" | "pocion";
 
 export interface WeaponSpec {
@@ -68,9 +104,12 @@ export interface WeaponSpec {
   /** How hard a blocked hit drains the defender's stamina (× damage). */
   drain: number;
   ranged?: boolean;
+  /**
+   * Against a shield: this much goes through instead of `pierce`, and the
+   * shield doesn't soften the drain (the flail's chain wraps around it).
+   */
+  shieldPierce?: number;
 }
-
-const deg = (d: number) => (d * Math.PI) / 180;
 
 export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   daga: { label: "Daga", damage: 13, reach: 1.6, arc: deg(75), windup: 0.2, recover: 0.24, stamina: 9, pierce: 0, drain: 0.8 },
@@ -79,7 +118,60 @@ export const WEAPONS: Record<WeaponId, WeaponSpec> = {
   maza: { label: "Maza", damage: 30, reach: 1.9, arc: deg(95), windup: 0.42, recover: 0.36, stamina: 21, pierce: 0.35, drain: 1.8 },
   lanza: { label: "Lanza", damage: 26, reach: 3.0, arc: deg(40), windup: 0.36, recover: 0.34, stamina: 17, pierce: 0, drain: 1 },
   arco: { label: "Arco", damage: 40, reach: 30, arc: 0, windup: 0, recover: 0.3, stamina: 10, pierce: 0, drain: 1, ranged: true },
+  // Slow and heavy: a blocked blow nearly empties the guard.
+  martillo: { label: "Martillo", damage: 36, reach: 2.0, arc: deg(85), windup: 0.6, recover: 0.48, stamina: 28, pierce: 0.25, drain: 2.6 },
+  // Wide arcing swings; against a shield almost half goes through.
+  mangual: { label: "Mangual", damage: 27, reach: 2.3, arc: deg(115), windup: 0.42, recover: 0.38, stamina: 20, pierce: 0.1, drain: 1.3, shieldPierce: 0.45 },
 };
+
+/**
+ * The special attack ("Golpe especial") of each weapon family, once the meter
+ * is full: a wind-up everyone can read, then the blow (`hit` seconds into the
+ * active part), then a recovery. Swords, daggers and the flail spin hitting
+ * all around; axes, maces and hammers slam the ground (no guard stops it, a
+ * jump does); the spear lunges far; the bow looses three full arrows.
+ */
+export type SpecialKind = "torbellino" | "terremoto" | "estocada" | "triple";
+
+export interface SpecialSpec {
+  label: string;
+  windup: number;
+  active: number;
+  hit: number;
+  recover: number;
+  damage: number;
+  reach: number;
+  arc: number;
+  /** Fraction through a block (the slam ignores guards). */
+  pierce: number;
+  push: number;
+  stagger: number;
+}
+
+export const SPECIALS: Record<SpecialKind, SpecialSpec> = {
+  torbellino: { label: "Torbellino", windup: 0.45, active: 0.55, hit: 0.15, recover: 0.35, damage: 26, reach: 2.6, arc: Math.PI * 2, pierce: 0.4, push: 8, stagger: 0.5 },
+  terremoto: { label: "Terremoto", windup: 0.7, active: 0.12, hit: 0, recover: 0.65, damage: 32, reach: 3.4, arc: Math.PI * 2, pierce: 1, push: 12, stagger: 0.9 },
+  estocada: { label: "Estocada", windup: 0.5, active: 0.32, hit: 0.2, recover: 0.45, damage: 40, reach: 2.9, arc: deg(40), pierce: 0.5, push: 10, stagger: 0.6 },
+  triple: { label: "Triple flecha", windup: 0.4, active: 0.05, hit: 0, recover: 0.45, damage: 40, reach: 30, arc: 0, pierce: 0, push: 0, stagger: 0 },
+};
+/** The spear's lunge: speed during the active part. */
+const LUNGE_DASH = 10;
+/** The triple arrow: angle between arrows. */
+export const TRIPLE_SPREAD = 0.09;
+/** The slam doesn't reach someone this high in the air. */
+const SLAM_JUMP = 0.45;
+
+export function specialOf(w: WeaponId): SpecialKind {
+  if (w === "arco") return "triple";
+  if (w === "lanza") return "estocada";
+  if (w === "hacha" || w === "maza" || w === "martillo") return "terremoto";
+  return "torbellino";
+}
+
+export function specialLength(kind: SpecialKind): number {
+  const sp = SPECIALS[kind];
+  return sp.windup + sp.active + sp.recover;
+}
 
 export const ITEM_LABEL: Record<ItemKind, string> = {
   ...(Object.fromEntries(Object.entries(WEAPONS).map(([k, v]) => [k, v.label])) as Record<WeaponId, string>),
@@ -112,9 +204,9 @@ export interface Gear {
 
 export const START_GEAR: Gear = { w: "daga", sh: false };
 
-/** What a fighter is doing; others see it in the pose to animate it. Append only (poses send the index). */
-export type Act = "idle" | "windup" | "recover" | "draw" | "stagger" | "dodge";
-export const ACTS: Act[] = ["idle", "windup", "recover", "draw", "stagger", "dodge"];
+/** What a fighter is doing; others see it in the pose to animate it. Append only (poses send the index; old clients read unknown ones as idle). */
+export type Act = "idle" | "windup" | "recover" | "draw" | "stagger" | "dodge" | "kick" | "special";
+export const ACTS: Act[] = ["idle", "windup", "recover", "draw", "stagger", "dodge", "kick", "special"];
 
 export interface FighterInput {
   /** Strafe (-1 left … 1 right) and forward (-1 back … 1 forward), joystick-style. */
@@ -129,9 +221,13 @@ export interface FighterInput {
   sprint: boolean;
   /** Pressed: a dodge toward where you move (backward if standing). */
   dodge: boolean;
+  /** Pressed: a kick (when its cooldown is over). */
+  kick: boolean;
+  /** Pressed: the special attack. The caller only sets it while the meter (in the room's state) is full. */
+  special: boolean;
 }
 
-export const IDLE_INPUT: FighterInput = { mx: 0, mz: 0, yaw: 0, pitch: 0, jump: false, attack: false, block: false, sprint: false, dodge: false };
+export const IDLE_INPUT: FighterInput = { mx: 0, mz: 0, yaw: 0, pitch: 0, jump: false, attack: false, block: false, sprint: false, dodge: false, kick: false, special: false };
 
 export type FighterEvent =
   /** An attack starts winding up (a whoosh), a jump or a dodge. */
@@ -140,8 +236,26 @@ export type FighterEvent =
   | { type: "dodge" }
   /** The swing lands now: the caller checks what it hit. */
   | { type: "strike" }
-  /** The bow shoots with this much draw (0–1). */
-  | { type: "shoot"; draw: number };
+  /** A kick starts, and its foot lands now (the caller checks what it hit). */
+  | { type: "kick" }
+  | { type: "kickHit" }
+  /** The special starts (the caller spends the meter), and its blow lands now. */
+  | { type: "special"; kind: SpecialKind }
+  | { type: "specialHit"; kind: SpecialKind }
+  /** The bow shoots with this much draw (0–1), `yawOff` to the side of where it looks (the triple arrow). */
+  | { type: "shoot"; draw: number; yawOff?: number };
+
+/** How a hit taken lands (besides blocked and the stamina it costs). */
+export interface HitExtra {
+  /** I parried it: nothing happens to me. */
+  parried?: boolean;
+  /** A kick (or a slam) knocked my guard aside. */
+  guardBreak?: boolean;
+  kick?: boolean;
+  /** Knockback speed (m/s) and stagger (s), when not the usual. */
+  push?: number;
+  stagger?: number;
+}
 
 /** Something round fighters bump into (pillars, other fighters). */
 export interface Solid {
@@ -210,6 +324,17 @@ export class Fighter {
   draw = 0;
   /** Swings chained so far (0 = the first); odd ones come from the other side. */
   combo = 0;
+  /** Seconds until the next kick. */
+  kickCd = 0;
+  /** The special being done (while `act` is "special"). */
+  specialKind: SpecialKind = "torbellino";
+  /** Seconds holding the current block, whether it can parry, and seconds since the last one ended. */
+  private blockAge = 0;
+  private parryOk = false;
+  private sinceBlock = 10;
+  private hitDone = false;
+  private kickWas = false;
+  private specialWas = false;
   private queued = false;
   private dodgeX = 0;
   private dodgeZ = 0;
@@ -227,6 +352,11 @@ export class Fighter {
 
   get onGround(): boolean {
     return this.y <= 0 && this.vy <= 0;
+  }
+
+  /** Seconds since a block that can still parry started (Infinity when not blocking or it can't). */
+  get parryAge(): number {
+    return this.blocking && this.parryOk ? this.blockAge : Infinity;
   }
 
   private start(act: Act, len: number) {
@@ -255,6 +385,11 @@ export class Fighter {
     this.attackWas = input.attack;
     const dodge = input.dodge && !this.dodgeWas;
     this.dodgeWas = input.dodge;
+    const kick = input.kick && !this.kickWas;
+    this.kickWas = input.kick;
+    const special = input.special && !this.specialWas;
+    this.specialWas = input.special;
+    this.kickCd = Math.max(0, this.kickCd - dt);
 
     // The act in progress.
     if (this.act === "windup" && this.actT >= this.actLen) {
@@ -274,6 +409,26 @@ export class Fighter {
       }
     } else if ((this.act === "stagger" || this.act === "dodge") && this.actT >= this.actLen) {
       this.start("idle", 0);
+    } else if (this.act === "kick") {
+      if (!this.hitDone && this.actT >= KICK_HIT) {
+        this.hitDone = true;
+        events.push({ type: "kickHit" });
+      } else if (!this.hitDone && this.actT - dt <= 0) {
+        this.kx += fx * KICK_STEP;
+        this.kz += fz * KICK_STEP;
+      }
+      if (this.actT >= this.actLen) this.start("idle", 0);
+    } else if (this.act === "special") {
+      const sp = SPECIALS[this.specialKind];
+      if (!this.hitDone && this.actT >= sp.windup + sp.hit) {
+        this.hitDone = true;
+        if (this.specialKind === "triple") {
+          for (const off of [-TRIPLE_SPREAD, 0, TRIPLE_SPREAD]) events.push({ type: "shoot", draw: 1, yawOff: off });
+        } else {
+          events.push({ type: "specialHit", kind: this.specialKind });
+        }
+      }
+      if (this.actT >= this.actLen) this.start("idle", 0);
     }
 
     // Dodging: from idle or late in a recovery, toward where you move.
@@ -297,13 +452,43 @@ export class Fighter {
       events.push({ type: "dodge" });
     }
 
+    // A kick or the special: from the same moments as a dodge (a raised guard drops for them).
+    const ready = this.act === "idle" || (this.act === "recover" && this.actT > this.actLen * 0.5) || this.act === "draw";
+    if (special && ready && this.onGround) {
+      this.specialKind = specialOf(gear.w);
+      this.queued = false;
+      this.draw = 0;
+      this.combo = 0;
+      this.hitDone = false;
+      this.start("special", specialLength(this.specialKind));
+      events.push({ type: "special", kind: this.specialKind });
+    } else if (kick && ready && this.onGround && this.kickCd <= 0 && this.stamina >= KICK_STAMINA) {
+      this.stamina -= KICK_STAMINA;
+      this.kickCd = KICK_COOLDOWN;
+      this.queued = false;
+      this.draw = 0;
+      this.combo = 0;
+      this.hitDone = false;
+      this.start("kick", KICK_SECONDS);
+      events.push({ type: "kick" });
+    }
+
     // Blocking: only when free; it also cancels an attack being wound up (a feint).
     const canBlock = !weapon.ranged && (this.act === "idle" || this.act === "windup");
+    const wasBlocking = this.blocking;
     if (input.block && canBlock) {
       if (this.act === "windup") this.start("idle", 0);
       this.blocking = this.stamina > 0;
     } else {
       this.blocking = false;
+    }
+    if (this.blocking) {
+      if (!wasBlocking) {
+        this.parryOk = this.sinceBlock >= PARRY_REARM;
+        this.blockAge = 0;
+      } else this.blockAge += dt;
+    } else {
+      this.sinceBlock = wasBlocking ? 0 : this.sinceBlock + dt;
     }
 
     if (weapon.ranged) {
@@ -347,11 +532,21 @@ export class Fighter {
     if (this.act === "windup") speed *= 0.7;
     if (this.act === "draw") speed *= 0.55;
     if (this.act === "stagger") speed *= 0.3;
+    if (this.act === "kick") speed *= 0.35;
+    if (this.act === "special") speed *= this.specialKind === "torbellino" ? 0.55 : this.specialKind === "triple" ? 0.4 : 0.1;
     if (!this.onGround) speed *= 0.9;
     const rx = -fz;
     const rz = fx;
     let vx = (fx * mz + rx * mx) * speed + this.kx;
     let vz = (fz * mz + rz * mx) * speed + this.kz;
+    if (this.act === "special" && this.specialKind === "estocada") {
+      // The lunge: a dash straight ahead during the blow.
+      const sp = SPECIALS.estocada;
+      if (this.actT >= sp.windup && this.actT < sp.windup + sp.active) {
+        vx = fx * LUNGE_DASH + this.kx;
+        vz = fz * LUNGE_DASH + this.kz;
+      }
+    }
     if (this.act === "dodge") {
       // The dash fades out toward the end.
       const k = 1 - Math.pow(this.actT / this.actLen, 2) * 0.6;
@@ -375,7 +570,8 @@ export class Fighter {
 
     const jump = input.jump && !this.jumpWas;
     this.jumpWas = input.jump;
-    if (jump && this.onGround && this.act !== "stagger" && this.act !== "dodge" && this.stamina >= JUMP_STAMINA) {
+    const busy = this.act === "stagger" || this.act === "dodge" || this.act === "kick" || this.act === "special";
+    if (jump && this.onGround && !busy && this.stamina >= JUMP_STAMINA) {
       this.vy = JUMP_SPEED;
       this.stamina -= JUMP_STAMINA;
       events.push({ type: "jump" });
@@ -395,10 +591,28 @@ export class Fighter {
    * Took a hit from someone at (fromX, fromZ): a block costs stamina (and
    * breaks the guard when it runs out); a clean hit makes it flinch.
    */
-  receive(blocked: boolean, drain: number, fromX: number, fromZ: number) {
+  receive(blocked: boolean, drain: number, fromX: number, fromZ: number, extra: HitExtra = {}) {
     const dx = this.x - fromX;
     const dz = this.z - fromZ;
     const d = Math.hypot(dx, dz) || 1;
+    if (extra.parried) {
+      // My parry: just a little step back.
+      this.kx += (dx / d) * KNOCKBACK * 0.2;
+      this.kz += (dz / d) * KNOCKBACK * 0.2;
+      return;
+    }
+    if (extra.guardBreak) {
+      // The guard is knocked aside: it drops and I reel.
+      this.stamina = Math.max(0, this.stamina - drain);
+      this.blocking = false;
+      const push = extra.push ?? KICK_PUSH;
+      this.kx += (dx / d) * push;
+      this.kz += (dz / d) * push;
+      if (this.act !== "special" && this.act !== "dodge") this.start("stagger", extra.stagger ?? KICK_GUARD_BREAK);
+      this.queued = false;
+      this.draw = 0;
+      return;
+    }
     if (blocked) {
       this.stamina -= drain;
       this.kx += (dx / d) * KNOCKBACK * 0.45;
@@ -410,11 +624,29 @@ export class Fighter {
       }
       return;
     }
-    this.kx += (dx / d) * KNOCKBACK;
-    this.kz += (dz / d) * KNOCKBACK;
-    if (this.act !== "recover" && this.act !== "dodge") this.start("stagger", FLINCH_SECONDS);
+    // Mid-special the knight doesn't flinch (it still gets pushed, a little).
+    const armored = this.act === "special";
+    const push = (extra.push ?? KNOCKBACK) * (armored ? 0.3 : 1);
+    this.kx += (dx / d) * push;
+    this.kz += (dz / d) * push;
+    if (armored || this.act === "dodge") return;
+    // A kick or a special also stops a recovery; a plain hit doesn't.
+    if (this.act !== "recover" || extra.kick || extra.stagger) this.start("stagger", extra.stagger ?? (extra.kick ? KICK_FLINCH : FLINCH_SECONDS));
     this.queued = false;
     this.draw = 0;
+  }
+
+  /** My blow was parried: knocked back and wide open for a moment. */
+  parried(fromX: number, fromZ: number) {
+    const dx = this.x - fromX;
+    const dz = this.z - fromZ;
+    const d = Math.hypot(dx, dz) || 1;
+    this.kx += (dx / d) * KNOCKBACK * 0.6;
+    this.kz += (dz / d) * KNOCKBACK * 0.6;
+    this.queued = false;
+    this.combo = 0;
+    this.blocking = false;
+    this.start("stagger", PARRY_STAGGER);
   }
 }
 
@@ -433,6 +665,8 @@ export interface FighterView {
   alive: boolean;
   /** Mid-dodge: nothing touches it. */
   dodging?: boolean;
+  /** Seconds since a block that can parry started (absent or Infinity: none). */
+  blockAge?: number;
 }
 
 export interface Strike {
@@ -440,9 +674,21 @@ export interface Strike {
   blocked: boolean;
   /** Health taken. */
   damage: number;
-  /** Stamina the target loses (only when blocked). */
+  /** Stamina the target loses (when blocked, or its guard knocked aside). */
   drain: number;
+  /** A perfect parry (blocked too): no damage, and the attacker reels. */
+  parried?: boolean;
+  kick?: boolean;
+  /** The target's guard was knocked aside (a kick or a slam into a raised guard). */
+  guardBreak?: boolean;
+  /** Part of a special attack (doesn't fill the meter). */
+  special?: boolean;
+  /** Knockback speed and stagger seconds when not the usual. */
+  push?: number;
+  stagger?: number;
 }
+
+const canParry = (t: FighterView) => (t.blockAge ?? Infinity) <= PARRY_WINDOW;
 
 /** Whether `target`'s guard faces something coming from (fromX, fromZ). */
 function guarded(target: FighterView, fromX: number, fromZ: number, arrow: boolean): boolean {
@@ -476,11 +722,106 @@ export function meleeStrikes(me: FighterView, gear: Gear, others: FighterView[])
     if (dist > 0.7 && Math.abs(angleDiff(yawTo(dx, dz), me.yaw)) > w.arc / 2 + Math.atan2(FIGHTER_RADIUS, dist)) continue;
     if (pillarBetween(me.x, me.z, t.x, t.z)) continue;
     const blocked = guarded(t, me.x, me.z, false);
+    if (blocked && canParry(t)) {
+      out.push({ target: t.id, blocked, parried: true, damage: 0, drain: 0 });
+      continue;
+    }
+    const wraps = t.shield && w.shieldPierce !== undefined;
     out.push({
       target: t.id,
       blocked,
-      damage: Math.round(blocked ? w.damage * w.pierce : w.damage),
-      drain: blocked ? w.damage * w.drain * (t.shield ? SHIELD_DRAIN : 1) : 0,
+      damage: Math.round(blocked ? w.damage * (wraps ? w.shieldPierce! : w.pierce) : w.damage),
+      drain: blocked ? w.damage * w.drain * (t.shield && !wraps ? SHIELD_DRAIN : 1) : 0,
+    });
+  }
+  return out;
+}
+
+/**
+ * A blow decided before the target's newest pose arrived (the network is
+ * late): `t` as seen a moment later, with `blockAge` measured at the blow's
+ * time. If its guard faces the attacker at (fromX, fromZ) and was raised
+ * within the window before the blow, the blow becomes a parry; else it stays.
+ * Kicks and the slam can't be parried.
+ */
+export function lateParry(st: Strike, t: FighterView, fromX: number, fromZ: number): Strike {
+  if (st.parried || st.blocked || st.kick || st.guardBreak || !guarded(t, fromX, fromZ, false) || !canParry(t)) return st;
+  return { target: st.target, blocked: true, parried: true, special: st.special, damage: 0, drain: 0 };
+}
+
+/** The distance to `t` if it's an enemy in reach and in front (same rules as a swing), else null. */
+function inFront(me: FighterView, t: FighterView, reach: number, arc: number, maxDy = 1.4): number | null {
+  if (!t.alive || t.dodging || t.team === me.team || t.id === me.id) return null;
+  const dx = t.x - me.x;
+  const dz = t.z - me.z;
+  const dist = Math.hypot(dx, dz);
+  if (dist > reach + FIGHTER_RADIUS || Math.abs(t.y - me.y) > maxDy) return null;
+  if (arc < Math.PI * 2 && dist > 0.7 && Math.abs(angleDiff(yawTo(dx, dz), me.yaw)) > arc / 2 + Math.atan2(FIGHTER_RADIUS, dist)) return null;
+  if (pillarBetween(me.x, me.z, t.x, t.z)) return null;
+  return dist;
+}
+
+/** What a kick hits: no guard stops it (a raised one is knocked aside); a dodge does. */
+export function kickStrikes(me: FighterView, others: FighterView[]): Strike[] {
+  const out: Strike[] = [];
+  for (const t of others) {
+    if (inFront(me, t, KICK_REACH, KICK_ARC, 0.8) === null) continue;
+    const breaks = t.blocking;
+    out.push({
+      target: t.id,
+      blocked: false,
+      kick: true,
+      guardBreak: breaks,
+      damage: KICK_DAMAGE,
+      drain: breaks ? KICK_GUARD_DRAIN : 0,
+      push: KICK_PUSH,
+      stagger: breaks ? KICK_GUARD_BREAK : KICK_FLINCH,
+    });
+  }
+  return out;
+}
+
+/**
+ * What a special's blow hits. The slam: everyone around, weaker toward the
+ * edge, no guard stops it (a raised one is knocked aside) but a jump does.
+ * The spin and the lunge: blocked like a swing (more goes through) and they
+ * can be parried.
+ */
+export function specialStrikes(me: FighterView, kind: SpecialKind, others: FighterView[]): Strike[] {
+  const sp = SPECIALS[kind];
+  const out: Strike[] = [];
+  if (kind === "triple") return out;
+  const slam = kind === "terremoto";
+  for (const t of others) {
+    if (slam && t.y - me.y > SLAM_JUMP) continue;
+    const dist = inFront(me, t, sp.reach, sp.arc);
+    if (dist === null) continue;
+    if (slam) {
+      out.push({
+        target: t.id,
+        blocked: false,
+        special: true,
+        guardBreak: t.blocking,
+        damage: Math.round(sp.damage * (1 - 0.4 * Math.min(1, dist / sp.reach))),
+        drain: t.blocking ? KICK_GUARD_DRAIN : 0,
+        push: sp.push,
+        stagger: sp.stagger,
+      });
+      continue;
+    }
+    const blocked = guarded(t, me.x, me.z, false);
+    if (blocked && canParry(t)) {
+      out.push({ target: t.id, blocked, parried: true, special: true, damage: 0, drain: 0 });
+      continue;
+    }
+    out.push({
+      target: t.id,
+      blocked,
+      special: true,
+      damage: Math.round(blocked ? sp.damage * sp.pierce : sp.damage),
+      drain: blocked ? sp.damage * 1.2 * (t.shield ? SHIELD_DRAIN : 1) : 0,
+      push: blocked ? sp.push * 0.4 : sp.push,
+      stagger: blocked ? undefined : sp.stagger,
     });
   }
   return out;
@@ -499,9 +840,9 @@ export interface Arrow {
 }
 
 /** An arrow leaving `f`'s eyes where it looks, faster and stronger the more it was drawn. */
-export function launchArrow(f: Fighter, draw: number): Arrow {
+export function launchArrow(f: Fighter, draw: number, yawOff = 0): Arrow {
   const speed = ARROW_MIN_SPEED + (ARROW_MAX_SPEED - ARROW_MIN_SPEED) * draw;
-  const [fx, fz] = forward(f.yaw);
+  const [fx, fz] = forward(f.yaw + yawOff);
   const c = Math.cos(f.pitch);
   return {
     x: f.x + fx * 0.5,
@@ -564,16 +905,21 @@ export const RESPAWN_PREFIX = "p";
 
 /**
  * The items laid out for a round: mirrored weapon pairs (same weapon on both
- * sides, so it's fair) plus one in the middle, shuffled by the seed; and
- * with `potions`, two mirrored pairs of potions.
+ * sides, so it's fair) plus a heavy one in the middle, shuffled by the seed:
+ * always a sword and a shield, and four of the rest. With `potions`, two
+ * mirrored pairs of potions.
  */
 export function roundItems(seed: number, round: number, potions = false): Record<string, ArenaItem> {
   const rand = mulberry32((seed ^ Math.imul(round + 1, 0x85ebca6b)) >>> 0);
-  const pairs: ItemKind[] = ["espada", "escudo", "lanza", "maza", "arco", "espada"];
-  for (let i = pairs.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [pairs[i], pairs[j]] = [pairs[j], pairs[i]];
-  }
+  const shuffle = <T,>(list: T[]) => {
+    for (let i = list.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [list[i], list[j]] = [list[j], list[i]];
+    }
+    return list;
+  };
+  const rest = shuffle<ItemKind>(["lanza", "maza", "arco", "mangual", "martillo", "espada"]).slice(0, 4);
+  const pairs = shuffle<ItemKind>(["espada", "escudo", ...rest]);
   // Spots on the red half (x < 0); blue's are their mirror.
   const spots: [number, number][] = [
     [-11, 6.5],
@@ -588,7 +934,7 @@ export function roundItems(seed: number, round: number, potions = false): Record
     items[`i${i}r`] = { kind: pairs[i], x, z };
     items[`i${i}b`] = { kind: pairs[i], x: -x, z: -z };
   });
-  items.c = { kind: rand() < 0.5 ? "hacha" : "maza", x: 0, z: 0 };
+  items.c = { kind: (["hacha", "martillo", "hacha", "maza"] as ItemKind[])[Math.floor(rand() * 4)], x: 0, z: 0 };
   if (potions) {
     const potionSpots: [number, number][] = [
       [-8.5, 0],
@@ -629,24 +975,37 @@ export interface BotMind {
   /** Swings left to chain in this flurry, and the swing it last pressed for. */
   chain: number;
   pressFor: number;
+  /** Seconds until it raises its guard to parry a swing it saw coming (−1: none planned). */
+  parryIn: number;
+  /** Seconds before it considers kicking again (on top of the kick's own cooldown). */
+  kickWait: number;
 }
 
 export function newMind(): BotMind {
-  return { wait: 0.5, strafe: 0, strafeT: 0, blockT: 0, seen: {}, releaseAt: 0.8, chain: 0, pressFor: -1 };
+  return { wait: 0.5, strafe: 0, strafeT: 0, blockT: 0, seen: {}, releaseAt: 0.8, chain: 0, pressFor: -1, parryIn: -1, kickWait: 1 };
 }
 
 /** What a bot sees of an enemy: its view plus what it's doing and with what. */
 export interface BotEnemy extends FighterView {
   act: Act;
-  /** Server time (ms) the act started, to notice a new wind-up. */
+  /** Server time (ms) the act started, to notice a new wind-up, and how long it lasts (s). */
   actAt: number;
+  actLen?: number;
   weapon: WeaponId;
 }
 
 export interface BotWorld {
   enemies: BotEnemy[];
   items: { id: string; kind: ItemKind; x: number; z: number }[];
+  /** Server time now (to time a parry) and the bot's special meter. */
+  now?: number;
+  special?: number;
 }
+
+/** How often a bot tries a perfect parry on a swing it sees coming (else block, dodge or take it). */
+const BOT_PARRY = 0.22;
+/** How often a bot kicks a raised guard in reach, per decision. */
+const BOT_KICK_GUARD = 0.55;
 
 /**
  * A bot's input for this step: go for a better weapon (or a potion when
@@ -701,6 +1060,18 @@ export function botInput(
     mind.strafeT = 0.5 + rand() * 1.0;
   }
 
+  // The meter is full: the special, when it would reach someone.
+  if (target && (world.special ?? 0) >= SPECIAL_MAX && (f.act === "idle" || f.act === "draw") && f.onGround) {
+    const kind = specialOf(gear.w);
+    const facing = Math.abs(angleDiff(yawTo(target.x - f.x, target.z - f.z), f.yaw));
+    const near =
+      kind === "terremoto" ? targetDist < SPECIALS.terremoto.reach * 0.85 :
+      kind === "torbellino" ? targetDist < SPECIALS.torbellino.reach * 0.85 :
+      kind === "estocada" ? targetDist < SPECIALS.estocada.reach + 2.5 && facing < 0.25 :
+      targetDist < 22 && facing < 0.15;
+    if (near && rand() < dt * 3) input.special = true;
+  }
+
   if (goal && !pick && (!target || itemDist < targetDist)) {
     turnTo(yawTo(goal.x - f.x, goal.z - f.z), 8);
     input.mz = 1;
@@ -731,14 +1102,19 @@ export function botInput(
       input.mz = targetDist > close ? 1 : targetDist < w.reach * 0.45 ? -0.6 : 0;
       input.sprint = targetDist > 7 && f.stamina > 50;
       input.mx = targetDist < 6 ? mind.strafe * 0.8 : 0;
-      // A swing it sees coming: block it, dodge it, or (sometimes) take it.
+      // A swing it sees coming: parry it, block it, dodge it, or (sometimes) take it.
       if (target.act === "windup" && mind.seen[target.id] !== target.actAt) {
         mind.seen[target.id] = target.actAt;
         const reach = WEAPONS[target.weapon].reach + 1;
         const aimed = Math.abs(angleDiff(yawTo(f.x - target.x, f.z - target.z), target.yaw)) < 0.8;
         if (targetDist < reach && aimed) {
           const r = rand();
-          if (r < (gear.sh ? 0.6 : 0.4)) mind.blockT = WEAPONS[target.weapon].windup + 0.2;
+          // When the blow lands: what's left of the wind-up.
+          const left = target.actLen !== undefined && world.now !== undefined ? target.actLen - (world.now - target.actAt) / 1000 : -1;
+          if (r < BOT_PARRY && left > 0.15 && mind.blockT <= 0) {
+            // Let go of any guard now and raise it again just before the blow (a little early or late at times).
+            mind.parryIn = Math.max(0.02, left - 0.12 + (rand() - 0.5) * 0.12);
+          } else if (r < (gear.sh ? 0.6 : 0.4)) mind.blockT = WEAPONS[target.weapon].windup + 0.2;
           else if (r < 0.7 && f.stamina > 35) {
             input.dodge = true;
             input.mx = rand() < 0.5 ? -1 : 1;
@@ -746,9 +1122,37 @@ export function botInput(
           }
         }
       }
-      if (mind.blockT > 0) {
+      // A special winding up close by: mostly get away from it.
+      if (target.act === "special" && mind.seen[target.id] !== target.actAt) {
+        mind.seen[target.id] = target.actAt;
+        const kind = specialOf(target.weapon);
+        if (targetDist < SPECIALS[kind].reach + 1.5 && f.stamina > 25) {
+          const r = rand();
+          if (r < 0.55) {
+            input.dodge = true;
+            input.mx = rand() < 0.5 ? -1 : 1;
+            input.mz = -1;
+          } else if (r < 0.75 && kind === "terremoto") input.jump = true;
+          else if (kind !== "terremoto") mind.blockT = SPECIALS[kind].windup + 0.3;
+        }
+      }
+      mind.kickWait -= dt;
+      if (mind.parryIn >= 0) {
+        mind.parryIn -= dt;
+        if (mind.parryIn < 0) mind.blockT = 0.35;
+      } else if (mind.blockT > 0) {
         mind.blockT -= dt;
         input.block = f.stamina > 15;
+      } else if (
+        f.act === "idle" &&
+        mind.kickWait <= 0 &&
+        f.kickCd <= 0 &&
+        targetDist < KICK_REACH + 0.25 &&
+        Math.abs(angleDiff(yawTo(dx, dz), f.yaw)) < 0.5
+      ) {
+        // Kick a raised guard open often, and now and then just to push.
+        mind.kickWait = 0.6 + rand() * 0.8;
+        if (rand() < (target.blocking ? BOT_KICK_GUARD : 0.12)) input.kick = true;
       } else if (f.act === "recover" && mind.chain > 0) {
         // Keep the flurry going: one press per swing, once the recovery accepts it.
         if (mind.pressFor !== f.combo && f.actT > f.actLen * 0.25) {

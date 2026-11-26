@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Keyboard, MonitorPlay, Shield, Swords } from "lucide-react";
+import { Keyboard, MonitorPlay, Shield, Sparkles, Swords } from "lucide-react";
 import { NO_PAD, openPad, teamInfo, type ArenaPad, type ArenaState } from "@/lib/arena";
-import { MAX_HP, WEAPONS } from "@/lib/arenaSim";
+import { MAX_HP, SPECIALS, SPECIAL_MAX, WEAPONS, specialOf } from "@/lib/arenaSim";
 import { useWakeLock } from "@/components/carreras/Controller";
 import { TOUCH_LOOK } from "./Controls";
 
@@ -12,10 +12,11 @@ import { TOUCH_LOOK } from "./Controls";
  * played like on the phone itself: a stick on the left (it appears where the
  * thumb lands; up = forward), and on the right a zone to drag and look
  * around — the knight faces and strikes where its camera looks — with the
- * buttons on it: «Atacar» and «Bloquear» (held), «Esquivar», «Saltar» and
- * «Agarrar» (presses, counted so none is lost). Shows my health and gear and
+ * buttons on it: «Atacar» and «Bloquear» (held), «Esquivar», «Saltar»,
+ * «Patada», «Especial» (lit when the meter is full) and «Agarrar» (presses,
+ * counted so none is lost). Shows my health, special meter and gear and
  * vibrates when I'm hit. On a computer: WASD move, the arrows look, J
- * attacks, K blocks, L dodges, space jumps, E picks up.
+ * attacks, K blocks, L dodges, I kicks, O the special, space jumps, E picks up.
  */
 
 /** ~30 a second: the look feels direct on the TV without flooding the database. */
@@ -40,7 +41,7 @@ function capture(e: ReactPointerEvent<HTMLElement>) {
 }
 
 /** Presses and look per room and player, kept while the page lives (the screen only uses what changed). */
-const counts = new Map<string, Pick<ArenaPad, "j" | "d" | "p" | "lx" | "ly">>();
+const counts = new Map<string, Pick<ArenaPad, "j" | "d" | "p" | "k" | "s" | "lx" | "ly">>();
 
 export default function Pad({ roomId, clientId, state }: { roomId: string; clientId: string; state: ArenaState }) {
   useWakeLock();
@@ -69,7 +70,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
   const send = (patch: Partial<ArenaPad>, urgent = false) => {
     wire.current = { ...wire.current, ...patch };
     const w = wire.current;
-    counts.set(key, { j: w.j, d: w.d, p: w.p, lx: w.lx, ly: w.ly });
+    counts.set(key, { j: w.j, d: w.d, p: w.p, k: w.k, s: w.s, lx: w.lx, ly: w.ly });
     const go = () => {
       timer.current = null;
       lastAt.current = performance.now();
@@ -95,8 +96,8 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
     setHeld((h) => ({ ...h, [b]: on }));
     if (on) navigator.vibrate?.(10);
   };
-  const press = (c: "j" | "d" | "p") => {
-    send({ [c]: wire.current[c] + 1 }, true);
+  const press = (c: "j" | "d" | "p" | "k" | "s") => {
+    send({ [c]: (wire.current[c] ?? 0) + 1 }, true);
     navigator.vibrate?.(12);
   };
 
@@ -144,6 +145,8 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
       if (!e.repeat && k === " ") press("j");
       else if (!e.repeat && k === "l") press("d");
       else if (!e.repeat && k === "e") press("p");
+      else if (!e.repeat && k === "i") press("k");
+      else if (!e.repeat && k === "o") press("s");
       else if (!(k in MOVE_KEYS) && k !== "j" && k !== "k" && !k.startsWith("arrow")) return;
       e.preventDefault();
       down.add(k);
@@ -230,7 +233,9 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
     onPointerCancel: () => hold(b, false),
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   });
-  const tap = (c: "j" | "d" | "p") => ({
+  const special = state.special[clientId] ?? 0;
+  const full = special >= SPECIAL_MAX;
+  const tap = (c: "j" | "d" | "p" | "k" | "s") => ({
     onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
       e.preventDefault();
       e.stopPropagation();
@@ -253,6 +258,14 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
           {team && (
             <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-white/10">
               <div className="h-full rounded-full transition-all" style={{ width: `${(hp / MAX_HP) * 100}%`, background: color }} />
+            </div>
+          )}
+          {team && (
+            <div className="mt-1 flex items-center gap-1.5">
+              <Sparkles className={`h-3 w-3 shrink-0 ${full ? "text-talo-hero" : "text-white/40"}`} />
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+                <div className={`h-full rounded-full transition-all ${full ? "bg-talo-hero" : "bg-white/50"}`} style={{ width: `${(Math.min(SPECIAL_MAX, special) / SPECIAL_MAX) * 100}%` }} />
+              </div>
             </div>
           )}
         </div>
@@ -308,6 +321,15 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
             <span className="pointer-events-none absolute left-4 top-3 text-sm font-bold text-white/35">Arrastra aquí para mirar</span>
             <div className="absolute bottom-3 right-3 flex items-end gap-3">
               <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  {...tap("s")}
+                  aria-label="Golpe especial"
+                  className={`flex h-12 w-20 flex-col items-center justify-center rounded-2xl text-[11px] font-bold leading-tight ${full ? "animate-pulse bg-white text-talo-ink" : "bg-white/[0.06] text-white/35"}`}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {gear ? SPECIALS[specialOf(gear.w)].label : "Especial"}
+                </button>
                 <button type="button" {...tap("p")} className="h-12 w-20 rounded-2xl bg-talo-hero/90 text-sm font-bold text-talo-ink active:bg-talo-hero">
                   Agarrar
                 </button>
@@ -319,6 +341,9 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
                 </button>
               </div>
               <div className="flex flex-col items-center gap-3">
+                <button type="button" {...tap("k")} className="h-12 w-24 rounded-2xl bg-white/[0.14] text-sm font-bold active:bg-white/25">
+                  Patada
+                </button>
                 <button
                   type="button"
                   {...holdBtn("b")}
@@ -341,7 +366,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
       )}
 
       <p className="pointer-events-none hidden items-center justify-center gap-1.5 text-xs text-white/40 [@media(hover:hover)_and_(pointer:fine)]:flex">
-        <Keyboard className="h-3.5 w-3.5" /> WASD moverte · flechas mirar · J atacar · K bloquear · L esquivar · espacio saltar · E agarrar
+        <Keyboard className="h-3.5 w-3.5" /> WASD moverte · flechas mirar · J atacar · K bloquear · L esquivar · I patada · O especial · espacio saltar · E agarrar
       </p>
     </div>
   );

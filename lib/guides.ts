@@ -850,7 +850,8 @@ export const GUIDES: Record<GameId, Guide> = {
       {
         title: "Armas",
         text: [
-          "Empiezas con una daga. Por la arena hay espadas, hachas, mazas, lanzas, arcos y escudos: acércate y agárralos. Cada arma tiene su alcance y velocidad.",
+          "Empiezas con una daga. Por la arena hay espadas, hachas, mazas, martillos, manguales, lanzas, arcos y escudos: acércate y agárralos. Cada arma tiene su alcance y velocidad.",
+          "El martillo es lento pero pesado: un golpe bloqueado casi vacía el aguante del rival. El mangual barre en arcos anchos y su cadena pasa en parte por encima de los escudos.",
           "Si la sala tiene pociones, las del piso te curan.",
         ],
       },
@@ -858,14 +859,22 @@ export const GUIDES: Record<GameId, Guide> = {
         title: "Pelear",
         text: [
           "Ataca en el momento justo y vuelve a atacar durante el golpe para encadenar un combo. Bloquea de frente para frenar golpes (no los de atrás) y esquiva para escapar.",
-          "Correr, bloquear y esquivar gastan aguante: si se vacía, quedas expuesto.",
+          "Correr, bloquear, patear y esquivar gastan aguante: si se vacía, quedas expuesto.",
+        ],
+      },
+      {
+        title: "Parada perfecta, patada y especial",
+        text: [
+          "Parada perfecta: levanta el bloqueo justo antes de que te llegue el golpe. No te hace daño, no gastas aguante y el rival queda aturdido un momento: aprovecha para pegarle. Si bloqueas a cada rato, no cuenta.",
+          "Patada: corta, rápida y de poco daño, pero ningún bloqueo la frena: si el rival se está cubriendo, le rompe la guardia y lo deja expuesto. Se puede esquivar y hay que esperar un poco entre una y otra.",
+          "Golpe especial: la barra violeta se llena cuando pegas, bloqueas y, sobre todo, con paradas perfectas. Llena, lanza un golpe fuerte según tu arma: torbellino con espadas, dagas y manguales (pega alrededor), terremoto con hachas, mazas y martillos (golpe al suelo que empuja a todos; salta para evitarlo), estocada larga con la lanza y triple flecha con el arco. Brilla antes de salir: si lo ves venir, esquiva.",
         ],
       },
       {
         title: "Controles",
         text: [
-          "Celular: joystick a la izquierda para moverte, arrastra la pantalla para mirar, y botones para atacar, bloquear, esquivar, saltar y agarrar.",
-          "Computadora: haz clic en la arena. WASD para moverte, mouse para mirar, Shift para correr, clic para atacar, clic derecho o F para bloquear, Q para esquivar, espacio para saltar, E para agarrar y V para cambiar la cámara.",
+          "Celular: joystick a la izquierda para moverte, arrastra la pantalla para mirar, y botones para atacar, bloquear, esquivar, saltar, patear, el golpe especial (se ilumina cuando está listo) y agarrar.",
+          "Computadora: haz clic en la arena. WASD para moverte, mouse para mirar, Shift para correr, clic para atacar, clic derecho o F para bloquear, R o la rueda del mouse para patear, X para el golpe especial, Q para esquivar, espacio para saltar, E para agarrar y V para cambiar la cámara.",
         ],
       },
       {
@@ -879,7 +888,7 @@ export const GUIDES: Record<GameId, Guide> = {
         text: [
           "Al crear la sala, elige «En una pantalla grande»: el combate se ve en una computadora conectada a la tele o al proyector, y cada uno entra desde su celular con el código.",
           "La pantalla se divide: cada persona (hasta 4) tiene su parte, con la cámara detrás de su caballero. Con más de 4 personas, se ve toda la arena desde arriba.",
-          "El celular es el control, como cuando juegas en el celular: joystick para moverte (a fondo hacia adelante es correr) y arrastrar el dedo en la mitad derecha para mirar; tu caballero mira y pega hacia donde apunta tu cámara. «Atacar» y «Bloquear» se mantienen apretados, y «Esquivar», «Saltar» y «Agarrar» se tocan. El celular vibra cuando te pegan.",
+          "El celular es el control, como cuando juegas en el celular: joystick para moverte (a fondo hacia adelante es correr) y arrastrar el dedo en la mitad derecha para mirar; tu caballero mira y pega hacia donde apunta tu cámara. «Atacar» y «Bloquear» se mantienen apretados, y «Esquivar», «Saltar», «Patada», el golpe especial y «Agarrar» se tocan. El celular muestra tu barra de especial y vibra cuando te pegan.",
         ],
       },
     ],

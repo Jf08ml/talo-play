@@ -2,7 +2,20 @@ import * as THREE from "three";
 import { mulberry32 } from "./random";
 import { Bloom, aimShadow, glowColor, type Quality } from "./postfx";
 import type { TeamId } from "./teams";
-import { ARENA_RADIUS, EYE_HEIGHT, PILLARS, PILLAR_RADIUS, WEAPONS, type ArenaItem, type ItemKind } from "./arenaSim";
+import {
+  ARENA_RADIUS,
+  EYE_HEIGHT,
+  KICK_HIT,
+  KICK_SECONDS,
+  PILLARS,
+  PILLAR_RADIUS,
+  SPECIALS,
+  WEAPONS,
+  specialOf,
+  type ArenaItem,
+  type ItemKind,
+  type SpecialKind,
+} from "./arenaSim";
 import {
   DARK_STEEL,
   GOLD,
@@ -23,14 +36,28 @@ import {
   lerp,
   phong,
   shieldMesh,
+  swingFlail,
   swinging,
   weaponMesh,
   type Knight,
   type KnightPose,
 } from "./arena3dKnight";
-import { Impacts, Particles, SwingTrail } from "./arena3dFx";
+import { Impacts, Particles, Shockwaves, SwingTrail } from "./arena3dFx";
 
 export type { KnightPose } from "./arena3dKnight";
+
+/**
+ * Something a knight did that the page may want to hear, seen from the
+ * poses (so it's the same for your own knight, bots and rivals): a kick or a
+ * special starting, and their blows landing.
+ */
+export interface ArenaFx {
+  id: string;
+  kind: "kick" | "kickHit" | "special" | "specialHit";
+  special?: SpecialKind;
+  x: number;
+  z: number;
+}
 
 /**
  * Arena medieval in 3D (three.js), browser only: a sand arena inside a
@@ -66,6 +93,16 @@ const FLASH_HIT = new THREE.Color(0xffd0a8);
 const FLASH_BLOCK = new THREE.Color(0xfff1b0);
 const FLASH_HIT_GLOW = glowColor(0xffc49a, 1.35);
 const FLASH_BLOCK_GLOW = glowColor(0xfff0a8, 1.6);
+// A perfect parry: whiter and brighter than a block.
+const PARRY_SPARKS = [new THREE.Color(0xffffff), new THREE.Color(0xfff6c4), new THREE.Color(0xfde047), new THREE.Color(0xbae6fd)];
+const FLASH_PARRY = new THREE.Color(0xfffbe8);
+const FLASH_PARRY_GLOW = glowColor(0xfff6d8, 2.2);
+const PARRY_RING = new THREE.Color(0xfff3b0);
+// Specials: the charge's aura, the slam's ring, the whirlwind's.
+const AURA = new THREE.Color(0xffc94a);
+const AURA_GLOW = glowColor(0xffd36b, 1.6);
+const SLAM_RING = new THREE.Color(0xf6d7a0);
+const SPIN_RING = new THREE.Color(0xfff2d6);
 
 // ---- Textures ----------------------------------------------------------------
 
@@ -191,8 +228,12 @@ function handPose(p: KnightPose, bob: number): { right: HandPose; left: HandPose
   let right: HandPose = { ...HAND_IDLE, py: HAND_IDLE.py + bob };
   let left: HandPose = { px: -0.36, py: -0.42 + bob, pz: -0.48, rx: 0, ry: 0.35, rz: 0 };
   if (w.ranged) {
+    // The triple arrow draws all the way in its wind-up.
+    const tw = SPECIALS.triple.windup;
+    const draw = p.act === "draw" ? p.draw : p.act === "special" && p.actT < tw ? ease(p.actT / tw) : 0;
     left = { px: -0.06, py: -0.18, pz: -0.55, rx: 0, ry: 0, rz: 0.12 };
-    right = { px: 0.04, py: -0.2, pz: -0.45 + (p.act === "draw" ? p.draw * 0.22 : 0), rx: 0, ry: 0, rz: 0 };
+    right = { px: 0.04, py: -0.2, pz: -0.45 + draw * 0.22, rx: 0, ry: 0, rz: 0 };
+    if (p.act === "kick") left = { ...left, py: left.py + 0.05, px: left.px - 0.1 };
     return { right, left };
   }
   const spear = p.gear.w === "lanza";
@@ -213,6 +254,38 @@ function handPose(p: KnightPose, bob: number): { right: HandPose; left: HandPose
     ry: lerp(a.ry, b.ry, k),
     rz: lerp(a.rz, b.rz, k),
   });
+  if (p.act === "kick") {
+    // Arms a little out for balance (the foot comes up from below, see `updateHands`).
+    right = { ...right, py: right.py + 0.06, px: right.px + 0.1, rz: right.rz - 0.3 };
+    left = { ...left, px: left.px - 0.08, py: left.py + 0.05 };
+    return { right, left };
+  }
+  if (p.act === "special") {
+    const kind = specialOf(p.gear.w);
+    const sp = SPECIALS[kind];
+    const ww = ease(clamp01(p.actT / sp.windup));
+    const a = clamp01((p.actT - sp.windup) / sp.active);
+    const back = ease(clamp01((p.actT - sp.windup - sp.active) / sp.recover));
+    const started = p.actT >= sp.windup;
+    if (kind === "torbellino") {
+      // Two sweeps across in front while the body turns.
+      const sweep = (1 - Math.cos(a * Math.PI * 4)) / 2;
+      right = started ? mix(mix(wound, swung, sweep), right, back) : mix(right, wound, ww);
+    } else if (kind === "terremoto") {
+      const up: HandPose = { px: 0.12, py: 0.1, pz: -0.3, rx: 2.0, ry: 0.1, rz: -0.1 };
+      const down: HandPose = { px: 0.04, py: -0.5, pz: -0.8, rx: -0.6, ry: 0, rz: -0.1 };
+      const hit = ease(clamp01(a * 2));
+      right = started ? mix(mix(up, down, hit), right, back) : mix(right, up, ww);
+      const upL = { ...up, px: -0.1, rx: 0.4 };
+      const downL = { ...down, px: -0.14, rx: 0 };
+      left = started ? mix(mix(upL, downL, hit), left, back) : mix(left, upL, ww);
+    } else if (kind === "estocada") {
+      const pulled: HandPose = { px: 0.25, py: -0.28, pz: -0.12, rx: 0, ry: 0.05, rz: -0.1 };
+      const out: HandPose = { px: 0.08, py: -0.24, pz: -1.35, rx: 0, ry: 0, rz: -0.1 };
+      right = started ? mix(mix(pulled, out, easeOutBack(clamp01(a * 1.6), 1.2)), right, back) : mix(right, pulled, ww);
+    }
+    return { right, left };
+  }
   if (p.blocking) {
     if (p.gear.sh) left = { px: -0.12, py: -0.24, pz: -0.42, rx: 0, ry: 0.1, rz: 0 };
     else right = { px: 0.05, py: -0.16, pz: -0.5, rx: 0.15, ry: 0, rz: Math.PI / 2 - 0.15 };
@@ -259,6 +332,15 @@ export class ArenaScene {
   private sparks = new Particles(420, true, 9, 1.2);
   private dust = new Particles(300, false, -0.4, 3);
   private impacts: Impacts;
+  private shock = new Shockwaves();
+  /** A glow around a knight charging its special (made the first time it does). */
+  private auras = new Map<string, THREE.Sprite>();
+  /** Per knight: the act last seen and whether its blow was already shown (for `ArenaFx`). */
+  private actSeen = new Map<string, { act: string; t: number; hit: boolean }>();
+  private fxOut: ArenaFx[] = [];
+  /** First person: your foot, coming up for a kick. */
+  private handFoot = new THREE.Group();
+  private handWeapon: THREE.Group | null = null;
   private geos = knightGeos();
   /** Swing trails behind third-person weapons (id → trail). */
   private trails = new Map<string, SwingTrail>();
@@ -320,7 +402,7 @@ export class ArenaScene {
     this.impacts = new Impacts(this.glow);
     // Under bloom the swing trails glow a little.
     this.trailColor = high ? glowColor(0xfff2d6, 1.25) : new THREE.Color(0xfff2d6).multiplyScalar(0.85);
-    this.scene.add(this.sparks.points, this.dust.points, this.embers.points, this.impacts.group);
+    this.scene.add(this.sparks.points, this.dust.points, this.embers.points, this.impacts.group, this.shock.group);
     // Specks of dust hanging in the sunlight.
     {
       const n = high ? 160 : 80;
@@ -349,7 +431,18 @@ export class ArenaScene {
     );
     this.trail.position.set(0, -0.42, -0.95);
     this.trail.rotation.x = -1.05;
-    this.hands.add(this.handRight, this.handLeft, this.trail);
+    {
+      // A boot and greave pointing ahead, seen from above as it kicks.
+      const boot = new THREE.Mesh(new THREE.CapsuleGeometry(0.085, 0.2, 3, 10).rotateX(Math.PI / 2).scale(1.2, 0.9, 1), lambert(LEATHER));
+      const greave = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.3, 3, 10), phong(DARK_STEEL, 60));
+      greave.position.set(0, 0.22, 0.12);
+      greave.rotation.x = 0.5;
+      const toe = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1.1, 0.8, 1.3).rotateX(-Math.PI / 2), phong(DARK_STEEL, 60));
+      toe.position.z = -0.15;
+      this.handFoot.add(boot, greave, toe);
+      this.handFoot.visible = false;
+    }
+    this.hands.add(this.handRight, this.handLeft, this.trail, this.handFoot);
     this.handScene.add(this.hands);
   }
 
@@ -566,6 +659,8 @@ export class ArenaScene {
         disposeTree(k.root);
         disposeTree(k.shadow);
         this.knights.delete(id);
+        this.auras.delete(id);
+        this.actSeen.delete(id);
         const trail = this.trails.get(id);
         if (trail) {
           this.scene.remove(trail.mesh);
@@ -685,11 +780,40 @@ export class ArenaScene {
     }
   }
 
-  /** A hit: sparks on metal (`block`), a flash, sparks and a ring on a clean hit, sand on a fall. */
-  burst(x: number, y: number, z: number, kind: "hit" | "block" | "dust") {
+  /**
+   * A hit: sparks on metal (`block`), a flash, sparks and a ring on a clean
+   * hit, sand on a fall; a perfect parry is a bigger, whiter burst with a
+   * ring around; a kick, a puff and a few sparks.
+   */
+  burst(x: number, y: number, z: number, kind: "hit" | "block" | "dust" | "parry" | "kick") {
     const high = this.shadows;
     if (kind === "dust") {
       this.dustRing(x, z, 18, 1.6, 0.55);
+      return;
+    }
+    if (kind === "parry") {
+      const n = high ? 64 : 36;
+      for (let i = 0; i < n; i++) {
+        const a = this.rand() * Math.PI * 2;
+        const fast = this.rand() < 0.45;
+        const sp = 4 + this.rand() * (fast ? 9 : 4);
+        this.sparks.spawn(x, y, z, Math.cos(a) * sp, 1 + this.rand() * 5, Math.sin(a) * sp, PARRY_SPARKS[i % PARRY_SPARKS.length], fast ? 0.06 : 0.1 + this.rand() * 0.08, 0.3 + this.rand() * 0.5, 1);
+      }
+      this.impacts.spawn(x, y, z, high ? FLASH_PARRY_GLOW : FLASH_PARRY, 1.5, 1.3, 0.32);
+      this.shock.spawn(x, y, z, PARRY_RING, 1.7, 0.32);
+      return;
+    }
+    if (kind === "kick") {
+      for (let i = 0; i < (high ? 14 : 8); i++) {
+        const a = this.rand() * Math.PI * 2;
+        const sp = 2 + this.rand() * 3;
+        this.sparks.spawn(x, y, z, Math.cos(a) * sp, 0.5 + this.rand() * 2, Math.sin(a) * sp, HIT_SPARKS[i % HIT_SPARKS.length], 0.07, 0.25, 1);
+      }
+      this.impacts.spawn(x, y, z, high ? FLASH_HIT_GLOW : FLASH_HIT, 0.55, 0.6, 0.18);
+      for (let i = 0; i < 8; i++) {
+        const a = this.rand() * Math.PI * 2;
+        this.dust.spawn(x, y, z, Math.cos(a) * 1.4, 0.3 + this.rand(), Math.sin(a) * 1.4, DUST_LIGHT, 0.3, 0.5, 0.4, 0.9);
+      }
       return;
     }
     const block = kind === "block";
@@ -743,6 +867,108 @@ export class ArenaScene {
     this.cheerT = 2.2;
   }
 
+  /** What the knights did since the last call (kicks and specials starting and landing). */
+  takeFx(): ArenaFx[] {
+    const out = this.fxOut;
+    this.fxOut = [];
+    return out;
+  }
+
+  /** Notices kicks and specials from the pose (new act, the blow's moment), shows their effects and the charge's glow. */
+  private actFx(id: string, k: Knight, p: KnightPose, dt: number) {
+    let seen = this.actSeen.get(id);
+    if (!seen) {
+      seen = { act: "", t: 0, hit: false };
+      this.actSeen.set(id, seen);
+    }
+    const fresh = p.act !== seen.act || p.actT < seen.t - 0.05;
+    seen.act = p.act;
+    seen.t = p.actT;
+    if (fresh) seen.hit = false;
+    const fx = -Math.sin(p.yaw);
+    const fz = -Math.cos(p.yaw);
+    let charging = false;
+    let charge = 0;
+    if (p.alive && p.act === "kick") {
+      if (fresh) this.fxOut.push({ id, kind: "kick", x: p.x, z: p.z });
+      if (!seen.hit && p.actT >= KICK_HIT) {
+        seen.hit = true;
+        this.fxOut.push({ id, kind: "kickHit", x: p.x, z: p.z });
+        // Sand off the planted foot.
+        for (let i = 0; i < 5; i++) {
+          const a = this.rand() * Math.PI * 2;
+          this.dust.spawn(p.x + Math.cos(a) * 0.15, 0.06, p.z + Math.sin(a) * 0.15, Math.cos(a) * 0.6, 0.3, Math.sin(a) * 0.6, DUST, 0.3, 0.5, 0.35, 0.7);
+        }
+      }
+    } else if (p.alive && p.act === "special") {
+      const kind = specialOf(p.gear.w);
+      const sp = SPECIALS[kind];
+      if (fresh) this.fxOut.push({ id, kind: "special", special: kind, x: p.x, z: p.z });
+      charging = p.actT < sp.windup + sp.hit;
+      charge = clamp01(p.actT / sp.windup);
+      if (!seen.hit && p.actT >= sp.windup + sp.hit) {
+        seen.hit = true;
+        this.fxOut.push({ id, kind: "specialHit", special: kind, x: p.x, z: p.z });
+        this.specialFx(kind, p, fx, fz);
+      }
+      // The lunge raises sand all along the dash.
+      if (kind === "estocada" && p.actT >= sp.windup && p.actT < sp.windup + sp.active) {
+        k.dustAcc += dt * 50;
+        while (k.dustAcc > 1) {
+          k.dustAcc -= 1;
+          const a = this.rand() * Math.PI * 2;
+          this.dust.spawn(p.x + Math.cos(a) * 0.2, 0.06, p.z + Math.sin(a) * 0.2, -fx * 1.2 + Math.cos(a) * 0.4, 0.4, -fz * 1.2 + Math.sin(a) * 0.4, DUST, 0.35, 0.6, 0.4, 0.8);
+        }
+      }
+    }
+    // The charge's glow: grows through the wind-up, flickering.
+    let aura = this.auras.get(id);
+    if (charging && !aura) {
+      aura = new THREE.Sprite(
+        new THREE.SpriteMaterial({ map: this.glow, color: this.shadows ? AURA_GLOW : AURA, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, fog: false })
+      );
+      aura.position.y = 1.0;
+      k.root.add(aura);
+      this.auras.set(id, aura);
+    }
+    if (aura) {
+      aura.visible = charging;
+      if (charging) {
+        aura.scale.setScalar(1.5 + charge * 1.3 + Math.sin(this.time * 32) * 0.12);
+        (aura.material as THREE.SpriteMaterial).opacity = 0.3 + 0.5 * charge;
+      }
+    }
+  }
+
+  /** The moment a special's blow lands, on every screen. */
+  private specialFx(kind: SpecialKind, p: KnightPose, fx: number, fz: number) {
+    const high = this.shadows;
+    const sp = SPECIALS[kind];
+    if (kind === "terremoto") {
+      const x = p.x + fx * 0.9;
+      const z = p.z + fz * 0.9;
+      this.shock.spawn(x, 0.06, z, SLAM_RING, sp.reach + 0.6, 0.6);
+      this.shock.spawn(x, 0.08, z, SLAM_RING, sp.reach * 0.55, 0.35);
+      this.dustRing(x, z, high ? 34 : 22, 4.5, 0.7);
+      // Clods thrown up.
+      for (let i = 0; i < (high ? 16 : 9); i++) {
+        const a = this.rand() * Math.PI * 2;
+        const s = 1 + this.rand() * 2.5;
+        this.dust.spawn(x, 0.1, z, Math.cos(a) * s, 3 + this.rand() * 3, Math.sin(a) * s, DUST, 0.22, 0.8, 0.8, 0.3);
+      }
+      this.impacts.spawn(x, 0.3, z, high ? FLASH_BLOCK_GLOW : FLASH_BLOCK, 1.3, 0, 0.25);
+    } else if (kind === "torbellino") {
+      this.shock.spawn(p.x, p.y + 1.05, p.z, SPIN_RING, sp.reach + 0.3, 0.5);
+      this.dustRing(p.x, p.z, high ? 22 : 14, 2.6, 0.5);
+    } else if (kind === "estocada") {
+      const x = p.x + fx * 2.0;
+      const z = p.z + fz * 2.0;
+      this.impacts.spawn(x, p.y + 1.3, z, high ? FLASH_HIT_GLOW : FLASH_HIT, 0.9, 0.9, 0.22);
+    } else {
+      this.impacts.spawn(p.x + fx * 0.7, p.y + 1.5, p.z + fz * 0.7, high ? FLASH_BLOCK_GLOW : FLASH_BLOCK, 0.8, 0.6, 0.2);
+    }
+  }
+
   private tip = new THREE.Vector3();
   private base = new THREE.Vector3();
 
@@ -768,6 +994,12 @@ export class ArenaScene {
       // The blob shadow shrinks while in the air.
       k.shadow.scale.setScalar(1 - Math.min(0.5, p.y * 0.6));
       const ev = animateKnight(k, p, dt, this.time);
+      this.actFx(id, k, p, dt);
+      // A flail's chain hangs and swings.
+      if (k.weapon?.userData.flail) {
+        k.root.updateMatrixWorld(true);
+        swingFlail(k.weapon, swinging(p), dt);
+      }
       // Sand kicked up: footsteps when running, a puff on dodges and landings.
       if (p.alive && p.y < 0.05) {
         if (p.act === "dodge" && k.lastAct !== "dodge") this.dustRing(p.x, p.z, 14, 1.8, 0.5);
@@ -806,7 +1038,9 @@ export class ArenaScene {
           k.root.updateMatrixWorld(true);
           this.tip.copy(k.weapon.userData.tip as THREE.Vector3);
           this.base.copy(k.weapon.userData.base as THREE.Vector3);
-          k.weapon.localToWorld(this.tip);
+          const ball = k.weapon.userData.tipObj as THREE.Object3D | undefined;
+          if (ball) ball.getWorldPosition(this.tip);
+          else k.weapon.localToWorld(this.tip);
           k.weapon.localToWorld(this.base);
           trail.push(this.base, this.tip, this.time, sw);
         }
@@ -862,6 +1096,7 @@ export class ArenaScene {
     this.sparks.update(dt);
     this.dust.update(dt);
     this.embers.update(dt);
+    this.shock.update(dt);
     this.shake = Math.max(0, this.shake - dt * (1.1 + this.shake * 1.6));
     this.shakeT += dt;
   }
@@ -878,6 +1113,7 @@ export class ArenaScene {
         }
       }
       this.handShield = null;
+      this.handWeapon = null;
       const fist = () => new THREE.Mesh(new THREE.CapsuleGeometry(0.048, 0.05, 3, 10).rotateX(Math.PI / 2), phong(DARK_STEEL));
       if (p.gear.w === "arco") {
         const bow = weaponMesh("arco");
@@ -890,6 +1126,7 @@ export class ArenaScene {
         const w = weaponMesh(p.gear.w);
         w.rotation.x = 0.5;
         this.handRight.add(w, fist());
+        this.handWeapon = w;
         if (p.gear.sh) {
           this.handShield = shieldMesh(team);
           this.handShield.scale.setScalar(0.85);
@@ -914,11 +1151,22 @@ export class ArenaScene {
     };
     apply(this.handRight, this.handNow.right);
     apply(this.handLeft, this.handNow.left);
-    // The swing's trail: bright as it goes through, fading right after.
+    // Kicking: the foot comes up from below the view and goes out.
+    if (p.act === "kick") {
+      const kt = p.actT / KICK_SECONDS;
+      const hitT = KICK_HIT / KICK_SECONDS;
+      const out = ease(clamp01(kt / hitT)) * (1 - ease(clamp01((kt - 0.5) / 0.4)));
+      this.handFoot.visible = out > 0.02;
+      this.handFoot.position.set(0.14, lerp(-1.15, -0.55, out), lerp(-0.35, -0.95, out));
+      this.handFoot.rotation.set(lerp(0.6, -0.45, out), 0, -0.15 * out);
+    } else this.handFoot.visible = false;
+    // The swing's trail: bright as it goes through, fading right after (and through a special's blow).
     const melee = !WEAPONS[p.gear.w].ranged && p.gear.w !== "lanza";
     const swingT = p.act === "recover" && p.actLen > 0 ? p.actT / p.actLen : 1;
-    this.trail.material.opacity = melee && swingT < 0.45 ? (1 - swingT / 0.45) * 0.5 : 0;
+    const spSwing = p.act === "special" ? swinging(p) : 0;
+    this.trail.material.opacity = Math.max(melee && swingT < 0.45 ? (1 - swingT / 0.45) * 0.5 : 0, spSwing * 0.55);
     this.trail.scale.x = p.combo % 2 ? -1 : 1;
+    if (this.handWeapon?.userData.flail) swingFlail(this.handWeapon, swingT < 0.45 || spSwing > 0 ? 1 : 0, dt);
     // The bow's string follows the draw.
     const bow = this.handLeft.children.find((c) => c.userData.string) as THREE.Group | undefined;
     const string = bow?.userData.string as THREE.Line | undefined;

@@ -107,6 +107,69 @@ export class ArenaAudio {
     this.hiss("highpass", 3000, 6000, 0.08, 0.25 * vol, pan, 0.05);
   }
 
+  /** A perfect parry: a bright ring over the clang, and a short rising "shing". */
+  parry(vol = 1, pan = 0) {
+    if (!this.live) return;
+    const t = this.ctx!.currentTime;
+    for (const [f, v] of [
+      [1560, 0.13],
+      [2340, 0.09],
+      [3120, 0.06],
+      [4680, 0.035],
+    ]) {
+      this.tone(f, t, 0.8, "sine", v * vol, undefined, pan);
+    }
+    this.tone(900, t, 0.25, "triangle", 0.1 * vol, 2400, pan);
+    this.hiss("highpass", 4000, 9000, 0.12, 0.3 * vol, pan, 0.05);
+  }
+
+  /** A kick: a short whoosh as the leg goes out. */
+  kick(vol = 1, pan = 0) {
+    if (!this.live) return;
+    this.hiss("bandpass", 400, 1200, 0.16, 0.22 * vol, pan, 0.5);
+  }
+
+  /** A kick landing: a dull boot on armor. */
+  kickHit(vol = 1, pan = 0) {
+    if (!this.live) return;
+    const t = this.ctx!.currentTime;
+    this.tone(110, t, 0.14, "sine", 0.55 * vol, 50, pan);
+    this.tone(420, t, 0.06, "square", 0.06 * vol, 200, pan);
+    this.hiss("lowpass", 900, 150, 0.12, 0.35 * vol, pan, 0.05);
+  }
+
+  /** A special winding up: a rising hum (longer for the slam). */
+  charge(seconds: number, vol = 1, pan = 0) {
+    if (!this.live) return;
+    const t = this.ctx!.currentTime;
+    this.tone(160, t, seconds + 0.1, "sawtooth", 0.05 * vol, 520, pan);
+    this.tone(320, t, seconds + 0.1, "triangle", 0.06 * vol, 1040, pan);
+    this.hiss("bandpass", 300, 2500, seconds + 0.1, 0.12 * vol, pan, 0.9);
+  }
+
+  /** The slam: a deep boom and rocks. */
+  slam(vol = 1, pan = 0) {
+    if (!this.live) return;
+    const t = this.ctx!.currentTime;
+    this.tone(60, t, 0.7, "sine", 0.8 * vol, 28, pan);
+    this.tone(120, t, 0.3, "triangle", 0.3 * vol, 45, pan);
+    this.hiss("lowpass", 3000, 120, 0.8, 0.55 * vol, pan, 0.03);
+  }
+
+  /** The whirlwind: a long whooshing spin. */
+  whirl(vol = 1, pan = 0) {
+    if (!this.live) return;
+    this.hiss("bandpass", 500, 2600, 0.55, 0.35 * vol, pan, 0.4);
+    this.hiss("bandpass", 2600, 700, 0.5, 0.2 * vol, pan, 0.6);
+  }
+
+  /** The lunge: a fast rush forward. */
+  lunge(vol = 1, pan = 0) {
+    if (!this.live) return;
+    this.hiss("bandpass", 800, 3200, 0.3, 0.32 * vol, pan, 0.3);
+    this.tone(200, this.ctx!.currentTime, 0.25, "triangle", 0.08 * vol, 500, pan);
+  }
+
   /** A clean hit: a thud. */
   thud(vol = 1, pan = 0) {
     if (!this.live) return;
