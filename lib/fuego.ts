@@ -33,6 +33,10 @@ export const SIZE_OPTIONS = [2, 4, 6, 8] as const;
 export const GOAL_OPTIONS = [10, 20, 30] as const;
 export const MINUTE_OPTIONS = [5, 10] as const;
 export const FEED_SIZE = 6;
+/** Just back on your feet: nobody can hurt you for this long (no spawn killing). */
+export const SPAWN_GUARD_MS = 2000;
+/** On a big screen each person gets a quarter of it at most. */
+export const SCREEN_MAX_PEOPLE = 4;
 
 /** How long a taken pickup takes to come back. */
 export const RESPAWN_ITEM_MS: Record<PickupKind, number> = {
@@ -47,6 +51,8 @@ export const RESPAWN_ITEM_MS: Record<PickupKind, number> = {
 
 export type FuegoMode = "todos" | "equipos";
 export type FuegoStatus = "waiting" | "playing" | "finished";
+/** Where the match is seen: each on their phone, or a big screen with the phones as controllers. */
+export type FuegoView = "telefono" | "pantalla";
 /** A fighter's side: a team, or "ffa" in free-for-all. */
 export type Side = TeamId | "ffa";
 
@@ -62,6 +68,7 @@ export interface FuegoMeta {
   minutes: number;
   bots: boolean;
   level: BotLevel;
+  view: FuegoView;
   createdAt: number | object;
 }
 
@@ -77,6 +84,8 @@ export interface FeedEntry {
   w: string;
   h: boolean;
   t: number;
+  /** The killer's streak with this kill (absent on older entries and suicides). */
+  s?: number;
 }
 
 /** The last hit a fighter took, for its own phone (damage direction, flash). */
@@ -109,9 +118,14 @@ export interface FuegoState {
   hitAt: Record<string, number>;
   /** Server time of death; absent or 0 = alive. */
   deadAt: Record<string, number>;
+  /** Server time of the last respawn: `SPAWN_GUARD_MS` of protection from there. */
+  spawnAt: Record<string, number>;
   hits: Record<string, HitNote>;
   kills: Record<string, number>;
   deaths: Record<string, number>;
+  /** Kills in a row without dying, and the best of the match. */
+  streak: Record<string, number>;
+  best: Record<string, number>;
   score: Record<TeamId, number>;
   items: Record<string, { kind: PickupKind; x: number; z: number }>;
   respawns: Record<string, { kind: PickupKind; x: number; z: number; at: number }>;
@@ -181,6 +195,7 @@ export function normalizeMeta(raw: Partial<FuegoMeta>): FuegoMeta {
     minutes: raw.minutes ?? 10,
     bots: raw.bots ?? true,
     level: raw.level ?? "normal",
+    view: raw.view === "pantalla" ? "pantalla" : "telefono",
     createdAt: raw.createdAt ?? 0,
   };
 }
@@ -204,9 +219,12 @@ function normalizeState(raw: Partial<FuegoState> | null): FuegoState | null {
     sh: raw.sh ?? {},
     hitAt: raw.hitAt ?? {},
     deadAt: raw.deadAt ?? {},
+    spawnAt: raw.spawnAt ?? {},
     hits: raw.hits ?? {},
     kills: raw.kills ?? {},
     deaths: raw.deaths ?? {},
+    streak: raw.streak ?? {},
+    best: raw.best ?? {},
     score: { red: raw.score?.red ?? 0, blue: raw.score?.blue ?? 0 },
     items: raw.items ?? {},
     respawns: raw.respawns ?? {},
@@ -243,6 +261,17 @@ export function shieldOf(s: Pick<FuegoState, "sh" | "hitAt">, id: string, now: n
 
 export const teamInfo = (id: TeamId) => TEAMS.find((t) => t.id === id)!;
 
+/** Still protected after respawning? */
+export function guarded(s: Pick<FuegoState, "spawnAt">, id: string, now: number): boolean {
+  return now - (s.spawnAt[id] ?? 0) < SPAWN_GUARD_MS;
+}
+
+/** A fighter's color: their team's, or their own in free-for-all. */
+export function fighterColor(s: FuegoState, id: string): string {
+  const side = s.roster[id];
+  return side === "red" || side === "blue" ? teamInfo(side).color : (s.players[id]?.color ?? "#f97316");
+}
+
 /** The fighters ranked by kills (then fewer deaths). */
 export function ranking(s: FuegoState): string[] {
   return Object.keys(s.roster).sort((a, b) => (s.kills[b] ?? 0) - (s.kills[a] ?? 0) || (s.deaths[a] ?? 0) - (s.deaths[b] ?? 0));
@@ -257,7 +286,7 @@ function mutate(roomId: string, fn: (state: FuegoState) => FuegoState | null) {
   return transactState(statePath(roomId), normalizeState, fn);
 }
 
-export type FuegoSettings = Pick<FuegoMeta, "map" | "mode" | "size" | "goal" | "minutes" | "bots" | "level">;
+export type FuegoSettings = Pick<FuegoMeta, "map" | "mode" | "size" | "goal" | "minutes" | "bots" | "level" | "view">;
 
 export async function createFuegoRoom(hostId: string, settings: FuegoSettings): Promise<string> {
   const roomId = generateRoomCode();
@@ -309,13 +338,15 @@ export function shuffleTeams(roomId: string, connected: string[]) {
 }
 
 /**
- * Starts a match: the connected people (up to `size`), plus bots to fill
- * the places when `bots` is on. Needs two fighters at least.
+ * Starts a match: the connected people (up to `size`, and up to
+ * `SCREEN_MAX_PEOPLE` on a big screen), plus bots to fill the places when
+ * `bots` is on. Needs two fighters at least.
  */
 export function startMatch(roomId: string, settings: FuegoSettings, connected: string[]) {
   return mutate(roomId, (s) => {
     if (s.status !== "waiting" && s.status !== "finished") return null;
-    const people = connected.filter((id) => s.players[id]).slice(0, settings.size);
+    const most = settings.view === "pantalla" ? Math.min(settings.size, SCREEN_MAX_PEOPLE) : settings.size;
+    const people = connected.filter((id) => s.players[id]).slice(0, most);
     const roster: Record<string, Side> = {};
     const bots: Record<string, string> = {};
     if (settings.mode === "equipos") {
@@ -368,9 +399,12 @@ export function startMatch(roomId: string, settings: FuegoSettings, connected: s
       sh: Object.fromEntries(ids.map((id) => [id, MAX_SHIELD])),
       hitAt: {},
       deadAt: {},
+      spawnAt: {},
       hits: {},
       kills: {},
       deaths: {},
+      streak: {},
+      best: {},
       score: { red: 0, blue: 0 },
       items,
       respawns: {},
@@ -414,7 +448,19 @@ export function damage(roomId: string, key: number, attacker: string, from: { x:
   return mutate(roomId, (s) => {
     if (!playing(s, key) || !(attacker in s.roster)) return null;
     const now = serverNow();
-    let next = { ...s, hp: { ...s.hp }, sh: { ...s.sh }, hitAt: { ...s.hitAt }, deadAt: { ...s.deadAt }, hits: { ...s.hits }, kills: { ...s.kills }, deaths: { ...s.deaths }, score: { ...s.score } };
+    let next = {
+      ...s,
+      hp: { ...s.hp },
+      sh: { ...s.sh },
+      hitAt: { ...s.hitAt },
+      deadAt: { ...s.deadAt },
+      hits: { ...s.hits },
+      kills: { ...s.kills },
+      deaths: { ...s.deaths },
+      streak: { ...s.streak },
+      best: { ...s.best },
+      score: { ...s.score },
+    };
     let changed = false;
     for (const h of hits) {
       const t = h.target;
@@ -422,6 +468,7 @@ export function damage(roomId: string, key: number, attacker: string, from: { x:
       const self = t === attacker;
       if (self && weapon !== "cohete" && weapon !== "granada") continue;
       if (!self && allies(s, attacker, t)) continue;
+      if (!self && guarded(s, t, now)) continue;
       changed = true;
       let dmg = Math.max(0, h.damage);
       const shield = shieldOf(next, t, now);
@@ -434,12 +481,19 @@ export function damage(roomId: string, key: number, attacker: string, from: { x:
       if (next.hp[t] === 0) {
         next.deadAt[t] = Math.round(now);
         next.deaths[t] = (next.deaths[t] ?? 0) + 1;
+        delete next.streak[t];
+        let streak = 0;
         if (!self) {
           next.kills[attacker] = (next.kills[attacker] ?? 0) + 1;
+          streak = (next.streak[attacker] ?? 0) + 1;
+          next.streak[attacker] = streak;
+          next.best[attacker] = Math.max(next.best[attacker] ?? 0, streak);
           const side = s.roster[attacker];
           if (side !== "ffa") next.score[side] += 1;
         }
-        next = { ...next, ...addFeed(next, { k: attacker, v: t, w: weapon, h: h.head, t: Math.round(now) }) };
+        const entry: FeedEntry = { k: attacker, v: t, w: weapon, h: h.head, t: Math.round(now) };
+        if (streak) entry.s = streak;
+        next = { ...next, ...addFeed(next, entry) };
       }
     }
     if (!changed) return null;
@@ -460,7 +514,14 @@ export function respawn(roomId: string, key: number, id: string) {
     if (!playing(s, key) || !(id in s.roster) || !s.deadAt[id] || serverNow() < s.deadAt[id] + RESPAWN_MS - 300) return null;
     const deadAt = { ...s.deadAt };
     delete deadAt[id];
-    return { ...s, deadAt, hp: { ...s.hp, [id]: MAX_HP }, sh: { ...s.sh, [id]: MAX_SHIELD }, hitAt: { ...s.hitAt, [id]: 0 } };
+    return {
+      ...s,
+      deadAt,
+      hp: { ...s.hp, [id]: MAX_HP },
+      sh: { ...s.sh, [id]: MAX_SHIELD },
+      hitAt: { ...s.hitAt, [id]: 0 },
+      spawnAt: { ...s.spawnAt, [id]: Math.round(serverNow()) },
+    };
   });
 }
 
@@ -562,4 +623,80 @@ export function publishBoom(roomId: string, b: FuegoBoom): string {
 
 export function subscribeBooms(roomId: string, cb: (list: Record<string, FuegoBoom>) => void): Unsubscribe {
   return onValue(ref(getDb(), `${base(roomId)}/booms`), (snap) => cb(snap.val() ?? {}));
+}
+
+// ---- Big screen: the phones' pads and what the screen tells each phone ---------------------
+
+/**
+ * A phone's pad when the match is on a big screen (`fuego/input/{clientId}`,
+ * removed on disconnect): the stick (`x` strafe, `y` forward, −1…1), the look
+ * dragged so far (`lx`/`ly`, accumulated radians), the trigger held (`f`) and
+ * aiming (`a`, toggled on the phone). Presses are counters, so none is lost
+ * between two reads: `ft` trigger presses (a tap shorter than a frame still
+ * shoots), `j` jump, `r` reload, `q` switch weapon, `g` grenade, `m` melee,
+ * `p` pick up. `sid` is random per page load: when it changes (the phone
+ * reloaded and its counters and look started again) the screen resyncs
+ * instead of reading it as presses or a drag. The screen turns it into the
+ * soldier's input (`lib/fuegoPad.ts`).
+ */
+export interface FuegoPad {
+  sid: number;
+  x: number;
+  y: number;
+  lx: number;
+  ly: number;
+  f: number;
+  a: number;
+  ft: number;
+  j: number;
+  r: number;
+  q: number;
+  g: number;
+  m: number;
+  p: number;
+}
+
+export const NO_PAD: FuegoPad = { sid: 0, x: 0, y: 0, lx: 0, ly: 0, f: 0, a: 0, ft: 0, j: 0, r: 0, q: 0, g: 0, m: 0, p: 0 };
+
+export function openPad(roomId: string, clientId: string) {
+  const r = ref(getDb(), `${base(roomId)}/input/${clientId}`);
+  onDisconnect(r).remove().catch(console.error);
+  return {
+    send: (pad: FuegoPad) => set(r, pad).catch(console.error),
+    close: () => {
+      onDisconnect(r).cancel().catch(console.error);
+      remove(r).catch(console.error);
+    },
+  };
+}
+
+export function subscribePads(roomId: string, cb: (pads: Record<string, FuegoPad>) => void): Unsubscribe {
+  return onValue(ref(getDb(), `${base(roomId)}/input`), (snap) => cb(snap.val() ?? {}));
+}
+
+/**
+ * What only the big screen knows about each person (ammo and weapons are
+ * local to whoever runs the soldier), written to `fuego/live/{id}` when it
+ * changes so the phone can show it: weapon in hand and the other one
+ * (`WEAPON_IDS` index, −1 none), magazine and reserve, grenades, the weapon
+ * on the floor in reach (`n`, a label or ""), reloading and aiming.
+ */
+export interface FuegoLive {
+  w: number;
+  o: number;
+  m: number;
+  r: number;
+  g: number;
+  n: string;
+  l: number;
+  z: number;
+}
+
+export function publishLive(roomId: string, patch: Record<string, FuegoLive>) {
+  if (!Object.keys(patch).length) return;
+  update(ref(getDb(), `${base(roomId)}/live`), patch).catch(console.error);
+}
+
+export function subscribeLive(roomId: string, id: string, cb: (live: FuegoLive | null) => void): Unsubscribe {
+  return onValue(ref(getDb(), `${base(roomId)}/live/${id}`), (snap) => cb(snap.val()));
 }

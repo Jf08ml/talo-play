@@ -1,24 +1,29 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
+  NO_PAD,
   RESPAWN_MS,
   allies,
   backToWaiting,
   damage,
+  fighterColor,
   fighterName,
+  guarded,
   isAlive,
   isBot,
   openPose,
   pickItem,
   publishBoom,
+  publishLive,
   ranking,
   respawn,
   respawnItems,
   shieldOf,
   startMatch,
   subscribeBooms,
+  subscribePads,
   subscribePoses,
   subscribeProjectiles,
   teamInfo,
@@ -27,7 +32,9 @@ import {
   type DamageHit,
   type FeedEntry,
   type FuegoBoom,
+  type FuegoLive,
   type FuegoMeta,
+  type FuegoPad,
   type FuegoPose,
   type FuegoProjectile,
   type FuegoState,
@@ -63,8 +70,9 @@ import {
   type Target,
   type WeaponId,
 } from "@/lib/fuegoSim";
+import { kickLook, newPadSeen, padInput, resetLook, type PadSeen } from "@/lib/fuegoPad";
 import { MAPS, type PickupKind } from "@/lib/fuegoMaps";
-import { FuegoScene } from "@/lib/fuego3d";
+import { FuegoScene, type Eye, type ViewModel } from "@/lib/fuego3d";
 import { useQuality } from "@/hooks/useQuality";
 import QualityButton from "@/components/QualityButton";
 import { FuegoAudio } from "@/lib/fuegoAudio";
@@ -75,14 +83,17 @@ import { useWakeLock } from "@/components/carreras/Controller";
 import { TaloMark } from "@/components/TaloLogo";
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from "@/components/ui";
 import { MOUSE_LOOK, TOUCH_LOOK, TouchControls, newControls, useDesktopControls, useFinePointer, type ControlState } from "./Controls";
-import { ListOrdered, MousePointerClick, RotateCw, Volume2, VolumeX } from "lucide-react";
+import { Bomb, Crown, Flame, ListOrdered, MousePointerClick, RotateCw, ShieldCheck, Skull, Volume2, VolumeX } from "lucide-react";
 import FullscreenButton from "@/components/FullscreenButton";
 
 const STEP = 1 / 60;
 const POSE_MS = 50;
+const LIVE_MS = 150;
 const RADAR_RANGE = 28;
+const BASE_FOV = 78;
 /** Mobile aim help: bullets that pass this close (radians) to someone still hit. */
 const TOUCH_ASSIST = 0.06;
+const TOAST_MS = 2600;
 
 interface Ghost {
   x: number;
@@ -100,7 +111,20 @@ interface Ghost {
   firedAt: number;
 }
 
-interface BotRun {
+/** How someone died: who, with what, and how much the killer had left. */
+interface Death {
+  killer: string;
+  weapon: string;
+  hp: number;
+  sh: number;
+}
+
+/**
+ * A soldier this client runs besides its own: a bot (bot host), or — on the
+ * big screen — a person playing from their phone's pad (`remote`). The view
+ * fields (aiming, recoil, deaths, toasts…) are only used for people.
+ */
+interface Run {
   s: Soldier;
   a: Arsenal;
   mind: BotMind;
@@ -109,7 +133,26 @@ interface BotRun {
   end: [number, number, number];
   m: number;
   g: number;
-  pickAt: number;
+  remote?: PadSeen;
+  aiming: boolean;
+  sinceShot: number;
+  meleeT: number;
+  land: number;
+  deathAt: number;
+  deathSpot: { x: number; y: number; z: number; yaw: number };
+  death: Death | null;
+  lastKiller: string;
+  recent: number[];
+  hurtAt: number;
+  hurtShield: boolean;
+  toast: { title: string; sub: string; at: number } | null;
+  near: string;
+  nearId: string;
+  wantPick: boolean;
+  prevYaw: number;
+  prevPitch: number;
+  /** Camera tilt while strafing (big screen views). */
+  roll: number;
 }
 
 interface LocalProjectile {
@@ -129,10 +172,14 @@ interface Hud {
   other: WeaponId | null;
   grenades: number;
   alive: boolean;
+  guard: boolean;
   respawnIn: number;
   killer: string;
+  killedWith: string;
+  killerHp: number;
   near: string;
   zoomed: boolean;
+  aiming: boolean;
   reloading: boolean;
   radar: { x: number; y: number; ally: boolean }[];
   watching: string;
@@ -144,8 +191,23 @@ interface Hud {
   board: boolean;
 }
 
+/** Big screen: one person's view and what's drawn over it. */
+interface ViewHud extends Hud {
+  id: string;
+  toast: { title: string; sub: string; at: number } | null;
+  /** Hit just now: 1 on the shield, 2 on health. */
+  hurt: 0 | 1 | 2;
+}
+
+interface Toast {
+  title: string;
+  sub: string;
+  id: number;
+}
+
 const SOUND_KEY = "fuego.sound";
 const QUALITY_KEY = "fuego.calidad";
+const NO_SEND = { send: () => {}, close: () => {} } as unknown as ReturnType<typeof openPose>;
 
 function formatClock(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000));
@@ -160,10 +222,61 @@ const WEAPON_WORD: Record<string, string> = {
   lanzacohetes: "cohete",
   cohete: "cohete",
   granada: "granada",
-  golpe: "golpe",
+  golpe: "culatazo",
 };
 
-/** The match on screen: the map in 3D, your soldier, the bots if you run them, and the HUD. */
+/** Big screen, split: the views' rectangles (fractions, from the top-left) for 1–4 people. */
+export function splitRects(n: number): [number, number, number, number][] {
+  if (n <= 1) return [[0, 0, 1, 1]];
+  if (n === 2) return [[0, 0, 0.5, 1], [0.5, 0, 0.5, 1]];
+  if (n === 3) return [[0, 0, 0.5, 0.5], [0.5, 0, 0.5, 0.5], [0, 0.5, 1, 0.5]];
+  return [[0, 0, 0.5, 0.5], [0.5, 0, 0.5, 0.5], [0, 0.5, 0.5, 0.5], [0.5, 0.5, 0.5, 0.5]];
+}
+
+/** The people who get a view on the big screen (up to 4), red team first. */
+export function splitPeople(state: FuegoState): string[] {
+  const order = (id: string) => (state.roster[id] === "red" ? 0 : state.roster[id] === "blue" ? 1 : 0);
+  return Object.keys(state.roster)
+    .filter((id) => !isBot(id))
+    .sort((a, b) => order(a) - order(b) || a.localeCompare(b))
+    .slice(0, 4);
+}
+
+/** The medals a kill earns its killer (most special first). */
+function medalsFor(e: FeedEntry, recent: number, lastKiller: string, firstBlood: boolean): string[] {
+  const out: string[] = [];
+  const streak = e.s ?? 0;
+  if (streak >= 10 && streak % 5 === 0) out.push(streak === 10 ? "¡Leyenda!" : `¡Racha de ${streak}!`);
+  else if (streak === 5) out.push("¡Imparable!");
+  if (recent >= 4) out.push("¡Masacre!");
+  else if (recent === 3) out.push("¡Triple baja!");
+  else if (recent === 2) out.push("¡Doble baja!");
+  if (firstBlood) out.push("¡Primera sangre!");
+  if (lastKiller && e.v === lastKiller) out.push("¡Venganza!");
+  if (e.w === "golpe") out.push("¡Culatazo!");
+  else if (e.h) out.push("¡Tiro a la cabeza!");
+  return out;
+}
+
+/** "One kill from winning" for whoever is there, or "". */
+function nearWin(s: FuegoState, myId: string): string {
+  if (s.status !== "playing") return "";
+  if (s.mode === "equipos") {
+    const team = (["red", "blue"] as TeamId[]).find((t) => s.score[t] === s.goal - 1);
+    if (!team) return "";
+    return s.roster[myId] === team ? "¡A una baja de ganar!" : `¡El ${teamInfo(team).label} está a una baja!`;
+  }
+  const leader = ranking(s).find((id) => (s.kills[id] ?? 0) === s.goal - 1);
+  if (!leader) return "";
+  return leader === myId ? "¡A una baja de ganar!" : `¡${fighterName(s, leader)} está a una baja!`;
+}
+
+/**
+ * The match on screen: the map in 3D, your soldier, the bots if you run them,
+ * and the HUD. With `screen` (the big screen, `myId` ""), it runs everyone —
+ * people from their phones' pads, bots with their brain — decides their hits,
+ * and draws a first-person view per person (up to 4), split.
+ */
 export default function Battle({
   roomId,
   meta,
@@ -171,6 +284,7 @@ export default function Battle({
   myId,
   presence,
   presenceLoaded,
+  screen = false,
 }: {
   roomId: string;
   meta: FuegoMeta;
@@ -178,6 +292,7 @@ export default function Battle({
   myId: string;
   presence: PresenceMap;
   presenceLoaded: boolean;
+  screen?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef(state);
@@ -192,19 +307,21 @@ export default function Battle({
     }
   });
   const [hud, setHud] = useState<Hud | null>(null);
+  const [views, setViews] = useState<ViewHud[]>([]);
+  const [marks, setMarks] = useState<Record<string, { n: number; head: boolean; kill: boolean }>>({});
   const [clock, setClock] = useState(0);
   const [hit, setHit] = useState<{ n: number; head: boolean; kill: boolean }>({ n: 0, head: false, kill: false });
   const [hurtDirs, setHurtDirs] = useState<{ a: number; id: number; shield: boolean }[]>([]);
   const [shieldBroke, setShieldBroke] = useState(0);
   const [quality, toggleQuality] = useQuality(QUALITY_KEY);
-  const [toast, setToast] = useState<{ text: string; id: number } | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
   const [aimToggle, setAimToggle] = useState(false);
   const aimToggleRef = useRef(false);
   const [board, setBoard] = useState(false);
   const fine = useFinePointer();
   const myAliveNow = !!hud?.alive;
   const canFight = state.status === "playing" && myAliveNow && myId in state.roster;
-  const locked = useDesktopControls(controlsRef, canvasRef, fine, canFight);
+  const locked = useDesktopControls(controlsRef, canvasRef, fine && !screen, canFight);
 
   useWakeLock();
   useEffect(() => {
@@ -247,9 +364,11 @@ export default function Battle({
     let poses: Record<string, FuegoPose> = {};
     let projIn: Record<string, FuegoProjectile> = {};
     let boomsIn: Record<string, FuegoBoom> = {};
-    const unsubPoses = subscribePoses(roomId, (p) => (poses = p));
+    let pads: Record<string, FuegoPad> = {};
+    const unsubPoses = screen ? () => {} : subscribePoses(roomId, (p) => (poses = p));
     const unsubProj = subscribeProjectiles(roomId, (p) => (projIn = p));
     const unsubBooms = subscribeBooms(roomId, (b) => (boomsIn = b));
+    const unsubPads = screen ? subscribePads(roomId, (p) => (pads = p)) : () => {};
 
     let frame = 0;
     let last = performance.now();
@@ -263,33 +382,39 @@ export default function Battle({
     let myGrenades = 0;
     let deathAt = 0;
     let deathSpot = { x: 0, y: 0, z: 0, yaw: 0 };
-    let killerId = "";
+    let myDeath: Death | null = null;
+    let myLastKiller = "";
     const look = { yaw: 0, pitch: 0 };
     let sinceShot = 10;
     let meleeT = 0;
     let lastPose = 0;
+    let lastLive = 0;
     let hudAt = 0;
     let lastHudKey = "";
+    let lastViewsKey = "";
     let lastStride = 0;
+    let myRoll = 0;
     let lastCount = -1;
     let shieldWas = MAX_SHIELD;
     let alarmAt = 0;
-    let kills: number[] = [];
+    let myRecent: number[] = [];
     let whizzAt = 0;
     let land = 0;
     let hurtId = 0;
     let toastId = 0;
     const ghosts = new Map<string, Ghost>();
-    const bots = new Map<string, BotRun>();
+    const runs = new Map<string, Run>();
     const myProj: LocalProjectile[] = [];
     const remoteProj = new Map<string, { p: Projectile; age: number }>();
     const seenBooms = new Set<string>(Object.keys(boomsIn));
     const seenHits = new Map<string, number>();
     const seenFeed = new Set<string>(Object.keys(stateRef.current.feed));
+    let anyKill = Object.values(stateRef.current.kills).some((k) => k > 0);
+    const liveSent = new Map<string, string>();
     const called = new Map<string, number>();
     let lastItems: unknown = null;
     let lastInfo = "";
-    const mySend = myId in stateRef.current.roster ? openPose(roomId, myId, true) : null;
+    const mySend = !screen && myId in stateRef.current.roster ? openPose(roomId, myId, true) : null;
     for (const [id, h] of Object.entries(stateRef.current.hits)) seenHits.set(id, h.n);
     const rand = Math.random;
 
@@ -300,10 +425,40 @@ export default function Battle({
       Promise.resolve(fn()).catch(console.error);
     };
 
+    const newRun = (sol: Soldier, remote: PadSeen | undefined, dead: boolean, send: ReturnType<typeof openPose>): Run => ({
+      s: sol,
+      a: new Arsenal(),
+      mind: newMind(),
+      send,
+      dead,
+      end: [0, 0, 0],
+      m: 0,
+      g: 0,
+      remote,
+      aiming: false,
+      sinceShot: 10,
+      meleeT: 0,
+      land: 0,
+      deathAt: 0,
+      deathSpot: { x: sol.x, y: sol.y, z: sol.z, yaw: sol.yaw },
+      death: null,
+      lastKiller: "",
+      recent: [],
+      hurtAt: 0,
+      hurtShield: false,
+      toast: null,
+      near: "",
+      nearId: "",
+      wantPick: false,
+      prevYaw: sol.yaw,
+      prevPitch: 0,
+      roll: 0,
+    });
+
     /** Position of a fighter as this client sees it, or null if unknown (left, no pose yet). */
     const posOf = (id: string): (Target & { yaw: number; pitch: number; speed: number }) | null => {
       if (id === myId) return me && !myDead ? { id, x: me.x, y: me.y, z: me.z, yaw: look.yaw, pitch: look.pitch, speed: me.speed } : null;
-      const run = bots.get(id);
+      const run = runs.get(id);
       if (run) return run.dead ? null : { id, x: run.s.x, y: run.s.y, z: run.s.z, yaw: run.s.yaw, pitch: run.s.pitch, speed: run.s.speed };
       const g = ghosts.get(id);
       if (!g?.pose) return null;
@@ -323,8 +478,25 @@ export default function Battle({
         .map(posOf)
         .filter((t): t is NonNullable<typeof t> => !!t);
 
-    /** Volume and pan of a sound at (x, z) for my ears. */
+    /** Is the crosshair of someone at (x, y, z) looking along yaw/pitch over an enemy? (Touch aim help.) */
+    const overEnemy = (s: FuegoState, id: string, sol: Soldier, yaw: number, pitch: number) => {
+      const [dx, dy, dz] = spreadDir(yaw, pitch, [0, 0, 0]);
+      return enemiesOf(s, id).some((e) => {
+        const ex = e.x - sol.x;
+        const ey = e.y + 1.2 - (sol.y + EYE);
+        const ez = e.z - sol.z;
+        const d = Math.hypot(ex, ey, ez);
+        return d < 60 && (ex * dx + ey * dy + ez * dz) / d > Math.cos(0.08);
+      });
+    };
+
+    /** Volume and pan of a sound at (x, z): for my ears, or (big screen) the nearest person's. */
     const where = (x: number, z: number): [number, number] => {
+      if (screen) {
+        let d = Infinity;
+        for (const run of runs.values()) if (run.remote && !run.dead) d = Math.min(d, Math.hypot(x - run.s.x, z - run.s.z));
+        return [1 / (1 + (d === Infinity ? 15 : d) / 10), 0];
+      }
       const ex = me?.x ?? deathSpot.x;
       const ez = me?.z ?? deathSpot.z;
       const dx = x - ex;
@@ -347,6 +519,15 @@ export default function Battle({
         rand
       );
 
+    const deathOf = (s: FuegoState, id: string, now: number): Death => {
+      const killer = s.hits[id]?.from ?? "";
+      const entry = Object.entries(s.feed)
+        .sort((a, b) => Number(b[0].slice(1)) - Number(a[0].slice(1)))
+        .find(([, e]) => e.v === id)?.[1];
+      const alive = killer && killer !== id && isAlive(s, killer);
+      return { killer, weapon: entry?.w ?? "", hp: alive ? (s.hp[killer] ?? 0) : -1, sh: alive ? Math.round(shieldOf(s, killer, now)) : 0 };
+    };
+
     const poseFor = (sol: Soldier, a: Arsenal, end: [number, number, number], m: number, g: number, aim: boolean): FuegoPose => ({
       k: key,
       x: Math.round(sol.x * 100) / 100,
@@ -367,11 +548,28 @@ export default function Battle({
       t: Math.round(serverNow()),
     });
 
+    /** A hit marker for whoever fired: me on my phone, or that person's view on the big screen. */
+    const markHit = (id: string, head: boolean, kill: boolean) => {
+      if (id === myId && !screen) setHit((h) => ({ n: h.n + 1, head, kill }));
+      else if (screen && runs.get(id)?.remote) setMarks((m) => ({ ...m, [id]: { n: (m[id]?.n ?? 0) + 1, head, kill } }));
+    };
+
+    /** Where a first-person shot leaves the gun (a bit to the right unless aiming). */
+    const muzzleOfEye = (sol: Soldier, dx: number, dy: number, dz: number, aiming: boolean): [number, number, number] => {
+      const rx = Math.cos(sol.yaw);
+      const rz = -Math.sin(sol.yaw);
+      const side = aiming ? 0 : 0.18;
+      return [sol.x + dx * 0.7 + rx * side, sol.y + EYE - 0.16 + dy * 0.7, sol.z + dz * 0.7 + rz * side];
+    };
+
     /** A soldier's weapon events: shots (decide hits), rockets/grenades (launch), melee. */
     const handleEvents = (s: FuegoState, id: string, sol: Soldier, a: Arsenal, events: ArsenalEvent[], mine: boolean): { end?: [number, number, number]; m?: boolean; g?: boolean } => {
       const out: { end?: [number, number, number]; m?: boolean; g?: boolean } = {};
+      const run = runs.get(id);
+      const person = mine || !!run?.remote;
       const eyeY = sol.y + EYE;
       const [vol, pan] = mine ? [1, 0] : where(sol.x, sol.z);
+      const assist = mine ? (fine ? 0 : TOUCH_ASSIST) : run?.remote ? TOUCH_ASSIST : 0;
       for (const ev of events) {
         if (ev.type === "shot") {
           const targets = enemiesOf(s, id);
@@ -380,7 +578,7 @@ export default function Battle({
           let hitKind: "escudo" | "cuerpo" | "nada" = "nada";
           for (const off of ev.dirs) {
             const [dx, dy, dz] = spreadDir(sol.yaw, sol.pitch, off);
-            const res = castBullet(world, { ox: sol.x, oy: eyeY, oz: sol.z, dx, dy, dz }, ev.weapon, targets, mine && !fine ? TOUCH_ASSIST : 0);
+            const res = castBullet(world, { ox: sol.x, oy: eyeY, oz: sol.z, dx, dy, dz }, ev.weapon, targets, assist);
             first ??= res.end;
             if (res.hit) {
               const prev = byTarget.get(res.hit.target);
@@ -388,7 +586,11 @@ export default function Battle({
               hitKind = shieldOf(s, res.hit.target, serverNow()) > 1 ? "escudo" : "cuerpo";
               if (hitKind === "escudo") scene.shieldHit(res.hit.target);
             }
-            const from = mine ? muzzleOfMe(sol, dx, dy, dz) : scene.muzzle(id) ?? [sol.x, eyeY - 0.2, sol.z];
+            const from = mine
+              ? muzzleOfEye(sol, dx, dy, dz, controlsRef.current.aim || aimToggleRef.current)
+              : run?.remote
+                ? muzzleOfEye(sol, dx, dy, dz, run.aiming)
+                : (scene.muzzle(id) ?? [sol.x, eyeY - 0.2, sol.z]);
             scene.shot(mine ? null : id, from, res.end[0], res.end[1], res.end[2], ev.weapon, res.hit ? hitKind : "nada", res.normal);
             if (!mine && !res.hit) nearMiss(from, res.end);
           }
@@ -398,13 +600,16 @@ export default function Battle({
           if (mine) {
             sinceShot = 0;
             look.pitch = Math.min(1.3, look.pitch + WEAPONS[ev.weapon].kick);
+          } else if (run) {
+            run.sinceShot = 0;
+            if (run.remote) kickLook(run.remote, WEAPONS[ev.weapon].kick);
           }
           const hits = [...byTarget.values()];
           if (hits.length) {
-            if (mine) {
+            if (person) {
               const head = hits.some((h) => h.head);
-              audio?.hitMarker(head, false);
-              setHit((h) => ({ n: h.n + 1, head, kill: false }));
+              if (mine) audio?.hitMarker(head, false);
+              markHit(id, head, false);
             }
             damage(roomId, key, id, { x: sol.x, z: sol.z }, ev.weapon, hits).catch(console.error);
           }
@@ -416,6 +621,7 @@ export default function Battle({
           if (kind === "cohete") {
             audio?.shot("lanzacohetes", vol, pan);
             if (mine) sinceShot = 0;
+            else if (run) run.sinceShot = 0;
           } else {
             if (mine) audio?.throwGrenade();
             out.g = true;
@@ -424,12 +630,11 @@ export default function Battle({
           out.m = true;
           audio?.melee(vol, pan);
           if (mine) meleeT = 0.35;
+          else if (run) run.meleeT = 0.35;
           const t = meleeTarget(world, { id, x: sol.x, y: sol.y, z: sol.z, yaw: sol.yaw }, enemiesOf(s, id));
           if (t) {
-            if (mine) {
-              audio?.hitMarker(false, false);
-              setHit((h) => ({ n: h.n + 1, head: false, kill: false }));
-            }
+            if (mine) audio?.hitMarker(false, false);
+            if (person) markHit(id, false, false);
             damage(roomId, key, id, { x: sol.x, z: sol.z }, "golpe", [{ target: t, damage: MELEE_DAMAGE, head: false }]).catch(console.error);
           }
         } else if (mine && ev.type === "reload") audio?.reload();
@@ -455,13 +660,6 @@ export default function Battle({
       }
     };
 
-    const muzzleOfMe = (sol: Soldier, dx: number, dy: number, dz: number): [number, number, number] => {
-      const rx = Math.cos(sol.yaw);
-      const rz = -Math.sin(sol.yaw);
-      const side = controlsRef.current.aim || aimToggleRef.current ? 0 : 0.18;
-      return [sol.x + dx * 0.7 + rx * side, sol.y + EYE - 0.16 + dy * 0.7, sol.z + dz * 0.7 + rz * side];
-    };
-
     /** Applies a pickup that went through to the soldier's arsenal. */
     const applyPickup = (a: Arsenal, kind: PickupKind) => {
       if (kind === "granadas") a.grenades = Math.min(MAX_GRENADES, a.grenades + 2);
@@ -479,8 +677,99 @@ export default function Battle({
         const res = await pickItem(roomId, key, id, itemId);
         if (!res.committed) return;
         applyPickup(a, kind);
-        if (mine) audio?.pickup();
+        if (mine || runs.get(id)?.remote) audio?.pickup();
       }, 900);
+    };
+
+    /** Pickups under a soldier's feet: taken if they help, else the weapon in reach to offer. */
+    const pickupsAt = (s: FuegoState, id: string, sol: Soldier, a: Arsenal, mine: boolean): { near: string; nearId: string } => {
+      let near = "";
+      let nearId = "";
+      for (const [iid, it] of Object.entries(s.items)) {
+        if (Math.hypot(it.x - sol.x, it.z - sol.z) > 1.3) continue;
+        if (autoPick(a, it.kind, s.hp[id] ?? MAX_HP)) tryPick(s, id, a, iid, mine);
+        else if (isWeapon(it.kind) && !a.has(it.kind)) {
+          near = PICKUP_LABEL[it.kind];
+          nearId = iid;
+        }
+      }
+      return { near, nearId };
+    };
+
+    /** A medal (or a plain kill) for the one who did it: my toast, or their view's on the big screen. */
+    const celebrate = (id: string, title: string, sub: string) => {
+      if (id === myId && !screen) setToast({ title, sub, id: toastId++ });
+      const run = runs.get(id);
+      if (run?.remote) run.toast = { title, sub, at: performance.now() };
+    };
+
+    /** What the HUD shows for one soldier (mine, or a person's view on the big screen). */
+    const hudFor = (
+      s: FuegoState,
+      id: string,
+      sol: Soldier | null,
+      a: Arsenal,
+      yaw: number,
+      pitch: number,
+      dead: boolean,
+      aiming: boolean,
+      death: Death | null,
+      near: string,
+      watching: string,
+      boardHeld: boolean,
+      now: number
+    ): Hud => {
+      const radar: Hud["radar"] = [];
+      if (sol && !dead) {
+        for (const o of Object.keys(s.roster)) {
+          if (o === id || !isAlive(s, o)) continue;
+          const p = posOf(o);
+          if (!p) continue;
+          const ally = allies(s, id, o);
+          const g = ghosts.get(o);
+          const loud = p.speed > 3.5 || (g && performance.now() - g.firedAt < 1500) || (runs.get(o)?.a.cool ?? 0) > 0 || (o === myId && sinceShot < 1.5);
+          if (!ally && !loud) continue;
+          const dx = p.x - sol.x;
+          const dz = p.z - sol.z;
+          if (Math.hypot(dx, dz) > RADAR_RANGE) continue;
+          // Rotated so up is where they look.
+          const c2 = Math.cos(yaw);
+          const s2 = Math.sin(yaw);
+          radar.push({ x: (dx * c2 - dz * s2) / RADAR_RANGE, y: (dx * s2 + dz * c2) / RADAR_RANGE, ally });
+        }
+      }
+      const other = a.slots.length > 1 ? a.slots[1 - a.current].id : null;
+      const zoomed = aiming && a.weapon === "francotirador";
+      let scope = { range: 0, zoomX: 1, onTarget: false };
+      if (sol && !dead && aiming) {
+        const [dx, dy, dz] = spreadDir(yaw, pitch, [0, 0, 0]);
+        const res = castBullet(world, { ox: sol.x, oy: sol.y + EYE, oz: sol.z, dx, dy, dz }, a.weapon, enemiesOf(s, id));
+        scope = { range: Math.round(res.dist), zoomX: Math.round((BASE_FOV / WEAPONS[a.weapon].zoom) * 10) / 10, onTarget: !!res.hit };
+      }
+      const killer = death?.killer ?? "";
+      return {
+        hp: s.hp[id] ?? 0,
+        shield: Math.round(shieldOf(s, id, now)),
+        weapon: a.weapon,
+        mag: a.slot.mag,
+        reserve: a.slot.reserve,
+        other,
+        grenades: a.grenades,
+        alive: !!sol && !dead,
+        guard: !dead && guarded(s, id, now),
+        respawnIn: dead && s.deadAt[id] ? Math.max(0, Math.ceil((s.deadAt[id] + RESPAWN_MS - now) / 1000)) : 0,
+        killer: killer && killer !== id ? fighterName(s, killer) : killer === id ? "tú mismo" : "",
+        killedWith: death?.weapon ? (WEAPON_WORD[death.weapon] ?? death.weapon) : "",
+        killerHp: death && killer !== id ? death.hp : -1,
+        near,
+        zoomed,
+        aiming,
+        reloading: a.reloading > 0,
+        radar,
+        watching,
+        ...scope,
+        board: boardHeld,
+      };
     };
 
     const tick = (t: number) => {
@@ -491,7 +780,7 @@ export default function Battle({
       const now = serverNow();
       const ids = Object.keys(s.roster);
       const c = controlsRef.current;
-      const inRoster = myId in s.roster;
+      const inRoster = !screen && myId in s.roster;
 
       // My life: died, waiting, back.
       const stateSaysAlive = isAlive(s, myId);
@@ -499,7 +788,8 @@ export default function Battle({
         if (!myDead && !stateSaysAlive) {
           myDead = true;
           deathAt = performance.now();
-          killerId = s.hits[myId]?.from ?? "";
+          myDeath = deathOf(s, myId, now);
+          myLastKiller = myDeath.killer !== myId ? myDeath.killer : "";
           if (me) deathSpot = { x: me.x, y: me.y, z: me.z, yaw: look.yaw };
           audio?.death();
           scene.jolt(0.8);
@@ -512,38 +802,51 @@ export default function Battle({
           look.yaw = sp.yaw;
           look.pitch = 0;
           myDead = false;
-          killerId = "";
+          myDeath = null;
           shieldWas = MAX_SHIELD;
           setAimToggle(false);
         }
       }
 
-      // Bot host: the connected person with the lowest id runs the bots.
+      // Who runs what: the big screen runs everyone; else the connected person with the lowest id runs the bots.
       const { presence: pres, presenceLoaded: loaded } = presenceRef.current;
       const people = Object.keys(pres).filter((id) => id in s.players).sort();
-      const botHost = loaded && people[0] === myId && s.status === "playing";
-      if (botHost) {
-        for (const id of ids.filter(isBot)) {
-          if (bots.has(id)) continue;
+      const host = s.status === "playing" && (screen || (loaded && people[0] === myId));
+      if (host) {
+        for (const id of screen ? ids : ids.filter(isBot)) {
+          if (runs.has(id)) continue;
           const p = poses[id];
           const sp = spawnFor(s, id);
           const sol = p && p.k === key ? new Soldier(p.x, p.z, p.yw, world) : new Soldier(sp.x, sp.z, sp.yaw, world);
-          bots.set(id, { s: sol, a: new Arsenal(), mind: newMind(), send: openPose(roomId, id, false), dead: !isAlive(s, id), end: [0, 0, 0], m: 0, g: 0, pickAt: 0 });
+          const remote = screen && !isBot(id) ? newPadSeen(pads[id] ?? NO_PAD, sol.yaw) : undefined;
+          runs.set(id, newRun(sol, remote, !isAlive(s, id), screen ? NO_SEND : openPose(roomId, id, false)));
         }
-      } else if (bots.size) {
-        for (const run of bots.values()) run.send.close();
-        bots.clear();
+      } else if (runs.size) {
+        for (const run of runs.values()) run.send.close();
+        runs.clear();
       }
-      for (const [id, run] of bots) {
+      for (const [id, run] of runs) {
         const alive = isAlive(s, id);
-        if (!run.dead && !alive) run.dead = true;
-        if (run.dead && !alive && now >= (s.deadAt[id] ?? 0) + RESPAWN_MS) once(`respawn:${id}`, () => respawn(roomId, key, id), 800);
+        if (!run.dead && !alive) {
+          run.dead = true;
+          run.deathAt = performance.now();
+          run.deathSpot = { x: run.s.x, y: run.s.y, z: run.s.z, yaw: run.s.yaw };
+          run.death = deathOf(s, id, now);
+          run.lastKiller = run.death.killer !== id ? run.death.killer : "";
+          run.aiming = false;
+          if (run.remote) audio?.death();
+        }
+        if (run.dead && !alive && s.status === "playing" && now >= (s.deadAt[id] ?? 0) + RESPAWN_MS) once(`respawn:${id}`, () => respawn(roomId, key, id), 800);
         if (run.dead && alive) {
           const sp = spawnFor(s, id);
           run.s = new Soldier(sp.x, sp.z, sp.yaw, world);
           run.a = new Arsenal();
           run.mind = newMind();
           run.dead = false;
+          run.death = null;
+          run.prevYaw = sp.yaw;
+          run.prevPitch = 0;
+          if (run.remote) resetLook(run.remote, sp.yaw);
         }
       }
 
@@ -552,51 +855,62 @@ export default function Battle({
       const prevYaw = look.yaw;
       const prevPitch = look.pitch;
       const aiming = s.status === "playing" && !myDead && (fine ? c.aim : aimToggleRef.current);
-      const zoomFov = aiming ? WEAPONS[arms.weapon].zoom : 78;
+      const zoomFov = aiming ? WEAPONS[arms.weapon].zoom : BASE_FOV;
       // Zoomed in, the view turns slower; on touch only a little slower, or the scope can't be aimed.
-      sens *= fine ? zoomFov / 78 : Math.sqrt(zoomFov / 78);
-      if (!fine && me && !myDead && !aiming) {
-        const ens = enemiesOf(s, myId);
-        const [dx, dy, dz] = spreadDir(look.yaw, look.pitch, [0, 0, 0]);
-        const over = ens.some((e) => {
-          const ex = e.x - me!.x;
-          const ey = e.y + 1.2 - (me!.y + EYE);
-          const ez = e.z - me!.z;
-          const d = Math.hypot(ex, ey, ez);
-          return d < 60 && (ex * dx + ey * dy + ez * dz) / d > Math.cos(0.08);
-        });
-        if (over) sens *= 0.55;
-      }
+      sens *= fine ? zoomFov / BASE_FOV : Math.sqrt(zoomFov / BASE_FOV);
+      if (!fine && me && !myDead && !aiming && overEnemy(s, myId, me, look.yaw, look.pitch)) sens *= 0.55;
       look.yaw -= c.lookX * sens;
       look.pitch = Math.max(-1.35, Math.min(1.35, look.pitch - c.lookY * sens));
       c.lookX = 0;
       c.lookY = 0;
 
-      // Hits I took: direction, flash, sounds.
+      // Hits taken: my direction arrows, flash and sounds; on the big screen, a flash on that person's view.
       for (const [id, h] of Object.entries(s.hits)) {
         const seen = seenHits.get(id) ?? 0;
         if (h.n <= seen) continue;
         seenHits.set(id, h.n);
-        if (id === myId && me) {
+        const onShield = shieldOf(s, id, now) > 1;
+        scene.hurt(id, onShield);
+        if (id === myId && me && !screen) {
           const a = Math.atan2(-(h.x - me.x), -(h.z - me.z)) - look.yaw;
-          const onShield = shieldOf(s, myId, now) > 1;
           setHurtDirs((list) => [...list.slice(-3), { a, id: hurtId++, shield: onShield }]);
           audio?.hurt(onShield);
           scene.jolt(0.25);
         }
+        const run = runs.get(id);
+        if (run?.remote) {
+          run.hurtAt = performance.now();
+          run.hurtShield = onShield;
+        }
       }
 
-      // Kill feed: chimes, "you eliminated", multi-kills.
-      for (const [fid, e] of Object.entries(s.feed) as [string, FeedEntry][]) {
+      // Kill feed: chimes, medals ("¡Doble baja!", "¡Venganza!"…) for whoever did it.
+      for (const [fid, e] of Object.entries(s.feed).sort((a, b) => Number(a[0].slice(1)) - Number(b[0].slice(1))) as [string, FeedEntry][]) {
         if (seenFeed.has(fid)) continue;
         seenFeed.add(fid);
-        if (e.k === myId && e.v !== myId) {
-          kills = [...kills.filter((k2) => performance.now() - k2 < 4000), performance.now()];
+        if (e.k === e.v) continue;
+        const firstBlood = !anyKill;
+        anyKill = true;
+        const tNow = performance.now();
+        const run = runs.get(e.k);
+        let recent = 0;
+        let lastKiller = "";
+        if (e.k === myId && !screen) {
+          myRecent = [...myRecent.filter((k2) => tNow - k2 < 4000), tNow];
+          recent = myRecent.length;
+          lastKiller = myLastKiller;
+          if (e.v === myLastKiller) myLastKiller = "";
           audio?.hitMarker(e.h, true);
-          setHit((h2) => ({ n: h2.n + 1, head: e.h, kill: true }));
-          const streak = kills.length >= 3 ? "¡Triple baja!" : kills.length === 2 ? "¡Doble baja!" : e.h ? "¡Tiro a la cabeza!" : "";
-          setToast({ text: `${streak ? `${streak} · ` : ""}Eliminaste a ${fighterName(s, e.v)}`, id: toastId++ });
-        }
+          markHit(myId, e.h, true);
+        } else if (run?.remote) {
+          run.recent = [...run.recent.filter((k2) => tNow - k2 < 4000), tNow];
+          recent = run.recent.length;
+          lastKiller = run.lastKiller;
+          if (e.v === run.lastKiller) run.lastKiller = "";
+          markHit(e.k, e.h, true);
+        } else continue;
+        const medals = medalsFor(e, recent, lastKiller, firstBlood);
+        celebrate(e.k, medals.slice(0, 2).join(" · ") || "Baja", `Eliminaste a ${fighterName(s, e.v)}`);
       }
 
       // Countdown and start.
@@ -617,7 +931,7 @@ export default function Battle({
             everyone(s)
               .filter((o) => o.id !== self)
               .map((o) => ({ x: o.x, y: o.y, z: o.z }));
-          if (me && !myDead) {
+          if (me && !myDead && inRoster) {
             const wasAir = !me.onGround;
             me.step({ mx: c.mx, mz: c.mz, yaw: look.yaw, pitch: look.pitch, jump: c.jump, aiming }, world, STEP, solids(myId));
             if (wasAir && me.landed > 0) {
@@ -631,31 +945,53 @@ export default function Battle({
             if (r.m) myMelee++;
             if (r.g) myGrenades++;
           }
-          for (const [id, run] of bots) {
+          for (const [id, run] of runs) {
             if (run.dead || !isAlive(s, id)) continue;
-            const view = {
-              enemies: Object.keys(s.roster)
-                .filter((o) => o !== id && !allies(s, id, o))
-                .map((o) => {
-                  const p = posOf(o);
-                  return p ? { ...p, alive: isAlive(s, o) } : null;
-                })
-                .filter((e): e is NonNullable<typeof e> => !!e),
-              items: Object.entries(s.items).map(([iid, it]) => ({ id: iid, ...it })),
-              hp: s.hp[id] ?? MAX_HP,
-              shield: shieldOf(s, id, now),
-            };
-            const out = botThink(world, graph, run.s, run.a, run.mind, view, s.level, STEP, rand);
-            run.s.step(out.move, world, STEP, solids(id));
-            const evs = run.a.step(out.arms, STEP, rand);
+            let evs: ArsenalEvent[];
+            let pick: string | null = null;
+            if (run.remote) {
+              // A person on the big screen, from their phone.
+              const zoom = run.aiming ? WEAPONS[run.a.weapon].zoom : BASE_FOV;
+              let k = Math.sqrt(zoom / BASE_FOV);
+              if (!run.aiming && overEnemy(s, id, run.s, run.s.yaw, run.s.pitch)) k *= 0.55;
+              const inp = padInput(run.remote, pads[id] ?? NO_PAD, STEP, k, run.s.onGround);
+              run.aiming = inp.aim;
+              const wasAir = !run.s.onGround;
+              run.s.step({ ...inp.move, aiming: run.aiming }, world, STEP, solids(id));
+              if (wasAir && run.s.landed > 0) {
+                run.land = Math.min(1, run.s.landed / 12);
+                run.s.landed = 0;
+              }
+              evs = run.a.step({ ...inp.arms, aim: run.aiming }, STEP);
+              if (inp.pick) run.wantPick = true;
+            } else {
+              const view = {
+                enemies: Object.keys(s.roster)
+                  .filter((o) => o !== id && !allies(s, id, o))
+                  .map((o) => {
+                    const p = posOf(o);
+                    return p ? { ...p, alive: isAlive(s, o) } : null;
+                  })
+                  .filter((e): e is NonNullable<typeof e> => !!e),
+                items: Object.entries(s.items).map(([iid, it]) => ({ id: iid, ...it })),
+                hp: s.hp[id] ?? MAX_HP,
+                shield: shieldOf(s, id, now),
+              };
+              const out = botThink(world, graph, run.s, run.a, run.mind, view, s.level, STEP, rand);
+              run.s.step(out.move, world, STEP, solids(id));
+              evs = run.a.step(out.arms, STEP, rand);
+              pick = out.pick ?? null;
+            }
             const r = handleEvents(s, id, run.s, run.a, evs, false);
             if (r.end) run.end = r.end;
             if (r.m) run.m++;
             if (r.g) run.g++;
-            // Bots take what's under their feet when it helps them.
-            for (const [iid, it] of Object.entries(s.items)) {
-              if (Math.hypot(it.x - run.s.x, it.z - run.s.z) > 1.3) continue;
-              if (autoPick(run.a, it.kind, s.hp[id] ?? MAX_HP) || (out.pick === iid && isWeapon(it.kind) && !run.a.has(it.kind))) tryPick(s, id, run.a, iid, false);
+            if (!run.remote) {
+              // Bots take what's under their feet when it helps them.
+              for (const [iid, it] of Object.entries(s.items)) {
+                if (Math.hypot(it.x - run.s.x, it.z - run.s.z) > 1.3) continue;
+                if (autoPick(run.a, it.kind, s.hp[id] ?? MAX_HP) || (pick === iid && isWeapon(it.kind) && !run.a.has(it.kind))) tryPick(s, id, run.a, iid, false);
+              }
             }
           }
         }
@@ -668,8 +1004,13 @@ export default function Battle({
       }
       sinceShot += dt;
       meleeT = Math.max(0, meleeT - dt);
+      for (const run of runs.values()) {
+        run.sinceShot += dt;
+        run.meleeT = Math.max(0, run.meleeT - dt);
+        run.land = Math.max(0, run.land - dt * 4);
+      }
 
-      // My rockets and grenades (and my bots'): fly them, explode, hurt.
+      // My rockets and grenades (and the ones of those I run): fly them, explode, hurt.
       for (let i = myProj.length - 1; i >= 0; i--) {
         const pr = myProj[i];
         pr.age += dt;
@@ -682,23 +1023,23 @@ export default function Battle({
         const hits = blast(world, pr.p.kind, x, y, z, everyone(s));
         if (hits.length) {
           damage(roomId, key, pr.owner, { x, z }, pr.p.kind, hits).catch(console.error);
-          if (pr.owner === myId && hits.some((h) => h.target !== myId)) {
-            audio?.hitMarker(false, false);
-            setHit((h) => ({ n: h.n + 1, head: false, kill: false }));
+          if (hits.some((h) => h.target !== pr.owner)) {
+            if (pr.owner === myId && !screen) audio?.hitMarker(false, false);
+            markHit(pr.owner, false, false);
           }
         }
         // Mine are shown right here: skip them when they come back from the database.
         seenBooms.add(publishBoom(roomId, { k: key, kind: pr.p.kind, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, z: Math.round(z * 10) / 10, t: Math.round(serverNow()) }));
         const [vol, pan] = where(x, z);
-        const near = Math.hypot(x - (me?.x ?? 999), z - (me?.z ?? 999));
+        const near = screen ? 999 : Math.hypot(x - (me?.x ?? 999), z - (me?.z ?? 999));
         scene.explosion(x, y, z, pr.p.kind === "cohete", near);
         audio?.explosion(vol, pan);
       }
       // Everyone else's: flown the same way from their launch, drawn.
-      const draws: Record<string, { kind: Projectile["kind"]; x: number; y: number; z: number; vx: number; vy: number; vz: number }> = {};
-      for (const pr of myProj) draws[pr.id] = { ...pr.p };
+      const draws: Record<string, { kind: Projectile["kind"]; x: number; y: number; z: number; vx: number; vy: number; vz: number; age?: number }> = {};
+      for (const pr of myProj) draws[pr.id] = { ...pr.p, age: pr.age };
       for (const [pid, raw] of Object.entries(projIn)) {
-        if (raw.k !== key || raw.o === myId || bots.has(raw.o)) continue;
+        if (raw.k !== key || raw.o === myId || runs.has(raw.o)) continue;
         let r = remoteProj.get(pid);
         if (!r) {
           r = { p: { kind: raw.kind, x: raw.x, y: raw.y, z: raw.z, vx: raw.vx, vy: raw.vy, vz: raw.vz }, age: 0 };
@@ -709,7 +1050,7 @@ export default function Battle({
         }
         r.age += dt;
         flyProjectile(world, r.p, dt, []);
-        draws[pid] = { ...r.p };
+        draws[pid] = { ...r.p, age: r.age };
       }
       for (const pid of remoteProj.keys()) if (!(pid in projIn)) remoteProj.delete(pid);
       scene.setProjectiles(draws);
@@ -719,33 +1060,34 @@ export default function Battle({
         seenBooms.add(bid);
         if (b.k !== key || now - b.t > 2000) continue;
         const [vol, pan] = where(b.x, b.z);
-        const near = Math.hypot(b.x - (me?.x ?? 999), b.z - (me?.z ?? 999));
+        const near = screen ? 999 : Math.hypot(b.x - (me?.x ?? 999), b.z - (me?.z ?? 999));
         scene.explosion(b.x, b.y, b.z, b.kind === "cohete", near);
         audio?.explosion(vol, pan);
       }
 
-      // Pickups in reach.
+      // Pickups in reach: mine, and the people on the big screen.
       let near = "";
       let nearId = "";
-      if (me && !myDead && playing) {
-        for (const [iid, it] of Object.entries(s.items)) {
-          if (Math.hypot(it.x - me.x, it.z - me.z) > 1.3) continue;
-          if (autoPick(arms, it.kind, s.hp[myId] ?? MAX_HP)) tryPick(s, myId, arms, iid, true);
-          else if (isWeapon(it.kind) && !arms.has(it.kind)) {
-            near = PICKUP_LABEL[it.kind];
-            nearId = iid;
-          }
-        }
-      }
+      if (me && !myDead && playing && inRoster) ({ near, nearId } = pickupsAt(s, myId, me, arms, true));
       if (c.pick) {
         c.pick = false;
         if (nearId) tryPick(s, myId, arms, nearId, true);
+      }
+      for (const [id, run] of runs) {
+        if (!run.remote) continue;
+        const found = !run.dead && playing ? pickupsAt(s, id, run.s, run.a, false) : { near: "", nearId: "" };
+        run.near = found.near;
+        run.nearId = found.nearId;
+        if (run.wantPick) {
+          run.wantPick = false;
+          if (run.nearId) tryPick(s, id, run.a, run.nearId, false);
+        }
       }
 
       // Everyone else, from their poses.
       const ease = 1 - Math.exp(-dt * 16);
       for (const id of ids) {
-        if (id === myId || bots.has(id)) continue;
+        if (id === myId || runs.has(id)) continue;
         const p = poses[id];
         let g = ghosts.get(id);
         if (!p || p.k !== key) {
@@ -815,7 +1157,7 @@ export default function Battle({
       if (playing && Object.values(s.respawns).some((r) => r.at <= now)) once("items", () => respawnItems(roomId, key));
 
       // My shield: alarm when empty, a sound when it starts filling.
-      if (me && !myDead) {
+      if (me && !myDead && inRoster) {
         const sh = shieldOf(s, myId, now);
         if (sh < 1 && shieldWas >= 1) {
           audio?.shieldBreak();
@@ -833,21 +1175,42 @@ export default function Battle({
         }
       }
 
-      // Publish my pose and my bots'.
+      // Publish my pose and my bots' (the big screen publishes none: nobody else draws them).
       if (t - lastPose >= POSE_MS) {
         lastPose = t;
         if (me && mySend && !myDead) mySend.send(poseFor(me, arms, myEnd, myMelee, myGrenades, aiming));
-        for (const run of bots.values()) if (!run.dead) run.send.send(poseFor(run.s, run.a, run.end, run.m, run.g, false));
+        for (const run of runs.values()) if (!run.dead) run.send.send(poseFor(run.s, run.a, run.end, run.m, run.g, false));
+      }
+      // Big screen: each phone learns its ammo, weapons and what it can pick up.
+      if (screen && t - lastLive >= LIVE_MS) {
+        lastLive = t;
+        const patch: Record<string, FuegoLive> = {};
+        for (const [id, run] of runs) {
+          if (!run.remote) continue;
+          const other = run.a.slots.length > 1 ? run.a.slots[1 - run.a.current].id : null;
+          const live: FuegoLive = {
+            w: WEAPON_IDS.indexOf(run.a.weapon),
+            o: other ? WEAPON_IDS.indexOf(other) : -1,
+            m: run.a.slot.mag,
+            r: run.a.slot.reserve,
+            g: run.a.grenades,
+            n: run.near,
+            l: run.a.reloading > 0 ? 1 : 0,
+            z: run.aiming ? 1 : 0,
+          };
+          const k = JSON.stringify(live);
+          if (liveSent.get(id) !== k) {
+            liveSent.set(id, k);
+            patch[id] = live;
+          }
+        }
+        publishLive(roomId, patch);
       }
 
       // Draw.
       const info = ids
         .filter((id) => id !== myId)
-        .map((id) => {
-          const side = s.roster[id];
-          const color = side === "red" || side === "blue" ? teamInfo(side).color : (s.players[id]?.color ?? "#f97316");
-          return [id, { color, label: fighterName(s, id), ally: allies(s, myId, id) }] as const;
-        });
+        .map((id) => [id, { color: fighterColor(s, id), label: fighterName(s, id), ally: !screen && allies(s, myId, id) }] as const);
       const infoKey = JSON.stringify(info);
       if (infoKey !== lastInfo) {
         lastInfo = infoKey;
@@ -857,12 +1220,12 @@ export default function Battle({
         if (id === myId) continue;
         const pos = posOf(id);
         const alive = isAlive(s, id);
-        const run = bots.get(id);
+        const run = runs.get(id);
         const g = ghosts.get(id);
         const deadFor = alive ? 0 : Math.max(0, (now - (s.deadAt[id] ?? now)) / 1000);
         if (pos) {
           const weapon = run ? run.a.weapon : (WEAPON_IDS[g?.pose?.w ?? 0] ?? "rifle");
-          scene.setSoldier(id, { x: pos.x, y: pos.y, z: pos.z, yaw: pos.yaw, pitch: pos.pitch, weapon, speed: pos.speed, alive, deadFor });
+          scene.setSoldier(id, { x: pos.x, y: pos.y, z: pos.z, yaw: pos.yaw, pitch: pos.pitch, weapon, speed: pos.speed, alive, deadFor, guard: guarded(s, id, now) });
         } else if (!alive && (run || g)) {
           const x = run ? run.s.x : g!.x;
           const y = run ? run.s.y : g!.y;
@@ -877,102 +1240,139 @@ export default function Battle({
         scene.setPickups(s.items, mapId, map.items);
       }
 
-      // Camera: my eyes; when dead, above where I fell looking at who did it; spectators follow someone.
-      let eye = { x: 0, y: 30, z: map.hz, yaw: 0, pitch: -0.5, fov: 78 };
-      let watching = "";
-      if (me && !myDead) {
-        eye = { x: me.x, y: me.y + EYE, z: me.z, yaw: look.yaw, pitch: look.pitch, fov: zoomFov };
-      } else if (inRoster) {
-        const k = posOf(killerId);
-        const yaw = k ? Math.atan2(-(k.x - deathSpot.x), -(k.z - deathSpot.z)) : deathSpot.yaw;
-        const up = Math.min(1, (performance.now() - deathAt) / 1200);
-        eye = { x: deathSpot.x - Math.sin(yaw) * -2 * up, y: deathSpot.y + 1 + up * 3, z: deathSpot.z - Math.cos(yaw) * -2 * up, yaw, pitch: -0.35 * up, fov: 70 };
-      } else {
+      /** First-person eye with feel: a bob with the steps and a slight tilt into the strafe. */
+    const feltEye = (sol: Soldier, yaw: number, pitch: number, fov: number, roll: number, aiming: boolean): Eye => {
+      const amt = sol.onGround ? Math.min(1, sol.speed / 6) * (aiming ? 0.3 : 1) : 0;
+      const bob = Math.abs(Math.sin((sol.stride / 2.3) * Math.PI)) * 0.04 * amt;
+      return { x: sol.x, y: sol.y + EYE - bob, z: sol.z, yaw, pitch, roll, fov };
+    };
+    const tilt = (roll: number, mx: number) => roll + (-mx * 0.022 - roll) * (1 - Math.exp(-dt * 8));
+
+    /** Looking at whoever killed them, from a bit above where they fell. */
+      const deathCam = (spot: { x: number; y: number; z: number; yaw: number }, killer: string, since: number): Eye => {
+        const k = killer ? posOf(killer) : null;
+        const yaw = k ? Math.atan2(-(k.x - spot.x), -(k.z - spot.z)) : spot.yaw;
+        const up = Math.min(1, since / 1200);
+        return { x: spot.x - Math.sin(yaw) * -2 * up, y: spot.y + 1 + up * 3, z: spot.z - Math.cos(yaw) * -2 * up, yaw, pitch: -0.35 * up, fov: 70 };
+      };
+      /** Following someone from behind (spectators). */
+      const spectate = (): { eye: Eye; watching: string } => {
         const alive = ids.filter((id) => isAlive(s, id) && posOf(id));
         const pick = alive[Math.floor(performance.now() / 8000) % Math.max(1, alive.length)];
         const p = pick ? posOf(pick) : null;
-        if (p) {
-          eye = { x: p.x - Math.sin(p.yaw) * -3, y: p.y + 2.6, z: p.z - Math.cos(p.yaw) * -3, yaw: p.yaw, pitch: -0.25, fov: 70 };
-          watching = fighterName(s, pick);
+        if (!p) return { eye: { x: 0, y: 30, z: map.hz, yaw: 0, pitch: -0.5, fov: BASE_FOV }, watching: "" };
+        return { eye: { x: p.x - Math.sin(p.yaw) * -3, y: p.y + 2.6, z: p.z - Math.cos(p.yaw) * -3, yaw: p.yaw, pitch: -0.25, fov: 70 }, watching: fighterName(s, pick) };
+      };
+
+      let watching = "";
+      if (screen) {
+        const viewIds = splitPeople(s).filter((id) => runs.get(id)?.remote);
+        if (viewIds.length) {
+          const rects = splitRects(viewIds.length);
+          scene.renderViews(
+            viewIds.map((id, i) => {
+              const run = runs.get(id)!;
+              const alive = !run.dead && isAlive(s, id);
+              const lookDX = run.s.yaw - run.prevYaw;
+              const lookDY = run.s.pitch - run.prevPitch;
+              run.prevYaw = run.s.yaw;
+              run.prevPitch = run.s.pitch;
+              const zoomed = run.aiming && run.a.weapon === "francotirador";
+              run.roll = tilt(run.roll, alive ? (pads[id]?.x ?? 0) : 0);
+              const eye: Eye = alive
+                ? feltEye(run.s, run.s.yaw, run.s.pitch, run.aiming ? WEAPONS[run.a.weapon].zoom : BASE_FOV, run.roll, run.aiming)
+                : deathCam(run.deathSpot, run.death?.killer ?? "", performance.now() - run.deathAt);
+              const vm: ViewModel | null =
+                alive && playing
+                  ? {
+                      weapon: run.a.weapon,
+                      sinceShot: run.sinceShot,
+                      reload: run.a.reloading > 0 ? 1 - run.a.reloading / WEAPONS[run.a.weapon].reload : 0,
+                      switching: run.a.switching,
+                      melee: run.meleeT / 0.35,
+                      aiming: run.aiming,
+                      speed: run.s.speed,
+                      lookDX,
+                      lookDY,
+                      land: run.land,
+                      color: fighterColor(s, id),
+                      hidden: zoomed,
+                    }
+                  : alive
+                    ? { weapon: run.a.weapon, sinceShot: 10, reload: 0, switching: 0, melee: 0, aiming: false, speed: 0, lookDX: 0, lookDY: 0, land: 0, color: fighterColor(s, id), hidden: false }
+                    : null;
+              return { id, eye, view: vm, rect: rects[i] };
+            }),
+            dt
+          );
+        } else {
+          const sp = spectate();
+          scene.render(sp.eye, null, dt);
         }
+      } else {
+        // Camera: my eyes; when dead, above where I fell looking at who did it; spectators follow someone.
+        let eye: Eye;
+        myRoll = tilt(myRoll, me && !myDead ? c.mx : 0);
+        if (me && !myDead) eye = feltEye(me, look.yaw, look.pitch, zoomFov, myRoll, aiming);
+        else if (inRoster) eye = deathCam(deathSpot, myDeath?.killer ?? "", performance.now() - deathAt);
+        else {
+          const sp = spectate();
+          eye = sp.eye;
+          watching = sp.watching;
+        }
+        const zoomed = aiming && arms.weapon === "francotirador";
+        land = Math.max(0, land - dt * 4);
+        scene.render(
+          eye,
+          me && !myDead
+            ? {
+                weapon: arms.weapon,
+                sinceShot,
+                reload: arms.reloading > 0 ? 1 - arms.reloading / WEAPONS[arms.weapon].reload : 0,
+                switching: arms.switching,
+                melee: meleeT / 0.35,
+                aiming,
+                speed: me.speed,
+                lookDX: look.yaw - prevYaw,
+                lookDY: look.pitch - prevPitch,
+                land,
+                color: fighterColor(s, myId),
+                hidden: zoomed,
+              }
+            : null,
+          dt
+        );
       }
-      const zoomed = aiming && arms.weapon === "francotirador";
-      land = Math.max(0, land - dt * 4);
-      const mySide = s.roster[myId];
-      const myColor = mySide === "red" || mySide === "blue" ? teamInfo(mySide).color : (s.players[myId]?.color ?? "#64748b");
-      scene.render(
-        eye,
-        me && !myDead
-          ? {
-              weapon: arms.weapon,
-              sinceShot,
-              reload: arms.reloading > 0 ? 1 - arms.reloading / WEAPONS[arms.weapon].reload : 0,
-              switching: arms.switching,
-              melee: meleeT / 0.35,
-              aiming,
-              speed: me.speed,
-              lookDX: look.yaw - prevYaw,
-              lookDY: look.pitch - prevPitch,
-              land,
-              color: myColor,
-              hidden: zoomed,
-            }
-          : null,
-        dt
-      );
 
       // HUD, ten times a second.
       if (t - hudAt > 100) {
         hudAt = t;
-        const radar: Hud["radar"] = [];
-        if (me && !myDead) {
-          for (const id of ids) {
-            if (id === myId || !isAlive(s, id)) continue;
-            const p = posOf(id);
-            if (!p) continue;
-            const ally = allies(s, myId, id);
-            const g = ghosts.get(id);
-            const loud = p.speed > 3.5 || (g && performance.now() - g.firedAt < 1500) || (bots.get(id)?.a.cool ?? 0) > 0;
-            if (!ally && !loud) continue;
-            const dx = p.x - me.x;
-            const dz = p.z - me.z;
-            if (Math.hypot(dx, dz) > RADAR_RANGE) continue;
-            // Rotated so up is where I look.
-            const c2 = Math.cos(look.yaw);
-            const s2 = Math.sin(look.yaw);
-            radar.push({ x: (dx * c2 - dz * s2) / RADAR_RANGE, y: (dx * s2 + dz * c2) / RADAR_RANGE, ally });
+        if (screen) {
+          const list: ViewHud[] = splitPeople(s)
+            .map((id) => [id, runs.get(id)] as const)
+            .filter((e): e is readonly [string, Run] => !!e[1]?.remote)
+            .map(([id, run]) => {
+              const since = performance.now() - run.hurtAt;
+              const toastOn = run.toast && performance.now() - run.toast.at < TOAST_MS ? run.toast : null;
+              return {
+                ...hudFor(s, id, run.s, run.a, run.s.yaw, run.s.pitch, run.dead || !isAlive(s, id), run.aiming, run.death, run.near, "", false, now),
+                id,
+                toast: toastOn,
+                hurt: since < 350 ? (run.hurtShield ? 1 : 2) : 0,
+              };
+            });
+          const vk = JSON.stringify(list);
+          if (vk !== lastViewsKey) {
+            lastViewsKey = vk;
+            setViews(list);
           }
-        }
-        const other = arms.slots.length > 1 ? arms.slots[1 - arms.current].id : null;
-        const scopeInfo = () => {
-          if (!me || myDead || !aiming) return { range: 0, zoomX: 1, onTarget: false };
-          const [dx, dy, dz] = spreadDir(look.yaw, look.pitch, [0, 0, 0]);
-          const res = castBullet(world, { ox: me.x, oy: me.y + EYE, oz: me.z, dx, dy, dz }, arms.weapon, enemiesOf(s, myId));
-          return { range: Math.round(res.dist), zoomX: Math.round((78 / WEAPONS[arms.weapon].zoom) * 10) / 10, onTarget: !!res.hit };
-        };
-        const next: Hud = {
-          hp: s.hp[myId] ?? 0,
-          shield: Math.round(shieldOf(s, myId, now)),
-          weapon: arms.weapon,
-          mag: arms.slot.mag,
-          reserve: arms.slot.reserve,
-          other,
-          grenades: arms.grenades,
-          alive: !!me && !myDead,
-          respawnIn: myDead && s.deadAt[myId] ? Math.max(0, Math.ceil((s.deadAt[myId] + RESPAWN_MS - now) / 1000)) : 0,
-          killer: killerId && killerId !== myId ? fighterName(s, killerId) : killerId === myId ? "tú mismo" : "",
-          near,
-          zoomed,
-          reloading: arms.reloading > 0,
-          radar,
-          watching,
-          ...scopeInfo(),
-          board: c.board,
-        };
-        const hk = JSON.stringify(next);
-        if (hk !== lastHudKey) {
-          lastHudKey = hk;
-          setHud(next);
+        } else {
+          const next = hudFor(s, myId, me, arms, look.yaw, look.pitch, myDead || !me, aiming, myDeath, near, watching, c.board, now);
+          const hk = JSON.stringify(next);
+          if (hk !== lastHudKey) {
+            lastHudKey = hk;
+            setHud(next);
+          }
         }
         setClock(now);
       }
@@ -981,24 +1381,25 @@ export default function Battle({
     frame = requestAnimationFrame(tick);
     // Development only: hand yourself a weapon from the console, for testing (`__fuego.give("francotirador")`).
     const devWindow = window as unknown as { __fuego?: { give: (w: WeaponId) => void } };
-    if (process.env.NODE_ENV !== "production") devWindow.__fuego = { give: (w) => arms.take(w) };
+    if (process.env.NODE_ENV !== "production" && !screen) devWindow.__fuego = { give: (w) => arms.take(w) };
     return () => {
       cancelAnimationFrame(frame);
-      delete devWindow.__fuego;
+      if (!screen) delete devWindow.__fuego;
       unsubPoses();
       unsubProj();
       unsubBooms();
+      unsubPads();
       mySend?.close();
-      for (const run of bots.values()) run.send.close();
+      for (const run of runs.values()) run.send.close();
       for (const pr of myProj) pr.down();
       scene.dispose();
     };
-  }, [roomId, myId, gameNo, mapId, fine, quality]);
+  }, [roomId, myId, gameNo, mapId, fine, quality, screen]);
 
   // Messages fade.
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 2600);
+    const t = setTimeout(() => setToast(null), TOAST_MS);
     return () => clearTimeout(t);
   }, [toast]);
   useEffect(() => {
@@ -1011,21 +1412,28 @@ export default function Battle({
   const counting = state.status === "playing" && now < state.startedAt;
   const count = Math.ceil((state.startedAt - now) / 1000);
   const left = state.endsAt - now;
-  const inRoster = myId in state.roster;
+  const inRoster = !screen && myId in state.roster;
   const showBoard = board || !!hud?.board;
   const feed = Object.entries(state.feed)
     .sort((a, b) => Number(a[0].slice(1)) - Number(b[0].slice(1)))
     .slice(-5)
     .map(([, e]) => e)
     .filter((e) => now - e.t < 8000);
-  const myScore = state.kills[myId] ?? 0;
-  const leader = ranking(state)[0];
+  const alert = nearWin(state, myId);
+  const big = screen ? { zoom: 1.4 } : undefined;
 
   return (
     <div className="fixed inset-0 z-40 select-none overflow-hidden bg-slate-900" style={{ touchAction: "none" }}>
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 
-      {hud?.zoomed && <Scope range={hud.range} zoomX={hud.zoomX} onTarget={hud.onTarget} />}
+      {/* Big screen: each person's view with their own HUD. */}
+      {screen &&
+        state.status !== "waiting" &&
+        views.map((v, i) => (
+          <ViewOverlay key={v.id} v={v} rect={splitRects(views.length)[i]} state={state} mark={marks[v.id]} playing={state.status === "playing" && !counting} />
+        ))}
+
+      {hud?.zoomed && <Scope range={hud.range} zoomX={hud.zoomX} onTarget={hud.onTarget} unit="vmin" />}
 
       {/* Low health: a slow red pulse at the edges. */}
       {inRoster && hud?.alive && hud.hp <= 35 && !hud.zoomed && (
@@ -1059,18 +1467,13 @@ export default function Battle({
         />
       )}
 
-      {/* Crosshair and hit marker. */}
-      {hud?.alive && state.status === "playing" && !hud.zoomed && <Crosshair weapon={hud.weapon} />}
-      {hit.n > 0 && (
-        <div key={hit.n} className="pointer-events-none absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 animate-[ping_0.25s_ease-out_1]">
-          {[45, 135, 225, 315].map((r) => (
-            <span
-              key={r}
-              className="absolute left-1/2 top-1/2 h-0.5 w-3"
-              style={{ transform: `translate(-50%, -50%) rotate(${r}deg) translateX(10px)`, backgroundColor: hit.kill ? "#ef4444" : hit.head ? "#fbbf24" : "#ffffff" }}
-            />
-          ))}
-        </div>
+      {/* Crosshair, hit marker and the weapon in reach. */}
+      {inRoster && hud?.alive && state.status === "playing" && !hud.zoomed && <Crosshair weapon={hud.weapon} aiming={hud.aiming} />}
+      {!screen && <HitMarker mark={hit} />}
+      {inRoster && hud?.alive && fine && hud.near && state.status === "playing" && (
+        <p className="pointer-events-none absolute left-1/2 top-[58%] z-20 -translate-x-1/2 rounded-lg bg-slate-950/70 px-3 py-1 text-sm text-white">
+          <kbd className="mr-1.5 rounded bg-white px-1.5 font-bold text-slate-900">E</kbd>Agarrar {hud.near}
+        </p>
       )}
 
       {/* Top: back, score and time, options. */}
@@ -1082,27 +1485,9 @@ export default function Battle({
           {inRoster && hud && <Radar points={hud.radar} />}
         </div>
 
-        <div className="flex flex-col items-center gap-1">
-          <div className="flex items-center gap-3 rounded-2xl bg-slate-950/70 px-4 py-1.5 font-display text-xl font-bold text-white backdrop-blur">
-            {state.mode === "equipos" ? (
-              <>
-                <span style={{ color: teamInfo("red").color }}>{state.score.red}</span>
-                <span className="text-sm font-medium text-slate-300">{state.status === "playing" && !counting ? formatClock(left) : `a ${state.goal}`}</span>
-                <span style={{ color: teamInfo("blue").color }}>{state.score.blue}</span>
-              </>
-            ) : (
-              <>
-                <span className="text-amber-300">{myScore}</span>
-                <span className="text-sm font-medium text-slate-300">{state.status === "playing" && !counting ? formatClock(left) : `a ${state.goal}`}</span>
-                <span className="text-sm text-slate-300">
-                  1º {leader ? `${fighterName(state, leader, myId)} ${state.kills[leader] ?? 0}` : "-"}
-                </span>
-              </>
-            )}
-          </div>
-          <p className="rounded-full bg-slate-950/50 px-2 text-[11px] text-slate-200">
-            {MAPS[state.map].name} · gana {state.mode === "equipos" ? "el equipo" : "quien"} que llegue a {state.goal} bajas
-          </p>
+        <div className="flex flex-col items-center gap-1" style={big}>
+          <ScorePanel state={state} myId={screen ? "" : myId} clock={state.status === "playing" && !counting ? formatClock(left) : ""} lastMinute={state.status === "playing" && !counting && left < 60000} />
+          {alert && <p className="animate-pulse rounded-full bg-amber-400 px-3 py-0.5 text-xs font-bold text-slate-950">{alert}</p>}
         </div>
 
         <div className="pointer-events-auto flex flex-col items-end gap-1.5">
@@ -1116,57 +1501,18 @@ export default function Battle({
             </button>
             <FullscreenButton className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur" />
           </div>
-          <ul className="flex flex-col items-end gap-0.5">
-            {feed.map((e, i) => (
-              <li key={`${e.t}-${i}`} className="rounded-md bg-slate-950/60 px-2 py-0.5 text-[11px] text-white backdrop-blur">
-                <span className={e.k === myId ? "text-amber-300" : ""}>{fighterName(state, e.k, myId)}</span>{" "}
-                <span className="text-slate-400">
-                  [{WEAPON_WORD[e.w] ?? e.w}
-                  {e.h ? " 🎯" : ""}]
-                </span>{" "}
-                <span className={e.v === myId ? "text-red-300" : ""}>{e.v === e.k ? "se eliminó solo" : fighterName(state, e.v, myId)}</span>
-              </li>
-            ))}
-          </ul>
+          <KillFeed feed={feed} state={state} myId={myId} style={big} />
         </div>
       </div>
 
       {/* Shield, health, weapon and ammo. */}
       {inRoster && hud?.alive && (
         <>
-          <div className={`pointer-events-none absolute left-1/2 z-20 w-64 -translate-x-1/2 ${fine ? "bottom-4" : "top-[5.25rem]"}`}>
-            <div className="flex gap-0.5">
-              {Array.from({ length: 10 }, (_, i) => (
-                <div key={i} className="h-2 flex-1 skew-x-[-20deg] rounded-sm bg-slate-800/80">
-                  <div className="h-full rounded-sm bg-cyan-300 shadow-[0_0_6px_rgba(103,232,249,0.8)]" style={{ width: `${Math.max(0, Math.min(1, hud.shield / MAX_SHIELD * 10 - i)) * 100}%` }} />
-                </div>
-              ))}
-            </div>
-            <div className="mt-1 flex gap-0.5">
-              {Array.from({ length: 10 }, (_, i) => (
-                <div key={i} className="h-1.5 flex-1 skew-x-[-20deg] rounded-sm bg-slate-800/80">
-                  <div className={`h-full rounded-sm ${hud.hp <= 35 ? "bg-red-500" : "bg-emerald-400"}`} style={{ width: `${Math.max(0, Math.min(1, hud.hp / MAX_HP * 10 - i)) * 100}%` }} />
-                </div>
-              ))}
-            </div>
+          <div className={`pointer-events-none absolute left-1/2 z-20 w-64 -translate-x-1/2 ${fine ? "bottom-4" : "top-[5.75rem]"}`}>
+            <Bars shield={hud.shield} hp={hud.hp} guard={hud.guard} />
           </div>
-          <div className={`pointer-events-none absolute z-20 rounded-xl bg-slate-950/60 px-3 py-2 text-right text-white backdrop-blur ${fine ? "bottom-4 right-4" : "bottom-44 left-4 text-left"}`}>
-            <p className="font-display text-3xl font-bold leading-none">
-              {hud.weapon === "lanzacohetes" || hud.mag > 0 ? hud.mag : <span className="text-red-400">0</span>}
-              <span className="ml-1 text-base font-medium text-slate-400">/ {hud.reserve}</span>
-            </p>
-            <p className="mt-0.5 text-xs font-semibold">
-              {WEAPONS[hud.weapon].label}
-              {hud.reloading && <span className="ml-1 text-amber-300">recargando…</span>}
-            </p>
-            {!hud.reloading && hud.mag === 0 && hud.reserve === 0 && <p className="text-xs font-bold text-red-400">Sin munición: cambia de arma</p>}
-            {!hud.reloading && hud.reserve > 0 && hud.mag <= Math.max(1, Math.floor(WEAPONS[hud.weapon].mag / 4)) && (
-              <p className="animate-pulse text-xs font-bold text-amber-300">{fine ? "R: recarga" : "Recarga"}</p>
-            )}
-            <p className="text-[11px] text-slate-400">
-              {hud.other ? `${WEAPONS[hud.other].label} · ` : ""}💣 {hud.grenades}
-            </p>
-            {fine && hud.near && <p className="mt-1 text-xs text-amber-200">E: agarrar {hud.near}</p>}
+          <div className={`pointer-events-none absolute z-20 ${fine ? "bottom-4 right-4" : "bottom-44 left-4"}`}>
+            <WeaponPanel hud={hud} keys={fine} align={fine ? "right" : "left"} />
           </div>
         </>
       )}
@@ -1180,7 +1526,7 @@ export default function Battle({
         </div>
       )}
 
-      {!fine && (
+      {!fine && !screen && (
         <p className="pointer-events-none absolute inset-x-0 top-28 z-20 hidden items-center justify-center gap-1.5 text-xs text-white drop-shadow portrait:flex">
           <RotateCw className="h-3.5 w-3.5" /> Gira el teléfono para jugar mejor
         </p>
@@ -1188,27 +1534,22 @@ export default function Battle({
 
       {toast && (
         <div key={toast.id} className="pointer-events-none absolute inset-x-0 top-1/3 z-20 flex justify-center">
-          <p className="animate-celebration-in rounded-xl bg-slate-950/70 px-4 py-2 font-display text-lg font-bold text-amber-300 backdrop-blur">{toast.text}</p>
+          <MedalToast title={toast.title} sub={toast.sub} />
         </div>
       )}
 
       {counting && (
         <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center">
-          <p className="mb-2 font-display text-2xl font-bold text-white drop-shadow-[0_0_12px_rgba(0,0,0,0.8)]">{MAPS[state.map].name}</p>
-          <span key={count} className="animate-celebration-in font-display text-[24vmin] font-extrabold text-white drop-shadow-[0_0_30px_rgba(0,0,0,0.7)]">
+          <p className="mb-2 font-display text-2xl text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">{MAPS[state.map].name}</p>
+          <span key={count} className="animate-celebration-in font-display text-[24vmin] text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.7)]">
             {count}
           </span>
         </div>
       )}
 
-      {inRoster && hud && !hud.alive && state.status === "playing" && !counting && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-red-950/20">
-          <p className="font-display text-3xl font-bold text-white drop-shadow">{hud.killer ? `Te eliminó ${hud.killer}` : "Te eliminaron"}</p>
-          <p className="rounded-xl bg-slate-950/60 px-4 py-1.5 text-white backdrop-blur">Reapareces en {hud.respawnIn}…</p>
-        </div>
-      )}
+      {inRoster && hud && !hud.alive && state.status === "playing" && !counting && <DeathCard hud={hud} />}
 
-      {!inRoster && hud?.watching && state.status === "playing" && (
+      {!inRoster && !screen && hud?.watching && state.status === "playing" && (
         <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center">
           <p className="rounded-xl bg-slate-950/75 px-4 py-2 text-sm text-white backdrop-blur">
             Mirando a <b>{hud.watching}</b> · juegas la próxima partida
@@ -1223,7 +1564,7 @@ export default function Battle({
       )}
 
       {state.status === "finished" && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4">
+        <div className="absolute inset-0 z-30 flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4">
           <Results roomId={roomId} meta={meta} state={state} myId={myId} presence={presence} />
         </div>
       )}
@@ -1231,31 +1572,288 @@ export default function Battle({
   );
 }
 
-/** Sniper scope: dark around the lens, mil-dot reticle, range to what's under the crosshair. */
-function Scope({ range, zoomX, onTarget }: { range: number; zoomX: number; onTarget: boolean }) {
-  const color = onTarget ? "#ef4444" : "#0f172a";
+/** Big screen: one person's quarter (or half) with their crosshair, bars, ammo, medals and death notice. */
+function ViewOverlay({
+  v,
+  rect,
+  state,
+  mark,
+  playing,
+}: {
+  v: ViewHud;
+  rect: [number, number, number, number];
+  state: FuegoState;
+  mark?: { n: number; head: boolean; kill: boolean };
+  playing: boolean;
+}) {
+  const [x, y, w, h] = rect;
+  const color = fighterColor(state, v.id);
+  const bottomRow = y > 0;
   return (
-    <div className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(circle at center, rgba(96,165,250,0.06) 0 31vmin, rgba(0,0,0,0.6) 32vmin, rgba(0,0,0,0.96) 33vmin)" }}>
-      <div className="absolute left-1/2 top-1/2 h-[64vmin] w-[64vmin] -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[inset_0_0_40px_10px_rgba(0,0,0,0.65)]" />
-      <div className="absolute left-1/2 top-1/2 h-[64vmin] w-[2px] -translate-x-1/2 -translate-y-1/2" style={{ background: `linear-gradient(${color} 0 44%, transparent 44% 56%, ${color} 56%)` }} />
-      <div className="absolute left-1/2 top-1/2 h-[2px] w-[64vmin] -translate-x-1/2 -translate-y-1/2" style={{ background: `linear-gradient(90deg, ${color} 0 44%, transparent 44% 56%, ${color} 56%)` }} />
+    <div
+      className="pointer-events-none absolute overflow-hidden border-2 border-slate-950"
+      style={{ left: `${x * 100}%`, top: `${y * 100}%`, width: `${w * 100}%`, height: `${h * 100}%`, containerType: "size" }}
+    >
+      {v.zoomed && <Scope range={v.range} zoomX={v.zoomX} onTarget={v.onTarget} unit="cqmin" />}
+      {v.hurt > 0 && (
+        <div className="absolute inset-0" style={{ boxShadow: v.hurt === 1 ? "inset 0 0 70px 14px rgba(34,211,238,0.45)" : "inset 0 0 80px 20px rgba(220,38,38,0.55)" }} />
+      )}
+      {v.alive && v.hp <= 35 && !v.zoomed && <div className="absolute inset-0 animate-pulse" style={{ boxShadow: "inset 0 0 90px 24px rgba(185,28,28,0.45)" }} />}
+      {v.alive && playing && !v.zoomed && <Crosshair weapon={v.weapon} aiming={v.aiming} />}
+      {mark && <HitMarker mark={mark} />}
+
+      {/* Name, shield and health: under the score in the top row, at the top in the bottom row. */}
+      <div className={`absolute left-3 flex w-60 flex-col gap-1.5 rounded-2xl bg-slate-950/70 px-3.5 py-2.5 ${bottomRow ? "top-3" : "bottom-3"}`}>
+        <span className="flex items-center gap-2 truncate text-lg font-bold" style={{ color }}>
+          <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: color }} />
+          {fighterName(state, v.id)}
+          {v.guard && v.alive && <ShieldCheck className="h-4 w-4 shrink-0 text-cyan-300" aria-label="Protegido" />}
+          <span className="ml-auto font-mono text-base text-white">{state.kills[v.id] ?? 0}</span>
+        </span>
+        {v.alive && <Bars shield={v.shield} hp={v.hp} guard={false} />}
+      </div>
+
+      {v.alive && (
+        <div className="absolute bottom-3 right-3">
+          <WeaponPanel hud={v} keys={false} align="right" />
+        </div>
+      )}
+      {v.alive && v.near && playing && (
+        <p className="absolute left-1/2 top-[60%] -translate-x-1/2 whitespace-nowrap rounded-lg bg-amber-400 px-3 py-1 text-base font-bold text-slate-950">Agarrar {v.near}</p>
+      )}
+      {v.alive && v.radar.length > 0 && (
+        <div className={`absolute ${bottomRow ? "right-3 top-3" : "left-3 top-16"}`}>
+          <Radar points={v.radar} />
+        </div>
+      )}
+
+      {v.toast && (
+        <div key={v.toast.at} className="absolute inset-x-0 top-[26%] flex justify-center">
+          <MedalToast title={v.toast.title} sub={v.toast.sub} />
+        </div>
+      )}
+      {!v.alive && playing && (
+        <div className="absolute inset-0 bg-red-950/25">
+          <DeathCard hud={v} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Shield over health, in ten segments each; "Protegido" just after respawning. */
+function Bars({ shield, hp, guard }: { shield: number; hp: number; guard: boolean }) {
+  return (
+    <div className="relative">
+      <div className="flex gap-0.5">
+        {Array.from({ length: 10 }, (_, i) => (
+          <div key={i} className="h-2 flex-1 rounded-sm bg-slate-800/80">
+            <div className="h-full rounded-sm bg-cyan-300" style={{ width: `${Math.max(0, Math.min(1, (shield / MAX_SHIELD) * 10 - i)) * 100}%` }} />
+          </div>
+        ))}
+      </div>
+      <div className="mt-1 flex gap-0.5">
+        {Array.from({ length: 10 }, (_, i) => (
+          <div key={i} className="h-1.5 flex-1 rounded-sm bg-slate-800/80">
+            <div className={`h-full rounded-sm ${hp <= 35 ? "bg-red-500" : "bg-emerald-400"}`} style={{ width: `${Math.max(0, Math.min(1, (hp / MAX_HP) * 10 - i)) * 100}%` }} />
+          </div>
+        ))}
+      </div>
+      {guard && (
+        <span className="absolute -top-6 left-1/2 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-cyan-300 px-2 py-0.5 text-[11px] font-bold text-slate-950">
+          <ShieldCheck className="h-3 w-3" /> Protegido
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** The weapon in hand with its ammo, the other one, and the grenades as pips. */
+function WeaponPanel({ hud, keys, align }: { hud: Hud; keys: boolean; align: "left" | "right" }) {
+  const def = WEAPONS[hud.weapon];
+  const low = !hud.reloading && hud.reserve > 0 && hud.mag <= Math.max(1, Math.floor(def.mag / 4));
+  const dry = !hud.reloading && hud.mag === 0 && hud.reserve === 0;
+  return (
+    <div className={`flex flex-col gap-1 rounded-2xl bg-slate-950/65 px-3.5 py-2.5 text-white backdrop-blur ${align === "right" ? "items-end text-right" : "items-start text-left"}`}>
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-300">
+        {def.label}
+        {hud.reloading && <span className="ml-1.5 normal-case text-amber-300">recargando…</span>}
+      </p>
+      <p className="font-mono text-3xl font-bold leading-none">
+        <span className={hud.mag === 0 && hud.weapon !== "lanzacohetes" ? "text-red-400" : ""}>{hud.mag}</span>
+        <span className="ml-1 text-base font-medium text-slate-400">/ {hud.reserve}</span>
+      </p>
+      {dry && <p className="text-xs font-bold text-red-400">Sin munición: cambia de arma</p>}
+      {low && <p className="animate-pulse text-xs font-bold text-amber-300">{keys ? "R: recarga" : "Recarga"}</p>}
+      <div className={`flex items-center gap-2 text-[11px] text-slate-300 ${align === "right" ? "flex-row-reverse" : ""}`}>
+        <span className="flex items-center gap-0.5">
+          <Bomb className="h-3 w-3" />
+          {Array.from({ length: MAX_GRENADES }, (_, i) => (
+            <span key={i} className={`h-2 w-2 rounded-full ${i < hud.grenades ? "bg-lime-400" : "bg-white/15"}`} />
+          ))}
+        </span>
+        {hud.other && (
+          <span className="rounded bg-white/10 px-1.5 py-0.5">
+            {keys && <b className="mr-1">Q</b>}
+            {WEAPONS[hud.other].label}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MedalToast({ title, sub }: { title: string; sub: string }) {
+  return (
+    <div className="animate-celebration-in flex flex-col items-center rounded-2xl bg-slate-950/75 px-5 py-2 text-center backdrop-blur">
+      <p className="font-display text-2xl text-amber-300">{title}</p>
+      <p className="text-sm text-white">{sub}</p>
+    </div>
+  );
+}
+
+/** Who got you, with what, and how much they had left; then the respawn count. */
+function DeathCard({ hud }: { hud: Hud }) {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 p-4 text-center">
+      <Skull className="h-10 w-10 text-white/80" />
+      <p className="font-display text-3xl text-white drop-shadow">{hud.killer ? (hud.killer === "tú mismo" ? "Te eliminaste solo" : `Te eliminó ${hud.killer}`) : "Te eliminaron"}</p>
+      {hud.killer && hud.killer !== "tú mismo" && (
+        <p className="rounded-full bg-slate-950/60 px-3 py-1 text-sm text-slate-200">
+          {hud.killedWith && <>con {hud.killedWith} · </>}
+          {hud.killerHp > 0 ? `le quedaba ${hud.killerHp} de vida` : hud.killerHp === 0 ? "ya cayó también" : ""}
+        </p>
+      )}
+      <p className="rounded-xl bg-slate-950/70 px-4 py-1.5 font-bold text-white">Reapareces en {hud.respawnIn}…</p>
+    </div>
+  );
+}
+
+function HitMarker({ mark }: { mark: { n: number; head: boolean; kill: boolean } }) {
+  if (!mark.n) return null;
+  return (
+    <div key={mark.n} className="pointer-events-none absolute left-1/2 top-1/2 h-8 w-8 -translate-x-1/2 -translate-y-1/2 animate-[ping_0.25s_ease-out_1]">
+      {[45, 135, 225, 315].map((r) => (
+        <span
+          key={r}
+          className="absolute left-1/2 top-1/2 h-0.5 w-3"
+          style={{ transform: `translate(-50%, -50%) rotate(${r}deg) translateX(10px)`, backgroundColor: mark.kill ? "#ef4444" : mark.head ? "#fbbf24" : "#ffffff" }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Score and time: teams with a bar each toward the goal; free-for-all with your place (or the top 3). */
+function ScorePanel({ state, myId, clock, lastMinute }: { state: FuegoState; myId: string; clock: string; lastMinute: boolean }) {
+  const time = (
+    <span className={`min-w-14 text-center font-mono text-base font-bold ${lastMinute ? "animate-pulse text-red-400" : "text-slate-200"}`}>{clock || `a ${state.goal}`}</span>
+  );
+  if (state.mode === "equipos") {
+    const bar = (team: TeamId, dir: "left" | "right") => (
+      <div className="flex w-24 flex-col gap-1">
+        <span className={`font-display text-2xl leading-none ${dir === "left" ? "text-left" : "text-right"}`} style={{ color: teamInfo(team).color }}>
+          {state.score[team]}
+        </span>
+        <span className={`flex h-1.5 overflow-hidden rounded-full bg-white/10 ${dir === "right" ? "justify-end" : ""}`}>
+          <span className="block h-full rounded-full" style={{ width: `${Math.min(100, (state.score[team] / state.goal) * 100)}%`, background: teamInfo(team).color }} />
+        </span>
+      </div>
+    );
+    return (
+      <div className="flex items-center gap-3 rounded-2xl bg-slate-950/70 px-4 py-2 text-white backdrop-blur">
+        {bar("red", "left")}
+        {time}
+        {bar("blue", "right")}
+      </div>
+    );
+  }
+  const order = ranking(state);
+  if (myId && myId in state.roster) {
+    const place = order.findIndex((id) => (state.kills[id] ?? 0) === (state.kills[myId] ?? 0)) + 1;
+    const leader = order[0];
+    return (
+      <div className="flex items-center gap-3 rounded-2xl bg-slate-950/70 px-4 py-1.5 text-white backdrop-blur">
+        <span className="flex flex-col items-center leading-none">
+          <span className="font-display text-2xl text-amber-300">{state.kills[myId] ?? 0}</span>
+          <span className="text-[10px] text-slate-400">{place}º de {order.length}</span>
+        </span>
+        {time}
+        <span className="flex max-w-32 items-center gap-1 truncate text-sm text-slate-200">
+          <Crown className="h-3.5 w-3.5 shrink-0 text-amber-300" />
+          {leader === myId ? "Vas primero" : `${fighterName(state, leader, myId)} ${state.kills[leader] ?? 0}`}
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-3 rounded-2xl bg-slate-950/70 px-4 py-1.5 text-white backdrop-blur">
+      {time}
+      {order.slice(0, 3).map((id, i) => (
+        <span key={id} className="flex items-center gap-1.5 text-sm font-bold">
+          {i === 0 && <Crown className="h-3.5 w-3.5 text-amber-300" />}
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: fighterColor(state, id) }} />
+          <span className="max-w-24 truncate">{fighterName(state, id)}</span>
+          <span className="font-mono text-amber-300">{state.kills[id] ?? 0}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function KillFeed({ feed, state, myId, style }: { feed: FeedEntry[]; state: FuegoState; myId: string; style?: React.CSSProperties }) {
+  return (
+    <ul className="flex flex-col items-end gap-0.5" style={style}>
+      {feed.map((e, i) => (
+        <li key={`${e.t}-${i}`} className={`flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] text-white backdrop-blur ${e.k === myId ? "bg-amber-500/40" : e.v === myId ? "bg-red-600/40" : "bg-slate-950/60"}`}>
+          <b style={{ color: fighterColor(state, e.k) }}>{fighterName(state, e.k, myId)}</b>
+          <span className="text-slate-300">
+            {WEAPON_WORD[e.w] ?? e.w}
+            {e.h ? " 🎯" : ""}
+          </span>
+          <b style={{ color: e.v === e.k ? undefined : fighterColor(state, e.v) }}>{e.v === e.k ? "se eliminó solo" : fighterName(state, e.v, myId)}</b>
+          {(e.s ?? 0) >= 3 && (
+            <span className="flex items-center gap-0.5 rounded bg-orange-500 px-1 font-bold text-white">
+              <Flame className="h-3 w-3" />
+              {e.s}
+            </span>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Sniper scope: dark around the lens, mil-dot reticle, range to what's under the crosshair. `unit` sizes it to the window or to a split view. */
+function Scope({ range, zoomX, onTarget, unit }: { range: number; zoomX: number; onTarget: boolean; unit: "vmin" | "cqmin" }) {
+  const color = onTarget ? "#ef4444" : "#0f172a";
+  const u = (n: number) => `${n}${unit}`;
+  return (
+    <div
+      className="pointer-events-none absolute inset-0"
+      style={{ background: `radial-gradient(circle at center, rgba(96,165,250,0.06) 0 ${u(31)}, rgba(0,0,0,0.6) ${u(32)}, rgba(0,0,0,0.96) ${u(33)})` }}
+    >
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-[inset_0_0_40px_10px_rgba(0,0,0,0.65)]" style={{ width: u(64), height: u(64) }} />
+      <div className="absolute left-1/2 top-1/2 w-[2px] -translate-x-1/2 -translate-y-1/2" style={{ height: u(64), background: `linear-gradient(${color} 0 44%, transparent 44% 56%, ${color} 56%)` }} />
+      <div className="absolute left-1/2 top-1/2 h-[2px] -translate-x-1/2 -translate-y-1/2" style={{ width: u(64), background: `linear-gradient(90deg, ${color} 0 44%, transparent 44% 56%, ${color} 56%)` }} />
       {[-3, -2, -1, 1, 2, 3].map((k) => (
-        <span key={`h${k}`} className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ backgroundColor: color, marginLeft: `${k * 4}vmin` }} />
+        <span key={`h${k}`} className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ backgroundColor: color, marginLeft: u(k * 4) }} />
       ))}
       {[1, 2, 3].map((k) => (
-        <span key={`v${k}`} className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ backgroundColor: color, marginTop: `${k * 4}vmin` }} />
+        <span key={`v${k}`} className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ backgroundColor: color, marginTop: u(k * 4) }} />
       ))}
       <span className="absolute left-1/2 top-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ backgroundColor: onTarget ? "#ef4444" : "#e11d48" }} />
-      <p className="absolute left-1/2 top-1/2 ml-[18vmin] mt-[3vmin] font-mono text-sm font-bold text-emerald-300 drop-shadow">
+      <p className="absolute left-1/2 top-1/2 font-mono text-sm font-bold text-emerald-300 drop-shadow" style={{ marginLeft: u(18), marginTop: u(3) }}>
         {range} m · x{zoomX}
       </p>
     </div>
   );
 }
 
-function Crosshair({ weapon }: { weapon: WeaponId }) {
+/** The crosshair per weapon; it closes in while aiming. */
+function Crosshair({ weapon, aiming }: { weapon: WeaponId; aiming: boolean }) {
   if (weapon === "escopeta") {
-    return <div className="pointer-events-none absolute left-1/2 top-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/80 shadow" />;
+    return <div className={`pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/80 shadow transition-all ${aiming ? "h-10 w-10" : "h-14 w-14"}`} />;
   }
   if (weapon === "lanzacohetes") {
     return (
@@ -1264,7 +1862,7 @@ function Crosshair({ weapon }: { weapon: WeaponId }) {
       </div>
     );
   }
-  const gap = weapon === "rifle" ? 7 : 5;
+  const gap = (weapon === "rifle" ? 7 : 5) * (aiming ? 0.5 : 1);
   return (
     <div className="pointer-events-none absolute left-1/2 top-1/2 h-0 w-0">
       <div className="absolute left-1/2 top-1/2 h-1 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow" />
@@ -1286,7 +1884,7 @@ function Radar({ points }: { points: { x: number; y: number; ally: boolean }[] }
       {points.map((p, i) => (
         <span
           key={i}
-          className={`absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${p.ally ? "bg-sky-300" : "bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.9)]"}`}
+          className={`absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${p.ally ? "bg-sky-300" : "bg-red-500"}`}
           style={{ left: `${50 + p.x * 50}%`, top: `${50 + p.y * 50}%` }}
         />
       ))}
@@ -1297,9 +1895,9 @@ function Radar({ points }: { points: { x: number; y: number; ally: boolean }[] }
 function Scoreboard({ state, myId }: { state: FuegoState; myId: string }) {
   const ids = ranking(state);
   return (
-    <div className="w-full max-w-md rounded-3xl bg-slate-950/90 p-4 text-white shadow-2xl ring-1 ring-white/10">
+    <div className="w-full max-w-lg rounded-3xl bg-slate-950/90 p-4 text-white shadow-2xl ring-1 ring-white/10">
       {state.mode === "equipos" && (
-        <p className="mb-2 text-center font-display text-2xl font-bold">
+        <p className="mb-2 text-center font-display text-2xl">
           <span style={{ color: teamInfo("red").color }}>{state.score.red}</span> – <span style={{ color: teamInfo("blue").color }}>{state.score.blue}</span>
         </p>
       )}
@@ -1309,23 +1907,23 @@ function Scoreboard({ state, myId }: { state: FuegoState; myId: string }) {
             <th className="py-1">Jugador</th>
             <th className="w-14 text-right">Bajas</th>
             <th className="w-16 text-right">Muertes</th>
+            <th className="w-14 text-right">Racha</th>
           </tr>
         </thead>
         <tbody>
-          {ids.map((id) => {
-            const side = state.roster[id];
-            return (
-              <tr key={id} className={id === myId ? "text-amber-300" : ""}>
-                <td className="flex items-center gap-2 py-1">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: side === "red" || side === "blue" ? teamInfo(side).color : (state.players[id]?.color ?? "#f97316") }} />
-                  {fighterName(state, id, myId)}
-                  {isBot(id) && <span className="text-xs text-slate-500">bot</span>}
-                </td>
-                <td className="text-right font-mono">{state.kills[id] ?? 0}</td>
-                <td className="text-right font-mono text-slate-400">{state.deaths[id] ?? 0}</td>
-              </tr>
-            );
-          })}
+          {ids.map((id, i) => (
+            <tr key={id} className={id === myId ? "text-amber-300" : ""}>
+              <td className="flex items-center gap-2 py-1">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: fighterColor(state, id) }} />
+                {fighterName(state, id, myId)}
+                {i === 0 && (state.kills[id] ?? 0) > 0 && <Crown className="h-3.5 w-3.5 text-amber-300" />}
+                {isBot(id) && <span className="text-xs text-slate-500">bot</span>}
+              </td>
+              <td className="text-right font-mono">{state.kills[id] ?? 0}</td>
+              <td className="text-right font-mono text-slate-400">{state.deaths[id] ?? 0}</td>
+              <td className="text-right font-mono text-slate-400">{state.best[id] ?? 0}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
@@ -1348,11 +1946,32 @@ function Results({ roomId, meta, state, myId, presence }: { roomId: string; meta
           ? "🏆 ¡Ganaste!"
           : `🏆 Ganó ${fighterName(state, state.winner, myId)}`;
   const connected = Object.keys(presence);
+  const ids = ranking(state);
+  const mvp = ids[0];
+  const streaker = [...ids].sort((a, b) => (state.best[b] ?? 0) - (state.best[a] ?? 0))[0];
+  const awards: { icon: ReactNode; label: string; who: string; value: string }[] = [];
+  if (mvp && (state.kills[mvp] ?? 0) > 0) awards.push({ icon: <Crown className="h-5 w-5 text-amber-300" />, label: "Más bajas", who: mvp, value: `${state.kills[mvp]}` });
+  if (streaker && (state.best[streaker] ?? 0) >= 2) awards.push({ icon: <Flame className="h-5 w-5 text-orange-400" />, label: "Mejor racha", who: streaker, value: `${state.best[streaker]} seguidas` });
   return (
-    <div className="animate-celebration-in flex w-full max-w-md flex-col items-center gap-4 rounded-3xl bg-slate-950/90 p-5 text-center shadow-2xl ring-1 ring-white/10 backdrop-blur">
-      <p className="font-display text-3xl font-bold" style={{ color: team?.color ?? "#fbbf24" }}>
+    <div className="animate-celebration-in flex w-full max-w-lg flex-col items-center gap-4 rounded-3xl bg-slate-950/90 p-5 text-center shadow-2xl ring-1 ring-white/10 backdrop-blur">
+      <p className="font-display text-3xl" style={{ color: team?.color ?? "#fbbf24" }}>
         {title}
       </p>
+      {awards.length > 0 && (
+        <div className="grid w-full grid-cols-2 gap-2">
+          {awards.map((a) => (
+            <div key={a.label} className="flex items-center gap-2.5 rounded-2xl bg-white/[0.06] px-3 py-2 text-left">
+              {a.icon}
+              <span className="min-w-0">
+                <span className="block text-[11px] text-slate-400">{a.label}</span>
+                <span className="block truncate text-sm font-bold text-white">
+                  <span style={{ color: fighterColor(state, a.who) }}>{fighterName(state, a.who, myId)}</span> · {a.value}
+                </span>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       <Scoreboard state={state} myId={myId} />
       <div className="flex w-full max-w-xs flex-col gap-2">
         <button onClick={() => startMatch(roomId, meta, connected)} className={PRIMARY_BUTTON}>
@@ -1365,4 +1984,3 @@ function Results({ roomId, meta, state, myId, presence }: { roomId: string; meta
     </div>
   );
 }
-

@@ -762,7 +762,7 @@ export const GAMES: Record<GameId, GameInfo> = {
     duration: "5–10 min",
     contexts: ["amigos", "grupo", "pareja", "solo"],
     howTo: [
-      "Elige mapa y modo: todos contra todos o rojos contra azules. Los bots completan los lugares libres.",
+      "Elige mapa y modo: todos contra todos o rojos contra azules, cada uno en su celular o en una pantalla grande con los celulares como control. Los bots completan los lugares libres.",
       "Empiezas con fusil, pistola y granadas. Busca la escopeta, el francotirador o el lanzacohetes por el mapa; llevas dos armas a la vez.",
       "El escudo se recarga si no te pegan; la vida, con botiquines. Gana quien llega primero a las bajas pedidas.",
     ],

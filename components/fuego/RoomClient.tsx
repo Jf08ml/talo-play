@@ -29,8 +29,11 @@ import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { RoomSettingsEditor } from "@/components/RoomSettings";
 import { watchRoomMeta } from "@/lib/roomSettings";
 import Battle from "./Battle";
+import Pad from "./Pad";
+import Link from "next/link";
+import { roomPath } from "@/lib/games";
 import { SETTINGS } from "./settings";
-import { Bot, Shuffle, Smartphone } from "lucide-react";
+import { Bot, MonitorPlay, Shuffle, Smartphone } from "lucide-react";
 import { placeIn, useAwardMatch } from "@/hooks/useAwardMatch";
 
 type Status = "loading" | "not-found" | "ready" | "error";
@@ -40,7 +43,8 @@ const LEVEL_LABEL = { facil: "fáciles", normal: "normales", dificil: "difícile
 export function settingsSummary(meta: FuegoMeta): string {
   const map = MAPS[meta.map];
   const mode = meta.mode === "equipos" ? `${meta.size / 2} contra ${meta.size / 2}` : `todos contra todos (${meta.size})`;
-  return `${map.name} · ${mode} · a ${meta.goal} bajas · ${meta.minutes} min${meta.bots ? ` · bots ${LEVEL_LABEL[meta.level]}` : ""}`;
+  const where = meta.view === "pantalla" ? " · en pantalla grande" : "";
+  return `${map.name} · ${mode} · a ${meta.goal} bajas · ${meta.minutes} min${meta.bots ? ` · bots ${LEVEL_LABEL[meta.level]}` : ""}${where}`;
 }
 
 /** A Fuego cruzado room: the waiting room (teams if it's a team game), then the match full screen. */
@@ -106,6 +110,16 @@ export default function RoomClient({ roomId }: { roomId: string }) {
 
   if (!configured) return <FirebaseSetupNotice />;
 
+  // Big screen: the match is on the TV; this phone is the controller.
+  if (status === "ready" && state && meta && state.status !== "waiting" && meta.view === "pantalla") {
+    return (
+      <>
+        <OpenRoomBeacon roomId={roomId} game="fuego" />
+        <Pad roomId={roomId} clientId={myId} state={state} />
+      </>
+    );
+  }
+
   if (status === "ready" && state && meta && state.status !== "waiting") {
     return (
       <>
@@ -143,13 +157,26 @@ export default function RoomClient({ roomId }: { roomId: string }) {
               settings={<RoomSettingsEditor settings={SETTINGS} roomId={roomId} meta={meta} />}
               onStart={() => startMatch(roomId, meta, connected)}
             >
-              <div className="flex gap-2.5 rounded-xl bg-sky-500/10 p-3 text-sm text-sky-100 ring-1 ring-sky-400/20">
-                <Smartphone className="mt-0.5 h-5 w-5 shrink-0" />
-                <p>
-                  Cada uno juega desde su teléfono (horizontal) o su computadora con mouse y teclado. Empiezas con fusil, pistola y dos
-                  granadas: las armas pesadas están repartidas por el mapa.
-                </p>
-              </div>
+              {meta.view === "pantalla" ? (
+                <div className="flex gap-2.5 rounded-xl bg-amber-400/10 p-3 text-sm text-amber-100 ring-1 ring-amber-300/25">
+                  <MonitorPlay className="mt-0.5 h-5 w-5 shrink-0" />
+                  <p>
+                    La partida se ve en una pantalla grande y tu celular es el control. En la computadora conectada a la tele abre{" "}
+                    <Link href={`${roomPath("fuego", roomId)}/pantalla`} className="font-bold underline">
+                      la pantalla de esta sala
+                    </Link>
+                    : desde ahí se empieza. Juegan hasta 4 personas a la vez, cada una con su parte de la pantalla.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex gap-2.5 rounded-xl bg-sky-500/10 p-3 text-sm text-sky-100 ring-1 ring-sky-400/20">
+                  <Smartphone className="mt-0.5 h-5 w-5 shrink-0" />
+                  <p>
+                    Cada uno juega desde su teléfono (horizontal) o su computadora con mouse y teclado. Empiezas con fusil, pistola y dos
+                    granadas: las armas pesadas están repartidas por el mapa.
+                  </p>
+                </div>
+              )}
               {meta.mode === "equipos" && <TeamPicker roomId={roomId} state={state} myId={myId} connected={connected} size={meta.size} bots={meta.bots} />}
               {meta.mode === "todos" && meta.bots && people < meta.size && (
                 <p className="flex items-center justify-center gap-1.5 text-center text-xs text-slate-400">

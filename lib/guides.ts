@@ -1143,6 +1143,21 @@ export const GUIDES: Record<GameId, Guide> = {
         text: [
           "Empiezas con fusil, pistola y granadas. Por el mapa hay escopeta, francotirador y lanzacohetes; llevas dos armas a la vez (agarrar una cambia la que tienes en la mano).",
           "El escudo absorbe los primeros daños y se recarga solo si dejan de pegarte. La vida, en cambio, solo vuelve con botiquines.",
+          "Al reaparecer quedas protegido dos segundos (el escudo brilla): nadie puede eliminarte apenas vuelves.",
+        ],
+      },
+      {
+        title: "Rachas y medallas",
+        text: [
+          "Cada baja seguida sin morir suma a tu racha: a las 5 eres imparable y a las 10, leyenda. La tabla guarda la mejor racha de cada uno.",
+          "También hay medallas por la primera baja de la partida, por eliminar a quien te eliminó (venganza), por bajas dobles y triples, por tiros a la cabeza y por culatazos. Cuando alguien queda a una baja de ganar, todos lo ven.",
+        ],
+      },
+      {
+        title: "En una pantalla grande",
+        text: [
+          "Al crear la sala elige «En una pantalla grande»: la partida se ve en una computadora conectada a la tele, con la pantalla dividida para hasta 4 personas, cada una en primera persona. Los demás lugares los ocupan bots.",
+          "Cada celular es el control de su soldado: joystick a la izquierda, arrastra a la derecha para mirar, y botones para disparar (si lo arrastras, también miras), apuntar, saltar, recargar, cambiar de arma, granada, golpe y agarrar. El celular muestra tu escudo, tu vida y tu munición, y vibra cuando te pegan.",
         ],
       },
       {
@@ -1153,7 +1168,10 @@ export const GUIDES: Record<GameId, Guide> = {
         ],
       },
     ],
-    tips: ["Si te quedas sin escudo, cúbrete unos segundos antes de volver a pelear."],
+    tips: [
+      "Si te quedas sin escudo, cúbrete unos segundos antes de volver a pelear.",
+      "Al morir verás con qué te eliminaron y cuánta vida le quedaba al otro: si quedó débil, ve a buscarlo.",
+    ],
   },
   otelo: {
     goal: "Terminar con más fichas de tu color en el tablero.",

@@ -1,6 +1,7 @@
 "use client";
 
-import { Bot } from "lucide-react";
+import { Bot, MonitorPlay, Smartphone } from "lucide-react";
+import { roomPath } from "@/lib/games";
 import { GOAL_OPTIONS, MINUTE_OPTIONS, SIZE_OPTIONS, createFuegoRoom, normalizeMeta, type FuegoSettings } from "@/lib/fuego";
 import { MAPS, MAP_ORDER } from "@/lib/fuegoMaps";
 import type { BotLevel } from "@/lib/fuegoSim";
@@ -13,11 +14,25 @@ const LEVELS: { id: BotLevel; label: string }[] = [
   { id: "dificil", label: "Difíciles" },
 ];
 
-/** Map, mode, how many fighters, kills to win, time and bots. */
+/** Where it's seen, map, mode, how many fighters, kills to win, time and bots. */
 export const SETTINGS: GameSettings<FuegoSettings> = {
   game: "fuego",
-  initial: { map: "bunker", mode: "todos", size: 4, goal: 20, minutes: 10, bots: true, level: "normal" },
+  initial: { map: "bunker", mode: "todos", size: 4, goal: 20, minutes: 10, bots: true, level: "normal", view: "telefono" },
   fields: [
+    {
+      kind: "choice",
+      key: "view",
+      label: "Dónde se ve",
+      layout: 2,
+      options: [
+        { value: "telefono", label: "Cada uno en su celular", icon: Smartphone },
+        { value: "pantalla", label: "En una pantalla grande", icon: MonitorPlay },
+      ],
+      hint: (v) =>
+        v.view === "pantalla"
+          ? "La partida se ve en una computadora conectada a la tele o al proyector, con la pantalla dividida: hasta 4 personas, cada una en primera persona. Los celulares son el control (joystick, arrastrar para mirar y botones grandes) y vibran cuando te pegan. Los bots completan el resto."
+          : "Cada uno juega en 3D desde su celular o su computadora con mouse y teclado. Sirve también para jugar a distancia.",
+    },
     {
       kind: "choice",
       key: "map",
@@ -67,10 +82,12 @@ export const SETTINGS: GameSettings<FuegoSettings> = {
     },
   ],
   create: (v, hostId) => createFuegoRoom(hostId, v),
+  afterCreate: (roomId, v) => (v.view === "pantalla" ? `${roomPath("fuego", roomId)}/pantalla` : roomPath("fuego", roomId)),
+  createLabel: (v) => (v.view === "pantalla" ? "Crear sala y abrir la pantalla" : "Crear sala"),
   // The state keeps its own copy of the map and mode.
   save: (roomId, v) => saveRoomSettings(roomId, "fuego/state", { ...v }, { map: v.map, mode: v.mode }),
   fromMeta: (meta) => {
     const m = normalizeMeta(meta);
-    return { map: m.map, mode: m.mode, size: m.size, goal: m.goal, minutes: m.minutes, bots: m.bots, level: m.level };
+    return { map: m.map, mode: m.mode, size: m.size, goal: m.goal, minutes: m.minutes, bots: m.bots, level: m.level, view: m.view };
   },
 };
