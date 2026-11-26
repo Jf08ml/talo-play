@@ -1,9 +1,10 @@
-import { ref, get, onDisconnect, onValue, push, remove, serverTimestamp, set, update, type Unsubscribe } from "firebase/database";
+import { ref, get, onDisconnect, onValue, push, remove, runTransaction, serverTimestamp, set, update, type Unsubscribe } from "firebase/database";
 import { getDb } from "./firebase";
 import { generateRoomCode } from "./ids";
 import { serverNow } from "./serverTime";
 import { transactState } from "./transact";
-import { makeSeed } from "./random";
+import { makeSeed, seededShuffle } from "./random";
+import { RIVAL_NAMES } from "./boardBot";
 import { TEAMS, type TeamId } from "./teams";
 import {
   BOT_NAMES,
@@ -73,6 +74,8 @@ export interface ArenaMeta {
    * screen (`/arena-medieval/{id}/pantalla`, the authority) with the phones as pads.
    */
   view: ArenaView;
+  /** A public arena (`ONLINE_WORLDS`). */
+  online?: boolean;
   createdAt: number | object;
 }
 
@@ -134,6 +137,13 @@ export interface ArenaState {
   kills: Record<string, number>;
   /** Matches won per person. */
   wins: Record<string, number>;
+  /**
+   * A public arena (`ONLINE_WORLDS`): matches chain by themselves with
+   * whoever is there, bots filling the places under people's names.
+   */
+  online: boolean;
+  /** Online: when the next match may start (server time). */
+  nextAt: number;
 }
 
 /** A fighter's pose, written by whoever runs it. */
@@ -225,6 +235,8 @@ function normalizeState(raw: Partial<ArenaState> | null): ArenaState | null {
     winner: raw.winner ?? "",
     kills: raw.kills ?? {},
     wins: raw.wins ?? {},
+    online: raw.online ?? false,
+    nextAt: raw.nextAt ?? 0,
   };
 }
 
@@ -566,7 +578,7 @@ export function nextRound(roomId: string, key: number) {
     for (const id of Object.keys(s.roster)) {
       if (s.roster[id] === champion && !isBot(id)) wins[id] = (wins[id] ?? 0) + 1;
     }
-    return { ...s, status: "finished", winner: champion, wins };
+    return { ...s, status: "finished", winner: champion, wins, nextAt: serverNow() + ONLINE_NEXT_MS };
   });
 }
 
@@ -650,4 +662,92 @@ export function openPad(roomId: string, clientId: string) {
 
 export function subscribePads(roomId: string, cb: (pads: Record<string, ArenaPad>) => void): Unsubscribe {
   return onValue(ref(getDb(), `${base(roomId)}/input`), (snap) => cb(snap.val() ?? {}));
+}
+
+// ---- Online: public arenas ---------------------------------------------------------
+
+/**
+ * Public arenas (codes with a 1, which `generateRoomCode` never makes): you
+ * enter and fight. Matches chain by themselves (`nextOnlineMatch`, called by
+ * whoever is there once `nextAt` passes): the people present split into two
+ * even teams, at least 2 against 2, and bots fill the places — named like
+ * people and never labelled as bots. Latecomers watch until the next match.
+ */
+export const ONLINE_WORLDS = ["ARENA1", "ARENA2", "ARENA3", "ARENA4"];
+export const ONLINE_MAX_PEOPLE = 6;
+/** After a match, the results show this long before the next one. */
+export const ONLINE_NEXT_MS = 9000;
+const ONLINE_WINS = 2;
+
+async function ensureWorld(roomId: string) {
+  const db = getDb();
+  await runTransaction(ref(db, `rooms/${roomId}/meta`), (cur: Partial<ArenaMeta> | null) =>
+    cur ? undefined : { game: "arena", size: 2, wins: ONLINE_WINS, bots: true, potions: true, regen: false, view: "telefono", online: true, createdAt: serverNow() }
+  );
+  await runTransaction(ref(db, statePath(roomId)), (cur: Partial<ArenaState> | null) =>
+    cur ? undefined : { status: "waiting", online: true, gameNo: 0, nextAt: 0 }
+  );
+}
+
+async function worldCrowds() {
+  const db = getDb();
+  return Promise.all(ONLINE_WORLDS.map(async (id) => ({ id, people: (await get(ref(db, `rooms/${id}/presence`))).size })));
+}
+
+export async function onlineCount(): Promise<number> {
+  return (await worldCrowds()).reduce((s, w) => s + w.people, 0);
+}
+
+/** The busiest public arena with room (created if it was cleaned up); its code. */
+export async function enterOnline(): Promise<string> {
+  const crowds = await worldCrowds();
+  const open = crowds.filter((w) => w.people < ONLINE_MAX_PEOPLE).sort((a, b) => b.people - a.people);
+  const id = open[0]?.id ?? ONLINE_WORLDS[0];
+  await ensureWorld(id);
+  return id;
+}
+
+/** The next match of a public arena, with the people `connected` now. */
+export function nextOnlineMatch(roomId: string, connected: string[]) {
+  return mutate(roomId, (s) => {
+    if (!s.online) return null;
+    // A battle in progress only gives way when none of its people is still here (only bots left fighting).
+    const inProgress = s.status === "fighting" || s.status === "roundEnd";
+    if (inProgress && Object.keys(s.roster).some((id) => !isBot(id) && connected.includes(id))) return null;
+    if (s.status === "finished" && serverNow() < s.nextAt) return null;
+    const seed = makeSeed();
+    const people = seededShuffle(connected.filter((id) => s.players[id] && !isBot(id)), seed).slice(0, ONLINE_MAX_PEOPLE);
+    if (!people.length) return null;
+    const size = Math.max(2, Math.min(3, Math.ceil(people.length / 2)));
+    const roster: Record<string, TeamId> = {};
+    people.forEach((id, i) => (roster[id] = i % 2 ? "blue" : "red"));
+    // Bots under people's names, never the name of someone here.
+    const taken = new Set(people.map((id) => s.players[id]?.name.trim().toLowerCase()));
+    const names = seededShuffle(RIVAL_NAMES, seed + 1).filter((n) => !taken.has(n.toLowerCase()));
+    const bots: Record<string, string> = {};
+    let botNo = 0;
+    for (const team of ["red", "blue"] as TeamId[]) {
+      const have = Object.values(roster).filter((t) => t === team).length;
+      for (let k = have; k < size; k++) {
+        const id = `bot${botNo}`;
+        bots[id] = names[botNo % names.length];
+        roster[id] = team;
+        botNo++;
+      }
+    }
+    const next: ArenaState = {
+      ...s,
+      gameNo: s.gameNo + 1,
+      seed,
+      need: ONLINE_WINS,
+      potions: true,
+      regen: false,
+      roster,
+      bots,
+      score: { red: 0, blue: 0 },
+      kills: {},
+      winner: "",
+    };
+    return setupRound(next, 1);
+  });
 }

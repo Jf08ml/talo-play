@@ -18,6 +18,7 @@ export interface QuickGame {
 }
 
 export const QUICK_GAMES: QuickGame[] = [
+  { game: "arena", kind: "mundo" },
   { game: "vibora", kind: "mundo" },
   { game: "ajedrez", kind: "duelo" },
   { game: "cuatro", kind: "duelo" },
@@ -71,6 +72,8 @@ export async function enterWorld(game: GameId): Promise<string> {
       return (await import("./puentesRoom")).enterOnline();
     case "tronco":
       return (await import("./troncoRoom")).enterOnline();
+    case "arena":
+      return (await import("./arena")).enterOnline();
     case "gravedad":
       return (await import("./gravedadRoom")).enterOnline();
     default:

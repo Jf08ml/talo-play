@@ -869,6 +869,12 @@ export const GUIDES: Record<GameId, Guide> = {
         ],
       },
       {
+        title: "En línea",
+        text: [
+          "Elige «En línea» y entras a una arena pública: peleas al toque con gente de todos lados, en dos equipos de 2 contra 2 o más, al mejor de 3 rondas. Las batallas van una detrás de otra; si llegas a mitad de una, miras y entras en la siguiente.",
+        ],
+      },
+      {
         title: "En pantalla grande",
         text: [
           "Al crear la sala, elige «En una pantalla grande»: el combate se ve en una computadora conectada a la tele o al proyector, y cada uno entra desde su celular con el código.",

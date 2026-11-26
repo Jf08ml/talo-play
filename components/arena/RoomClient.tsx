@@ -8,6 +8,7 @@ import {
   getArenaMeta,
   isBot,
   joinArena,
+  nextOnlineMatch,
   normalizeMeta,
   shuffleTeams,
   startMatch,
@@ -18,6 +19,7 @@ import {
 } from "@/lib/arena";
 import { TEAMS, type TeamId } from "@/lib/teams";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
+import { serverNow } from "@/lib/serverTime";
 import { useRoomPresence } from "@/hooks/useRoomPresence";
 import NamePrompt from "@/components/NamePrompt";
 import WaitingRoom from "@/components/WaitingRoom";
@@ -101,12 +103,39 @@ export default function RoomClient({ roomId }: { roomId: string }) {
       ? {
           place: awardTeam === state.winner ? 1 : 2,
           players: 2,
-          vsBotsOnly: Object.keys(state.roster).every((id) => state.roster[id] === awardTeam || isBot(id)),
+          // Public arenas' bots pass for people: they count like anyone there.
+          vsBotsOnly: !state.online && Object.keys(state.roster).every((id) => state.roster[id] === awardTeam || isBot(id)),
         }
       : null
   );
 
+  // Public arena: the next match starts by itself with whoever is here.
+  const online = !!state?.online;
+  // Also when the battle on now was left with only bots (its people are gone): start one with whoever is here.
+  const abandoned =
+    online && !!state && (state.status === "fighting" || state.status === "roundEnd") && !Object.keys(state.roster).some((id) => !isBot(id) && id in presence);
+  const waitingNext = online && !!state && (state.status === "waiting" || state.status === "finished" || abandoned) && presenceLoaded && !!state.players[myId];
+  const nextAt = state?.nextAt ?? 0;
+  const connectedKey = Object.keys(presence).sort().join(",");
+  useEffect(() => {
+    if (!waitingNext) return;
+    const wait = Math.max(0, nextAt - serverNow()) + 300 + Math.random() * 500;
+    const t = setTimeout(() => nextOnlineMatch(roomId, connectedKey.split(",")).catch(console.error), wait);
+    return () => clearTimeout(t);
+  }, [waitingNext, nextAt, roomId, connectedKey]);
+
   if (!configured) return <FirebaseSetupNotice />;
+
+  if (status === "ready" && state && meta && online) {
+    return state.status === "waiting" ? (
+      <div className="flex min-h-dvh flex-col">
+        {identity.clientId && !identity.name && <NamePrompt onSubmit={identity.setName} submitLabel="Entrar a la arena" invitedTo="arena" />}
+        <RoomLoading text="Armando la batalla…" />
+      </div>
+    ) : (
+      <Battle roomId={roomId} meta={meta} state={state} myId={myId} presence={presence} presenceLoaded={presenceLoaded} />
+    );
+  }
 
   // Big screen: the fight is on the TV; this phone is the pad.
   if (status === "ready" && state && meta && state.status !== "waiting" && meta.view === "pantalla") {

@@ -1107,7 +1107,7 @@ function TeamBars({ state, team, myId }: { state: ArenaState; team: TeamId; myId
           <div key={id} className="w-28 rounded-lg bg-slate-950/55 px-1.5 py-1 backdrop-blur sm:w-36">
             <p className={`truncate text-[11px] font-semibold ${hp > 0 ? "text-white" : "text-slate-500 line-through"}`} style={{ color: hp > 0 ? color : undefined }}>
               {fighterName(state, id, myId)}
-              {isBot(id) && <span className="font-normal text-slate-400"> · bot</span>}
+              {isBot(id) && !state.online && <span className="font-normal text-slate-400"> · bot</span>}
             </p>
             <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-slate-800">
               <div className="h-full rounded-full transition-all" style={{ width: `${hp}%`, backgroundColor: color }} />
@@ -1152,22 +1152,44 @@ function Results({
             <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: teamInfo(state.roster[id]).color }} />
             <span className="min-w-0 flex-1 truncate text-left text-slate-100">
               {fighterName(state, id, myId)}
-              {isBot(id) && <span className="text-slate-500"> · bot</span>}
+              {isBot(id) && !state.online && <span className="text-slate-500"> · bot</span>}
               {!isBot(id) && state.wins[id] ? <span className="text-slate-500"> · {state.wins[id]} ganadas</span> : null}
             </span>
             <span className="font-mono text-slate-300">⚔ {state.kills[id] ?? 0}</span>
           </li>
         ))}
       </ol>
-      <div className="flex w-full max-w-xs flex-col gap-2">
-        <button onClick={() => startMatch(roomId, meta, connected)} className={PRIMARY_BUTTON}>
-          Revancha
-        </button>
-        <button onClick={() => backToWaiting(roomId, state.gameNo)} className={SECONDARY_BUTTON}>
-          Cambiar equipos o configuración
-        </button>
-      </div>
+      {state.online ? (
+        <NextBattle nextAt={state.nextAt} />
+      ) : (
+        <div className="flex w-full max-w-xs flex-col gap-2">
+          <button onClick={() => startMatch(roomId, meta, connected)} className={PRIMARY_BUTTON}>
+            Revancha
+          </button>
+          <button onClick={() => backToWaiting(roomId, state.gameNo)} className={SECONDARY_BUTTON}>
+            Cambiar equipos o configuración
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
+
+/** Public arena: when the next battle starts, and a way out. */
+function NextBattle({ nextAt }: { nextAt: number }) {
+  const [now, setNow] = useState(() => serverNow());
+  useEffect(() => {
+    const id = setInterval(() => setNow(serverNow()), 500);
+    return () => clearInterval(id);
+  }, []);
+  const left = Math.max(0, Math.ceil((nextAt - now) / 1000));
+  return (
+    <div className="flex w-full max-w-xs flex-col items-center gap-2">
+      <p className="text-sm text-slate-300">{left > 0 ? `La próxima batalla empieza en ${left} s` : "Armando la próxima batalla…"}</p>
+      <Link href="/arena-medieval" className="text-xs text-slate-400 underline-offset-2 hover:text-white hover:underline">
+        Salir de la arena
+      </Link>
+    </div>
+  );
+}
