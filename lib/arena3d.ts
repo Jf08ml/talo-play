@@ -294,6 +294,8 @@ export class ArenaScene {
   private shakeT = 0;
   private camPos = new THREE.Vector3();
   private camReady = false;
+  private camAim = new THREE.Vector3();
+  private aimReady = false;
   private rand = mulberry32(42);
   private time = 0;
 
@@ -971,7 +973,7 @@ export class ArenaScene {
    * over its shoulder; `look` is where the camera points (your own look, or
    * the followed knight's). Nobody to follow: a slow tour around the arena.
    */
-  render(follow: string | null, mode: ArenaCamera, look: { yaw: number; pitch: number; roll?: number; fov?: number }, dt: number) {
+  render(follow: string | null, mode: ArenaCamera, look: { yaw: number; pitch: number; roll?: number; fov?: number; smooth?: boolean }, dt: number) {
     const view = this.fit();
     if (!view) return;
     const { cw, ch } = view;
@@ -1018,10 +1020,15 @@ export class ArenaScene {
         want.z *= (ARENA_RADIUS - 0.4) / r;
       }
       if (!this.camReady) this.camPos.copy(want);
-      else this.camPos.lerp(want, 1 - Math.exp(-dt * 14));
+      // Watching someone (`smooth`): softer, and the point it looks at glides too.
+      else this.camPos.lerp(want, 1 - Math.exp(-dt * (look.smooth ? 6 : 14)));
       this.camReady = true;
       cam.position.copy(this.camPos);
-      cam.lookAt(eye.x + fx * 6 * Math.cos(pitch), eye.y - Math.sin(pitch) * 6 + 0.2, eye.z + fz * 6 * Math.cos(pitch));
+      const aim = new THREE.Vector3(eye.x + fx * 6 * Math.cos(pitch), eye.y - Math.sin(pitch) * 6 + 0.2, eye.z + fz * 6 * Math.cos(pitch));
+      if (!look.smooth || !this.aimReady) this.camAim.copy(aim);
+      else this.camAim.lerp(aim, 1 - Math.exp(-dt * 7));
+      this.aimReady = !!look.smooth;
+      cam.lookAt(this.camAim);
     }
     this.applyShake(cam);
     // Your own knight (and its swing trail) would be in the way of your eyes.

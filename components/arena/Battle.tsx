@@ -294,6 +294,9 @@ export default function Battle({
     let lastHp = -1;
     /** First-person feel: tilt when strafing, wider view when running or dodging. */
     const feel = { roll: 0, fov: 72 };
+    /** Watching someone else: whom, and the camera's own (smoothed) yaw. */
+    let specFollow: string | null = null;
+    let specYaw = 0;
     const mySend = myId in stateRef.current.roster ? openPose(roomId, myId, true) : null;
 
     /** Calls a state change once in a while (every client may; transactions keep it single). */
@@ -830,7 +833,19 @@ export default function Battle({
       const fe = 1 - Math.exp(-dt * 8);
       feel.roll += ((myAlive ? -c.mx * 0.035 : 0) - feel.roll) * fe;
       feel.fov += (72 + (me?.sprinting ? 9 : 0) + (me?.act === "dodge" ? 12 : 0) - feel.fov) * fe;
-      const camLook = follow === myId ? { ...look, roll: feel.roll, fov: feel.fov } : { yaw: fv?.yaw ?? 0, pitch: -0.2 };
+      // Watching someone else: the camera turns slower than their knight (bots turn sharply,
+      // and remote poses arrive in bursts), so it glides instead of jerking.
+      if (follow !== myId && fv) {
+        if (follow !== specFollow) {
+          specFollow = follow;
+          specYaw = fv.yaw;
+        }
+        let d = fv.yaw - specYaw;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        specYaw += d * (1 - Math.exp(-dt * 3));
+      }
+      const camLook = follow === myId ? { ...look, roll: feel.roll, fov: feel.fov } : { yaw: specYaw, pitch: -0.22, smooth: true };
       const mode: ArenaCamera = follow === myId && myAlive ? cameraRef.current : "tercera";
       if (fv && !screen) {
         earX = fv.x;
