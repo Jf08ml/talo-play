@@ -92,6 +92,14 @@ const SCENES: Record<GameId, ReactNode> = {
       <text x={60} y={50} textAnchor="middle" fontSize={30} fontWeight={900} fill={INK}>?</text>
     </>
   ),
+  quiensoy: (
+    <>
+      <T x={14} y={62} w={46} h={58} r={[23, 23, 7, 7]} c={W} look={[0, -1]} />
+      <rect x={18} y={26} width={38} height={30} rx={4} fill={Y} />
+      <text x={37} y={50} textAnchor="middle" fontSize={24} fontWeight={900} fill={INK}>?</text>
+      <T x={74} y={84} w={34} h={36} r={17} c={INK} look={[-1, -0.6]} expr="contento" />
+    </>
+  ),
   probable: (
     <>
       <T x={2} y={80} w={36} h={36} r={18} c={W} look={[1, -0.4]} />

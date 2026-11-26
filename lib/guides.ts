@@ -304,6 +304,37 @@ export const GUIDES: Record<GameId, Guide> = {
       { title: "Puntos", text: ["Acertar da entre 500 y 1000 puntos: más cuanto más rápido contestas. Errar o no contestar da 0. Cuando contestan todos, se revela la respuesta."] },
     ],
   },
+  quiensoy: {
+    goal: "Adivinar quién eres con la menor cantidad de preguntas.",
+    sections: [
+      {
+        title: "Tu personaje en la frente",
+        text: [
+          "A cada uno le toca un personaje: una persona famosa, alguien de una película o un dibujo, un animal, una comida, una profesión o un objeto. En tu celular ves el de todos los demás sobre su talo, pero el tuyo aparece como un signo de pregunta.",
+          "Si la sala es de «Ustedes eligen», antes de empezar cada uno escribe el personaje de quien le sigue, sin que lo vea.",
+        ],
+      },
+      {
+        title: "Preguntar y responder",
+        text: [
+          "En tu turno haces una pregunta que se responda por sí o por no sobre ti: «¿Soy una persona real?», «¿Soy un animal?», «¿Salgo en películas?». Según la sala, la dices en voz alta o la escribes.",
+          "Los demás responden con los botones Sí, No, A veces o No sé (ven tu personaje, tú no). Mientras la respuesta no sea mayoría de «no», sigues preguntando, hasta 5 por turno; si te dicen que no, pasa al siguiente.",
+          "Debajo tienes «Lo que sabes de ti»: cada pregunta que hiciste y lo que te respondieron, para no olvidarte.",
+        ],
+      },
+      {
+        title: "Adivinar y puntos",
+        text: [
+          "En tu turno, en vez de preguntar, puedes tocar «Adivinar» y escribir quién crees que eres. Si aciertas, ganas 12 puntos menos uno por cada pregunta que hiciste (y dos menos por cada intento fallido), nunca menos de 2. Si fallas, pierdes el turno.",
+          "Si no das más, puedes rendirte: ves tu personaje y no sumas. La ronda termina cuando todos adivinaron o se rindieron; en «Otra ronda» se reparten personajes nuevos y los puntos se suman.",
+        ],
+      },
+    ],
+    tips: [
+      "Empieza por preguntas que partan todo a la mitad: «¿Soy una persona?», «¿Existo de verdad?».",
+      "Al responder, piensa en lo que la mayoría sabe del personaje, no en un detalle raro.",
+    ],
+  },
   impostor: {
     goal: "Si eres del grupo: descubrir al impostor. Si eres el impostor: que no te descubran (o adivinar la palabra).",
     sections: [

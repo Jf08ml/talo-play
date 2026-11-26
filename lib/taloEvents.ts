@@ -88,7 +88,7 @@ export function reduceTalos(players: PlayerId[], prev: TaloState, ev: PublicGame
  * Games with hidden information: while a match is on, only these events are
  * allowed (the rest are ignored and the talos stay neutral).
  */
-export const HIDDEN_INFO_GAMES: GameId[] = ["impostor", "lobo", "naval", "truco", "chinchon", "codigo", "palabra", "verdades"];
+export const HIDDEN_INFO_GAMES: GameId[] = ["impostor", "quiensoy", "lobo", "naval", "truco", "chinchon", "codigo", "palabra", "verdades"];
 export const ALLOWED_DURING_HIDDEN: PublicGameEvent["type"][] = ["player_joined", "turn_changed", "reset"];
 
 /** Whether `ev` may reach the talos of `game` right now (`playing` = a match is on). */

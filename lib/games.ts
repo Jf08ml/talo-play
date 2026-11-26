@@ -6,7 +6,7 @@
  * Every room stores its game in `rooms/{id}/meta/game`; room codes are
  * global, so one code is enough to find any game's room (`lib/roomLookup.ts`).
  */
-export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena" | "yonunca" | "onda" | "telefono" | "ludo" | "lobo" | "ajedrez" | "chinchon" | "truco" | "fuego" | "otelo" | "backgammon" | "oca" | "domino" | "pasteleria" | "vibora" | "triqui" | "ladrillazo" | "puentes" | "tronco" | "minigolf" | "empujones" | "golpe" | "gravedad";
+export type GameId = "rompecabezas" | "memotest" | "tutti" | "dibujo" | "codigo" | "deslizante" | "cuatro" | "palabra" | "trivia" | "impostor" | "naval" | "probable" | "conoces" | "generala" | "emojis" | "verdades" | "damas" | "cajas" | "reto" | "mimica" | "ahorcado" | "sopa" | "carreras" | "carreras3d" | "arena" | "yonunca" | "onda" | "telefono" | "ludo" | "lobo" | "ajedrez" | "chinchon" | "truco" | "fuego" | "otelo" | "backgammon" | "oca" | "domino" | "pasteleria" | "vibora" | "triqui" | "ladrillazo" | "puentes" | "tronco" | "minigolf" | "empujones" | "golpe" | "gravedad" | "quiensoy";
 
 /** Who you're playing with: the first question the home page asks. */
 export type PlayContext = "pareja" | "amigos" | "grupo" | "solo";
@@ -202,6 +202,22 @@ export const GAMES: Record<GameId, GameInfo> = {
       "Mira tu carta a escondidas: tiene la palabra secreta, o te dice que eres el impostor.",
       "Por turnos, cada uno da una pista de una palabra, sin regalarla.",
       "Voten quién es el impostor. Si lo descubren, todavía puede ganar adivinando la palabra.",
+    ],
+  },
+  quiensoy: {
+    id: "quiensoy",
+    title: "¿Quién soy?",
+    path: "quien-soy",
+    addedAt: "2026-11-26",
+    tagline: "Todos ven tu personaje menos tú. Pregunta por sí o por no hasta adivinar quién eres: famosos, personajes, animales… o los que escriban ustedes.",
+    minPlayers: 2,
+    maxPlayers: 12,
+    duration: "10–20 min",
+    contexts: ["amigos", "grupo", "pareja"],
+    howTo: [
+      "A cada uno le toca un personaje secreto: en tu celular ves el de todos los demás, pero el tuyo no.",
+      "En tu turno preguntas por sí o por no sobre ti (en voz alta o escribiendo) y los demás responden con botones. Mientras no te digan que no, sigues.",
+      "Cuando creas saberlo, arriesga: con menos preguntas, más puntos. Si fallas, pierdes el turno.",
     ],
   },
   probable: {
@@ -770,13 +786,13 @@ export const GAMES: Record<GameId, GameInfo> = {
 };
 
 /** Home page order: quickest to start first. */
-export const GAME_ORDER: GameId[] = ["memotest", "impostor", "probable", "yonunca", "onda", "telefono", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "lobo", "vibora", "ladrillazo", "minigolf", "tronco", "empujones", "golpe", "gravedad", "arena", "fuego", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "triqui", "cajas", "naval", "damas", "ajedrez", "generala", "pasteleria", "chinchon", "truco", "ludo", "domino", "backgammon", "otelo", "oca", "tutti", "dibujo", "codigo", "deslizante", "puentes", "rompecabezas"];
+export const GAME_ORDER: GameId[] = ["memotest", "impostor", "quiensoy", "probable", "yonunca", "onda", "telefono", "reto", "emojis", "trivia", "conoces", "verdades", "mimica", "lobo", "vibora", "ladrillazo", "minigolf", "tronco", "empujones", "golpe", "gravedad", "arena", "fuego", "carreras3d", "carreras", "palabra", "sopa", "ahorcado", "cuatro", "triqui", "cajas", "naval", "damas", "ajedrez", "generala", "pasteleria", "chinchon", "truco", "ludo", "domino", "backgammon", "otelo", "oca", "tutti", "dibujo", "codigo", "deslizante", "puentes", "rompecabezas"];
 
 /** The home's shelves: every game in exactly one, in the order listed. */
 export type GameCategory = "previa" | "palabras" | "mesa" | "cartas" | "accion" | "puzzles";
 
 export const CATEGORIES: { id: GameCategory; label: string; hint: string; games: GameId[] }[] = [
-  { id: "previa", label: "Para la fiesta", hint: "Risas, secretos y votaciones en grupo", games: ["impostor", "probable", "yonunca", "onda", "telefono", "reto", "conoces", "verdades", "mimica", "lobo"] },
+  { id: "previa", label: "Para la fiesta", hint: "Risas, secretos y votaciones en grupo", games: ["impostor", "quiensoy", "probable", "yonunca", "onda", "telefono", "reto", "conoces", "verdades", "mimica", "lobo"] },
   { id: "palabras", label: "Preguntas y palabras", hint: "Para los que saben de todo", games: ["trivia", "emojis", "palabra", "sopa", "ahorcado", "tutti", "dibujo", "codigo"] },
   { id: "accion", label: "Acción y 3D", hint: "Carreras, combates y más", games: ["vibora", "ladrillazo", "minigolf", "tronco", "empujones", "golpe", "gravedad", "fuego", "arena", "carreras3d", "carreras", "pasteleria"] },
   { id: "mesa", label: "Juegos de mesa", hint: "Los clásicos de siempre, uno contra uno o en familia", games: ["cuatro", "triqui", "cajas", "naval", "damas", "ajedrez", "ludo", "backgammon", "otelo", "oca"] },
