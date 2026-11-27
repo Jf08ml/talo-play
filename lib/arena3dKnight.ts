@@ -3,6 +3,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import type { TeamId } from "./teams";
 import { KICK_HIT, KICK_SECONDS, SPECIALS, WEAPONS, specialOf, type Act, type Gear, type ItemKind, type WeaponId } from "./arenaSim";
 import { EMBLEM_PATHS, EMOTES, EMOTE_SECONDS } from "./arenaLooks";
+import { driveKnightModel, knightModel, shieldPart, weaponPart, type KnightModel } from "./arena3dModel";
 
 /**
  * Arena medieval's knights, weapons and items (three.js, browser only), and
@@ -52,9 +53,13 @@ export interface KnightLook {
   plume: string;
   emblem: string;
   helm: string;
+  /** A finish for steel plates; the cloth still carries the team color. */
+  armor: string;
+  cape: string;
+  trail: string;
 }
 
-export const PLAIN_LOOK: KnightLook = { plume: "", emblem: "ninguno", helm: "yelmo" };
+export const PLAIN_LOOK: KnightLook = { plume: "", emblem: "ninguno", helm: "yelmo", armor: "#b8c2cc", cape: "", trail: "" };
 
 /** Shared textures and geometries (never disposed with a knight). */
 const SHARED = "shared";
@@ -358,12 +363,103 @@ function bladeGeo(len: number, width: number, thick: number, tipLen: number): TH
   return g;
 }
 
+/** The flail's chain from the handle's end (z −0.36), five links along −z; it swings (`swingFlail`). */
+function flailChain(): THREE.Group {
+  const chain = new THREE.Group();
+  chain.position.z = -0.36;
+  const link = new THREE.TorusGeometry(0.02, 0.006, 4, 8);
+  const linkMat = phong(DARK_STEEL, 90);
+  for (let i = 0; i < 5; i++) {
+    const m = new THREE.Mesh(i ? link.clone() : link, linkMat);
+    m.position.z = -0.03 - i * 0.045;
+    m.rotation.set(0, Math.PI / 2, i % 2 ? Math.PI / 2 : 0);
+    chain.add(m);
+  }
+  return chain;
+}
+
+/** Where each weapon's swing trail runs (base → tip), in the weapon's frame. */
+const TRAIL: Record<Exclude<WeaponId, "arco" | "mangual">, [THREE.Vector3Tuple, THREE.Vector3Tuple]> = {
+  daga: [[0, 0, -0.08], [0, 0, -0.36]],
+  espada: [[0, 0, -0.25], [0, 0, -0.92]],
+  hacha: [[0, 0, -0.45], [0.22, 0, -0.74]],
+  // The modeled hammer's face sticks out less (0.15 m) than the old one's.
+  martillo: [[0, 0, -0.6], [0.15, 0, -0.87]],
+  maza: [[0, 0, -0.4], [0, 0, -0.7]],
+  lanza: [[0, 0, -1.4], [0, 0, -1.9]],
+};
+
+/** A modeled piece (standing, +y forward) laid in the weapon frame: forward along −z, +x kept. */
+function laid(part: THREE.Object3D, rotX = -Math.PI / 2): THREE.Group {
+  const g = new THREE.Group();
+  part.rotation.x = rotX;
+  g.add(part);
+  return g;
+}
+
+/** The bow's string: three points, the middle one pulled back with the draw. */
+function bowString(): THREE.Line {
+  return new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0.62, 0.1), new THREE.Vector3(0, 0, 0.1), new THREE.Vector3(0, -0.62, 0.1)]),
+    new THREE.LineBasicMaterial({ color: 0xf5f5f4 })
+  );
+}
+
+/**
+ * The weapon from the Meshy models (lib/arena3dModel.ts), in the same frame
+ * and with the same extras as the drawn ones, or null until they're loaded.
+ */
+function modeledWeapon(kind: WeaponId): THREE.Group | null {
+  if (kind === "arco") {
+    // Modeled already in the bow's frame (limbs ±y, belly −z, tips at z +0.1).
+    const bow = weaponPart("arco");
+    if (!bow) return null;
+    const g = new THREE.Group();
+    g.add(bow);
+    const string = bowString();
+    g.add(string);
+    g.userData.string = string;
+    g.userData.modeled = true;
+    return g;
+  }
+  if (kind === "mangual") {
+    const handle = weaponPart("mangual-mango");
+    const ball = weaponPart("mangual-bola");
+    if (!handle || !ball) return null;
+    const g = laid(handle);
+    const chain = flailChain();
+    // The ball hangs from its ring (origin) toward −y: turned to hang along the chain (−z).
+    ball.rotation.x = Math.PI / 2;
+    const hang = new THREE.Group();
+    hang.position.z = -0.24;
+    hang.add(ball);
+    chain.add(hang);
+    g.add(chain);
+    g.userData.flail = chain;
+    g.userData.tipObj = hang;
+    g.userData.tip = new THREE.Vector3(0, 0, -0.69);
+    g.userData.base = new THREE.Vector3(0, 0, -0.4);
+    g.userData.modeled = true;
+    return g;
+  }
+  const part = weaponPart(kind);
+  if (!part) return null;
+  const g = laid(part);
+  const [base, tip] = TRAIL[kind];
+  g.userData.base = new THREE.Vector3(...base);
+  g.userData.tip = new THREE.Vector3(...tip);
+  g.userData.modeled = true;
+  return g;
+}
+
 /**
  * A weapon held at the origin (the grip), pointing along -z (blade, head or
  * tip forward). Sizes in meters. `userData.tip` / `userData.base` are the
  * points a swing trail follows.
  */
 export function weaponMesh(kind: WeaponId): THREE.Group {
+  const modeled = modeledWeapon(kind);
+  if (modeled) return modeled;
   const g = new THREE.Group();
   const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x = 0, y = 0, z = 0) => {
     const m = new THREE.Mesh(geo, mat);
@@ -437,16 +533,7 @@ export function weaponMesh(kind: WeaponId): THREE.Group {
       add(new THREE.CylinderGeometry(0.027, 0.027, 0.12, 8).rotateX(Math.PI / 2), leather, 0, 0, 0.03);
       add(new THREE.SphereGeometry(0.03, 10, 8), gold, 0, 0, 0.1);
       add(new THREE.CylinderGeometry(0.03, 0.03, 0.04, 8).rotateX(Math.PI / 2), phong(DARK_STEEL), 0, 0, -0.34);
-      const chain = new THREE.Group();
-      chain.position.z = -0.36;
-      const link = new THREE.TorusGeometry(0.02, 0.006, 4, 8);
-      const linkMat = phong(DARK_STEEL, 90);
-      for (let i = 0; i < 5; i++) {
-        const m = new THREE.Mesh(i ? link.clone() : link, linkMat);
-        m.position.z = -0.03 - i * 0.045;
-        m.rotation.set(0, Math.PI / 2, i % 2 ? Math.PI / 2 : 0);
-        chain.add(m);
-      }
+      const chain = flailChain();
       const spikes: THREE.BufferGeometry[] = [new THREE.SphereGeometry(0.075, 12, 9)];
       const dirs: [number, number, number][] = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1], [0.7, 0.7, 0], [-0.7, -0.7, 0], [0.7, 0, 0.7], [-0.7, 0, -0.7]];
       for (const [x, y, z] of dirs) {
@@ -509,10 +596,7 @@ export function weaponMesh(kind: WeaponId): THREE.Group {
         new THREE.Vector3(0, -0.62, 0.1),
       ]);
       add(new THREE.TubeGeometry(curve, 20, 0.017, 6, false), wood);
-      const string = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0.62, 0.1), new THREE.Vector3(0, 0, 0.1), new THREE.Vector3(0, -0.62, 0.1)]),
-        new THREE.LineBasicMaterial({ color: 0xf5f5f4 })
-      );
+      const string = bowString();
       g.add(string);
       g.userData.string = string;
       add(capsule(0.026, 0.1, 6, 2), leather, 0, 0, -0.17);
@@ -523,6 +607,19 @@ export function weaponMesh(kind: WeaponId): THREE.Group {
 }
 
 export function shieldMesh(team: TeamId | null, color?: number, emblem = "ninguno"): THREE.Group {
+  // The modeled knight's own shield once it's loaded: the face in the team's
+  // color, and the chosen emblem over the model's symbol.
+  const modeled = shieldPart(color ?? (team ? TEAM_COLORS[team] : WOOD));
+  if (modeled) {
+    const decal = emblemDecal(emblem, 0.3);
+    if (decal && modeled.symbol) {
+      modeled.symbol.visible = false;
+      decal.position.copy(modeled.emblemAt);
+      modeled.group.add(decal);
+    }
+    modeled.group.userData.modeled = true;
+    return modeled.group;
+  }
   const g = new THREE.Group();
   // A slightly domed round shield, its front facing -z.
   const R = 0.34;
@@ -551,6 +648,9 @@ export function shieldMesh(team: TeamId | null, color?: number, emblem = "ningun
 }
 
 export function arrowMesh(): THREE.Group {
+  // Modeled tip up (+y), centered: laid with the tip toward −z like the drawn one.
+  const modeled = weaponPart("flecha");
+  if (modeled) return laid(modeled);
   const g = new THREE.Group();
   g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.7, 5).rotateX(Math.PI / 2), lambert(WOOD)));
   const tip = new THREE.Mesh(lathe([[0, 0], [0.018, 0.02], [0, 0.08]], 4).rotateX(-Math.PI / 2), phong(STEEL));
@@ -652,6 +752,8 @@ export interface Knight {
   tint: number;
   /** Its emblem (on the chest and the shield). */
   emblem: string;
+  cape: THREE.Group | null;
+  trailColor: THREE.Color | null;
   root: THREE.Group;
   body: THREE.Group;
   hips: THREE.Group;
@@ -672,10 +774,18 @@ export interface Knight {
   pose: KnightPose | null;
   hp: number;
   /** Armor that flashes white for a moment when hit. */
-  flashMats: THREE.MeshPhongMaterial[];
+  flashMats: (THREE.MeshPhongMaterial | THREE.MeshStandardMaterial)[];
+  /**
+   * The modeled knight (lib/arena3dModel.ts) when it's loaded: the rig above
+   * is then only animated, never drawn, and drives the model's bones.
+   */
+  model: KnightModel | null;
+  /** Where the nearest rival stands (the modeled knight looks at it), or null. */
+  target: { x: number; z: number } | null;
   flashT: number;
   lastAct: string;
   dustAcc: number;
+  trailAcc: number;
   /** Walk cycle phase, smoothed velocity in the world, last position. */
   walk: number;
   vx: number;
@@ -702,16 +812,18 @@ export function knightMesh(team: TeamId, geos: KnightGeos, tint: number = TEAM_C
   const root = new THREE.Group();
   const body = new THREE.Group();
   root.add(body);
-  const armor = phong(STEEL, 90);
+  const armorColor = Number.parseInt((look.armor || "#b8c2cc").replace(/^#/, ""), 16);
+  const armor = phong(Number.isFinite(armorColor) ? armorColor : STEEL, 90);
   const darkArmor = phong(DARK_STEEL, 40);
   const cloth = lambert(tint, { side: THREE.DoubleSide });
   const leather = lambert(LEATHER);
   const gold = phong(GOLD);
   const black = lambert(0x0b0b0f, { side: THREE.DoubleSide });
+  // The modeled knight, once loaded; until then (or without it) the rig is drawn.
+  const model = knightModel({ armor: look.armor, tint, plume: look.plume, helm: look.helm, cape: look.cape });
   const mesh = (geo: THREE.BufferGeometry, mat: THREE.Material, parent: THREE.Object3D) => {
-    const m = new THREE.Mesh(geo, mat);
-    parent.add(m);
-    return m;
+    if (model) return;
+    parent.add(new THREE.Mesh(geo, mat));
   };
 
   const hips = new THREE.Group();
@@ -750,11 +862,36 @@ export function knightMesh(team: TeamId, geos: KnightGeos, tint: number = TEAM_C
   const torso = new THREE.Group();
   torso.position.y = HIP_Y;
   body.add(torso);
+  let cape: THREE.Group | null = null;
+  if (model) {
+    // Only its sway is used: the model's own cape follows it.
+    if (look.cape) cape = new THREE.Group();
+  } else if (look.cape) {
+    const shape = new THREE.Shape();
+    shape.moveTo(-0.16, 0.22);
+    shape.quadraticCurveTo(0, 0.25, 0.16, 0.22);
+    shape.lineTo(0.23, -0.36);
+    shape.quadraticCurveTo(0, -0.43, -0.23, -0.36);
+    shape.closePath();
+    cape = new THREE.Group();
+    cape.position.set(0, -0.05, 0.17);
+    const capeColor = Number.parseInt(look.cape.replace(/^#/, ""), 16);
+    const capeMesh = new THREE.Mesh(new THREE.ShapeGeometry(shape), lambert(Number.isFinite(capeColor) ? capeColor : tint, { side: THREE.DoubleSide }));
+    capeMesh.position.z = 0.015;
+    capeMesh.castShadow = true;
+    cape.add(capeMesh);
+    torso.add(cape);
+  }
   mesh(geos.torsoSteel, armor, torso);
   mesh(geos.torsoCloth, cloth, torso);
   mesh(geos.torsoGold, gold, torso);
   const chest = emblemDecal(look.emblem, 0.13);
-  if (chest) {
+  if (chest && model) {
+    // On the breastplate's front (+z in the model, where it's most forward).
+    chest.position.set(0, -0.02, 0.197);
+    chest.rotation.y = Math.PI;
+    model.chest.add(chest);
+  } else if (chest) {
     chest.position.set(0, 0.2, -0.222);
     torso.add(chest);
   }
@@ -765,13 +902,15 @@ export function knightMesh(team: TeamId, geos: KnightGeos, tint: number = TEAM_C
   mesh(geos.helm, armor, head);
   mesh(geos.helmGold, gold, head);
   mesh(geos.visor, black, head);
-  const plumeMat = look.plume ? lambert(parseInt(look.plume.slice(1), 16), { side: THREE.DoubleSide }) : cloth;
-  const extras = look.helm !== "yelmo" ? helmExtras() : null;
-  if (look.helm === "cresta") mesh(extras!.crest, plumeMat, head);
-  else mesh(geos.plume, plumeMat, head);
-  if (look.helm === "cuernos") mesh(extras!.horns, lambert(0xe9dfc6), head);
-  if (look.helm === "corona") mesh(extras!.crown, gold, head);
-  if (look.helm === "alado") mesh(extras!.wings, phong(0xe5e7eb, 60), head);
+  if (!model) {
+    const plumeMat = look.plume ? lambert(parseInt(look.plume.slice(1), 16), { side: THREE.DoubleSide }) : cloth;
+    const extras = look.helm !== "yelmo" ? helmExtras() : null;
+    if (look.helm === "cresta") mesh(extras!.crest, plumeMat, head);
+    else mesh(geos.plume, plumeMat, head);
+    if (look.helm === "cuernos") mesh(extras!.horns, lambert(0xe9dfc6), head);
+    if (look.helm === "corona") mesh(extras!.crown, gold, head);
+    if (look.helm === "alado") mesh(extras!.wings, phong(0xe5e7eb, 60), head);
+  }
 
   const arms: ArmRig[] = [];
   let hand = new THREE.Group();
@@ -791,9 +930,12 @@ export function knightMesh(team: TeamId, geos: KnightGeos, tint: number = TEAM_C
     elbow.add(grip);
     torso.add(shoulder);
     arms.push({ shoulder, elbow, grip });
-    if (side === 1) hand = grip;
-    else offHand = grip;
+    // With the model, weapons go in its fists (same frame as the rig's grips).
+    const held = model ? model.grips[side === 1 ? 1 : 0] : grip;
+    if (side === 1) hand = held;
+    else offHand = held;
   }
+  if (model) body.add(model.holder);
 
   const shadow = new THREE.Mesh(geos.shadow, new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.45, depthWrite: false }));
   shadow.position.y = 0.02;
@@ -804,6 +946,8 @@ export function knightMesh(team: TeamId, geos: KnightGeos, tint: number = TEAM_C
     team,
     tint,
     emblem: look.emblem,
+    cape,
+    trailColor: look.trail ? new THREE.Color(Number.parseInt(look.trail.replace(/^#/, ""), 16)) : null,
     root,
     body,
     hips,
@@ -818,10 +962,13 @@ export function knightMesh(team: TeamId, geos: KnightGeos, tint: number = TEAM_C
     weaponKind: null,
     shield: null,
     shadow,
-    flashMats: [armor, darkArmor, gold],
+    flashMats: model ? model.armor : [armor, darkArmor, gold],
+    model,
+    target: null,
     flashT: 0,
     lastAct: "",
     dustAcc: 0,
+    trailAcc: 0,
     walk: Math.random() * 6,
     vx: 0,
     vz: 0,
@@ -992,6 +1139,11 @@ export function animateKnight(k: Knight, p: KnightPose, dt: number, time: number
   const speed = p.act === "dodge" ? 0 : p.speed;
   const moving = air ? 0 : clamp01(speed / 4.2);
   const running = p.running && moving > 0.5;
+  if (k.cape) {
+    const speedLift = Math.min(0.5, moving * 0.38);
+    k.cape.rotation.x = -0.08 - speedLift - Math.sin(time * 6 + k.seed) * (0.035 + moving * 0.09);
+    k.cape.rotation.z = Math.sin(time * 3.5 + k.seed) * (0.025 + moving * 0.075);
+  }
 
   // Walk cycle: the phase follows the distance walked (backwards when backing up).
   const stride = running ? 3.0 : 2.1;
@@ -1442,7 +1594,37 @@ export function animateKnight(k: Knight, p: KnightPose, dt: number, time: number
     pos.setZ(1, 0.1 + (p.act === "draw" ? p.draw * 0.45 : 0));
     pos.needsUpdate = true;
   }
+  if (k.model) driveKnightModel(k.model, k, a.crouch, k.cape, [a.thighX0, a.thighX1], faceCue(k, p, time, dirS * moving), dt, time);
   return ev;
+}
+
+/**
+ * The modeled knight's face for its pose: X eyes when down, a wince when hit,
+ * narrowed when attacking or guarding, happy squints for the cheerful gestures,
+ * and the head and eyes on the nearest rival (`k.target`, set by the scene),
+ * else wandering a little and toward where it sidesteps.
+ */
+function faceCue(k: Knight, p: KnightPose, time: number, sidestep: number) {
+  const emote = p.emote && (p.emoteT ?? 99) < EMOTE_SECONDS ? EMOTES[p.emote - 1]?.id : undefined;
+  let open = 1;
+  if (k.flashT > 0 || p.act === "stagger") open = 0.35;
+  else if (emote === "festejo" || emote === "burla") open = 0.3;
+  else if (p.act === "windup" || p.act === "kick" || p.act === "special" || p.act === "draw") open = 0.7;
+  else if (p.blocking) open = 0.75;
+  let look = Math.sin(time * 0.6 + k.seed) * 0.35 + sidestep * 0.4;
+  if (k.target && p.alive) {
+    // The rival in the knight's own frame (it faces −z, its right is +x).
+    const dx = k.target.x - p.x;
+    const dz = k.target.z - p.z;
+    const c = Math.cos(p.yaw);
+    const s = Math.sin(p.yaw);
+    const ang = Math.atan2(c * dx - s * dz, -(s * dx + c * dz));
+    if (Math.abs(ang) < 1.7) look = ang;
+  }
+  // Mid-swing the head stays with the body; the eyes still follow.
+  const busy = p.act !== "idle" || p.blocking;
+  const turn = Math.max(-0.5, Math.min(0.5, look)) * (busy ? 0.35 : 1);
+  return { ko: !p.alive, open, lookX: Math.max(-1, Math.min(1, (look - turn) / 0.5)), lookY: p.pitch * 0.8, turn };
 }
 
 /** Whether the knight's weapon is in the fast part of a swing (for the trail). */

@@ -43,6 +43,7 @@ import {
 } from "./arena3dKnight";
 import { EMOTES, EMOTE_SECONDS } from "./arenaLooks";
 import { Impacts, Particles, Shockwaves, SwingTrail } from "./arena3dFx";
+import { knightModelReady, loadKnightModel } from "./arena3dModel";
 import { GroundFx, buildMap, buildTrapsFor, canvasTexture, sandTexture, stoneTexture, type WorldFx } from "./arena3dMaps";
 import { getMap, supportAt, topAt, type ArenaMap, type ArenaMapId } from "./arenaMaps";
 
@@ -179,7 +180,7 @@ export interface FighterInfo {
 /** A knight in the scene: its level, the look it was built with, and its gesture bubble. */
 type SceneKnight = Knight & { lv: number; lookKey: string; bubble: THREE.Sprite; bubbleOf: number };
 
-const lookKey = (l: KnightLook | undefined) => (l ? `${l.plume}|${l.emblem}|${l.helm}` : "");
+const lookKey = (l: KnightLook | undefined) => (l ? `${l.plume}|${l.emblem}|${l.helm}|${l.armor}|${l.cape}|${l.trail}` : "");
 
 const bubbleTextures = new Map<number, THREE.CanvasTexture>();
 /** A gesture's bubble: its emoji on a white round bubble with a tail (made once per gesture). */
@@ -333,7 +334,7 @@ export class ArenaScene {
   private camera = new THREE.PerspectiveCamera(72, 1, 0.05, 400);
   private glow: THREE.Texture;
   private knights = new Map<string, SceneKnight>();
-  private items = new Map<string, { kind: ItemKind; group: THREE.Group }>();
+  private items = new Map<string, { kind: ItemKind; group: THREE.Group; modeled: boolean }>();
   private arrows = new Map<string, THREE.Group>();
   private sparks = new Particles(420, true, 9, 1.2);
   private dust = new Particles(300, false, -0.4, 3);
@@ -402,6 +403,9 @@ export class ArenaScene {
   ) {
     this.map = getMap(opts.map);
     this.R = this.map.bounds.kind === "circle" ? this.map.bounds.r : this.map.extent;
+    // The modeled knight: until it's loaded the knights are drawn from the rig,
+    // and `setFighters` swaps each one when it arrives.
+    void loadKnightModel();
     const high = (opts.quality ?? "alta") === "alta";
     this.shadows = high;
     this.maxDpr = opts.maxDpr ?? (high ? 1.75 : 1.25);
@@ -720,9 +724,10 @@ export class ArenaScene {
 
   /** Makes the scene's knights match `info` (id → team, name, and how it's dressed and its level). */
   setFighters(info: Record<string, FighterInfo>) {
+    const modeled = knightModelReady();
     for (const [id, k] of this.knights) {
       const want = info[id]?.color ? parseInt(info[id].color!.slice(1), 16) : TEAM_COLORS[info[id]?.team ?? k.team];
-      if (!(id in info) || info[id].team !== k.team || want !== k.tint || lookKey(info[id].look) !== k.lookKey) {
+      if (!(id in info) || info[id].team !== k.team || want !== k.tint || lookKey(info[id].look) !== k.lookKey || (modeled && !k.model)) {
         this.scene.remove(k.root, k.shadow);
         disposeTree(k.root);
         disposeTree(k.shadow);
@@ -765,6 +770,24 @@ export class ArenaScene {
       this.trails.set(id, trail);
       this.scene.add(trail.mesh);
     }
+  }
+
+  /** Who a knight looks at: the nearest standing knight within 9 m, rivals before teammates. */
+  private nearestRival(id: string, k: SceneKnight, p: KnightPose): { x: number; z: number } | null {
+    let best: KnightPose | null = null;
+    let bestD = 81;
+    for (const [other, o] of this.knights) {
+      const q = o.pose;
+      if (other === id || !q?.alive) continue;
+      // Teammates count as twice as far (in «todos contra todos» everyone has their own tint).
+      const ally = o.team === k.team && o.tint === k.tint;
+      const d = ((q.x - p.x) ** 2 + (q.z - p.z) ** 2) * (ally ? 4 : 1);
+      if (d < bestD) {
+        bestD = d;
+        best = q;
+      }
+    }
+    return best ? { x: best.x, z: best.z } : null;
   }
 
   private placeTag(tag: THREE.Sprite) {
@@ -813,7 +836,8 @@ export class ArenaScene {
   setItems(items: Record<string, ArenaItem>) {
     for (const [id, it] of this.items) {
       const now = items[id];
-      if (!now || now.kind !== it.kind) {
+      // Also remade once the models arrive, if it was drawn before them.
+      if (!now || now.kind !== it.kind || (!it.modeled && knightModelReady())) {
         this.scene.remove(it.group);
         disposeTree(it.group);
         this.items.delete(id);
@@ -843,7 +867,7 @@ export class ArenaScene {
       group.add(spinner, halo);
       group.position.set(it.x, 0, it.z);
       this.scene.add(group);
-      this.items.set(id, { kind: it.kind, group });
+      this.items.set(id, { kind: it.kind, group, modeled: knightModelReady() });
     }
   }
 
@@ -875,7 +899,7 @@ export class ArenaScene {
    * hit, sand on a fall; a perfect parry is a bigger, whiter burst with a
    * ring around; a kick, a puff and a few sparks.
    */
-  burst(x: number, y: number, z: number, kind: "hit" | "block" | "dust" | "parry" | "kick") {
+  burst(x: number, y: number, z: number, kind: "hit" | "block" | "dust" | "parry" | "kick", emblem = "ninguno") {
     const high = this.shadows;
     if (kind === "dust") {
       this.dustRing(x, z, 18, 1.6, 0.55, Math.max(0, y - 0.05));
@@ -908,7 +932,9 @@ export class ArenaScene {
     }
     const block = kind === "block";
     const n = block ? (high ? 40 : 26) : high ? 30 : 20;
-    const colors = block ? BLOCK_SPARKS : HIT_SPARKS;
+    const emblemHex: Record<string, number> = { cruz: 0xf5f0dc, estrella: 0xffd34f, rayo: 0x8cecff, luna: 0xc4a7ff, corona: 0xffcc55, dragon: 0xff694f, calavera: 0xf4f4f5 };
+    const customColor = block && emblemHex[emblem] ? new THREE.Color(emblemHex[emblem]) : undefined;
+    const colors: THREE.Color[] = block && customColor ? [customColor, new THREE.Color(0xffffff)] : block ? BLOCK_SPARKS : HIT_SPARKS;
     for (let i = 0; i < n; i++) {
       // Mostly outward and up, a few fast streaks.
       const a = this.rand() * Math.PI * 2;
@@ -919,8 +945,9 @@ export class ArenaScene {
       this.sparks.spawn(x, y, z, Math.cos(a) * sp, 0.8 + this.rand() * (block ? 4.5 : 3), Math.sin(a) * sp, c, size, 0.22 + this.rand() * (block ? 0.45 : 0.3), 1);
     }
     // A flash and an impact ring; under bloom the flash glows.
-    const flash = block ? (high ? FLASH_BLOCK_GLOW : FLASH_BLOCK) : high ? FLASH_HIT_GLOW : FLASH_HIT;
+    const flash = block && customColor ? customColor : block ? (high ? FLASH_BLOCK_GLOW : FLASH_BLOCK) : high ? FLASH_HIT_GLOW : FLASH_HIT;
     this.impacts.spawn(x, y, z, flash, block ? 0.75 : 0.6, block ? 0.6 : 0.75, block ? 0.16 : 0.22);
+    if (block && customColor) this.shock.spawn(x, y, z, customColor, 0.78, 0.19);
     if (!block) {
       // A little cloud of grit off the armor.
       for (let i = 0; i < 6; i++) {
@@ -1107,6 +1134,7 @@ export class ArenaScene {
       k.shadow.scale.setScalar(1 - Math.min(0.5, lift * 0.6));
       // Deep in the abyss: gone.
       if (p.y < -25) k.root.visible = false;
+      if (k.model) k.target = this.nearestRival(id, k, p);
       const ev = animateKnight(k, p, dt, this.time);
       this.actFx(id, k, p, dt);
       // A flail's chain hangs and swings.
@@ -1116,6 +1144,15 @@ export class ArenaScene {
       }
       // Sand kicked up: footsteps when running, a puff on dodges and landings.
       if (p.alive && lift < 0.05) {
+        if (k.trailColor !== null && p.speed > 3) {
+          k.trailAcc += dt * (p.running ? 14 : 8);
+          while (k.trailAcc >= 1) {
+            k.trailAcc -= 1;
+            const backX = Math.sin(p.yaw) * 0.42;
+            const backZ = Math.cos(p.yaw) * 0.42;
+            this.sparks.spawn(p.x + backX, gy + 0.38 + this.rand() * 0.28, p.z + backZ, (this.rand() - 0.5) * 0.7, 0.45 + this.rand() * 0.6, (this.rand() - 0.5) * 0.7, k.trailColor, 0.06 + this.rand() * 0.035, 0.22 + this.rand() * 0.14, 0.8);
+          }
+        }
         if (p.act === "dodge" && k.lastAct !== "dodge") this.dustRing(p.x, p.z, 14, 1.8, 0.5, gy);
         if (ev.land > 0) this.dustRing(p.x, p.z, 16, 1.4 + ev.land, 0.45, gy);
         if (ev.steps && p.speed > 3) {
@@ -1218,7 +1255,8 @@ export class ArenaScene {
 
   /** First-person hands: the held weapon (and shield or bow), moving with the pose. */
   private updateHands(p: KnightPose, team: TeamId, dt: number, emblem = "ninguno") {
-    const kind = `${p.gear.w}:${p.gear.sh}:${emblem}`;
+    // Remade once the modeled weapons arrive.
+    const kind = `${p.gear.w}:${p.gear.sh}:${emblem}:${knightModelReady()}`;
     if (kind !== this.handKind) {
       this.handKind = kind;
       for (const g of [this.handRight, this.handLeft]) {

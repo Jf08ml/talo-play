@@ -287,27 +287,27 @@ export function TouchControls({
     >
       {stick ? (
         <div className="pointer-events-none absolute" style={{ left: stick.x - STICK_RADIUS, top: stick.y - STICK_RADIUS }}>
-          <div className="h-28 w-28 rounded-full border-2 border-white/40 bg-white/10" />
+          <div className="h-28 w-28 rounded-full border-2 border-white/40 bg-white/10 max-[380px]:h-24 max-[380px]:w-24" />
           <div
-            className="absolute h-12 w-12 rounded-full bg-white/60"
+            className="absolute h-12 w-12 rounded-full bg-white/60 max-[380px]:h-10 max-[380px]:w-10"
             style={{ left: STICK_RADIUS - 24 + stick.dx, top: STICK_RADIUS - 24 + stick.dy }}
           />
         </div>
       ) : (
-        <div className="pointer-events-none absolute bottom-10 left-10 flex h-28 w-28 items-center justify-center rounded-full border-2 border-dashed border-white/25 text-[10px] text-white/50">
+        <div className="pointer-events-none absolute bottom-[max(2.5rem,env(safe-area-inset-bottom))] left-10 flex h-28 w-28 items-center justify-center rounded-full border-2 border-dashed border-white/25 text-[10px] text-white/50 max-[380px]:bottom-[max(2rem,env(safe-area-inset-bottom))] max-[380px]:left-8 max-[380px]:h-24 max-[380px]:w-24">
           mover
         </div>
       )}
 
       {/* Gestures: a small button that opens the four. */}
-      <div className="absolute right-5 top-28 flex flex-col items-end gap-2">
+      <div className="absolute right-5 top-28 flex flex-col items-end gap-2 max-[380px]:right-3 max-[380px]:top-24">
         <button
           onPointerDown={(e) => {
             e.stopPropagation();
             setEmotes((v) => !v);
           }}
           aria-label="Gestos"
-          className={`flex h-11 w-11 items-center justify-center rounded-full text-white ring-2 ${emotes ? "bg-white/40 ring-white/80" : "bg-white/15 ring-white/40"}`}
+          className={`flex h-11 w-11 items-center justify-center rounded-full text-white ring-2 max-[380px]:h-10 max-[380px]:w-10 ${emotes ? "bg-white/40 ring-white/80" : "bg-white/15 ring-white/40"}`}
         >
           <Smile className="h-5 w-5" />
         </button>
@@ -337,20 +337,20 @@ export function TouchControls({
             e.stopPropagation();
             controlsRef.current.pick = true;
           }}
-          className="absolute bottom-[13.5rem] right-5 flex h-12 items-center justify-center gap-1 rounded-full bg-amber-500/60 px-3 text-xs font-semibold text-white ring-2 ring-amber-200/70 active:bg-amber-500/90"
+          className="absolute bottom-[13.5rem] right-5 flex h-12 items-center justify-center gap-1 rounded-full bg-amber-500/60 px-3 text-xs font-semibold text-white ring-2 ring-amber-200/70 active:bg-amber-500/90 max-[380px]:right-3 max-[380px]:bottom-44 max-[380px]:h-10 max-[380px]:px-2"
         >
           <Hand className="h-4 w-4" /> {pickLabel}
         </button>
       )}
 
-      <div className="absolute bottom-5 right-5 grid grid-cols-3 items-end gap-3">
+      <div className="absolute bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1.25rem,env(safe-area-inset-right))] grid grid-cols-3 items-end gap-3 max-[380px]:bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-[380px]:right-3 max-[380px]:gap-1.5">
         <button
           {...held}
           data-hold="dodge"
           aria-label="Esquivar"
-          className="flex h-14 w-14 items-center justify-center self-center rounded-full bg-emerald-500/35 text-white ring-2 ring-emerald-300/60 active:bg-emerald-500/70"
+          className="flex h-14 w-14 items-center justify-center self-center rounded-full bg-emerald-500/35 text-white ring-2 ring-emerald-300/60 active:bg-emerald-500/70 max-[380px]:h-11 max-[380px]:w-11"
         >
-          <Wind className="h-6 w-6" />
+          <Wind className="h-6 w-6 max-[380px]:h-5 max-[380px]:w-5" />
         </button>
         <button
           {...held}
@@ -358,46 +358,46 @@ export function TouchControls({
           data-look="1"
           aria-label="Bloquear"
           disabled={bow}
-          className="flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/35 text-white ring-2 ring-sky-300/60 active:bg-sky-500/70 disabled:opacity-30"
+          className="flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/35 text-white ring-2 ring-sky-300/60 active:bg-sky-500/70 disabled:opacity-30 max-[380px]:h-12 max-[380px]:w-12"
         >
-          <Shield className="h-7 w-7" />
+          <Shield className="h-7 w-7 max-[380px]:h-5 max-[380px]:w-5" />
         </button>
         <button
           {...held}
           data-hold="attack"
           data-look="1"
           aria-label="Atacar"
-          className="flex h-24 w-24 items-center justify-center rounded-full bg-rose-500/40 text-white ring-2 ring-rose-300/70 active:bg-rose-500/75"
+          className="flex h-24 w-24 items-center justify-center rounded-full bg-rose-500/40 text-white ring-2 ring-rose-300/70 active:bg-rose-500/75 max-[380px]:h-[4.5rem] max-[380px]:w-[4.5rem]"
         >
-          <Swords className="h-10 w-10" />
+          <Swords className="h-10 w-10 max-[380px]:h-8 max-[380px]:w-8" />
         </button>
         <button
           {...held}
           data-hold="jump"
           aria-label="Saltar"
-          className="flex h-14 w-14 items-center justify-center justify-self-center rounded-full bg-white/20 text-white ring-2 ring-white/40 active:bg-white/40"
+          className="flex h-14 w-14 items-center justify-center justify-self-center rounded-full bg-white/20 text-white ring-2 ring-white/40 active:bg-white/40 max-[380px]:h-11 max-[380px]:w-11"
         >
-          <MoveUp className="h-6 w-6" />
+          <MoveUp className="h-6 w-6 max-[380px]:h-5 max-[380px]:w-5" />
         </button>
         <button
           {...held}
           data-hold="kick"
           aria-label="Patear"
-          className="flex h-14 w-14 items-center justify-center justify-self-center rounded-full bg-orange-500/35 text-white ring-2 ring-orange-300/60 transition-opacity active:bg-orange-500/70"
+          className="flex h-14 w-14 items-center justify-center justify-self-center rounded-full bg-orange-500/35 text-white ring-2 ring-orange-300/60 transition-opacity active:bg-orange-500/70 max-[380px]:h-11 max-[380px]:w-11"
           style={{ opacity: kick >= 1 ? 1 : 0.35 + kick * 0.4 }}
         >
-          <Footprints className="h-6 w-6" />
+          <Footprints className="h-6 w-6 max-[380px]:h-5 max-[380px]:w-5" />
         </button>
         {/* The special: its ring fills with the meter and lights up when full. */}
         <button
           {...held}
           data-hold="special"
           aria-label="Golpe especial"
-          className={`flex h-16 w-16 items-center justify-center justify-self-center rounded-full p-1 ${full ? "animate-pulse" : ""}`}
+          className={`flex h-16 w-16 items-center justify-center justify-self-center rounded-full p-1 max-[380px]:h-12 max-[380px]:w-12 ${full ? "animate-pulse" : ""}`}
           style={{ background: `conic-gradient(${full ? "#fde047" : "#a78bfa"} ${fill}%, rgba(255,255,255,0.15) 0)` }}
         >
           <span className={`flex h-full w-full items-center justify-center rounded-full ${full ? "bg-yellow-400/80 text-slate-950" : "bg-slate-950/70 text-white/50"}`}>
-            <Sparkles className="h-6 w-6" />
+            <Sparkles className="h-6 w-6 max-[380px]:h-5 max-[380px]:w-5" />
           </span>
         </button>
       </div>

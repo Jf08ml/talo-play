@@ -9,14 +9,17 @@ import { mulberry32 } from "./random";
  */
 
 export interface ArenaLook {
-  /** Plume color, shield emblem, helmet style, title (ids from the catalogs below). */
+  /** Armor finish, plume color, shield emblem, helmet style and title (ids from the catalogs below). */
+  armor: string;
+  cape: string;
+  trail: string;
   plume: string;
   emblem: string;
   helm: string;
   title: string;
 }
 
-export const DEFAULT_LOOK: ArenaLook = { plume: "equipo", emblem: "ninguno", helm: "yelmo", title: "escudero" };
+export const DEFAULT_LOOK: ArenaLook = { armor: "plata", cape: "ninguna", trail: "ninguna", plume: "equipo", emblem: "ninguno", helm: "yelmo", title: "escudero" };
 
 /** A look item: what it is, how it shows, and the level that unlocks it. */
 export interface LookItem {
@@ -26,6 +29,30 @@ export interface LookItem {
   /** Plumes: a color ("" = the team's). */
   color?: string;
 }
+
+/** Armor finishes unlock separately from team cloth, keeping teams easy to identify. */
+export const ARMORS: LookItem[] = [
+  { id: "plata", label: "Plata", level: 1, color: "#b8c2cc" },
+  { id: "hierro", label: "Hierro oscuro", level: 4, color: "#66717d" },
+  { id: "bronce", label: "Bronce", level: 8, color: "#b87542" },
+  { id: "jade", label: "Jade", level: 13, color: "#25846f" },
+  { id: "obsidiana", label: "Obsidiana", level: 19, color: "#51485e" },
+];
+
+export const CAPES: LookItem[] = [
+  { id: "ninguna", label: "Sin capa", level: 1 },
+  { id: "equipo", label: "Capa del equipo", level: 3 },
+  { id: "roja", label: "Capa carmesí", level: 7, color: "#dc2646" },
+  { id: "azul", label: "Capa zafiro", level: 11, color: "#2584d8" },
+  { id: "dorada", label: "Capa real", level: 16, color: "#e5ae32" },
+];
+
+export const TRAILS: LookItem[] = [
+  { id: "ninguna", label: "Sin estela", level: 1 },
+  { id: "fuego", label: "Chispas de fuego", level: 5, color: "#ff8b32" },
+  { id: "hielo", label: "Brillo de hielo", level: 10, color: "#79e5ff" },
+  { id: "arcano", label: "Polvo arcano", level: 17, color: "#c084fc" },
+];
 
 export const PLUMES: LookItem[] = [
   { id: "equipo", label: "Color del equipo", level: 1, color: "" },
@@ -213,6 +240,9 @@ export const unlocked = (item: LookItem, level: number) => level >= item.level;
 export function validLook(look: ArenaLook, level: number): ArenaLook {
   const ok = (list: LookItem[], id: string, dflt: string) => (list.some((i) => i.id === id && i.level <= level) ? id : dflt);
   return {
+    armor: ok(ARMORS, look.armor, DEFAULT_LOOK.armor),
+    cape: ok(CAPES, look.cape, DEFAULT_LOOK.cape),
+    trail: ok(TRAILS, look.trail, DEFAULT_LOOK.trail),
     plume: ok(PLUMES, look.plume, DEFAULT_LOOK.plume),
     emblem: ok(EMBLEMS, look.emblem, DEFAULT_LOOK.emblem),
     helm: ok(HELMS, look.helm, DEFAULT_LOOK.helm),
@@ -227,7 +257,7 @@ export function botLook(seed: number, level: number): ArenaLook {
     const open = list.filter((i) => i.level <= level);
     return open[Math.floor(rand() * open.length)]?.id ?? list[0].id;
   };
-  return { plume: pick(PLUMES), emblem: pick(EMBLEMS), helm: pick(HELMS), title: pick(TITLES) };
+  return { armor: pick(ARMORS), cape: pick(CAPES), trail: pick(TRAILS), plume: pick(PLUMES), emblem: pick(EMBLEMS), helm: pick(HELMS), title: pick(TITLES) };
 }
 
 // ---- Change notices, the hidden rating and the first visit -------------------------------

@@ -93,7 +93,10 @@ import {
 import { ArenaScene, type ArenaCamera, type FighterInfo, type KnightPose, type WorldFx } from "@/lib/arena3d";
 import type { KnightLook } from "@/lib/arena3dKnight";
 import {
+  ARMORS,
+  CAPES,
   PLUMES,
+  TRAILS,
   TITLES,
   applyMatch,
   daysSinceFirst,
@@ -227,7 +230,14 @@ function wonMatch(s: ArenaState, id: string): boolean {
 }
 
 /** A look for the 3D knight: the plume's color ("" = the cloth's). */
-const toKnightLook = (l: ArenaLook): KnightLook => ({ plume: PLUMES.find((p) => p.id === l.plume)?.color ?? "", emblem: l.emblem, helm: l.helm });
+const toKnightLook = (l: ArenaLook): KnightLook => ({
+  plume: PLUMES.find((p) => p.id === l.plume)?.color ?? "",
+  emblem: l.emblem,
+  helm: l.helm,
+  armor: ARMORS.find((p) => p.id === l.armor)?.color ?? ARMORS[0].color ?? "#b8c2cc",
+  cape: l.cape === "equipo" ? "equipo" : CAPES.find((p) => p.id === l.cape)?.color ?? "",
+  trail: TRAILS.find((p) => p.id === l.trail)?.color ?? "",
+});
 
 /** The announcer's banner colors, flat. */
 const TONE_CLASS: Record<Announcement["tone"], string> = {
@@ -712,7 +722,7 @@ export default function Battle({
         audio?.kickHit(vol, pan);
         if (h.guardBreak) audio?.clang(vol * 0.7, pan);
       } else if (h.blocked) {
-        scene.burst(x, y + 1.3, z, "block");
+        scene.burst(x, y + 1.3, z, "block", info[id]?.look?.emblem);
         audio?.clang(vol, pan);
       } else {
         scene.burst(x, y + 1.3, z, "hit");
@@ -1709,7 +1719,7 @@ export default function Battle({
 
       {/* Top bar: back, score and round, options (bigger on a TV). */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 p-2.5"
+        className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 px-2.5 pb-2.5 pt-[max(0.625rem,env(safe-area-inset-top))]"
         style={screen ? { zoom: 1.6 } : undefined}
       >
         <div className="pointer-events-auto flex flex-col gap-1.5">

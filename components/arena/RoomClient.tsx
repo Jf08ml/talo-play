@@ -184,7 +184,7 @@ export default function RoomClient({ roomId }: { roomId: string }) {
         {status === "error" && <RoomError message="No se pudo cargar la sala." />}
 
         {status === "ready" && state && meta && (
-          <div className="mx-auto w-full max-w-2xl p-4">
+          <div className="mx-auto w-full max-w-2xl p-3 sm:p-4">
             <WaitingRoom
               game="arena"
               roomId={roomId}
