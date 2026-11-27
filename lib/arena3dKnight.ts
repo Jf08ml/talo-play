@@ -752,6 +752,8 @@ export interface Knight {
   tint: number;
   /** Its emblem (on the chest and the shield). */
   emblem: string;
+  /** Its armor's color (the look's; first-person hands wear it too). */
+  armorColor: string;
   cape: THREE.Group | null;
   trailColor: THREE.Color | null;
   root: THREE.Group;
@@ -946,6 +948,7 @@ export function knightMesh(team: TeamId, geos: KnightGeos, tint: number = TEAM_C
     team,
     tint,
     emblem: look.emblem,
+    armorColor: look.armor,
     cape,
     trailColor: look.trail ? new THREE.Color(Number.parseInt(look.trail.replace(/^#/, ""), 16)) : null,
     root,

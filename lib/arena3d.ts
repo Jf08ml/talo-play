@@ -43,7 +43,7 @@ import {
 } from "./arena3dKnight";
 import { EMOTES, EMOTE_SECONDS } from "./arenaLooks";
 import { Impacts, Particles, Shockwaves, SwingTrail } from "./arena3dFx";
-import { knightModelReady, loadKnightModel } from "./arena3dModel";
+import { firstPersonArm, firstPersonFoot, knightModelReady, loadKnightModel } from "./arena3dModel";
 import { GroundFx, buildMap, buildTrapsFor, canvasTexture, sandTexture, stoneTexture, type WorldFx } from "./arena3dMaps";
 import { getMap, supportAt, topAt, type ArenaMap, type ArenaMapId } from "./arenaMaps";
 
@@ -216,6 +216,17 @@ function bubbleTexture(emote: number): THREE.CanvasTexture {
 }
 
 // ---- First-person hands ---------------------------------------------------------
+
+/** The drawn kicking foot (until the model loads): a boot and greave pointing ahead, seen from above. */
+function drawnFoot(): THREE.Mesh[] {
+  const boot = new THREE.Mesh(new THREE.CapsuleGeometry(0.085, 0.2, 3, 10).rotateX(Math.PI / 2).scale(1.2, 0.9, 1), lambert(LEATHER));
+  const greave = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.3, 3, 10), phong(DARK_STEEL, 60));
+  greave.position.set(0, 0.22, 0.12);
+  greave.rotation.x = 0.5;
+  const toe = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1.1, 0.8, 1.3).rotateX(-Math.PI / 2), phong(DARK_STEEL, 60));
+  toe.position.z = -0.15;
+  return [boot, greave, toe];
+}
 
 /** Where the held weapon sits in front of the camera, and how it's turned. */
 interface HandPose {
@@ -453,17 +464,8 @@ export class ArenaScene {
     );
     this.trail.position.set(0, -0.42, -0.95);
     this.trail.rotation.x = -1.05;
-    {
-      // A boot and greave pointing ahead, seen from above as it kicks.
-      const boot = new THREE.Mesh(new THREE.CapsuleGeometry(0.085, 0.2, 3, 10).rotateX(Math.PI / 2).scale(1.2, 0.9, 1), lambert(LEATHER));
-      const greave = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.3, 3, 10), phong(DARK_STEEL, 60));
-      greave.position.set(0, 0.22, 0.12);
-      greave.rotation.x = 0.5;
-      const toe = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1.1, 0.8, 1.3).rotateX(-Math.PI / 2), phong(DARK_STEEL, 60));
-      toe.position.z = -0.15;
-      this.handFoot.add(boot, greave, toe);
-      this.handFoot.visible = false;
-    }
+    // The kicking foot is filled in by `updateHands` (the model's, or `drawnFoot`).
+    this.handFoot.visible = false;
     this.hands.add(this.handRight, this.handLeft, this.trail, this.handFoot);
     this.handScene.add(this.hands);
   }
@@ -1270,12 +1272,13 @@ export class ArenaScene {
   }
 
   /** First-person hands: the held weapon (and shield or bow), moving with the pose. */
-  private updateHands(p: KnightPose, team: TeamId, dt: number, emblem = "ninguno") {
-    // Remade once the modeled weapons arrive.
-    const kind = `${p.gear.w}:${p.gear.sh}:${emblem}:${knightModelReady()}`;
+  private updateHands(p: KnightPose, me: Knight, dt: number) {
+    const { team, emblem, tint, armorColor } = me;
+    // Remade once the models arrive (the modeled arms, foot and weapons).
+    const kind = `${p.gear.w}:${p.gear.sh}:${emblem}:${tint}:${armorColor}:${knightModelReady()}`;
     if (kind !== this.handKind) {
       this.handKind = kind;
-      for (const g of [this.handRight, this.handLeft]) {
+      for (const g of [this.handRight, this.handLeft, this.handFoot]) {
         for (const c of [...g.children]) {
           g.remove(c);
           disposeTree(c);
@@ -1283,27 +1286,33 @@ export class ArenaScene {
       }
       this.handShield = null;
       this.handWeapon = null;
-      const fist = () => new THREE.Mesh(new THREE.CapsuleGeometry(0.048, 0.05, 3, 10).rotateX(Math.PI / 2), phong(DARK_STEEL));
+      // Your forearm and hand from the model (mitt and bracer), or a plain fist until it loads.
+      const fist = (side: "L" | "R") =>
+        firstPersonArm(side, tint, armorColor) ?? new THREE.Mesh(new THREE.CapsuleGeometry(0.048, 0.05, 3, 10).rotateX(Math.PI / 2), phong(DARK_STEEL));
       if (p.gear.w === "arco") {
         const bow = weaponMesh("arco");
         bow.rotation.set(0, 0, 0.15);
-        this.handLeft.add(bow, fist());
+        this.handLeft.add(bow, fist("L"));
         const arrow = arrowMesh();
         arrow.position.set(0, 0, -0.2);
-        this.handRight.add(arrow, fist());
+        this.handRight.add(arrow, fist("R"));
       } else {
         const w = weaponMesh(p.gear.w);
         w.rotation.x = 0.5;
-        this.handRight.add(w, fist());
+        this.handRight.add(w, fist("R"));
         this.handWeapon = w;
         if (p.gear.sh) {
           this.handShield = shieldMesh(team, undefined, emblem);
           this.handShield.scale.setScalar(0.85);
-          this.handLeft.add(this.handShield);
+          // The arm behind the shield, holding its handle.
+          this.handLeft.add(this.handShield, fist("L"));
         } else {
-          this.handLeft.add(fist());
+          this.handLeft.add(fist("L"));
         }
       }
+      const foot = firstPersonFoot(tint, armorColor);
+      if (foot) this.handFoot.add(foot);
+      else for (const part of drawnFoot()) this.handFoot.add(part);
     }
     const moving = Math.min(1, p.speed / 4.6);
     this.bob += dt * (3 + p.speed * 1.8);
@@ -1476,7 +1485,7 @@ export class ArenaScene {
     this.draw(cam, view, dt);
     if (k) k.tag.visible = tagShown;
     if (firstPerson && p && k) {
-      this.updateHands(p, k.team, dt, k.emblem);
+      this.updateHands(p, k, dt);
       cam.updateMatrixWorld();
       this.hands.position.copy(cam.position);
       this.hands.quaternion.copy(cam.quaternion);

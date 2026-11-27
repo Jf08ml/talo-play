@@ -300,6 +300,150 @@ export function shieldPart(face: number): { group: THREE.Group; emblemAt: THREE.
 }
 export const knightAnimations = () => templates?.animations ?? [];
 
+// ---- First person ------------------------------------------------------------------
+
+/** Pieces of the model cut out for first person (shared geometry), per limb. */
+const limbCache = new Map<string, { name: string; material: THREE.Material; geometry: THREE.BufferGeometry }[]>();
+
+/**
+ * The triangles of the knight's skinned meshes (the body and the merged
+ * armor) that follow `boneNames`, at rest, in `frameName`'s bone frame: the
+ * talo's mitt and the bracer for an arm, the shin and boot for a foot.
+ */
+function limbParts(key: string, boneNames: string[], frameName: string) {
+  const known = limbCache.get(key);
+  if (known || !templates) return known ?? null;
+  const out: { name: string; material: THREE.Material; geometry: THREE.BufferGeometry }[] = [];
+  const v = new THREE.Vector3();
+  templates.knight.traverse((o) => {
+    const m = o as THREE.SkinnedMesh;
+    if (!m.isSkinnedMesh) return;
+    const bones = m.skeleton.bones;
+    const ids = new Set(boneNames.map((n) => bones.findIndex((b) => b.name === gltfName(n))));
+    const frame = bones.findIndex((b) => b.name === gltfName(frameName));
+    if (frame < 0) return;
+    const g = m.geometry;
+    const si = g.getAttribute("skinIndex");
+    const sw = g.getAttribute("skinWeight");
+    const pos = g.getAttribute("position");
+    const nor = g.getAttribute("normal");
+    if (!si || !sw) return;
+    // The bone that moves each vertex the most.
+    const dominant = (i: number) => {
+      let best = -1;
+      let weight = -1;
+      for (let c = 0; c < 4; c++) {
+        const w = sw.getComponent(i, c);
+        if (w > weight) {
+          weight = w;
+          best = si.getComponent(i, c);
+        }
+      }
+      return best;
+    };
+    const toFrame = new THREE.Matrix4().copy(m.skeleton.boneInverses[frame]).multiply(m.bindMatrix);
+    const normals = new THREE.Matrix3().getNormalMatrix(toFrame);
+    const remap = new Map<number, number>();
+    const P: number[] = [];
+    const N: number[] = [];
+    const I: number[] = [];
+    const tris = (g.index ? g.index.count : pos.count) / 3;
+    const at = (k: number) => (g.index ? g.index.getX(k) : k);
+    for (let t = 0; t < tris; t++) {
+      const tri = [at(t * 3), at(t * 3 + 1), at(t * 3 + 2)];
+      if (!tri.every((i) => ids.has(dominant(i)))) continue;
+      for (const i of tri) {
+        let j = remap.get(i);
+        if (j === undefined) {
+          j = P.length / 3;
+          remap.set(i, j);
+          v.fromBufferAttribute(pos, i).applyMatrix4(toFrame);
+          P.push(v.x, v.y, v.z);
+          v.fromBufferAttribute(nor, i).applyMatrix3(normals).normalize();
+          N.push(v.x, v.y, v.z);
+        }
+        I.push(j);
+      }
+    }
+    if (!I.length) return;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(P, 3));
+    geometry.setAttribute("normal", new THREE.Float32BufferAttribute(N, 3));
+    geometry.setIndex(I);
+    geometry.computeBoundingSphere();
+    geometry.userData.shared = true;
+    out.push({ name: m.name, material: m.material as THREE.Material, geometry });
+  });
+  limbCache.set(key, out);
+  return out;
+}
+
+/** The limb's meshes with their own materials: the body in `tint`, steel in the armor's color. */
+function limbMeshes(parts: NonNullable<ReturnType<typeof limbParts>>, tint: number, armor: string): THREE.Mesh[] {
+  return parts.map(({ name, material, geometry }) => {
+    const mat = material.clone() as THREE.MeshStandardMaterial;
+    if (name === PART.body) mat.color.set(tint);
+    if (name === MERGED_STEEL && armor) mat.color.set(armor);
+    return new THREE.Mesh(geometry, mat);
+  });
+}
+
+/**
+ * Which way the forearm runs from the fist in first person (the right hand's;
+ * the left is mirrored): back toward the camera, down and out. The hands'
+ * frame has the weapon along −z.
+ */
+const FP_FOREARM = new THREE.Vector3(0.3, -0.36, 0.88).normalize();
+/** The forearm turned on itself so the back of the hand faces out and up. */
+const FP_ROLL = 0.6;
+const FP_SCALE = 1.05;
+
+/**
+ * Your own forearm and hand in first person, from the model (the mitt in
+ * your color and the bracer in your armor's): the fist at the origin, where
+ * the weapon or shield is held. Null until the model is loaded.
+ */
+export function firstPersonArm(side: "L" | "R", tint: number, armor: string): THREE.Group | null {
+  const parts = limbParts(`arm${side}`, [`Elbow.${side}`, `Wrist.${side}`, `HandTip.${side}`], `Wrist.${side}`);
+  const wrist = templates?.knight.getObjectByName(gltfName(`Wrist.${side}`));
+  const tip = templates?.knight.getObjectByName(gltfName(`HandTip.${side}`));
+  if (!parts?.length || !wrist || !tip) return null;
+  // In the wrist's frame: the fist halfway along the hand, the elbow back where the forearm starts.
+  const fist = tip.position.clone().multiplyScalar(0.55);
+  const toElbow = wrist.position.clone().negate().sub(fist).normalize();
+  const want = FP_FOREARM.clone();
+  if (side === "L") want.x = -want.x;
+  const turn = new THREE.Quaternion().setFromUnitVectors(toElbow, want);
+  turn.premultiply(new THREE.Quaternion().setFromAxisAngle(want, side === "R" ? FP_ROLL : -FP_ROLL));
+  const g = new THREE.Group();
+  for (const mesh of limbMeshes(parts, tint, armor)) {
+    mesh.quaternion.copy(turn);
+    mesh.position.copy(fist).negate().applyQuaternion(turn);
+    g.add(mesh);
+  }
+  g.scale.setScalar(FP_SCALE);
+  g.userData.modeled = true;
+  return g;
+}
+
+/** Your own right foot for the kick in first person (shin and boot), toe toward −z, from the ankle. */
+export function firstPersonFoot(tint: number, armor: string): THREE.Group | null {
+  // With the thigh and knee plate, so the cut at the top stays below the view.
+  const parts = limbParts("footR", ["Hip.R", "KneePlate.R", "Knee.R", "Ankle.R", "Toe.R"], "Ankle.R");
+  if (!parts?.length) return null;
+  const g = new THREE.Group();
+  for (const mesh of limbMeshes(parts, tint, armor)) {
+    // The model's toes point +z: half a turn. Then the leg laid level, running
+    // back toward the hip under the camera (its cut stays below the view), and
+    // the sole facing the rival.
+    mesh.rotation.set(Math.PI / 2, Math.PI, 0);
+    g.add(mesh);
+  }
+  g.scale.setScalar(FP_SCALE);
+  g.userData.modeled = true;
+  return g;
+}
+
 // ---- Eyes ------------------------------------------------------------------
 
 /**
