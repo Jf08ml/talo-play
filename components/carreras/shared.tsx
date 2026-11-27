@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   CARS,
   BOT_NAMES,
+  SEATS,
   FINISH_GRACE_MS,
   backToWaiting,
   closeRace,
@@ -15,7 +16,8 @@ import {
   type CarrerasState,
   type Seat,
 } from "@/lib/carreras";
-import type { CameraMode } from "@/lib/carreras3d";
+import type { CameraMode, CarLook } from "@/lib/carreras3d";
+import { DEFAULT_CAR_LOOK, botCarLook, carPaint, validCarLook } from "@/lib/carrerasProgress";
 import type { PresenceMap } from "@/lib/presence";
 import { serverNow } from "@/lib/serverTime";
 import { formatRaceTime } from "@/lib/format";
@@ -36,6 +38,39 @@ export function driverName(state: CarrerasState, seat: Seat, myId = ""): string 
   const id = state.seats[seat];
   if (id && id === myId) return "Tú";
   return state.players[id]?.name ?? CARS[seat].label;
+}
+
+/** A bot's level for its looks, by how well it drives. */
+const BOT_LOOK_LEVEL = { facil: 3, normal: 8, dificil: 14 } as const;
+
+/**
+ * How a seat's car looks on every screen: the driver's own look (only what
+ * their level unlocks) with "Nombre · Nv N" on its tag, a seeded look for a
+ * bot, or the seat's plain car. The tag keeps the seat's color, so a
+ * repainted car is still easy to match with the tags and the minimap.
+ */
+export function seatCarLook(state: CarrerasState, seat: Seat, label = driverName(state, seat)): CarLook {
+  const index = SEATS.indexOf(seat);
+  const player = isBotSeat(state, seat) ? undefined : state.players[state.seats[seat]];
+  const lv = Math.max(0, Math.floor(player?.lv ?? 0));
+  const ids = player?.look
+    ? validCarLook(player.look, Math.max(1, lv))
+    : isBotSeat(state, seat)
+      ? botCarLook(state.trackSeed * 7 + index + 1, BOT_LOOK_LEVEL[state.botLevel] ?? 8)
+      : DEFAULT_CAR_LOOK;
+  const p = carPaint(ids, CARS[seat].color, CARS[seat].accent, index + 1);
+  return {
+    color: p.color,
+    accent: p.accent,
+    number: p.number,
+    label: lv ? `${label} · Nv ${lv}` : label,
+    tag: CARS[seat].color,
+    metal: p.metal || undefined,
+    rims: p.rims,
+    rimGlow: p.rimGlow || undefined,
+    neon: p.neon || undefined,
+    flames: p.flames,
+  };
 }
 
 /**

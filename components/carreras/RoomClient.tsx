@@ -47,6 +47,8 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { carrerasSettings } from "./settings";
 import { MonitorPlay, Shuffle, Smartphone } from "lucide-react";
 import { useAwardMatch } from "@/hooks/useAwardMatch";
+import { RaceRewardCard, useMyCarLook, useRaceReward } from "./RaceProgress";
+import type { CarLookIds } from "@/lib/carrerasProgress";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -101,10 +103,17 @@ export default function RoomClient({ game, roomId }: { game: CarrerasGame; roomI
   }, [configured, game, roomId, identity.clientId, identity.name, router]);
 
   const hasState = state !== null;
+  // In 3D my car goes in dressed (and with my level on its tag); re-sent when I change it.
+  const myCar = useMyCarLook();
+  const carLookKey = game === "carreras3d" && myCar ? JSON.stringify(myCar) : "";
   useEffect(() => {
     if (!hasState || !identity.clientId || !identity.name) return;
-    joinCarreras(roomId, identity.clientId, { name: identity.name, color: identity.color }).catch(console.error);
-  }, [hasState, roomId, identity.clientId, identity.name, identity.color]);
+    const dressed = carLookKey ? (JSON.parse(carLookKey) as { look: CarLookIds; lv: number }) : null;
+    joinCarreras(roomId, identity.clientId, { name: identity.name, color: identity.color, ...(dressed ?? {}) }).catch(console.error);
+  }, [hasState, roomId, identity.clientId, identity.name, identity.color, carLookKey]);
+
+  // My experience and missions when a 3D race I drove closes.
+  const reward = useRaceReward(roomId, state, identity.clientId, game === "carreras3d");
 
   useRaceCloser(roomId, state, presence, presenceLoaded);
 
@@ -140,7 +149,7 @@ export default function RoomClient({ game, roomId }: { game: CarrerasGame; roomI
     return (
       <>
         <OpenRoomBeacon roomId={roomId} game={game} />
-        <PhoneRace roomId={roomId} meta={meta} state={state} myId={myId} botHost={botHost} />
+        <PhoneRace roomId={roomId} meta={meta} state={state} myId={myId} botHost={botHost} reward={reward} />
       </>
     );
   }
@@ -187,8 +196,9 @@ export default function RoomClient({ game, roomId }: { game: CarrerasGame; roomI
         {racing && (
           <div className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-3 p-4">
             {state.status === "finished" && (
-              <div className="flex justify-center">
+              <div className="flex flex-col items-center gap-3">
                 <Standings roomId={roomId} state={state} myId={myId} randomTrack={meta.track === "aleatoria"} />
+                {reward && <RaceRewardCard reward={reward} />}
               </div>
             )}
             {state.status === "racing" &&

@@ -21,6 +21,7 @@ import {
   subscribeInputs,
   trackSeedOf,
   writeLive,
+  writeRaceStats,
   type CarInputWire,
   type CarrerasGame,
   type CarrerasMeta,
@@ -51,11 +52,12 @@ import { subscribePresence, type PresenceMap } from "@/lib/presence";
 import { serverNow } from "@/lib/serverTime";
 import { roomPath } from "@/lib/games";
 import RoomQR from "@/components/RoomQR";
+import { RaceStatsTracker } from "@/lib/carrerasProgress";
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { useServerNow } from "@/hooks/useServerNow";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import TrackPreview from "@/components/carreras/TrackPreview";
-import { Standings, driverName, useCameraMode, useRaceCloser, useSoundSetting } from "@/components/carreras/shared";
+import { Standings, driverName, seatCarLook, useCameraMode, useRaceCloser, useSoundSetting } from "@/components/carreras/shared";
 import { TaloMark } from "@/components/TaloLogo";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { PRIMARY_BUTTON } from "@/components/ui";
@@ -84,6 +86,10 @@ interface Engine {
   brains: Partial<Record<Seat, BotBrain>>;
   laps: LapClock;
   wrong: string;
+  /** What each car did, for its driver's progress (lib/carrerasProgress.ts). */
+  stats: RaceStatsTracker;
+  /** The cars still racing when it closed got theirs written. */
+  statsSent: boolean;
 }
 
 /** Cars go back on the grid when this changes: a new race, or who's seated while waiting. */
@@ -247,17 +253,13 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
       if (!engine || engine.key !== engineKey(s)) {
         const cars: Partial<Record<Seat, Car>> = {};
         for (const seat of carSeats(s)) cars[seat] = gridCar(track, SEATS.indexOf(seat));
-        engine = { key: engineKey(s), cars, reported: new Set(), lastLive: "", brains: {}, laps: new LapClock(), wrong: "" };
+        engine = { key: engineKey(s), cars, reported: new Set(), lastLive: "", brains: {}, laps: new LapClock(), wrong: "", stats: new RaceStatsTracker(), statsSent: false };
         scene?.setCars({});
         setFlash({});
         setWrong("");
       }
       const seats = SEATS.filter((seat) => engine!.cars[seat]);
-      scene?.setCars(
-        Object.fromEntries(
-          seats.map((seat) => [seat, { color: CARS[seat].color, accent: CARS[seat].accent, number: SEATS.indexOf(seat) + 1, label: driverName(s, seat) }])
-        )
-      );
+      scene?.setCars(Object.fromEntries(seats.map((seat) => [seat, seatCarLook(s, seat)])));
 
       const now = serverNow();
       const moving = s.status !== "waiting" && now >= s.startedAt;
@@ -278,6 +280,7 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
           for (const seat of seats) {
             const hit = stepCar(engine.cars[seat]!, inputFor(seat, s, paceOf(seat)), track, STEP);
             if (cues.hit(seat, hit)) scene?.impact(seat, hit);
+            engine.stats.step(seat, engine.cars[seat]!, hit, STEP);
           }
           for (let i = 0; i < seats.length; i++) {
             for (let j = i + 1; j < seats.length; j++) {
@@ -301,6 +304,7 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
           const car = engine.cars[seat]!;
           const done = lapsDone(car, track);
           cues.lap(seat, done, laps);
+          engine.stats.lap(seat, Math.min(done, laps));
           const lapMs = engine.laps.update(seat, done, raceMs);
           if (lapMs && done < laps) {
             const best = engine.laps.best(seat) === lapMs;
@@ -315,6 +319,7 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
           audio?.finish(engine.reported.size === 1);
           scene?.confetti(seat);
           reportFinish(roomId, s.gameNo, seat, raceMs, engine.laps.best(seat)).catch(console.error);
+          if (!isBotSeat(s, seat)) writeRaceStats(roomId, s.gameNo, seat, engine.stats.get(seat));
         }
         if (wrongNow !== engine.wrong) {
           engine.wrong = wrongNow;
@@ -344,6 +349,12 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
         if (fx !== undefined || fy !== undefined) return (fx ?? Infinity) - (fy ?? Infinity);
         return engine!.cars[y]!.progress - engine!.cars[x]!.progress;
       });
+      if (s.status === "racing" && moving) ranked.forEach((seat, i) => engine!.stats.place(seat, i + 1));
+      // Closed with cars still out: their drivers get what they did too.
+      if (s.status === "finished" && !engine.statsSent) {
+        engine.statsSent = true;
+        for (const seat of seats) if (!engine.reported.has(seat) && !isBotSeat(s, seat)) writeRaceStats(roomId, s.gameNo, seat, engine.stats.get(seat));
+      }
       if (s.status !== "waiting") {
         const cars: Partial<Record<Seat, LiveCar>> = {};
         ranked.forEach((seat, i) => {

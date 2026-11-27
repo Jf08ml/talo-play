@@ -5,6 +5,7 @@ import { serverNow } from "./serverTime";
 import { transactState } from "./transact";
 import { makeSeed } from "./random";
 import { BOT_LEVELS, isLongTrack, isTrackId, type BotLevel, type TrackId } from "./carrerasTrack";
+import type { CarLookIds, RaceStats } from "./carrerasProgress";
 
 /**
  * Carreras, two games on the same rooms, physics and controls: `carreras`
@@ -64,6 +65,9 @@ export interface CarrerasMeta {
 export interface CarrerasPlayer {
   name: string;
   color: string;
+  /** Optional (absent on older clients): how the car looks and the driver's level (lib/carrerasProgress.ts). */
+  look?: CarLookIds;
+  lv?: number;
 }
 
 export interface CarrerasState {
@@ -252,7 +256,12 @@ export function joinCarreras(roomId: string, clientId: string, player: CarrerasP
     const known = s.players[clientId];
     const free = SEATS.find((seat) => !s.seats[seat]) ?? null;
     const sit = s.status === "waiting" && !seatOf(s, clientId) && free;
-    if (!sit && known?.name === player.name && known?.color === player.color) return null;
+    const same =
+      known?.name === player.name &&
+      known?.color === player.color &&
+      (known?.lv ?? 0) === (player.lv ?? 0) &&
+      JSON.stringify(known?.look ?? null) === JSON.stringify(player.look ?? null);
+    if (!sit && same) return null;
     return {
       ...s,
       players: { ...s.players, [clientId]: player },
@@ -410,6 +419,22 @@ export function subscribeLive(roomId: string, cb: (live: CarrerasLive | null) =>
     const raw = snap.val() as Partial<CarrerasLive> | null;
     cb(raw ? { gameNo: raw.gameNo ?? 0, cars: raw.cars ?? {} } : null);
   });
+}
+
+// ---- What each car did (for the driver's progress) -------------------------
+
+/**
+ * A car's race counts (lib/carrerasProgress.ts `RaceStats`), written by
+ * whoever runs that car (the big screen, or the phone) when it finishes or
+ * when the race closes; the driver's phone reads its own seat's. Tagged with
+ * the race number, so an old one is never taken for this one.
+ */
+export function writeRaceStats(roomId: string, gameNo: number, seat: Seat, stats: RaceStats) {
+  return set(ref(getDb(), `${base(roomId)}/stats/${seat}`), { ...stats, g: gameNo }).catch(console.error);
+}
+
+export function subscribeRaceStats(roomId: string, seat: Seat, cb: (stats: (RaceStats & { g: number }) | null) => void): Unsubscribe {
+  return onValue(ref(getDb(), `${base(roomId)}/stats/${seat}`), (snap) => cb(snap.val()));
 }
 
 // ---- Car poses (telefono: every phone → everyone) -------------------------

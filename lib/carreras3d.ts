@@ -684,6 +684,16 @@ export interface CarLook {
   /** Race number on the doors. */
   number?: number;
   label?: string;
+  /** The driver's cosmetics (lib/carrerasProgress.ts `carPaint`), all optional. */
+  metal?: boolean;
+  rims?: string;
+  rimGlow?: boolean;
+  /** A colored glow under the car. */
+  neon?: string;
+  /** The boost flames' two colors. */
+  flames?: [string, string];
+  /** The label's color (the seat's, when the paint is the driver's own). */
+  tag?: string;
 }
 
 interface CarParts {
@@ -887,12 +897,19 @@ function carMesh(geo: CarGeometry, look: CarLook, night: boolean, glow: THREE.Te
   const group = new THREE.Group();
   const floor = new THREE.Group();
   root.add(group, floor);
-  const paint = new THREE.MeshPhongMaterial({ color: look.color, shininess: 110, specular: 0x8a8a8a });
+  // A metal paint (gold, chrome) shines harder and mirrors more.
+  const paint = look.metal
+    ? new THREE.MeshPhongMaterial({ color: look.color, shininess: 200, specular: 0xffffff, reflectivity: 1 })
+    : new THREE.MeshPhongMaterial({ color: look.color, shininess: 110, specular: 0x8a8a8a });
   const accent = new THREE.MeshPhongMaterial({ color: look.accent ?? "#f8fafc", shininess: 110, specular: 0x8a8a8a });
   const glass = new THREE.MeshPhongMaterial({ color: 0x0b1222, shininess: 140, specular: 0xbcd0ff });
   const dark = new THREE.MeshLambertMaterial({ color: 0x15171c });
   const chrome = new THREE.MeshPhongMaterial({ color: 0xd8dee8, shininess: 150, specular: 0xffffff });
   const tireMat = new THREE.MeshLambertMaterial({ color: 0x0b0b0f });
+  // Rims in the driver's color (neon ones glow a little).
+  const rimMat = look.rims
+    ? new THREE.MeshPhongMaterial({ color: look.rims, shininess: 150, specular: 0xffffff, emissive: look.rimGlow ? new THREE.Color(look.rims).multiplyScalar(0.5) : 0x000000 })
+    : chrome;
   const head = new THREE.MeshBasicMaterial({ color: night ? glowColor(0xfff7d6, 1.6) : new THREE.Color(0xfefce8) });
   const tail = new THREE.MeshBasicMaterial({ color: TAIL_OFF.clone() });
   group.add(
@@ -918,7 +935,7 @@ function carMesh(geo: CarGeometry, look: CarLook, night: boolean, glow: THREE.Te
     [-11, -CAR_WIDTH / 2 - 0.6, false],
   ] as [number, number, boolean][]) {
     const w = new THREE.Group();
-    w.add(new THREE.Mesh(geo.tire, tireMat), new THREE.Mesh(geo.rim, chrome));
+    w.add(new THREE.Mesh(geo.tire, tireMat), new THREE.Mesh(geo.rim, rimMat));
     wheels.push(w);
     if (front) {
       const pivot = new THREE.Group();
@@ -938,6 +955,24 @@ function carMesh(geo: CarGeometry, look: CarLook, night: boolean, glow: THREE.Te
   shadow.position.y = ROAD_Y + 0.4;
   shadow.renderOrder = 1;
   floor.add(shadow);
+  if (look.neon) {
+    // The underglow: a colored halo on the road under the car (brighter at night).
+    const neon = new THREE.Mesh(
+      geo.shadow,
+      new THREE.MeshBasicMaterial({
+        map: glow,
+        color: new THREE.Color(look.neon).multiplyScalar(night ? 1.7 : 1.15),
+        transparent: true,
+        opacity: night ? 0.95 : 0.75,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    );
+    neon.position.y = ROAD_Y + 0.6;
+    neon.scale.setScalar(1.4);
+    neon.renderOrder = 2;
+    floor.add(neon);
+  }
 
   if (night) {
     // Headlight beam on the road.
@@ -1104,6 +1139,8 @@ interface Rig {
 }
 
 interface CarObj extends CarParts {
+  /** The look it was built from (rebuilt when it changes). */
+  lookKey: string;
   label: THREE.Sprite | null;
   /** Speed along the heading (negative backing up). */
   forward: number;
@@ -1126,6 +1163,8 @@ interface CarObj extends CarParts {
   shake: number;
   smokeAcc: number;
   flameAcc: number;
+  /** Its boost flames: the look's two colors and a white-hot core now and then. */
+  flameColors: THREE.Color[];
 }
 
 export interface CarPoseInput {
@@ -1988,7 +2027,8 @@ export class RaceScene {
   /** Makes the scene's cars match `cars` (key → paint, stripes, number and name label). */
   setCars(cars: Record<string, CarLook>) {
     for (const [key, obj] of this.cars) {
-      if (!(key in cars)) {
+      // Gone, or dressed differently now (a driver changed the look while waiting): rebuilt below.
+      if (!(key in cars) || JSON.stringify(cars[key]) !== obj.lookKey) {
         this.scene.remove(obj.group);
         disposeTree(obj.group);
         this.cars.delete(key);
@@ -1999,11 +2039,12 @@ export class RaceScene {
       this.carGeo ??= carGeometry();
       const parts = carMesh(this.carGeo, info, this.look.night, this.glow);
       if (this.shadows) parts.body.traverse((o) => ((o as THREE.Mesh).castShadow = (o as THREE.Mesh).isMesh));
-      const label = info.label ? labelSprite(info.label, info.color) : null;
+      const label = info.label ? labelSprite(info.label, info.tag ?? info.color) : null;
       if (label) parts.group.add(label);
       this.scene.add(parts.group);
       this.cars.set(key, {
         ...parts,
+        lookKey: JSON.stringify(info),
         label,
         forward: 0,
         lateral: 0,
@@ -2022,6 +2063,7 @@ export class RaceScene {
         shake: 0,
         smokeAcc: 0,
         flameAcc: 0,
+        flameColors: info.flames ? [new THREE.Color(info.flames[0]), new THREE.Color(info.flames[1]), new THREE.Color(0xf8fafc)] : this.flameColors,
       });
     }
   }
@@ -2240,7 +2282,7 @@ export class RaceScene {
               car.forward * fx * 0.6 - fx * 120 + (this.rand() - 0.5) * 20,
               (this.rand() - 0.2) * 20,
               car.forward * fz * 0.6 - fz * 120 + (this.rand() - 0.5) * 20,
-              this.flameColors[this.rand() < 0.15 ? 2 : Math.floor(this.rand() * 2)],
+              car.flameColors[this.rand() < 0.15 ? 2 : Math.floor(this.rand() * 2)],
               5 + this.rand() * 3,
               0.12 + this.rand() * 0.1,
               0.95,
@@ -2458,6 +2500,26 @@ export class RaceScene {
     this.glow.dispose();
     this.renderer.dispose();
   }
+}
+
+// ---- A car on its own (the lobby's «Tu auto» preview) ----------------------------------
+
+let previewGeo: CarGeometry | null = null;
+let previewGlow: THREE.CanvasTexture | null = null;
+
+/**
+ * One car dressed with `look`, outside any race (the lobby's preview), its
+ * nose toward +x and its wheels on y = 0, in the race's units (~34 long).
+ * The geometry and glow are shared by every preview; `disposeCar` frees the rest.
+ */
+export function previewCar(look: CarLook): THREE.Object3D {
+  previewGeo ??= carGeometry();
+  previewGlow ??= glowTexture();
+  return carMesh(previewGeo, look, false, previewGlow).group;
+}
+
+export function disposeCar(car: THREE.Object3D) {
+  disposeTree(car);
 }
 
 function disposeTree(root: THREE.Object3D) {

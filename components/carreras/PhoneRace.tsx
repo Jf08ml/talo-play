@@ -11,6 +11,7 @@ import {
   openPose,
   racersOf,
   reportFinish,
+  writeRaceStats,
   seatOf,
   sendBotPose,
   subscribePoses,
@@ -44,7 +45,9 @@ import { formatRaceTime } from "@/lib/format";
 import { useServerNow } from "@/hooks/useServerNow";
 import { TaloMark } from "@/components/TaloLogo";
 import Controller, { useWakeLock } from "./Controller";
-import { Standings, driverName, useCameraMode, useSoundSetting } from "./shared";
+import { Standings, seatCarLook, useCameraMode, useSoundSetting } from "./shared";
+import { RaceStatsTracker } from "@/lib/carrerasProgress";
+import { RaceRewardCard, type RaceReward } from "./RaceProgress";
 import { Eye, RotateCw, Volume2, VolumeX } from "lucide-react";
 import FullscreenButton from "@/components/FullscreenButton";
 import { useQuality } from "@/hooks/useQuality";
@@ -126,12 +129,15 @@ export default function PhoneRace({
   state,
   myId,
   botHost,
+  reward,
 }: {
   roomId: string;
   meta: CarrerasMeta;
   state: CarrerasState;
   myId: string;
   botHost: boolean;
+  /** What the race gave me (3D), under the standings. */
+  reward?: RaceReward | null;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const minimapRef = useRef<HTMLCanvasElement>(null);
@@ -216,6 +222,9 @@ export default function PhoneRace({
     let own: Car | null = null;
     let ownGame = -1;
     let reportedGame = -1;
+    // What my car did this race (for my progress), and the race its stats were written for.
+    let stats = new RaceStatsTracker();
+    let statsGame = -1;
     let lastPose = 0;
     let lastBotPose = 0;
     let lastHud = "";
@@ -237,17 +246,14 @@ export default function PhoneRace({
       const now = serverNow();
       const raceMs = now - s.startedAt;
 
-      scene.setCars(
-        Object.fromEntries(
-          racers.map((r) => [r, { color: CARS[r].color, accent: CARS[r].accent, number: SEATS.indexOf(r) + 1, label: driverName(s, r) }])
-        )
-      );
+      scene.setCars(Object.fromEntries(racers.map((r) => [r, seatCarLook(s, r)])));
 
       // My car.
       if (isDriver && (!own || ownGame !== s.gameNo)) {
         own = gridCar(track, SEATS.indexOf(seat!));
         ownGame = s.gameNo;
         acc = 0;
+        stats = new RaceStatsTracker();
       }
       if (!isDriver) own = null;
 
@@ -286,6 +292,7 @@ export default function PhoneRace({
                 : { steer: inputRef.current.s, brake: inputRef.current.b };
             const hit = stepCar(own, input, track, STEP);
             if (cues.hit("wall", hit)) scene.impact(seat!, hit);
+            if (!done) stats.step("own", own, hit, STEP);
             for (const [r, g] of ghosts) {
               const bump = collideWithGhost(own, g);
               if (cues.hit(r, bump)) {
@@ -327,6 +334,7 @@ export default function PhoneRace({
       if (own && s.status === "racing" && moving) {
         const done = lapsDone(own, track);
         cues.lap("own", done, laps);
+        stats.lap("own", Math.min(done, laps));
         const lapMs = lapClock.update("own", done, raceMs);
         if (lapMs && done < laps) {
           setFlash({
@@ -342,6 +350,13 @@ export default function PhoneRace({
         audio?.finish(Object.keys(s.results).length === 0);
         scene.confetti(seat!);
         reportFinish(roomId, s.gameNo, seat!, raceMs, lapClock.best("own")).catch(console.error);
+        statsGame = s.gameNo;
+        writeRaceStats(roomId, s.gameNo, seat!, stats.get("own"));
+      }
+      // Closed before I got to the line: what I did still counts.
+      if (own && s.status === "finished" && statsGame !== s.gameNo && ownGame === s.gameNo) {
+        statsGame = s.gameNo;
+        writeRaceStats(roomId, s.gameNo, seat!, stats.get("own"));
       }
       if (runBots && s.status === "racing" && moving) {
         for (const [r, car] of runBots.cars) {
@@ -415,6 +430,7 @@ export default function PhoneRace({
         if (fx !== undefined || fy !== undefined) return (fx ?? Infinity) - (fy ?? Infinity);
         return progressOf(y) - progressOf(x);
       });
+      if (own && s.status === "racing" && moving && s.results[seat!] === undefined) stats.place("own", ranked.indexOf(seat!) + 1);
 
       const dots: DrawCar[] = [];
       for (const r of racers) {
@@ -593,8 +609,9 @@ export default function PhoneRace({
       )}
 
       {state.status === "finished" && (
-        <div className="absolute inset-0 flex items-center justify-center overflow-y-auto bg-slate-950/30 p-4">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 overflow-y-auto bg-slate-950/30 p-4">
           <Standings roomId={roomId} state={state} myId={myId} randomTrack={meta.track === "aleatoria"} />
+          {reward && <RaceRewardCard reward={reward} />}
         </div>
       )}
     </div>
