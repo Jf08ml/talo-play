@@ -6,6 +6,7 @@ import { CARD } from "@/components/ui";
 import { useAccount } from "@/components/AccountProvider";
 import { CARS } from "@/lib/carreras";
 import {
+  BODIES,
   BOOSTS,
   CAR_PROGRESS_EVENT,
   MAX_NUMBER,
@@ -66,7 +67,7 @@ export default function CarCard() {
     <div className={`${CARD} flex flex-col gap-3`}>
       <div className="grid grid-cols-[minmax(110px,0.85fr)_minmax(0,1.15fr)] gap-3 sm:gap-4">
         <CarPreview3D
-          look={{ color: paint.color, accent: paint.accent, number: paint.number, metal: paint.metal || undefined, rims: paint.rims, rimGlow: paint.rimGlow || undefined, neon: paint.neon || undefined }}
+          look={{ body: paint.body, color: paint.color, accent: paint.accent, number: paint.number, metal: paint.metal || undefined, rims: paint.rims, rimGlow: paint.rimGlow || undefined, neon: paint.neon || undefined }}
           className="h-36 w-full sm:h-44"
         />
         <div className="min-w-0 self-center">
@@ -115,6 +116,7 @@ export default function CarCard() {
       </button>
       {open && (
         <div className="flex flex-col gap-3">
+          <Choices label="Carrocería" items={BODIES} value={look.body} level={level} onPick={(id) => pick("body", id)} plain />
           <Choices label="Pintura" items={PAINTS} value={look.paint} level={level} onPick={(id) => pick("paint", id)} fallback={CARS.a.color} />
           <Choices label="Franjas" items={STRIPES} value={look.stripes} level={level} onPick={(id) => pick("stripes", id)} fallback="#f8fafc" />
           <Choices label="Llantas" items={RIMS} value={look.rims} level={level} onPick={(id) => pick("rims", id)} />

@@ -565,8 +565,8 @@ const WALL_BOUNCE = 0.35;
 const WALL_SLOWDOWN = 0.75;
 
 export const GRAVITY = 950;
-/** How much steering is left in the air. */
-const AIR_STEER = 0.35;
+/** How much steering is left in the air (a bit more than before: landings are easier to line up). */
+const AIR_STEER = 0.45;
 /** Speed lost per second climbing a slope of 1 (gained going down). */
 const SLOPE_PULL = 280;
 /** Ground that falls away more than this below where the car would fly launches it. */
@@ -584,6 +584,83 @@ export interface CarInput {
   brake: boolean;
   /** false = foot off the gas (after the finish line); gas is automatic otherwise. */
   gas?: boolean;
+  /**
+   * The drift button, held (people; bots never press it): held while
+   * steering at speed it drifts, let go it fires the mini-turbo; tapped in
+   * the air it spins a trick. Like Mario Kart's, apart from the brake.
+   */
+  drift?: boolean;
+}
+
+// ---- Drifts, tricks and slipstream ----------------------------------------------
+
+/** A drift starts with the button held and the wheel turned at least this much (in either order), at least this fast; it ends below the second speed. */
+const DRIFT_STEER = 0.3;
+const DRIFT_FROM = MAX_SPEED * 0.35;
+const DRIFT_KEEP = MAX_SPEED * 0.25;
+/** Grip while drifting (the car slides), how much it turns by itself into the drift and with the wheel, and the speed it bleeds. */
+const DRIFT_GRIP = 2.2;
+const DRIFT_TURN = 1.9;
+const DRIFT_STEER_TURN = 1.3;
+const DRIFT_DRAG = 90;
+/** Seconds of drift for each mini-turbo (blue, orange, purple), and how long each one lasts. */
+export const DRIFT_TIERS = [0.75, 1.5, 2.4];
+const MINI_TURBO = [0.45, 0.8, 1.2];
+/** A trick spin's length; landed after it ends, a boost. */
+export const TRICK_SECONDS = 0.45;
+const TRICK_BOOST = 0.7;
+/** Slipstream: right behind another car (this far ahead, this close sideways), fast, for this long: a push. */
+const DRAFT_AHEAD = [22, 150];
+const DRAFT_SIDE = 16;
+const DRAFT_FROM = MAX_SPEED * 0.6;
+export const DRAFT_CHARGE = 1.1;
+const DRAFT_BOOST = 0.7;
+
+/** The mini-turbo a drift has charged so far: 0 none, 1 blue, 2 orange, 3 purple. */
+export function driftTier(car: Pick<Car, "drift" | "driftT">): number {
+  if (!car.drift) return 0;
+  return DRIFT_TIERS.filter((t) => car.driftT >= t).length;
+}
+
+/** A burst of speed: the boost for some seconds, and at least `top` times top speed at once. */
+function burst(car: Car, seconds: number, top: number) {
+  car.boost = Math.max(car.boost, seconds);
+  const fx = Math.cos(car.heading);
+  const fy = Math.sin(car.heading);
+  const kick = Math.max(0, MAX_SPEED * top - (car.vx * fx + car.vy * fy));
+  car.vx += fx * kick;
+  car.vy += fy * kick;
+}
+
+/**
+ * Slipstream for `car` behind any of `others` (cars or rivals' poses):
+ * charges while it stays right behind one at speed and fires a push when
+ * full. Call after stepping. Returns whether it's in someone's wake now.
+ */
+export function slipstream(car: Car, others: { x: number; y: number; z: number }[], dt: number): boolean {
+  const fx = Math.cos(car.heading);
+  const fy = Math.sin(car.heading);
+  const fwd = car.vx * fx + car.vy * fy;
+  let behind = false;
+  if (fwd > DRAFT_FROM && car.air === 0) {
+    for (const o of others) {
+      if (Math.abs(o.z - car.z) > CAR_HEIGHT) continue;
+      const dx = o.x - car.x;
+      const dy = o.y - car.y;
+      const ahead = dx * fx + dy * fy;
+      if (ahead > DRAFT_AHEAD[0] && ahead < DRAFT_AHEAD[1] && Math.abs(-dx * fy + dy * fx) < DRAFT_SIDE) {
+        behind = true;
+        break;
+      }
+    }
+  }
+  car.draft = behind ? car.draft + dt : Math.max(0, car.draft - dt * 2);
+  if (car.draft >= DRAFT_CHARGE) {
+    car.draft = 0;
+    car.drafts++;
+    burst(car, DRAFT_BOOST, 1.08);
+  }
+  return behind;
 }
 
 export interface Car {
@@ -609,7 +686,26 @@ export interface Car {
   progress: number;
   /** Seconds of wall-scrape left, for a spark effect. */
   bump: number;
+  /** Drifting: -1 left, 1 right, 0 not; and seconds of drift charged. */
+  drift: number;
+  driftT: number;
+  /** A trick spin's seconds left (0 none), and whether this flight has one to land. */
+  trick: number;
+  trickReady: boolean;
+  /** The drift button last step (a trick takes a fresh tap). */
+  lastDrift: boolean;
+  /** Seconds of slipstream charged. */
+  draft: number;
+  /** Counts for the race (missions): boost pads, mini-turbos (and purple ones), tricks landed, slipstream pushes. */
+  pads: number;
+  minis: number;
+  purples: number;
+  tricks: number;
+  drafts: number;
 }
+
+/** A car's drift, trick and race counts, all at rest. */
+const FRESH = { drift: 0, driftT: 0, trick: 0, trickReady: false, lastDrift: false, draft: 0, pads: 0, minis: 0, purples: 0, tricks: 0, drafts: 0 };
 
 /**
  * Starting grid behind the start line, two cars per row, facing the driving
@@ -639,6 +735,7 @@ export function gridCar(track: Track, k: number): Car {
     s,
     progress: s - track.length,
     bump: 0,
+    ...FRESH,
   };
 }
 
@@ -655,6 +752,38 @@ export function stepCar(car: Car, input: CarInput, track: Track, dt: number): nu
   let forward = car.vx * fx + car.vy * fy;
   let lateral = -car.vx * fy + car.vy * fx;
   const flying = car.air > 0;
+  const steer = Math.max(-1, Math.min(1, input.steer));
+  const held = !!input.drift;
+  const tap = held && !car.lastDrift;
+  car.lastDrift = held;
+
+  // Drifting: the button held while steering at speed; let go to fire its mini-turbo (braking or flying loses it).
+  if (car.drift && (flying || !held || input.brake || forward < DRIFT_KEEP)) {
+    const tier = flying || input.brake || forward < DRIFT_KEEP ? 0 : driftTier(car);
+    car.drift = 0;
+    car.driftT = 0;
+    if (tier > 0) {
+      car.minis++;
+      if (tier === 3) car.purples++;
+      burst(car, MINI_TURBO[tier - 1], 1 + tier * 0.03);
+      forward = car.vx * fx + car.vy * fy;
+      lateral = -car.vx * fy + car.vy * fx;
+    }
+  }
+  if (!car.drift && held && !input.brake && !flying && Math.abs(steer) > DRIFT_STEER && forward > DRIFT_FROM) {
+    car.drift = Math.sign(steer);
+    car.driftT = 0;
+  }
+  const drifting = car.drift !== 0;
+  // Steering into the drift charges it faster; against it, slower.
+  if (drifting) car.driftT += dt * (0.6 + 0.6 * Math.max(0, steer * car.drift));
+
+  // A trick: a tap of the drift button in the air spins the car; land it after the spin for a boost.
+  if (flying && tap && car.air > 0.08 && !car.trickReady) {
+    car.trick = TRICK_SECONDS;
+    car.trickReady = true;
+  }
+  car.trick = Math.max(0, car.trick - dt);
 
   if (!flying) {
     if (input.brake) {
@@ -664,6 +793,7 @@ export function stepCar(car: Car, input: CarInput, track: Track, dt: number): nu
     } else {
       forward -= Math.sign(forward) * Math.min(Math.abs(forward), COAST_DECEL * dt);
     }
+    if (drifting) forward -= DRIFT_DRAG * dt;
     if (car.boost > 0 && !input.brake && forward > 0) {
       forward += BOOST_ACCEL * Math.max(0, 1 - forward / (MAX_SPEED * BOOST_TOP)) * dt;
     }
@@ -677,11 +807,12 @@ export function stepCar(car: Car, input: CarInput, track: Track, dt: number): nu
   }
   forward -= forward * ROLL_DRAG * dt;
   forward = Math.min(forward, MAX_SPEED * BOOST_TOP);
-  lateral *= Math.exp(-GRIP * dt);
+  lateral *= Math.exp(-(drifting ? DRIFT_GRIP : GRIP) * dt);
 
-  const steer = Math.max(-1, Math.min(1, input.steer));
   const grip = Math.min(1, Math.abs(forward) / TURN_FULL_SPEED) * (flying ? AIR_STEER : 1);
-  car.heading += steer * TURN_RATE * grip * Math.sign(forward) * dt;
+  // Drifting, the car turns into the drift by itself and the wheel only widens or tightens it.
+  const turn = drifting ? car.drift * DRIFT_TURN + steer * DRIFT_STEER_TURN : steer * TURN_RATE;
+  car.heading += turn * grip * Math.sign(forward) * dt;
 
   const nfx = Math.cos(car.heading);
   const nfy = Math.sin(car.heading);
@@ -709,6 +840,8 @@ export function stepCar(car: Car, input: CarInput, track: Track, dt: number): nu
       car.vy *= slow;
       if (out > 40) car.bump = 0.25;
       hit = out;
+      // A real crash ends the drift with nothing.
+      if (out > 60) car.drift = car.driftT = 0;
     }
   }
   car.bump = Math.max(0, car.bump - dt);
@@ -723,6 +856,18 @@ export function stepCar(car: Car, input: CarInput, track: Track, dt: number): nu
       car.z = ground;
       car.vz = 0;
       car.air = 0;
+      // Landing a trick: after the spin, a boost; still spinning, a messy landing that costs speed.
+      if (car.trickReady) {
+        if (car.trick <= 0) {
+          car.tricks++;
+          burst(car, TRICK_BOOST, 1.06);
+        } else {
+          car.vx *= 0.7;
+          car.vy *= 0.7;
+        }
+        car.trick = 0;
+        car.trickReady = false;
+      }
     } else {
       car.air += dt;
     }
@@ -744,6 +889,7 @@ export function stepCar(car: Car, input: CarInput, track: Track, dt: number): nu
     for (const b of track.boosts) {
       if (near.lat < b.lo || near.lat > b.hi || intoZone(track, b, near.s) >= b.len) continue;
       if (car.boost < BOOST_SECONDS - 0.2) {
+        car.pads++;
         const fwd = car.vx * nfx + car.vy * nfy;
         const kick = Math.max(0, MAX_SPEED * BOOST_KICK - fwd);
         car.vx += nfx * kick;
@@ -858,6 +1004,7 @@ export function carFromPose(track: Track, p: { x: number; y: number; z?: number;
     s: near.s,
     progress: p.p,
     bump: 0,
+    ...FRESH,
   };
 }
 

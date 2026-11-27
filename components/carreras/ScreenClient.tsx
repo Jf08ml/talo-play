@@ -39,6 +39,7 @@ import {
   lapsDone,
   newBrain,
   stepCar,
+  slipstream,
   trackLabel,
   wrongWay,
   type BotBrain,
@@ -57,7 +58,7 @@ import { watchRoomMeta } from "@/lib/roomSettings";
 import { useServerNow } from "@/hooks/useServerNow";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
 import TrackPreview from "@/components/carreras/TrackPreview";
-import { Standings, driverName, seatCarLook, useCameraMode, useRaceCloser, useSoundSetting } from "@/components/carreras/shared";
+import { Standings, driverName, seatCarLook, stuntOf, useCameraMode, useRaceCloser, useSoundSetting } from "@/components/carreras/shared";
 import { TaloMark } from "@/components/TaloLogo";
 import { RoomLoading, RoomNotFound, RoomError } from "@/components/RoomStatus";
 import { PRIMARY_BUTTON } from "@/components/ui";
@@ -72,9 +73,9 @@ type Status = "loading" | "not-found" | "ready" | "error";
 const subscribeNever = () => () => {};
 const STEP = 1 / 120;
 /** Keyboard driving on the screen itself, to try it without phones. */
-const KEYS: Partial<Record<Seat, { left: string[]; right: string[]; brake: string[] }>> = {
-  a: { left: ["a", "A"], right: ["d", "D"], brake: ["s", "S"] },
-  b: { left: ["ArrowLeft"], right: ["ArrowRight"], brake: ["ArrowDown"] },
+const KEYS: Partial<Record<Seat, { left: string[]; right: string[]; brake: string[]; drift: string[] }>> = {
+  a: { left: ["a", "A"], right: ["d", "D"], brake: ["s", "S"], drift: ["Shift"] },
+  b: { left: ["ArrowLeft"], right: ["ArrowRight"], brake: ["ArrowDown"], drift: ["Enter"] },
 };
 
 interface Engine {
@@ -235,12 +236,12 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
       const k = KEYS[seat];
       const keys = keysRef.current;
       const has = (list: string[]) => list.some((key) => keys.has(key));
-      if (k && (has(k.left) || has(k.right) || has(k.brake))) {
-        return { steer: (has(k.right) ? 1 : 0) - (has(k.left) ? 1 : 0), brake: has(k.brake) };
+      if (k && (has(k.left) || has(k.right) || has(k.brake) || has(k.drift))) {
+        return { steer: (has(k.right) ? 1 : 0) - (has(k.left) ? 1 : 0), brake: has(k.brake), drift: has(k.drift) };
       }
       const wire = inputsRef.current[s.seats[seat]];
       // No phone connected (or it dropped): the car brakes instead of driving into a wall.
-      return wire ? { steer: wire.s ?? 0, brake: !!wire.b } : { steer: 0, brake: false, gas: false };
+      return wire ? { steer: wire.s ?? 0, brake: !!wire.b, drift: !!wire.d } : { steer: 0, brake: false, gas: false };
     };
 
     const tick = (t: number) => {
@@ -292,6 +293,11 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
             }
           }
         }
+        // Slipstream: every car behind any other (people and bots alike).
+        for (const seat of seats) {
+          if (s.results[seat] !== undefined) continue;
+          slipstream(engine.cars[seat]!, seats.filter((o) => o !== seat).map((o) => engine!.cars[o]!), dt);
+        }
       } else {
         acc = 0;
       }
@@ -336,7 +342,7 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
           const slip = Math.abs(-car.vx * Math.sin(car.heading) + car.vy * Math.cos(car.heading));
           const pan = is3d ? (seats.length === 1 ? 0 : i % 2 ? 0.6 : -0.6) : (car.x / track.worldW) * 1.6 - 0.8;
           cues.air(seat, car.air, pan);
-          cues.boost(seat, car.boost, pan);
+          cues.stunt(seat, car, dt, pan);
           audio.engine(seat, Math.hypot(car.vx, car.vy) / MAX_SPEED, (slip - 50) / 150, seats.length > 1 ? 0.7 : 1, pan);
         });
         audio.silence(seats);
@@ -386,7 +392,7 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
       } else {
         for (const seat of seats) {
           const car = engine.cars[seat]!;
-          scene.setPose(seat, { x: car.x, y: car.y, z: car.z, ground: car.ground, heading: car.heading, vx: car.vx, vy: car.vy, bump: car.bump });
+          scene.setPose(seat, { x: car.x, y: car.y, z: car.z, ground: car.ground, heading: car.heading, vx: car.vx, vy: car.vy, bump: car.bump, ...stuntOf(car) });
         }
         // Before the start with nobody seated: an aerial view of the track.
         scene.render(seats.length ? seats.map((key) => ({ key })) : [{ key: "" }], cameraRef.current, dt);
@@ -697,7 +703,7 @@ function JoinCard({
         {ready ? "¡Largar!" : "Esperando pilotos…"}
       </button>
       <p className="text-xs text-slate-500">
-        Hasta 4 pilotos{state.botCount > 0 ? ", los autos libres los manejan bots" : ""}. También se puede largar desde un teléfono. Para probar sin teléfonos: A/D y S, o las flechas.
+        Hasta 4 pilotos{state.botCount > 0 ? ", los autos libres los manejan bots" : ""}. También se puede largar desde un teléfono. Para probar sin teléfonos: A/D, S y Shift (derrape), o las flechas y Enter.
       </p>
     </div>
   );

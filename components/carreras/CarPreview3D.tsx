@@ -1,13 +1,23 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { disposeCar, previewCar, type CarLook } from "@/lib/carreras3d";
+import { carModelsReady, loadCarModels } from "@/lib/carreras3dModels";
 
 /** The «Tu auto» car in 3D: turning slowly, drag to turn it yourself. */
 export default function CarPreview3D({ look, className = "" }: { look: CarLook; className?: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const key = JSON.stringify(look);
+  // The modeled bodies: the drawn car until they load, then rebuilt with them.
+  const [modeled, setModeled] = useState(carModelsReady);
+  useEffect(() => {
+    let alive = true;
+    loadCarModels().then((ok) => alive && ok && setModeled(true));
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -100,7 +110,7 @@ export default function CarPreview3D({ look, className = "" }: { look: CarLook; 
       (floor.material as THREE.Material).dispose();
       renderer.dispose();
     };
-  }, [key]);
+  }, [key, modeled]);
 
   return (
     <div ref={hostRef} className={`relative overflow-hidden rounded-2xl bg-slate-900 ${className}`}>

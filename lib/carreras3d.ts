@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { MODEL_SCALE, carBody, carModelsReady, carWheel, loadCarModels } from "./carreras3dModels";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { mulberry32 } from "./random";
 import { Bloom, aimShadow, glowColor, type Quality } from "./postfx";
@@ -671,6 +672,10 @@ function labelSprite(text: string, color: string): THREE.Sprite {
 // ---- Cars ------------------------------------------------------------------
 
 const WHEEL_R = 4.2;
+/** The mini-turbo's sparks: blue, orange, purple (over 1: they glow under bloom). */
+const DRIFT_COLORS = [glowColor(0x60a5fa, 1.6), glowColor(0xfb923c, 1.6), glowColor(0xc084fc, 1.8)];
+/** The race number's square on a modeled body's doors (meters; shared by every car). */
+let numberPlane: THREE.PlaneGeometry | null = null;
 const TAIL_OFF = new THREE.Color(0x7f1d1d);
 // Over 1: under bloom (high quality) the brake lights glow; without it, they're just bright red.
 const TAIL_ON = glowColor(0xff2d2d, 2.4);
@@ -694,6 +699,8 @@ export interface CarLook {
   flames?: [string, string];
   /** The label's color (the seat's, when the paint is the driver's own). */
   tag?: string;
+  /** The modeled body (lib/carreras3dModels.ts `CarBodyId`); drawn car until the models load. */
+  body?: string;
 }
 
 interface CarParts {
@@ -707,6 +714,10 @@ interface CarParts {
   wheels: THREE.Object3D[];
   steering: THREE.Object3D[];
   tail: THREE.MeshBasicMaterial;
+  /** The wheels' radius (they roll by it). */
+  wheelR: number;
+  /** Drawn from the modeled body (false: the drawn car, until the models load). */
+  modeled: boolean;
 }
 
 /** Geometry every car shares (only the materials change), built once per scene. */
@@ -912,40 +923,113 @@ function carMesh(geo: CarGeometry, look: CarLook, night: boolean, glow: THREE.Te
     : chrome;
   const head = new THREE.MeshBasicMaterial({ color: night ? glowColor(0xfff7d6, 1.6) : new THREE.Color(0xfefce8) });
   const tail = new THREE.MeshBasicMaterial({ color: TAIL_OFF.clone() });
-  group.add(
-    new THREE.Mesh(geo.paint, paint),
-    new THREE.Mesh(geo.stripes, accent),
-    new THREE.Mesh(geo.dark, dark),
-    new THREE.Mesh(geo.glass, glass),
-    new THREE.Mesh(geo.chrome, chrome),
-    new THREE.Mesh(geo.heads, head),
-    new THREE.Mesh(geo.tails, tail)
-  );
-  if (look.number) {
-    const decal = new THREE.MeshLambertMaterial({ map: numberTexture(look.number), transparent: true, alphaTest: 0.5 });
-    group.add(new THREE.Mesh(geo.decals, decal));
-  }
-
   const wheels: THREE.Object3D[] = [];
   const steering: THREE.Object3D[] = [];
-  for (const [x, z, front] of [
-    [11, CAR_WIDTH / 2 + 0.6, true],
-    [11, -CAR_WIDTH / 2 - 0.6, true],
-    [-11, CAR_WIDTH / 2 + 0.6, false],
-    [-11, -CAR_WIDTH / 2 - 0.6, false],
-  ] as [number, number, boolean][]) {
-    const w = new THREE.Group();
-    w.add(new THREE.Mesh(geo.tire, tireMat), new THREE.Mesh(geo.rim, rimMat));
-    wheels.push(w);
-    if (front) {
-      const pivot = new THREE.Group();
-      pivot.position.set(x, WHEEL_R, z);
-      pivot.add(w);
-      steering.push(pivot);
-      group.add(pivot);
-    } else {
-      w.position.set(x, WHEEL_R, z);
-      group.add(w);
+  let wheelR = WHEEL_R;
+  // The driver's body, modeled (lib/carreras3dModels.ts), once loaded; until then the drawn one.
+  const model = look.body ? carBody(look.body) : null;
+  if (model) {
+    // Its parts take this car's materials, by name.
+    const byName: Record<string, THREE.Material> = {
+      Pintura: paint,
+      Franjas: accent,
+      Vidrio: glass,
+      Negro: dark,
+      Cromo: chrome,
+      Faros: head,
+      "Luces traseras": tail,
+      Neumático: tireMat,
+      Llanta: rimMat,
+    };
+    const dress = (root: THREE.Object3D) =>
+      root.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.isMesh) m.material = byName[(m.material as THREE.Material).name] ?? dark;
+      });
+    dress(model.scene);
+    // Meters, nose +z → race units, nose +x.
+    const holder = new THREE.Group();
+    holder.rotation.y = Math.PI / 2;
+    holder.scale.setScalar(MODEL_SCALE);
+    holder.add(model.scene);
+    group.add(holder);
+    if (look.number) {
+      // On both doors, facing out (readable from either side).
+      numberPlane ??= new THREE.PlaneGeometry(0.5, 0.5);
+      numberPlane.userData.shared = true;
+      const decal = new THREE.MeshLambertMaterial({ map: numberTexture(look.number), transparent: true, alphaTest: 0.5 });
+      for (const side of [1, -1]) {
+        const d = new THREE.Mesh(numberPlane, decal);
+        d.position.set(model.number.x * side, model.number.y, model.number.z);
+        d.rotation.y = (side * Math.PI) / 2;
+        holder.add(d);
+      }
+    }
+    const { spec } = model;
+    wheelR = spec.r * MODEL_SCALE;
+    for (const [zm, front] of [
+      [spec.front, true],
+      [spec.back, false],
+    ] as [number, boolean][]) {
+      for (const xm of [spec.x, -spec.x]) {
+        // Model (x, y, z) → race (z, y, −x), scaled.
+        const x = zm * MODEL_SCALE;
+        const z = -xm * MODEL_SCALE;
+        const w = new THREE.Group();
+        const tire = carWheel(look.body!);
+        if (tire) {
+          dress(tire);
+          tire.scale.setScalar(MODEL_SCALE);
+          // Its axle (x) along the race's z, the outer face out.
+          tire.rotation.y = z > 0 ? -Math.PI / 2 : Math.PI / 2;
+          w.add(tire);
+        }
+        wheels.push(w);
+        if (front) {
+          const pivot = new THREE.Group();
+          pivot.position.set(x, wheelR, z);
+          pivot.add(w);
+          steering.push(pivot);
+          group.add(pivot);
+        } else {
+          w.position.set(x, wheelR, z);
+          group.add(w);
+        }
+      }
+    }
+  } else {
+    group.add(
+      new THREE.Mesh(geo.paint, paint),
+      new THREE.Mesh(geo.stripes, accent),
+      new THREE.Mesh(geo.dark, dark),
+      new THREE.Mesh(geo.glass, glass),
+      new THREE.Mesh(geo.chrome, chrome),
+      new THREE.Mesh(geo.heads, head),
+      new THREE.Mesh(geo.tails, tail)
+    );
+    if (look.number) {
+      const decal = new THREE.MeshLambertMaterial({ map: numberTexture(look.number), transparent: true, alphaTest: 0.5 });
+      group.add(new THREE.Mesh(geo.decals, decal));
+    }
+    for (const [x, z, front] of [
+      [11, CAR_WIDTH / 2 + 0.6, true],
+      [11, -CAR_WIDTH / 2 - 0.6, true],
+      [-11, CAR_WIDTH / 2 + 0.6, false],
+      [-11, -CAR_WIDTH / 2 - 0.6, false],
+    ] as [number, number, boolean][]) {
+      const w = new THREE.Group();
+      w.add(new THREE.Mesh(geo.tire, tireMat), new THREE.Mesh(geo.rim, rimMat));
+      wheels.push(w);
+      if (front) {
+        const pivot = new THREE.Group();
+        pivot.position.set(x, WHEEL_R, z);
+        pivot.add(w);
+        steering.push(pivot);
+        group.add(pivot);
+      } else {
+        w.position.set(x, WHEEL_R, z);
+        group.add(w);
+      }
     }
   }
 
@@ -991,7 +1075,7 @@ function carMesh(geo: CarGeometry, look: CarLook, night: boolean, glow: THREE.Te
     beam.renderOrder = 2;
     floor.add(beam);
   }
-  return { group: root, body: group, floor, shadow: shadowMat, wheels, steering, tail };
+  return { group: root, body: group, floor, shadow: shadowMat, wheels, steering, tail, wheelR, modeled: !!model };
 }
 
 // ---- Particles ---------------------------------------------------------------
@@ -1165,6 +1249,10 @@ interface CarObj extends CarParts {
   flameAcc: number;
   /** Its boost flames: the look's two colors and a white-hot core now and then. */
   flameColors: THREE.Color[];
+  /** As its pose says: drifting (signed, 1 + mini-turbo) and a trick spin (0…1). */
+  drift: number;
+  spin: number;
+  driftAcc: number;
 }
 
 export interface CarPoseInput {
@@ -1179,6 +1267,10 @@ export interface CarPoseInput {
   vy: number;
   /** Seconds of wall scrape left (sparks), if known. */
   bump?: number;
+  /** Drifting: its side (−/+) times 1 + the mini-turbo charged (1 just drifting … 4 purple); 0 or absent not. */
+  drift?: number;
+  /** A trick spin's progress, 0…1 (0 or absent: none). */
+  spin?: number;
 }
 
 export interface ViewRequest {
@@ -1239,6 +1331,8 @@ export class RaceScene {
     const high = (opts.quality ?? "alta") === "alta";
     this.shadows = high;
     this.maxDpr = opts.maxDpr ?? (high ? 1.75 : 1.25);
+    // The modeled cars: drawn ones until they load, then `setCars` swaps them.
+    void loadCarModels();
     this.look = LOOKS[track.def.theme] ?? LOOKS.campo;
     this.worldW = track.worldW;
     this.worldH = track.worldH;
@@ -2028,7 +2122,7 @@ export class RaceScene {
   setCars(cars: Record<string, CarLook>) {
     for (const [key, obj] of this.cars) {
       // Gone, or dressed differently now (a driver changed the look while waiting): rebuilt below.
-      if (!(key in cars) || JSON.stringify(cars[key]) !== obj.lookKey) {
+      if (!(key in cars) || JSON.stringify(cars[key]) !== obj.lookKey || (!obj.modeled && !!cars[key].body && carModelsReady())) {
         this.scene.remove(obj.group);
         disposeTree(obj.group);
         this.cars.delete(key);
@@ -2064,6 +2158,9 @@ export class RaceScene {
         smokeAcc: 0,
         flameAcc: 0,
         flameColors: info.flames ? [new THREE.Color(info.flames[0]), new THREE.Color(info.flames[1]), new THREE.Color(0xf8fafc)] : this.flameColors,
+        drift: 0,
+        spin: 0,
+        driftAcc: 0,
       });
     }
   }
@@ -2081,6 +2178,8 @@ export class RaceScene {
     car.forward = pose.vx * fx + pose.vy * fy;
     car.lateral = -pose.vx * fy + pose.vy * fx;
     car.bump = pose.bump ?? 0;
+    car.drift = pose.drift ?? 0;
+    car.spin = pose.spin ?? 0;
   }
 
   /** Crossing the finish line: confetti over the car. */
@@ -2151,7 +2250,7 @@ export class RaceScene {
     const ease = (k: number) => 1 - Math.exp(-dt * k);
     for (const car of this.cars.values()) {
       // Wheels roll with the speed; front wheels follow how fast the car turns.
-      for (const w of car.wheels) w.rotation.z -= (car.forward * dt) / WHEEL_R;
+      for (const w of car.wheels) w.rotation.z -= (car.forward * dt) / car.wheelR;
       if (!Number.isNaN(car.lastHeading)) {
         let d = car.heading - car.lastHeading;
         if (d > Math.PI) d -= Math.PI * 2;
@@ -2197,6 +2296,8 @@ export class RaceScene {
       car.lastZ = car.z;
       car.lastGround = car.ground;
       car.body.rotation.z = car.pitch;
+      // A trick: a full barrel roll while it lasts.
+      car.body.rotation.x = car.spin > 0 ? car.spin * Math.PI * 2 * Math.sign(car.lateral || 1) : 0;
       car.floor.rotation.z = car.groundPitch;
       car.floor.position.y = -lift;
       // The shadow spreads and fades the higher the car flies.
@@ -2249,6 +2350,32 @@ export class RaceScene {
         }
       } else {
         car.smokeAcc = 0;
+      }
+      const tier = Math.abs(car.drift) - 1;
+      if (tier >= 1 && lift < 1) {
+        car.driftAcc += dt * (30 + tier * 15);
+        const color = DRIFT_COLORS[tier - 1];
+        while (car.driftAcc >= 1) {
+          car.driftAcc -= 1;
+          const side = this.rand() < 0.5 ? 1 : -1;
+          const a = this.rand() * Math.PI * 2;
+          this.sparks.spawn(
+            p.x - fx * 12 - fz * side * 8,
+            car.ground + 2,
+            p.z - fz * 12 + fx * side * 8,
+            Math.cos(a) * 40 - fx * 60,
+            30 + this.rand() * 60,
+            Math.sin(a) * 40 - fz * 60,
+            color,
+            2.6 + tier * 0.6 + this.rand() * 1.5,
+            0.25 + this.rand() * 0.2,
+            1,
+            -2,
+            car.ground
+          );
+        }
+      } else {
+        car.driftAcc = 0;
       }
       if (car.bump > 0 && this.rand() < 0.7) {
         const a = this.rand() * Math.PI * 2;

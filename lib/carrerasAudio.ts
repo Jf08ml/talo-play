@@ -1,12 +1,16 @@
 /**
  * Carreras sounds, synthesized with Web Audio (no files to load): an engine
  * per car whose pitch climbs through the gears, tire screech, hits, jumps and
- * landings, boosts, the countdown beeps, lap chimes and the finish fanfare.
- * Browser only.
+ * landings, boosts, the countdown beeps, lap chimes and the finish fanfare;
+ * and the stunts: drift sparks crackling with a chime per color, a mini-turbo
+ * blast that grows with its color, a trick's spin and its landing (a «ta-dá»,
+ * or a thud), and the slipstream's wind and push. Browser only.
  *
  * Browsers keep audio suspended until a tap or a key press, so the context
  * resumes on the first one (`unlock` listeners) — before that it's silent.
  */
+
+import { DRAFT_CHARGE, driftTier, type Car } from "./carrerasTrack";
 
 /** Speed fractions where the next gear starts (the engine drops in pitch there). */
 const GEARS = [0, 0.2, 0.4, 0.6, 0.8, 1.05];
@@ -19,6 +23,9 @@ interface EngineVoice {
   gain: GainNode;
   skid: GainNode;
   skidSrc: AudioBufferSourceNode;
+  /** The slipstream's wind (low noise), up while it charges. */
+  wind: GainNode;
+  windSrc: AudioBufferSourceNode;
   pan: StereoPannerNode | null;
 }
 
@@ -103,15 +110,27 @@ export class RaceAudio {
     skid.gain.value = 0;
     skidSrc.connect(band).connect(skid);
 
+    const windSrc = ctx.createBufferSource();
+    windSrc.buffer = this.noise;
+    windSrc.loop = true;
+    const low = ctx.createBiquadFilter();
+    low.type = "lowpass";
+    low.frequency.value = 700;
+    const wind = ctx.createGain();
+    wind.gain.value = 0;
+    windSrc.connect(low).connect(wind);
+
     const pan = typeof ctx.createStereoPanner === "function" ? ctx.createStereoPanner() : null;
     const out: AudioNode = pan ?? this.master;
     if (pan) pan.connect(this.master);
     gain.connect(out);
     skid.connect(out);
+    wind.connect(out);
     saw.start();
     sub.start();
     skidSrc.start();
-    v = { saw, sub, filter, gain, skid, skidSrc, pan };
+    windSrc.start();
+    v = { saw, sub, filter, gain, skid, skidSrc, wind, windSrc, pan };
     this.engines.set(key, v);
     return v;
   }
@@ -141,14 +160,16 @@ export class RaceAudio {
       const stopAt = (this.ctx?.currentTime ?? 0) + 0.2;
       v.gain.gain.setTargetAtTime(0, stopAt - 0.2, 0.05);
       v.skid.gain.setTargetAtTime(0, stopAt - 0.2, 0.05);
+      v.wind.gain.setTargetAtTime(0, stopAt - 0.2, 0.05);
       v.saw.stop(stopAt + 0.3);
       v.sub.stop(stopAt + 0.3);
       v.skidSrc.stop(stopAt + 0.3);
+      v.windSrc.stop(stopAt + 0.3);
       this.engines.delete(key);
     }
   }
 
-  private tone(freq: number, start: number, dur: number, type: OscillatorType, vol: number, slideTo?: number) {
+  private tone(freq: number, start: number, dur: number, type: OscillatorType, vol: number, slideTo?: number, pan = 0) {
     const ctx = this.ctx!;
     const osc = ctx.createOscillator();
     osc.type = type;
@@ -158,7 +179,7 @@ export class RaceAudio {
     g.gain.setValueAtTime(0.0001, start);
     g.gain.exponentialRampToValueAtTime(vol, start + 0.01);
     g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
-    osc.connect(g).connect(this.master!);
+    osc.connect(g).connect(this.panned(pan));
     osc.start(start);
     osc.stop(start + dur + 0.05);
   }
@@ -181,6 +202,16 @@ export class RaceAudio {
     src.connect(lp).connect(g).connect(this.master!);
     src.start(t, Math.random() * 0.5, 0.35);
     this.tone(110, t, 0.22, "sine", 0.5 * k, 45);
+  }
+
+  /** Where a one-off sound goes: the master, through a panner when there's one. */
+  private panned(pan: number): AudioNode {
+    const ctx = this.ctx!;
+    if (!pan || typeof ctx.createStereoPanner !== "function") return this.master!;
+    const p = ctx.createStereoPanner();
+    p.pan.value = Math.max(-1, Math.min(1, pan));
+    p.connect(this.master!);
+    return p;
   }
 
   /** A burst of filtered noise whose band sweeps from `f0` to `f1` (whooshes). */
@@ -227,6 +258,76 @@ export class RaceAudio {
     const t = this.ctx!.currentTime;
     this.sweep(300, 3200, 0.5, 0.4, pan);
     this.tone(330, t, 0.35, "sawtooth", 0.06, 990);
+  }
+
+  /** One spark under a drift: a tiny bright tick (several a second make the crackle). */
+  crackle(pan = 0) {
+    if (!this.live) return;
+    const ctx = this.ctx!;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noise;
+    const hp = ctx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 3500 + Math.random() * 2500;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.09, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+    src.connect(hp).connect(g).connect(this.panned(pan));
+    src.start(t, Math.random() * 0.8, 0.04);
+  }
+
+  /** A drift's sparks change color: a short chime, higher for each (1 blue, 2 orange, 3 purple). */
+  driftLevel(tier: number, pan = 0) {
+    if (!this.live) return;
+    const t = this.ctx!.currentTime;
+    const f = [0, 880, 1175, 1568][Math.max(1, Math.min(3, tier))];
+    this.tone(f, t, 0.18, "triangle", 0.13, undefined, pan);
+    this.tone(f * 2, t, 0.1, "sine", 0.05, undefined, pan);
+  }
+
+  /** A mini-turbo: a blast, longer and stronger for orange (2) and much more for purple (3). */
+  miniTurbo(tier: number, pan = 0) {
+    if (!this.live) return;
+    const t = this.ctx!.currentTime;
+    const k = Math.max(1, Math.min(3, tier));
+    this.tone(120 - k * 15, t, 0.15 + k * 0.08, "sine", 0.35 + k * 0.1, 40, pan);
+    this.sweep(250, 2400 + k * 900, 0.35 + k * 0.15, 0.3 + k * 0.08, pan);
+    this.tone(260 + k * 60, t, 0.3 + k * 0.12, "sawtooth", 0.05 + k * 0.02, 900 + k * 400, pan);
+  }
+
+  /** A trick starting: a quick spin, two whooshes going round. */
+  trickSpin(pan = 0) {
+    if (!this.live) return;
+    this.sweep(700, 2600, 0.18, 0.28, pan);
+    setTimeout(() => this.live && this.sweep(2600, 700, 0.2, 0.24, pan), 170);
+  }
+
+  /** Landing a trick: «¡ta-dá!» when it's done in time, a dull thud when still spinning. */
+  trickLand(ok: boolean, pan = 0) {
+    if (!this.live) return;
+    const t = this.ctx!.currentTime;
+    if (ok) {
+      this.tone(784, t, 0.12, "square", 0.09, undefined, pan);
+      this.tone(1175, t + 0.11, 0.3, "square", 0.1, undefined, pan);
+      this.tone(1568, t + 0.11, 0.3, "triangle", 0.07, undefined, pan);
+    } else {
+      this.tone(70, t, 0.3, "sine", 0.5, 35, pan);
+      this.sweep(500, 120, 0.3, 0.25, pan);
+    }
+  }
+
+  /** The slipstream's wind on a car's voice: `level` 0 (none) … 1 (about to push). */
+  draftWind(key: string, level: number) {
+    const v = this.engines.get(key);
+    if (!v || !this.ctx) return;
+    v.wind.gain.setTargetAtTime(Math.max(0, Math.min(1, level)) * 0.1, this.ctx.currentTime, 0.08);
+  }
+
+  /** The slipstream's push: a long airy whoosh. */
+  draftPush(pan = 0) {
+    if (!this.live) return;
+    this.sweep(200, 1800, 0.6, 0.32, pan);
   }
 
   /** Countdown: a short beep for 3, 2, 1 and a long high one for the start. */
@@ -288,7 +389,8 @@ export class RaceCues {
   private lastHit = new Map<string, number>();
   /** Longest time in the air of the current flight, per car (absent = on the road). */
   private flights = new Map<string, number>();
-  private boosts = new Map<string, number>();
+  /** What each car was doing last frame (its stunt counts, drift color, trick), to tell what just happened. */
+  private stunts = new Map<string, { pads: number; minis: number; purples: number; tricks: number; drafts: number; tier: number; spinning: boolean; ready: boolean; crackle: number }>();
 
   constructor(private audio: RaceAudio | null) {}
 
@@ -340,11 +442,47 @@ export class RaceCues {
     }
   }
 
-  /** A car's seconds of boost left: a whoosh each time a pad tops it up. */
-  boost(key: string, seconds: number, pan = 0) {
-    const prev = this.boosts.get(key) ?? 0;
-    this.boosts.set(key, seconds);
-    if (seconds > prev + 0.3) this.audio?.boost(pan);
+  /**
+   * A car's boosts and stunts, from its own counts (a new car each race):
+   * the pad's whoosh, the drift's crackle and color chimes, the mini-turbo's
+   * blast by its color, the trick's spin and landing, the slipstream's wind
+   * and push. Each one once, as it happens.
+   */
+  stunt(key: string, car: Car, dt: number, pan = 0) {
+    const tier = driftTier(car);
+    const prev = this.stunts.get(key);
+    const now = {
+      pads: car.pads,
+      minis: car.minis,
+      purples: car.purples,
+      tricks: car.tricks,
+      drafts: car.drafts,
+      tier,
+      spinning: car.trick > 0,
+      ready: car.trickReady,
+      crackle: prev?.crackle ?? 0,
+    };
+    // A new car (a new race) starts counting from here.
+    if (prev && car.pads >= prev.pads && car.minis >= prev.minis) {
+      const a = this.audio;
+      if (car.pads > prev.pads) a?.boost(pan);
+      if (car.minis > prev.minis) a?.miniTurbo(car.purples > prev.purples ? 3 : Math.max(1, prev.tier), pan);
+      if (car.drafts > prev.drafts) a?.draftPush(pan);
+      if (now.spinning && !prev.spinning) a?.trickSpin(pan);
+      if (car.tricks > prev.tricks) a?.trickLand(true, pan);
+      else if (prev.ready && !now.ready) a?.trickLand(false, pan);
+      if (car.drift && tier > prev.tier) a?.driftLevel(tier, pan);
+      // Drifting: sparks crackle, faster with each color.
+      if (car.drift) {
+        now.crackle += dt * (8 + tier * 7);
+        while (now.crackle >= 1) {
+          now.crackle -= 1;
+          a?.crackle(pan);
+        }
+      } else now.crackle = 0;
+    }
+    this.audio?.draftWind(key, car.draft / DRAFT_CHARGE);
+    this.stunts.set(key, now);
   }
 
   /** A hit of `speed`; true when it's worth showing (sparks, shake) — it also sounds. */

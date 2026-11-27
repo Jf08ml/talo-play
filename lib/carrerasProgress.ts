@@ -14,6 +14,8 @@ export type { LookItem };
 
 /** How your car is dressed: ids from the catalogs below, and a race number (0 = the seat's). */
 export interface CarLookIds {
+  /** The car's body (a modeled one, lib/carreras3dModels.ts). */
+  body: string;
   paint: string;
   stripes: string;
   rims: string;
@@ -23,7 +25,17 @@ export interface CarLookIds {
   number: number;
 }
 
-export const DEFAULT_CAR_LOOK: CarLookIds = { paint: "asiento", stripes: "auto", rims: "plata", boost: "fuego", neon: "ninguno", title: "novato", number: 0 };
+export const DEFAULT_CAR_LOOK: CarLookIds = { body: "deportivo", paint: "asiento", stripes: "auto", rims: "plata", boost: "fuego", neon: "ninguno", title: "novato", number: 0 };
+
+/** Bodies: only how it looks — every car has the same size and handling. */
+export const BODIES: LookItem[] = [
+  { id: "deportivo", label: "Deportivo", level: 1 },
+  { id: "kart", label: "Kart", level: 4 },
+  { id: "clasico", label: "Clásico", level: 8 },
+  { id: "camioneta", label: "Camioneta", level: 12 },
+  { id: "formula", label: "Fórmula", level: 16 },
+  { id: "muscle", label: "Muscle", level: 20 },
+];
 
 /** Paint: "asiento" keeps the seat's color (the one its tags and the minimap use). `metal` shines like chrome. */
 export const PAINTS: (LookItem & { metal?: boolean })[] = [
@@ -101,9 +113,14 @@ export interface RaceStats {
   p: number;
   /** Laps completed. */
   l: number;
+  /** Mini-turbos fired (and how many were purple), tricks landed, slipstream pushes. Absent on older rooms. */
+  m?: number;
+  mp?: number;
+  t?: number;
+  r?: number;
 }
 
-export const EMPTY_RACE: RaceStats = { b: 0, j: 0, air: 0, w: 0, p: 0, l: 0 };
+export const EMPTY_RACE: RaceStats = { b: 0, j: 0, air: 0, w: 0, p: 0, l: 0, m: 0, mp: 0, t: 0, r: 0 };
 
 /** A race as it ended for me. */
 export interface RaceSummary {
@@ -121,7 +138,18 @@ export function raceXp(r: RaceSummary): number {
   if (!r.played) return 0;
   const podium = r.players > 1 ? ([0, 35, 20, 10][r.place] ?? 0) : 0;
   const s = r.stats;
-  return 20 + podium + (r.finished ? 5 : 0) + Math.min(15, s.p * 3) + Math.min(10, s.j * 2) + Math.min(10, s.b) + (r.finished && s.w === 0 ? 10 : 0);
+  return (
+    20 +
+    podium +
+    (r.finished ? 5 : 0) +
+    Math.min(15, s.p * 3) +
+    Math.min(10, s.j * 2) +
+    Math.min(10, s.b) +
+    Math.min(12, (s.m ?? 0) * 2 + (s.mp ?? 0) * 2) +
+    Math.min(8, (s.t ?? 0) * 2) +
+    Math.min(6, (s.r ?? 0) * 2) +
+    (r.finished && s.w === 0 ? 10 : 0)
+  );
 }
 
 // ---- Daily missions ----------------------------------------------------------------
@@ -145,6 +173,10 @@ export const MISSIONS: MissionDef[] = [
   { id: "adelantar8", text: "Adelanta 8 autos", goal: 8, xp: 80, count: (r) => r.stats.p },
   { id: "limpia1", text: "Termina una carrera sin chocar contra la pared", goal: 1, xp: 90, count: (r) => (r.finished && r.stats.w === 0 ? 1 : 0) },
   { id: "vueltas12", text: "Completa 12 vueltas", goal: 12, xp: 60, count: (r) => r.stats.l },
+  { id: "mini6", text: "Lanza 6 mini-turbos derrapando", goal: 6, xp: 80, count: (r) => r.stats.m ?? 0 },
+  { id: "morado2", text: "Carga 2 mini-turbos morados", goal: 2, xp: 100, count: (r) => r.stats.mp ?? 0 },
+  { id: "trucos4", text: "Haz 4 trucos en el aire", goal: 4, xp: 80, count: (r) => r.stats.t ?? 0 },
+  { id: "rebufo3", text: "Aprovecha el rebufo 3 veces", goal: 3, xp: 70, count: (r) => r.stats.r ?? 0 },
 ];
 
 /** The day's three missions (same for everyone that UTC day; not the same three as Arena's day). */
@@ -241,6 +273,7 @@ export function validCarLook(look: Partial<CarLookIds> | undefined, level: numbe
   const ok = (list: LookItem[], id: string, dflt: string) => (list.some((i) => i.id === id && i.level <= level) ? id : dflt);
   const n = Math.floor(Number(l.number) || 0);
   return {
+    body: ok(BODIES, l.body, DEFAULT_CAR_LOOK.body),
     paint: ok(PAINTS, l.paint, DEFAULT_CAR_LOOK.paint),
     stripes: ok(STRIPES, l.stripes, DEFAULT_CAR_LOOK.stripes),
     rims: ok(RIMS, l.rims, DEFAULT_CAR_LOOK.rims),
@@ -260,11 +293,12 @@ export function botCarLook(seed: number, level: number): CarLookIds {
   };
   // Bots mostly keep the seat's paint, so their cars stay easy to tell apart.
   const paint = rand() < 0.6 ? "asiento" : pick(PAINTS);
-  return { paint, stripes: pick(STRIPES), rims: pick(RIMS), boost: pick(BOOSTS), neon: pick(NEONS), title: pick(TITLES), number: 0 };
+  return { body: pick(BODIES), paint, stripes: pick(STRIPES), rims: pick(RIMS), boost: pick(BOOSTS), neon: pick(NEONS), title: pick(TITLES), number: 0 };
 }
 
 /** What the 3D car needs from a look (colors resolved; the seat's for "asiento"/"auto"). */
 export interface CarPaint {
+  body: string;
   color: string;
   accent?: string;
   metal: boolean;
@@ -282,6 +316,7 @@ export function carPaint(look: CarLookIds, seatColor: string, seatAccent: string
   // Automatic stripes: the seat's own on its paint, else white or ink by how light the paint is.
   const accent = stripes || (paint?.color ? (lightness(color) > 0.6 ? "#111111" : "#f8fafc") : seatAccent);
   return {
+    body: look.body || DEFAULT_CAR_LOOK.body,
     color,
     accent,
     metal: !!paint?.metal,
@@ -311,7 +346,6 @@ const PASS_FROM = 3;
 
 interface Tracked {
   stats: RaceStats;
-  boost: number;
   air: number;
   place: number;
   wallAt: number;
@@ -329,18 +363,21 @@ export class RaceStatsTracker {
   private of(key: string): Tracked {
     let c = this.cars.get(key);
     if (!c) {
-      c = { stats: { ...EMPTY_RACE }, boost: 0, air: 0, place: 0, wallAt: -9, t: 0 };
+      c = { stats: { ...EMPTY_RACE }, air: 0, place: 0, wallAt: -9, t: 0 };
       this.cars.set(key, c);
     }
     return c;
   }
 
-  step(key: string, car: { boost: number; air: number }, wallHit: number, dt: number) {
+  step(key: string, car: { air: number; pads: number; minis: number; purples: number; tricks: number; drafts: number }, wallHit: number, dt: number) {
     const c = this.of(key);
     c.t += dt;
-    // A pad sets the boost back up (once per pass).
-    if (car.boost > c.boost + 0.1) c.stats.b++;
-    c.boost = car.boost;
+    // The car keeps its own counts from the start (a new car each race).
+    c.stats.b = car.pads;
+    c.stats.m = car.minis;
+    c.stats.mp = car.purples;
+    c.stats.t = car.tricks;
+    c.stats.r = car.drafts;
     if (car.air > 0) c.stats.air += dt;
     else if (c.air >= JUMP_MIN) c.stats.j++;
     c.air = car.air;

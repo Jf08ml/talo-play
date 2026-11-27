@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { openInput, type CarInputWire } from "@/lib/carreras";
-import { ChevronLeft, ChevronRight, Hand, Keyboard, Smartphone, Gamepad2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Hand, Keyboard, Smartphone, Gamepad2, Sparkles } from "lucide-react";
 
 export type ControlMode = "botones" | "inclinacion";
 
@@ -13,9 +13,9 @@ const SEND_MS = 50;
 const FULL_TILT_DEG = 30;
 const DEAD_ZONE = 0.06;
 
-type Zone = "left" | "right" | "brake";
+type Zone = "left" | "right" | "brake" | "drift";
 
-/** Keyboard driving (computers): arrows or A/D to steer, down arrow, S or space to brake. */
+/** Keyboard driving (computers): arrows or A/D to steer, down arrow, S or space to brake, Shift to drift. */
 const KEY_ZONES: Record<string, Zone> = {
   ArrowLeft: "left",
   a: "left",
@@ -27,6 +27,7 @@ const KEY_ZONES: Record<string, Zone> = {
   s: "brake",
   S: "brake",
   " ": "brake",
+  Shift: "drift",
 };
 
 const FINE_POINTER = "(hover: hover) and (pointer: fine)";
@@ -148,13 +149,13 @@ export function useInputSender(roomId: string, clientId: string): (input: CarInp
     timer.current = null;
     const wire = pending.current;
     const last = lastSent.current;
-    if (last && last.wire.s === wire.s && last.wire.b === wire.b) return;
+    if (last && last.wire.s === wire.s && last.wire.b === wire.b && !!last.wire.d === !!wire.d) return;
     lastSent.current = { wire, at: Date.now() };
     sender.current?.send(wire);
   };
 
   return (wire: CarInputWire) => {
-    pending.current = { s: Math.round(wire.s * 20) / 20, b: wire.b };
+    pending.current = { s: Math.round(wire.s * 20) / 20, b: wire.b, d: !!wire.d };
     if (timer.current) return;
     const wait = lastSent.current ? SEND_MS - (Date.now() - lastSent.current.at) : 0;
     if (wait <= 0) flush();
@@ -164,8 +165,8 @@ export function useInputSender(roomId: string, clientId: string): (input: CarInp
 
 /**
  * The phone as a steering wheel. Gas is automatic; the player steers (two
- * big buttons, or tilting the phone) and holds "Frenar" to slow down or
- * reverse. `panel` fills a page (pantalla mode); `overlay` sits on top of the
+ * buttons under the left thumb, or tilting the phone), holds «Derrape» (the
+ * right thumb) to drift and «Frenar» to slow down or reverse. `panel` fills a page (pantalla mode); `overlay` sits on top of the
  * 3D view (telefono mode).
  */
 export default function Controller({
@@ -183,7 +184,7 @@ export default function Controller({
   const [mode, setMode] = useState<ControlMode>(readMode);
   const [tiltError, setTiltError] = useState<string | null>(null);
   const [tiltReady, setTiltReady] = useState(false);
-  const [pressed, setPressed] = useState<Record<Zone, boolean>>({ left: false, right: false, brake: false });
+  const [pressed, setPressed] = useState<Record<Zone, boolean>>({ left: false, right: false, brake: false, drift: false });
   const [tilt, setTilt] = useState(0);
   const tiltRef = useRef(0);
   const pointers = useRef(new Map<number, Zone>());
@@ -200,11 +201,11 @@ export default function Controller({
   // Buttons: every finger is tracked by pointer id, so left + brake works at once; held keys count too.
   const updateFromPointers = () => {
     const zones = new Set([...pointers.current.values(), ...keys.current]);
-    const next = { left: zones.has("left"), right: zones.has("right"), brake: zones.has("brake") };
+    const next = { left: zones.has("left"), right: zones.has("right"), brake: zones.has("brake"), drift: zones.has("drift") };
     setPressed(next);
     const keySteer = (keys.current.has("right") ? 1 : 0) - (keys.current.has("left") ? 1 : 0);
     const steer = mode === "botones" || keySteer ? (next.right ? 1 : 0) - (next.left ? 1 : 0) : tiltRef.current;
-    emit({ s: steer, b: next.brake });
+    emit({ s: steer, b: next.brake, d: next.drift });
   };
 
   const down = (e: ReactPointerEvent<HTMLElement>) => {
@@ -263,7 +264,7 @@ export default function Controller({
       setTilt(steer);
       tiltRef.current = steer;
       // Held arrow keys win over the tilt.
-      if (!keys.current.has("left") && !keys.current.has("right")) emit({ s: steer, b: current.current.b });
+      if (!keys.current.has("left") && !keys.current.has("right")) emit({ s: steer, b: current.current.b, d: current.current.d });
     };
     window.addEventListener("deviceorientation", onTilt);
     return () => window.removeEventListener("deviceorientation", onTilt);
@@ -280,7 +281,7 @@ export default function Controller({
     setMode(next);
     setTilt(0);
     tiltRef.current = 0;
-    emit({ s: 0, b: current.current.b });
+    emit({ s: 0, b: current.current.b, d: current.current.d });
   };
 
   // A tilt mode remembered from last time still needs iOS's permission: ask on the first tap.
@@ -292,6 +293,9 @@ export default function Controller({
       <Keyboard className="h-4 w-4" />
       <span>
         <Key>←</Key> <Key>→</Key> o <Key>A</Key> <Key>D</Key> doblar
+      </span>
+      <span>
+        <Key>Shift</Key> derrapar (en el aire: truco)
       </span>
       <span>
         <Key>↓</Key> o <Key>Espacio</Key> frenar
@@ -331,15 +335,38 @@ export default function Controller({
     </div>
   );
 
-  const brake = (big: boolean) => (
+  const brake = (className = "") => (
     <div
       data-zone="brake"
       onPointerDown={down}
-      className={`${zoneClass(pressed.brake)} flex-col gap-1 border-slate-400/70 text-slate-100 ${big ? "flex-1" : ""}`}
+      className={`${zoneClass(pressed.brake)} flex-col gap-0.5 border-slate-400/70 text-slate-100 ${className}`}
     >
-      <Hand className={big ? "h-10 w-10" : "h-8 w-8"} />
-      <span className="text-xs font-semibold uppercase tracking-wide">Frenar</span>
+      <Hand className="h-6 w-6" />
+      <span className="text-[11px] font-semibold uppercase tracking-wide">Frenar</span>
     </div>
+  );
+
+  // Held while steering: a drift (sparks under the car), let go for the mini-turbo; a tap in the air, a trick.
+  const drift = (className = "") => (
+    <div
+      data-zone="drift"
+      onPointerDown={down}
+      className={`${zoneClass(pressed.drift)} flex-col gap-1 border-amber-300/80 text-amber-100 ${className}`}
+    >
+      <Sparkles className="h-9 w-9" />
+      <span className="text-xs font-bold uppercase tracking-wide">Derrape</span>
+    </div>
+  );
+
+  const steerButtons = (icon: string) => (
+    <>
+      <div data-zone="left" onPointerDown={down} className={`pointer-events-auto flex-1 ${zoneClass(pressed.left)}`} style={{ borderColor: color }}>
+        <ChevronLeft className={icon} style={{ color }} />
+      </div>
+      <div data-zone="right" onPointerDown={down} className={`pointer-events-auto flex-1 ${zoneClass(pressed.right)}`} style={{ borderColor: color }}>
+        <ChevronRight className={icon} style={{ color }} />
+      </div>
+    </>
   );
 
   const tiltTap = (
@@ -378,15 +405,13 @@ export default function Controller({
       >
         {mode === "botones" ? (
           <>
-            <div data-zone="left" onPointerDown={down} className={`pointer-events-auto flex-1 ${zoneClass(pressed.left)}`} style={{ borderColor: color }}>
-              <ChevronLeft className="h-16 w-16" style={{ color }} />
-            </div>
-            <div className="pointer-events-auto flex w-[28%] flex-col gap-2">
+            <div className="flex w-[46%] gap-2">{steerButtons("h-14 w-14")}</div>
+            <div className="pointer-events-auto flex flex-1 flex-col gap-2">
               {modeToggle}
-              {brake(true)}
-            </div>
-            <div data-zone="right" onPointerDown={down} className={`pointer-events-auto flex-1 ${zoneClass(pressed.right)}`} style={{ borderColor: color }}>
-              <ChevronRight className="h-16 w-16" style={{ color }} />
+              <div className="flex flex-1 gap-2">
+                {drift("flex-[1.6]")}
+                {brake("flex-1")}
+              </div>
             </div>
           </>
         ) : (
@@ -396,7 +421,14 @@ export default function Controller({
               {!needsTiltTap && wheel("h-12 w-12")}
             </div>
             {tiltError && <p className="text-xs text-amber-300">{tiltError}</p>}
-            {needsTiltTap ? tiltTap : brake(true)}
+            {needsTiltTap ? (
+              tiltTap
+            ) : (
+              <div className="flex flex-1 gap-2">
+                {brake("flex-1")}
+                {drift("flex-[1.6]")}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -409,13 +441,11 @@ export default function Controller({
       {tiltError && <p className="text-center text-xs text-amber-300">{tiltError}</p>}
 
       {mode === "botones" ? (
-        <div className="grid min-h-56 flex-1 grid-cols-[1fr_0.7fr_1fr] gap-3">
-          <div data-zone="left" onPointerDown={down} className={zoneClass(pressed.left)} style={{ borderColor: color }}>
-            <ChevronLeft className="h-20 w-20" style={{ color }} />
-          </div>
-          {brake(false)}
-          <div data-zone="right" onPointerDown={down} className={zoneClass(pressed.right)} style={{ borderColor: color }}>
-            <ChevronRight className="h-20 w-20" style={{ color }} />
+        <div className="grid min-h-56 flex-1 grid-cols-2 gap-3">
+          <div className="flex gap-2">{steerButtons("h-16 w-16")}</div>
+          <div className="flex flex-col gap-2">
+            {drift("flex-[1.6]")}
+            {brake("flex-1")}
           </div>
         </div>
       ) : needsTiltTap ? (
@@ -424,15 +454,18 @@ export default function Controller({
         <div className="flex min-h-56 flex-1 flex-col gap-3">
           <div className="flex flex-col items-center gap-2 py-2">
             {wheel("h-24 w-24")}
-            <p className="text-xs text-slate-400">Inclínalo como un volante, con la pantalla hacia tú.</p>
+            <p className="text-xs text-slate-400">Inclínalo como un volante, con la pantalla hacia ti.</p>
           </div>
-          {brake(true)}
+          <div className="flex flex-1 gap-3">
+            {brake("flex-1")}
+            {drift("flex-[1.6]")}
+          </div>
         </div>
       )}
 
       {fine && <div className="rounded-xl bg-slate-900/80 p-2 ring-1 ring-slate-700">{keysHint}</div>}
       <p className="text-center text-xs text-slate-500">
-        {locked ? "Prepárate: el auto acelera solo cuando largan." : "El auto acelera solo. Frena para doblar cerrado o ir marcha atrás."}
+        {locked ? "Prepárate: el auto acelera solo cuando largan." : "El auto acelera solo. Mantén «Derrape» mientras doblas y suéltalo para el mini-turbo; tócalo en el aire para un truco."}
       </p>
     </div>
   );

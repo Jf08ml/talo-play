@@ -107,7 +107,9 @@ export function useRaceReward(roomId: string, state: CarrerasState | null, myId:
     const times = Object.values(state.results).filter((ms): ms is number => typeof ms === "number");
     const myTime = state.results[seat];
     const place = 1 + (myTime === undefined ? times.length : times.filter((ms) => ms < myTime).length);
-    const raceStats: RaceStats = mine ? { b: mine.b ?? 0, j: mine.j ?? 0, air: mine.air ?? 0, w: mine.w ?? 0, p: mine.p ?? 0, l: mine.l ?? 0 } : EMPTY_RACE;
+    const raceStats: RaceStats = mine
+      ? { b: mine.b ?? 0, j: mine.j ?? 0, air: mine.air ?? 0, w: mine.w ?? 0, p: mine.p ?? 0, l: mine.l ?? 0, m: mine.m ?? 0, mp: mine.mp ?? 0, t: mine.t ?? 0, r: mine.r ?? 0 }
+      : EMPTY_RACE;
     const { next, gained, completed, levelsUp } = applyRace(loadCarProgress(), {
       played: true,
       place,
@@ -152,6 +154,7 @@ export function RaceRewardCard({ reward }: { reward: RaceReward }) {
       ))}
       <p className="mt-2 text-xs text-slate-400">
         {s.p} {s.p === 1 ? "adelantamiento" : "adelantamientos"} · {s.j} {s.j === 1 ? "salto" : "saltos"} · {s.b} {s.b === 1 ? "turbo" : "turbos"} ·{" "}
+        {s.m ?? 0} {(s.m ?? 0) === 1 ? "mini-turbo" : "mini-turbos"} · {s.t ?? 0} {(s.t ?? 0) === 1 ? "truco" : "trucos"} ·{" "}
         {s.w === 0 ? "sin choques" : `${s.w} ${s.w === 1 ? "choque" : "choques"}`}
       </p>
     </div>

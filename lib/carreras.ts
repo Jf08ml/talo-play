@@ -102,6 +102,8 @@ export interface CarrerasState {
 export interface CarInputWire {
   s: number;
   b: boolean;
+  /** The drift button held (absent on older phones). */
+  d?: boolean;
 }
 
 export interface LiveCar {
@@ -130,6 +132,9 @@ export interface CarPose {
   p: number;
   /** Server time of the sample. */
   t: number;
+  /** Drifting (side × (1 + mini-turbo charged)) and a trick spin's progress (0…1); absent when not. */
+  d?: number;
+  k?: number;
 }
 
 export function isCarrerasGame(game: unknown): game is CarrerasGame {

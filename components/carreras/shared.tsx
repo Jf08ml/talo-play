@@ -17,6 +17,7 @@ import {
   type Seat,
 } from "@/lib/carreras";
 import type { CameraMode, CarLook } from "@/lib/carreras3d";
+import { TRICK_SECONDS, driftTier, type Car } from "@/lib/carrerasTrack";
 import { DEFAULT_CAR_LOOK, botCarLook, carPaint, validCarLook } from "@/lib/carrerasProgress";
 import type { PresenceMap } from "@/lib/presence";
 import { serverNow } from "@/lib/serverTime";
@@ -40,6 +41,14 @@ export function driverName(state: CarrerasState, seat: Seat, myId = ""): string 
   return state.players[id]?.name ?? CARS[seat].label;
 }
 
+/** What the scene shows of a car's drift (side × (1 + mini-turbo)) and trick spin (0…1). */
+export function stuntOf(car: Car): { drift: number; spin: number } {
+  return {
+    drift: car.drift ? car.drift * (1 + driftTier(car)) : 0,
+    spin: car.trick > 0 ? 1 - car.trick / TRICK_SECONDS : 0,
+  };
+}
+
 /** A bot's level for its looks, by how well it drives. */
 const BOT_LOOK_LEVEL = { facil: 3, normal: 8, dificil: 14 } as const;
 
@@ -60,6 +69,7 @@ export function seatCarLook(state: CarrerasState, seat: Seat, label = driverName
       : DEFAULT_CAR_LOOK;
   const p = carPaint(ids, CARS[seat].color, CARS[seat].accent, index + 1);
   return {
+    body: p.body,
     color: p.color,
     accent: p.accent,
     number: p.number,

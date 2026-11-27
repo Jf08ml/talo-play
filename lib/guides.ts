@@ -830,13 +830,21 @@ export const GUIDES: Record<GameId, Guide> = {
         ],
       },
       {
+        title: "Derrapes, trucos y rebufo",
+        text: [
+          "Derrape: mantén el botón «Derrape» (Shift en la computadora) mientras doblas. Saltan chispas azules, después naranjas y al final moradas; suéltalo y sales con un mini-turbo, más largo cuanto más cargaste. Si frenas o chocas, se pierde.",
+          "Truco: en el aire, toca «Derrape» una vez y el auto da una vuelta. Si aterrizas después de completarla, ganas un turbo; si todavía estás girando, pierdes velocidad.",
+          "Rebufo: ve pegado detrás de otro auto a toda velocidad y, al rato, te da un empujón.",
+        ],
+      },
+      {
         title: "Bots",
         text: [
           "Si la sala tiene bots, los autos que nadie eligió los maneja la computadora. Se elige cuántos (hasta 3) y cómo manejan: fácil, normal o difícil.",
         ],
       },
     ],
-    tips: ["Frena un poco antes de las curvas cerradas: sales más rápido."],
+    tips: ["Frena un poco antes de las curvas cerradas: sales más rápido.", "En las curvas largas, derrapa: el mini-turbo morado es el más fuerte."],
   },
   carreras3d: {
     goal: "Completar las vueltas antes que los demás pilotos.",
@@ -856,6 +864,14 @@ export const GUIDES: Record<GameId, Guide> = {
         ],
       },
       {
+        title: "Derrapes, trucos y rebufo",
+        text: [
+          "Derrape: mantén el botón «Derrape» (Shift en la computadora) mientras doblas. Saltan chispas azules, después naranjas y al final moradas; suéltalo y sales con un mini-turbo, más largo cuanto más cargaste. Si frenas o chocas, se pierde.",
+          "Truco: en el aire, toca «Derrape» una vez y el auto da una vuelta. Si aterrizas después de completarla, ganas un turbo; si todavía estás girando, pierdes velocidad.",
+          "Rebufo: ve pegado detrás de otro auto a toda velocidad y, al rato, te da un empujón.",
+        ],
+      },
+      {
         title: "Pistas",
         text: [
           "Hay pistas cortas para empezar y tres largas, solo en 3D: Gran Premio (un ocho con puente), Cañón (subidas y saltos en el desierto) y Nocturna (una ciudad de noche con autopista). También hay pistas armadas al azar.",
@@ -871,6 +887,8 @@ export const GUIDES: Record<GameId, Guide> = {
       },
     ],
     tips: [
+      "En las curvas largas, derrapa: el mini-turbo morado es el más fuerte.",
+      "Al saltar de una rampa, toca «Derrape» en el aire: un truco bien aterrizado es turbo gratis.",
       "Si el juego va lento, baja la calidad gráfica desde el botón de la pantalla.",
       "Pasa por las flechas naranjas del piso: el turbo te da una buena ventaja en las rectas largas.",
     ],

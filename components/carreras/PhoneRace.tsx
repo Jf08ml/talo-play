@@ -33,6 +33,9 @@ import {
   lapsDone,
   newBrain,
   stepCar,
+  slipstream,
+  driftTier,
+  TRICK_SECONDS,
   wrongWay,
   type BotBrain,
   type Car,
@@ -45,7 +48,7 @@ import { formatRaceTime } from "@/lib/format";
 import { useServerNow } from "@/hooks/useServerNow";
 import { TaloMark } from "@/components/TaloLogo";
 import Controller, { useWakeLock } from "./Controller";
-import { Standings, seatCarLook, useCameraMode, useSoundSetting } from "./shared";
+import { Standings, seatCarLook, stuntOf, useCameraMode, useSoundSetting } from "./shared";
 import { RaceStatsTracker } from "@/lib/carrerasProgress";
 import { RaceRewardCard, type RaceReward } from "./RaceProgress";
 import { Eye, RotateCw, Volume2, VolumeX } from "lucide-react";
@@ -69,6 +72,9 @@ interface Ghost {
   vx: number;
   vy: number;
   p: number;
+  /** Drift and trick, as its pose said. */
+  d: number;
+  k: number;
 }
 
 interface Hud {
@@ -106,6 +112,8 @@ function poseOf(car: Car, game: number, now: number): CarPose {
     vy: Math.round(car.vy),
     p: Math.round(car.progress),
     t: Math.round(now),
+    ...(car.drift ? { d: car.drift * (1 + driftTier(car)) } : {}),
+    ...(car.trick > 0 ? { k: Math.round((1 - car.trick / TRICK_SECONDS) * 100) / 100 } : {}),
   };
 }
 
@@ -225,6 +233,9 @@ export default function PhoneRace({
     // What my car did this race (for my progress), and the race its stats were written for.
     let stats = new RaceStatsTracker();
     let statsGame = -1;
+    // My stunts seen so far (for their word on screen; -1 = a new car, nothing to announce yet).
+    let stuntSeen = -1;
+    let stunts = { m: 0, p: 0, t: 0 };
     let lastPose = 0;
     let lastBotPose = 0;
     let lastHud = "";
@@ -254,6 +265,7 @@ export default function PhoneRace({
         ownGame = s.gameNo;
         acc = 0;
         stats = new RaceStatsTracker();
+        stuntSeen = -1;
       }
       if (!isDriver) own = null;
 
@@ -289,7 +301,7 @@ export default function PhoneRace({
               ? { steer: 0, brake: false, gas: false }
               : auto
                 ? botInput(own, track, autoBrain, STEP)
-                : { steer: inputRef.current.s, brake: inputRef.current.b };
+                : { steer: inputRef.current.s, brake: inputRef.current.b, drift: !!inputRef.current.d };
             const hit = stepCar(own, input, track, STEP);
             if (cues.hit("wall", hit)) scene.impact(seat!, hit);
             if (!done) stats.step("own", own, hit, STEP);
@@ -324,12 +336,33 @@ export default function PhoneRace({
             }
           }
         }
+        if (own && !(s.status === "finished" || s.results[seat!] !== undefined)) {
+          slipstream(own, [...ghosts.values(), ...(runBots ? runBots.cars.values() : [])], dt);
+        }
+        if (runBots) {
+          for (const [r, car] of runBots.cars) {
+            const others: { x: number; y: number; z: number }[] = [...ghosts.values()];
+            for (const [o, c] of runBots.cars) if (o !== r) others.push(c);
+            if (own) others.push(own);
+            slipstream(car, others, dt);
+          }
+        }
       } else {
         acc = 0;
       }
+      // My stunts: a word on screen when one fires.
+      if (own) {
+        const done = own.minis + own.tricks + own.drafts;
+        if (done !== stuntSeen) {
+          const text = own.minis > stunts.m ? (own.purples > stunts.p ? "¡Mini-turbo morado!" : "¡Mini-turbo!") : own.tricks > stunts.t ? "¡Truco!" : "¡Rebufo!";
+          if (stuntSeen >= 0) setFlash({ text, sub: "", best: false, key: now });
+          stuntSeen = done;
+          stunts = { m: own.minis, p: own.purples, t: own.tricks };
+        }
+      }
       if (own) {
         cues.air("own", own.air);
-        cues.boost("own", own.boost);
+        cues.stunt("own", own, dt);
       }
       if (own && s.status === "racing" && moving) {
         const done = lapsDone(own, track);
@@ -393,10 +426,12 @@ export default function PhoneRace({
             vx: pose.vx,
             vy: pose.vy,
             p: pose.p,
+            d: pose.d ?? 0,
+            k: pose.k ?? 0,
           };
         } else {
           const g = gridCar(track, SEATS.indexOf(r));
-          target = { x: g.x, y: g.y, z: g.z, l: 0, h: g.heading, vx: 0, vy: 0, p: g.progress };
+          target = { x: g.x, y: g.y, z: g.z, l: 0, h: g.heading, vx: 0, vy: 0, p: g.progress, d: 0, k: 0 };
         }
         const cur = ghosts.get(r);
         if (!cur || Math.hypot(cur.x - target.x, cur.y - target.y) > 150) ghosts.set(r, target);
@@ -409,17 +444,19 @@ export default function PhoneRace({
           cur.vx = target.vx;
           cur.vy = target.vy;
           cur.p = target.p;
+          cur.d = target.d;
+          cur.k = target.k;
         }
       }
       for (const r of [...ghosts.keys()]) if (!racers.includes(r) || (r === seat && own) || runBots?.cars.has(r)) ghosts.delete(r);
 
       // Every car as plain numbers, wherever it's simulated.
       const carOf = (r: Seat) => {
-        if (r === seat && own) return { x: own.x, y: own.y, z: own.z, ground: own.ground, h: own.heading, vx: own.vx, vy: own.vy, p: own.progress, bump: own.bump };
+        if (r === seat && own) return { x: own.x, y: own.y, z: own.z, ground: own.ground, h: own.heading, vx: own.vx, vy: own.vy, p: own.progress, bump: own.bump, ...stuntOf(own) };
         const b = runBots?.cars.get(r);
-        if (b) return { x: b.x, y: b.y, z: b.z, ground: b.ground, h: b.heading, vx: b.vx, vy: b.vy, p: b.progress, bump: b.bump };
+        if (b) return { x: b.x, y: b.y, z: b.z, ground: b.ground, h: b.heading, vx: b.vx, vy: b.vy, p: b.progress, bump: b.bump, ...stuntOf(b) };
         const g = ghosts.get(r);
-        return g ? { x: g.x, y: g.y, z: g.z, ground: g.z - g.l, h: g.h, vx: g.vx, vy: g.vy, p: g.p, bump: 0 } : null;
+        return g ? { x: g.x, y: g.y, z: g.z, ground: g.z - g.l, h: g.h, vx: g.vx, vy: g.vy, p: g.p, bump: 0, drift: g.d, spin: g.k } : null;
       };
 
       // Places: finishers by time, then by distance driven.
@@ -436,7 +473,7 @@ export default function PhoneRace({
       for (const r of racers) {
         const c = carOf(r);
         if (!c) continue;
-        scene.setPose(r, { x: c.x, y: c.y, z: c.z, ground: c.ground, heading: c.h, vx: c.vx, vy: c.vy, bump: c.bump });
+        scene.setPose(r, { x: c.x, y: c.y, z: c.z, ground: c.ground, heading: c.h, vx: c.vx, vy: c.vy, bump: c.bump, drift: c.drift, spin: c.spin });
         dots.push({ x: c.x, y: c.y, heading: c.h, color: CARS[r].color });
       }
 
