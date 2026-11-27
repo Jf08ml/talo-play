@@ -754,6 +754,8 @@ export class ArenaScene {
       this.placeTag(tag);
       parts.root.add(tag);
       parts.root.userData.shadows = this.shadows;
+      // On quality «alta» the run trail glows (bloom only takes colors over 1).
+      if (this.shadows) parts.trailColor?.multiplyScalar(1.7);
       if (this.shadows) {
         parts.root.traverse((o) => ((o as THREE.Mesh).castShadow = (o as THREE.Mesh).isMesh && o !== tag));
         // Real shadows replace the soft blob under the feet.
@@ -1145,12 +1147,26 @@ export class ArenaScene {
       // Sand kicked up: footsteps when running, a puff on dodges and landings.
       if (p.alive && lift < 0.05) {
         if (k.trailColor !== null && p.speed > 3) {
-          k.trailAcc += dt * (p.running ? 14 : 8);
+          // A stream of sparks behind it, along the whole body, drifting back and falling.
+          k.trailAcc += dt * (p.running ? 42 : 26);
+          const bx = Math.sin(p.yaw);
+          const bz = Math.cos(p.yaw);
           while (k.trailAcc >= 1) {
             k.trailAcc -= 1;
-            const backX = Math.sin(p.yaw) * 0.42;
-            const backZ = Math.cos(p.yaw) * 0.42;
-            this.sparks.spawn(p.x + backX, gy + 0.38 + this.rand() * 0.28, p.z + backZ, (this.rand() - 0.5) * 0.7, 0.45 + this.rand() * 0.6, (this.rand() - 0.5) * 0.7, k.trailColor, 0.06 + this.rand() * 0.035, 0.22 + this.rand() * 0.14, 0.8);
+            const back = 0.3 + this.rand() * 0.3;
+            const side = (this.rand() - 0.5) * 0.5;
+            this.sparks.spawn(
+              p.x + bx * back + bz * side,
+              gy + 0.25 + this.rand() * 1.05,
+              p.z + bz * back - bx * side,
+              bx * 0.9 + (this.rand() - 0.5) * 0.6,
+              0.8 + this.rand() * 1.0,
+              bz * 0.9 + (this.rand() - 0.5) * 0.6,
+              k.trailColor,
+              0.09 + this.rand() * 0.06,
+              0.4 + this.rand() * 0.25,
+              0.95
+            );
           }
         }
         if (p.act === "dodge" && k.lastAct !== "dodge") this.dustRing(p.x, p.z, 14, 1.8, 0.5, gy);

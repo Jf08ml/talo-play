@@ -14,7 +14,7 @@ const EMBLEM_COLORS: Record<string, number> = { ninguno: 0xf8fafc, cruz: 0xf5f0d
 /** Preview of the exported, rigged Talo knight GLB. */
 export default function KnightPreview3D({ look, team, className = "" }: { look: KnightLook; team: TeamId; className?: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
-  const { armor, cape, emblem, helm, plume } = look;
+  const { armor, cape, emblem, helm, plume, trail } = look;
 
   useEffect(() => {
     const host = hostRef.current;
@@ -52,6 +52,33 @@ export default function KnightPreview3D({ look, team, className = "" }: { look: 
     ring.rotation.x = Math.PI / 2;
     ring.position.y = 0.025;
     scene.add(ring);
+
+    // The run trail: standing here, its sparks spiral up around the feet.
+    const SPARKS = 56;
+    let sparks: THREE.Points | null = null;
+    const sparkColor = new THREE.Color(trail || 0xffffff);
+    if (trail) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(SPARKS * 3), 3));
+      geo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(SPARKS * 3), 3));
+      const dot = document.createElement("canvas");
+      dot.width = dot.height = 32;
+      const ctx = dot.getContext("2d");
+      if (ctx) {
+        const g = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+        g.addColorStop(0, "rgba(255,255,255,1)");
+        g.addColorStop(0.4, "rgba(255,255,255,0.7)");
+        g.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, 32, 32);
+      }
+      const map = new THREE.CanvasTexture(dot);
+      sparks = new THREE.Points(
+        geo,
+        new THREE.PointsMaterial({ size: 0.24, map, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })
+      );
+      scene.add(sparks);
+    }
 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -151,6 +178,21 @@ export default function KnightPreview3D({ look, team, className = "" }: { look: 
       // Blinks and looks around a little.
       if (eyes) updateEyes(eyes, { ko: false, open: 1, lookX: Math.sin(t * 0.45) * 0.6, lookY: Math.sin(t * 0.3) * 0.25 }, dt, t);
       pivot.position.y = model && !failed ? 0.012 * Math.sin(t * 1.8) : 0;
+      if (sparks && model) {
+        const pos = sparks.geometry.getAttribute("position") as THREE.BufferAttribute;
+        const col = sparks.geometry.getAttribute("color") as THREE.BufferAttribute;
+        for (let i = 0; i < SPARKS; i++) {
+          // Each spark rises once around the knight, fading in and out (additive: darker = fainter).
+          const life = (t * 0.5 + i / SPARKS) % 1;
+          const angle = i * 2.39996 + t * 1.3;
+          const r = 0.42 + 0.14 * Math.sin(i * 1.7) - life * 0.12;
+          pos.setXYZ(i, Math.cos(angle) * r, 0.08 + life * 1.5, Math.sin(angle) * r);
+          const fade = Math.sin(life * Math.PI);
+          col.setXYZ(i, sparkColor.r * fade, sparkColor.g * fade, sparkColor.b * fade);
+        }
+        pos.needsUpdate = true;
+        col.needsUpdate = true;
+      }
       renderer.render(scene, camera);
       frame = requestAnimationFrame(draw);
     };
@@ -170,9 +212,15 @@ export default function KnightPreview3D({ look, team, className = "" }: { look: 
       (base.material as THREE.Material).dispose();
       ring.geometry.dispose();
       (ring.material as THREE.Material).dispose();
+      if (sparks) {
+        sparks.geometry.dispose();
+        const mat = sparks.material as THREE.PointsMaterial;
+        mat.map?.dispose();
+        mat.dispose();
+      }
       renderer.dispose();
     };
-  }, [armor, cape, emblem, helm, plume, team]);
+  }, [armor, cape, emblem, helm, plume, team, trail]);
 
   return (
     <div ref={hostRef} className={`relative overflow-hidden rounded-2xl bg-gradient-to-b from-slate-800 to-slate-950 ${className}`}>
