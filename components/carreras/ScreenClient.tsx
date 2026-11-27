@@ -50,6 +50,7 @@ import { drawMinimap, drawTopView, type DrawCar } from "@/lib/carrerasDraw";
 import { subscribePresence, type PresenceMap } from "@/lib/presence";
 import { serverNow } from "@/lib/serverTime";
 import { roomPath } from "@/lib/games";
+import RoomQR from "@/components/RoomQR";
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { useServerNow } from "@/hooks/useServerNow";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
@@ -419,11 +420,15 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
           )}
 
           <div className="pointer-events-none relative z-10 flex items-start justify-between gap-3 p-3">
-            <div className="pointer-events-auto flex items-center gap-2 rounded-xl bg-slate-950/70 px-3 py-2 backdrop-blur">
-              <Link href="/" aria-label="Volver a Talo">
-                <TaloMark className="h-6 w-6" />
-              </Link>
-              <span className="font-mono text-lg font-bold tracking-widest text-cyan-200">{roomId}</span>
+            <div className="flex flex-col items-start gap-2">
+              <div className="pointer-events-auto flex items-center gap-2 rounded-xl bg-slate-950/70 px-3 py-2 backdrop-blur">
+                <Link href="/" aria-label="Volver a Talo">
+                  <TaloMark className="h-6 w-6" />
+                </Link>
+                <span className="font-mono text-lg font-bold tracking-widest text-cyan-200">{roomId}</span>
+              </div>
+              {/* For whoever arrives mid-race: scan and they're in for the next one. */}
+              {state.status !== "waiting" && <RoomQR game={meta.game} roomId={roomId} className="h-24 w-24" />}
             </div>
             {!is3d && state.status !== "waiting" && (
               <div className="flex flex-wrap justify-center gap-2">
@@ -623,16 +628,20 @@ function JoinCard({
         <Smartphone className="h-7 w-7 text-cyan-300" />
         <p className="text-xl">Entra desde tu teléfono</p>
       </div>
-      <div>
-        <p className="break-all font-mono text-sm text-slate-300 sm:text-2xl">
-          {host}
-          {roomPath(meta.game, "")}
-          <span className="text-cyan-200">{roomId}</span>
-        </p>
-        <p className="mt-2 font-mono text-5xl font-bold tracking-[0.15em] sm:text-8xl sm:tracking-[0.2em] text-cyan-200 drop-shadow-[0_0_20px_rgba(34,211,238,0.4)]">
-          {roomId}
-        </p>
-        <p className="mt-1 text-sm text-slate-500">o en la página de Talo: «¿Te invitaron?» y este código</p>
+      <div className="flex w-full flex-col items-center gap-6 sm:flex-row sm:justify-center">
+        <RoomQR game={meta.game} roomId={roomId} className="h-44 w-44 shrink-0 sm:h-52 sm:w-52" />
+        <div className="min-w-0 sm:text-left">
+          <p className="text-lg text-slate-200">Escanéalo con la cámara del celular, o escribe:</p>
+          <p className="mt-2 break-all font-mono text-sm text-slate-300 sm:text-xl">
+            {host}
+            {roomPath(meta.game, "")}
+            <span className="text-cyan-200">{roomId}</span>
+          </p>
+          <p className="mt-2 font-mono text-5xl font-bold tracking-[0.15em] sm:text-7xl sm:tracking-[0.2em] text-cyan-200 drop-shadow-[0_0_20px_rgba(34,211,238,0.4)]">
+            {roomId}
+          </p>
+          <p className="mt-1 text-sm text-slate-500">o en la página de Talo: «¿Te invitaron?» y este código</p>
+        </div>
       </div>
 
       <div className="grid w-full grid-cols-2 gap-3">

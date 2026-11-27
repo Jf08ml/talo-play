@@ -43,6 +43,7 @@ import { mulberry32 } from "@/lib/random";
 import { subscribePresence, type PresenceMap } from "@/lib/presence";
 import { serverNow } from "@/lib/serverTime";
 import { roomPath } from "@/lib/games";
+import RoomQR from "@/components/RoomQR";
 import { backToWaiting, watchRoomMeta } from "@/lib/roomSettings";
 import { installUnlock, isMuted, playSound, setMuted, subscribeMuted } from "@/lib/sfx";
 import { useServerNow } from "@/hooks/useServerNow";
@@ -403,13 +404,17 @@ export default function EmpujonesScreen({ roomId }: { roomId: string }) {
         <>
           {/* Over everything else (the join card and the results take the whole height). */}
           <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 p-4">
-            <div className="pointer-events-auto flex items-center gap-1 rounded-xl bg-black/60 p-1">
-              <Link href="/" className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-bold text-white hover:bg-white/10">
-                <ArrowLeft className="h-4 w-4" />
-                <TaloMark className="h-6 w-6" />
-                Inicio
-              </Link>
-              <span className="px-2 font-code text-lg font-bold tracking-widest text-talo-hero">{roomId}</span>
+            <div className="flex flex-col items-start gap-2">
+              <div className="pointer-events-auto flex items-center gap-1 rounded-xl bg-black/60 p-1">
+                <Link href="/" className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-bold text-white hover:bg-white/10">
+                  <ArrowLeft className="h-4 w-4" />
+                  <TaloMark className="h-6 w-6" />
+                  Inicio
+                </Link>
+                <span className="px-2 font-code text-lg font-bold tracking-widest text-talo-hero">{roomId}</span>
+              </div>
+              {/* For whoever arrives mid-match. */}
+              {state.status !== "waiting" && <RoomQR game="empujones" roomId={roomId} className="h-24 w-24" />}
             </div>
             {state.status !== "waiting" && <Scoreboard state={state} presence={presence} alive={playing ? alive : null} />}
             <div className="flex gap-2">
@@ -556,7 +561,12 @@ function JoinCard({ roomId, meta, state, presence }: { roomId: string; meta: Emp
           <Smartphone className="h-7 w-7 text-talo-hero" />
           <p className="text-xl font-bold">Entra desde tu celular</p>
         </div>
+        <div className="flex items-center gap-5">
+          <RoomQR game="empujones" roomId={roomId} className="h-40 w-40 shrink-0 sm:h-48 sm:w-48" />
+          <p className="text-lg text-white/80">Escanéalo con la cámara del celular y entras directo a la sala.</p>
+        </div>
         <div>
+          <p className="mb-1 text-sm text-white/50">O escribe esta dirección:</p>
           <p className="break-all font-code text-base text-white/60 sm:text-xl">
             {host}
             {roomPath("empujones", "")}

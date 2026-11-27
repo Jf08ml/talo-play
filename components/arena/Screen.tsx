@@ -18,6 +18,7 @@ import { PRIMARY_BUTTON } from "@/components/ui";
 import { useWakeLock } from "@/components/carreras/Controller";
 import Battle from "./Battle";
 import { settingsSummary } from "./RoomClient";
+import RoomQR from "@/components/RoomQR";
 
 type Status = "loading" | "not-found" | "ready" | "error";
 
@@ -117,6 +118,11 @@ function Waiting({ roomId, meta, state, presence }: { roomId: string; meta: Aren
             <Smartphone className="h-8 w-8 text-talo-hero" />
             <p className="text-2xl font-bold">Entra desde tu celular</p>
           </div>
+          <div className="flex items-center gap-5">
+            <RoomQR game="arena" roomId={roomId} className="h-48 w-48 shrink-0 sm:h-56 sm:w-56" />
+            <p className="text-xl text-white/80">Escanéalo con la cámara del celular y entras directo a la sala.</p>
+          </div>
+          <p className="text-base text-white/50">O escribe esta dirección:</p>
           <p className="break-all font-code text-xl text-white/60">
             {host}
             {roomPath("arena", "")}
