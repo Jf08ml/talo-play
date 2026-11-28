@@ -5,6 +5,42 @@ import { openInput, type CarInputWire } from "@/lib/carreras";
 import { ChevronLeft, ChevronRight, ChevronsUp, Gauge, Hand, Keyboard, Smartphone, Gamepad2, Sparkles } from "lucide-react";
 import { ITEMS, isItem, type ItemId } from "@/lib/carrerasItems";
 import { ITEM_ICONS } from "./ItemCard";
+import { AdjustButton, PadSurface, usePadSettings } from "@/components/PadKit";
+import { padDefaults, type PadControl } from "@/lib/padLayout";
+
+type PadId = "izquierda" | "derecha" | "derrape" | "frenar" | "acelerar" | "poder";
+const CONTROLS: Record<PadId, PadControl> = {
+  izquierda: { label: "Doblar a la izquierda", size: 140, wide: 0.42 },
+  derecha: { label: "Doblar a la derecha", size: 140, wide: 0.42 },
+  derrape: { label: "Derrape", size: 100, wide: 1.2 },
+  frenar: { label: "Frenar", size: 66, wide: 1.05 },
+  acelerar: { label: "Acelerar", size: 66, wide: 1.05 },
+  poder: { label: "Poder", size: 62, wide: 1.6 },
+};
+/** Over the race the strip is low: wider steering buttons. */
+const OVERLAY_CONTROLS: Record<PadId, PadControl> = {
+  ...CONTROLS,
+  izquierda: { ...CONTROLS.izquierda, wide: 0.85 },
+  derecha: { ...CONTROLS.derecha, wide: 0.85 },
+};
+/** The phone as a pad next to a big screen: a page to fill (steering on the left, the rest in a column on the right). */
+const PANEL = padDefaults<PadId>({
+  izquierda: { x: 0.145, y: 0.5, s: 1.7 },
+  derecha: { x: 0.425, y: 0.5, s: 1.7 },
+  poder: { x: 0.78, y: 0.12, s: 1.4 },
+  derrape: { x: 0.78, y: 0.38, s: 1.25 },
+  frenar: { x: 0.78, y: 0.64, s: 1.4 },
+  acelerar: { x: 0.78, y: 0.86, s: 1.4 },
+});
+/** Over the race on the phone itself: a wide, low strip, everything in a row. */
+const OVERLAY = padDefaults<PadId>({
+  izquierda: { x: 0.08, y: 0.5, s: 0.88 },
+  derecha: { x: 0.225, y: 0.5, s: 0.88 },
+  poder: { x: 0.46, y: 0.5, s: 1 },
+  acelerar: { x: 0.6, y: 0.5, s: 1.1 },
+  frenar: { x: 0.74, y: 0.5, s: 1.1 },
+  derrape: { x: 0.9, y: 0.5, s: 1 },
+});
 
 export type ControlMode = "botones" | "inclinacion";
 
@@ -82,7 +118,7 @@ function screenAngle(): number {
  * Steering from the phone's tilt: how much gravity points along the screen's
  * left-right axis. Works the same held flat or upright, portrait or landscape.
  */
-function tiltSteer(e: DeviceOrientationEvent): number | null {
+function tiltSteer(e: DeviceOrientationEvent, sens = 1): number | null {
   if (e.beta === null || e.gamma === null) return null;
   const rad = Math.PI / 180;
   const b = e.beta * rad;
@@ -90,7 +126,7 @@ function tiltSteer(e: DeviceOrientationEvent): number | null {
   const a = screenAngle() * rad;
   // Gravity in device coordinates is (cosβ·sinγ, −sinβ, ·); the screen's x axis is (cos a, −sin a).
   const raw = Math.cos(b) * Math.sin(g) * Math.cos(a) + Math.sin(b) * Math.sin(a);
-  const steer = raw / Math.sin(FULL_TILT_DEG * rad);
+  const steer = raw / Math.sin((FULL_TILT_DEG / Math.max(0.3, sens)) * rad);
   if (Math.abs(steer) < DEAD_ZONE) return 0;
   return Math.max(-1, Math.min(1, steer));
 }
@@ -228,6 +264,9 @@ export default function Controller({
   // «Poder» presses so far (sent as a counter, so a quick tap is never lost between two sends).
   const presses = useRef(0);
   const [itemDown, setItemDown] = useState(false);
+  const overlay = variant === "overlay";
+  const [settings, setSettings] = usePadSettings(overlay ? "carreras.controles.celular" : "carreras.controles.pantalla", overlay ? OVERLAY : PANEL);
+  const [editing, setEditing] = useState(false);
 
   const emit = (wire: CarInputWire) => {
     current.current = { ...wire, i: presses.current, m: manual, g: manual && !!wire.g };
@@ -304,7 +343,7 @@ export default function Controller({
   useEffect(() => {
     if (mode !== "inclinacion") return;
     const onTilt = (e: DeviceOrientationEvent) => {
-      const steer = tiltSteer(e);
+      const steer = tiltSteer(e, settings.sens);
       if (steer === null) return;
       setTilt(steer);
       tiltRef.current = steer;
@@ -345,7 +384,6 @@ export default function Controller({
 
   // A tilt mode remembered from last time still needs iOS's permission: ask on the first tap.
   const needsTiltTap = mode === "inclinacion" && !tiltReady && tiltNeedsPermission();
-  const overlay = variant === "overlay";
 
   const keysHint = (
     <p className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-slate-200">
@@ -393,7 +431,7 @@ export default function Controller({
     <button
       type="button"
       onClick={() => switchGas(manual ? "auto" : "manual")}
-      className={`pointer-events-auto flex items-center justify-center gap-1.5 rounded-xl font-medium ring-1 ${overlay ? "bg-slate-950/60 px-2 py-1 text-xs ring-white/15" : "bg-slate-900/80 py-2 text-sm ring-slate-700"} text-slate-200`}
+      className={`pointer-events-auto flex items-center justify-center gap-1.5 rounded-xl font-medium ring-1 ${overlay ? "bg-slate-950/60 px-2 py-1 text-xs ring-white/15" : "w-full bg-slate-900/80 py-2 text-sm ring-slate-700"} text-slate-200`}
       aria-label={`Acelerador ${manual ? "manual" : "automático"}: tocar para cambiar`}
     >
       <Gauge className="h-4 w-4" /> Acelerador: <b className={manual ? "text-lime-300" : "text-sky-300"}>{manual ? "Manual" : "Automático"}</b>
@@ -401,7 +439,7 @@ export default function Controller({
   );
 
   const zoneClass = (on: boolean) =>
-    `flex select-none items-center justify-center rounded-3xl border-2 transition-transform ${
+    `flex h-full w-full select-none items-center justify-center rounded-3xl border-2 transition-transform ${
       on ? "scale-[0.97] bg-white/25" : overlay ? "bg-white/10 backdrop-blur-[2px]" : "bg-white/5"
     }`;
 
@@ -415,78 +453,63 @@ export default function Controller({
     </div>
   );
 
-  const brake = (className = "") => (
-    <div
-      data-zone="brake"
-      onPointerDown={down}
-      className={`${zoneClass(pressed.brake)} flex-col gap-0.5 border-slate-400/70 text-slate-100 ${className}`}
-    >
-      <Hand className="h-6 w-6" />
-      <span className="text-[11px] font-semibold uppercase tracking-wide">Frenar</span>
-    </div>
-  );
-
-  // Manual throttle: held to go.
-  const gas = (className = "") =>
-    manual ? (
-      <div data-zone="gas" onPointerDown={down} className={`${zoneClass(pressed.gas)} flex-col gap-1 border-lime-400/80 text-lime-100 ${className}`}>
-        <ChevronsUp className="h-9 w-9" />
-        <span className="text-xs font-bold uppercase tracking-wide">Acelerar</span>
-      </div>
-    ) : null;
-
-  // Held while steering: a drift (sparks under the car), let go for the mini-turbo; a tap in the air, a trick.
-  const drift = (className = "") => (
-    <div
-      data-zone="drift"
-      onPointerDown={down}
-      className={`${zoneClass(pressed.drift)} flex-col gap-1 border-amber-300/80 text-amber-100 ${className}`}
-    >
-      <Sparkles className="h-9 w-9" />
-      <span className="text-xs font-bold uppercase tracking-wide">Derrape</span>
-    </div>
-  );
-
   // «Poder»: what's held (its icon and color), the roulette still turning, or nothing yet.
   const held = item && isItem(item.id) ? item : null;
   const ItemIcon = held ? ITEM_ICONS[held.id as ItemId] : Sparkles;
   const itemColor = held && !held.rolling ? ITEMS[held.id as ItemId].color : "#64748b";
-  const itemButton = (className = "") =>
-    powers ? (
-      <button
-        type="button"
-        onPointerDown={(e) => {
-          e.preventDefault();
-          setItemDown(true);
-          pressItem();
-        }}
-        onPointerUp={() => setItemDown(false)}
-        onPointerCancel={() => setItemDown(false)}
-        onPointerLeave={() => setItemDown(false)}
-        className={`${zoneClass(itemDown)} pointer-events-auto flex-col gap-0.5 ${held && !held.rolling ? "animate-pulse" : ""} ${className}`}
-        style={{
-          borderColor: itemColor,
-          color: held && !held.rolling ? "#ffffff" : itemColor,
-          backgroundColor: held && !held.rolling ? `${itemColor}cc` : undefined,
-          boxShadow: held && !held.rolling ? `0 0 22px ${itemColor}` : undefined,
-        }}
-        aria-label={held ? `Usar ${ITEMS[held.id as ItemId].label}` : "Poder (sin poder todavía)"}
-      >
-        <ItemIcon className={`h-6 w-6 ${held?.rolling ? "animate-spin" : ""}`} />
-        <span className="text-[11px] font-bold uppercase tracking-wide">{held ? (held.rolling ? "…" : ITEMS[held.id as ItemId].label) : "Sin poder"}</span>
-      </button>
-    ) : null;
+  const steerIcon = overlay ? "h-12 w-12" : "h-16 w-16";
 
-  const steerButtons = (icon: string) => (
-    <>
-      <div data-zone="left" onPointerDown={down} className={`pointer-events-auto flex-1 ${zoneClass(pressed.left)}`} style={{ borderColor: color }}>
-        <ChevronLeft className={icon} style={{ color }} />
-      </div>
-      <div data-zone="right" onPointerDown={down} className={`pointer-events-auto flex-1 ${zoneClass(pressed.right)}`} style={{ borderColor: color }}>
-        <ChevronRight className={icon} style={{ color }} />
-      </div>
-    </>
-  );
+  /** How each control looks (the pad and the editor). */
+  const face = (id: PadId) => {
+    switch (id) {
+      case "izquierda":
+      case "derecha": {
+        const Icon = id === "izquierda" ? ChevronLeft : ChevronRight;
+        return (
+          <span className={zoneClass(id === "izquierda" ? pressed.left : pressed.right)} style={{ borderColor: color }}>
+            <Icon className={steerIcon} style={{ color }} />
+          </span>
+        );
+      }
+      case "frenar":
+        return (
+          <span className={`${zoneClass(pressed.brake)} flex-col gap-0.5 border-slate-400/70 text-slate-100`}>
+            <Hand className="h-6 w-6" />
+            <span className="text-[11px] font-semibold uppercase tracking-wide">Frenar</span>
+          </span>
+        );
+      case "acelerar":
+        return (
+          <span className={`${zoneClass(pressed.gas)} flex-col gap-1 border-lime-400/80 text-lime-100`}>
+            <ChevronsUp className="h-8 w-8" />
+            <span className="text-[11px] font-bold uppercase tracking-wide">Acelerar</span>
+          </span>
+        );
+      case "derrape":
+        // Held while steering: a drift (sparks under the car), let go for the mini-turbo; a tap in the air, a trick.
+        return (
+          <span className={`${zoneClass(pressed.drift)} flex-col gap-1 border-amber-300/80 text-amber-100`}>
+            <Sparkles className="h-9 w-9" />
+            <span className="text-xs font-bold uppercase tracking-wide">Derrape</span>
+          </span>
+        );
+      case "poder":
+        return (
+          <span
+            className={`${zoneClass(itemDown)} flex-col gap-0.5 ${held && !held.rolling ? "animate-pulse" : ""}`}
+            style={{
+              borderColor: itemColor,
+              color: held && !held.rolling ? "#ffffff" : itemColor,
+              backgroundColor: held && !held.rolling ? `${itemColor}cc` : undefined,
+              boxShadow: held && !held.rolling ? `0 0 22px ${itemColor}` : undefined,
+            }}
+          >
+            <ItemIcon className={`h-6 w-6 ${held?.rolling ? "animate-spin" : ""}`} />
+            <span className="text-[11px] font-bold uppercase tracking-wide">{held ? (held.rolling ? "…" : ITEMS[held.id as ItemId].label) : "Sin poder"}</span>
+          </span>
+        );
+    }
+  };
 
   const tiltTap = (
     <button
@@ -515,49 +538,72 @@ export default function Controller({
     );
   }
 
+  const tiltMode = mode === "inclinacion";
+  const hidden: PadId[] = [...(tiltMode ? (["izquierda", "derecha"] as PadId[]) : []), ...(manual ? [] : (["acelerar"] as PadId[])), ...(powers ? [] : (["poder"] as PadId[]))];
+  const pad = (
+    <PadSurface
+      controls={overlay ? OVERLAY_CONTROLS : CONTROLS}
+      settings={settings}
+      edit={{
+        open: editing,
+        onClose: () => setEditing(false),
+        onChange: setSettings,
+        defaults: overlay ? OVERLAY : PANEL,
+        face: (id) => face(id),
+        faded: hidden,
+        sens: { label: "Sensibilidad inclinación", min: 0.5, max: 2 },
+      }}
+      className={overlay ? "min-h-0 flex-1" : "min-h-56 flex-1"}
+    >
+      {(place) =>
+        (Object.keys(CONTROLS) as PadId[])
+          .filter((id) => !hidden.includes(id))
+          .map((id) =>
+            id === "poder" ? (
+              <button
+                key={id}
+                type="button"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  setItemDown(true);
+                  pressItem();
+                }}
+                onPointerUp={() => setItemDown(false)}
+                onPointerCancel={() => setItemDown(false)}
+                onPointerLeave={() => setItemDown(false)}
+                style={place(id)}
+                aria-label={held ? `Usar ${ITEMS[held.id as ItemId].label}` : "Poder (sin poder todavía)"}
+              >
+                {face(id)}
+              </button>
+            ) : (
+              <div
+                key={id}
+                data-zone={{ izquierda: "left", derecha: "right", derrape: "drift", frenar: "brake", acelerar: "gas" }[id]}
+                onPointerDown={down}
+                style={place(id)}
+              >
+                {face(id)}
+              </div>
+            )
+          )
+      }
+    </PadSurface>
+  );
+
+  const adjust = <AdjustButton onClick={() => setEditing(true)} className={overlay ? "!bg-slate-950/60" : ""} />;
+
   if (overlay) {
     return (
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 flex h-[46%] items-stretch gap-3 p-3"
-        style={{ touchAction: "none" }}
-        onContextMenu={(e) => e.preventDefault()}
-      >
-        {mode === "botones" ? (
-          <>
-            <div className="flex w-[46%] gap-2">{steerButtons("h-14 w-14")}</div>
-            <div className="pointer-events-auto flex flex-1 flex-col gap-2">
-              <div className="flex gap-2">
-                <div className="flex-1">{modeToggle}</div>
-                {gasToggle}
-                {itemButton("w-[30%] !rounded-2xl py-1")}
-              </div>
-              <div className="flex flex-1 gap-2">
-                {drift(manual ? "flex-[1.2]" : "flex-[1.6]")}
-                {brake(manual ? "flex-[0.8]" : "flex-1")}
-                {gas("flex-[1.4]")}
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="pointer-events-auto flex flex-1 flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
-              {modeToggle}
-              {gasToggle}
-              {!needsTiltTap && wheel("h-12 w-12")}
-            </div>
-            {tiltError && <p className="text-xs text-amber-300">{tiltError}</p>}
-            {needsTiltTap ? (
-              tiltTap
-            ) : (
-              <div className="flex flex-1 gap-2">
-                {brake("flex-1")}
-                {itemButton("flex-1")}
-                {drift("flex-[1.6]")}
-                {gas("flex-[1.4]")}
-              </div>
-            )}
-          </div>
-        )}
+      <div className="absolute inset-x-0 bottom-0 flex h-[46%] flex-col gap-2 p-3" style={{ touchAction: "none" }} onContextMenu={(e) => e.preventDefault()}>
+        <div className="flex items-center gap-2">
+          {modeToggle}
+          {gasToggle}
+          {adjust}
+          {tiltMode && !needsTiltTap && wheel("h-10 w-10")}
+        </div>
+        {tiltError && <p className="text-xs text-amber-300">{tiltError}</p>}
+        {tiltMode && needsTiltTap ? tiltTap : pad}
       </div>
     );
   }
@@ -565,37 +611,18 @@ export default function Controller({
   return (
     <div className="flex flex-1 flex-col gap-3" style={{ touchAction: "none" }} onContextMenu={(e) => e.preventDefault()}>
       {modeToggle}
-      {gasToggle}
+      <div className="flex gap-2">
+        <div className="flex-1">{gasToggle}</div>
+        {adjust}
+      </div>
       {tiltError && <p className="text-center text-xs text-amber-300">{tiltError}</p>}
-
-      {mode === "botones" ? (
-        <div className="grid min-h-56 flex-1 grid-cols-2 gap-3">
-          <div className="flex gap-2">{steerButtons("h-16 w-16")}</div>
-          <div className="flex flex-col gap-2">
-            {itemButton("flex-1")}
-            {drift("flex-[1.6]")}
-            <div className="flex flex-1 gap-2">
-              {brake("flex-1")}
-              {gas("flex-[1.3]")}
-            </div>
-          </div>
-        </div>
-      ) : needsTiltTap ? (
-        <div className="flex min-h-56 flex-1">{tiltTap}</div>
-      ) : (
-        <div className="flex min-h-56 flex-1 flex-col gap-3">
-          <div className="flex flex-col items-center gap-2 py-2">
-            {wheel("h-24 w-24")}
-            <p className="text-xs text-slate-400">Inclínalo como un volante, con la pantalla hacia ti.</p>
-          </div>
-          <div className="flex flex-1 gap-3">
-            {brake("flex-1")}
-            {itemButton("flex-1")}
-            {drift("flex-[1.6]")}
-            {gas("flex-[1.4]")}
-          </div>
+      {tiltMode && !needsTiltTap && (
+        <div className="flex flex-col items-center gap-2 py-1">
+          {wheel("h-20 w-20")}
+          <p className="text-xs text-slate-400">Inclínalo como un volante, con la pantalla hacia ti.</p>
         </div>
       )}
+      {tiltMode && needsTiltTap ? <div className="flex min-h-56 flex-1">{tiltTap}</div> : pad}
 
       {fine && <div className="rounded-xl bg-slate-900/80 p-2 ring-1 ring-slate-700">{keysHint}</div>}
       <p className="text-center text-xs text-slate-500">

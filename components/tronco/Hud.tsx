@@ -1,6 +1,8 @@
 "use client";
 
-import type { RefObject } from "react";
+import { useState, type RefObject } from "react";
+import { AdjustButton, PadSurface, usePadSettings } from "@/components/PadKit";
+import { padDefaults, type PadControl } from "@/lib/padLayout";
 import { ArrowUp, Footprints } from "lucide-react";
 import { JUMP_FROM, JUMP_TO, KICK_REACH, type Cue } from "@/lib/tronco";
 
@@ -101,8 +103,9 @@ export function ActionButtons({
   /** Filling the screen (a phone used as the controller). */
   big?: boolean;
 }) {
-  const size = big ? "h-full flex-col text-2xl" : "py-5 text-lg";
-  const icon = big ? "h-12 w-12" : "h-6 w-6";
+  if (big) return <ControllerButtons jumpRef={jumpRef} kickRef={kickRef} onJump={onJump} onKick={onKick} disabled={disabled} />;
+  const size = "py-5 text-lg";
+  const icon = "h-6 w-6";
   return (
     <div className={`grid grid-cols-2 gap-3 bg-talo-ink p-3 pb-[max(12px,env(safe-area-inset-bottom))] ${big ? "min-h-0 flex-1" : ""}`}>
       <button
@@ -128,5 +131,78 @@ export function ActionButtons({
         <Footprints className={icon} strokeWidth={2.5} /> Patear
       </button>
     </div>
+  );
+}
+
+type PadId = "saltar" | "patear";
+const CONTROLS: Record<PadId, PadControl> = {
+  saltar: { label: "Saltar", size: 190, wide: 0.85 },
+  patear: { label: "Patear", size: 190, wide: 0.85 },
+};
+const DEFAULTS = padDefaults<PadId>({
+  saltar: { x: 0.26, y: 0.52, s: 1 },
+  patear: { x: 0.74, y: 0.52, s: 1 },
+});
+const BUTTON = "flex h-full w-full select-none flex-col items-center justify-center gap-2 rounded-2xl bg-white/85 text-2xl font-bold text-talo-ink transition-[background-color,box-shadow,transform] duration-75 active:scale-95";
+
+/** The two buttons filling a phone used as the controller, each where the player put it («Ajustar», `tronco.controles`). */
+function ControllerButtons({
+  jumpRef,
+  kickRef,
+  onJump,
+  onKick,
+  disabled,
+}: {
+  jumpRef: RefObject<HTMLButtonElement | null>;
+  kickRef: RefObject<HTMLButtonElement | null>;
+  onJump: () => void;
+  onKick: () => void;
+  disabled?: boolean;
+}) {
+  const [settings, setSettings] = usePadSettings("tronco.controles", DEFAULTS);
+  const [editing, setEditing] = useState(false);
+  const face = (id: PadId) => (
+    <span className={`${BUTTON} pointer-events-none`}>
+      {id === "saltar" ? <ArrowUp className="h-12 w-12" strokeWidth={3} /> : <Footprints className="h-12 w-12" strokeWidth={2.5} />}
+      {CONTROLS[id].label}
+    </span>
+  );
+  return (
+    <PadSurface
+      controls={CONTROLS}
+      settings={settings}
+      edit={{ open: editing, onClose: () => setEditing(false), onChange: setSettings, defaults: DEFAULTS, face }}
+      className="min-h-0 flex-1 bg-talo-ink"
+    >
+      {(place) => (
+        <>
+          <button
+            ref={jumpRef}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              onJump();
+            }}
+            disabled={disabled}
+            style={place("saltar")}
+            className={`${BUTTON} ring-talo-hero/50 disabled:opacity-30 data-[ready=1]:scale-[1.03] data-[ready=1]:bg-talo-hero data-[ready=1]:ring-4`}
+          >
+            <ArrowUp className="h-12 w-12" strokeWidth={3} /> Saltar
+          </button>
+          <button
+            ref={kickRef}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              onKick();
+            }}
+            disabled={disabled}
+            style={place("patear")}
+            className={`${BUTTON} ring-emerald-300/50 disabled:opacity-30 data-[ready=1]:scale-[1.03] data-[ready=1]:bg-emerald-400 data-[ready=1]:ring-4`}
+          >
+            <Footprints className="h-12 w-12" strokeWidth={2.5} /> Patear
+          </button>
+          <AdjustButton onClick={() => setEditing(true)} className="absolute bottom-2 left-1/2 -translate-x-1/2" />
+        </>
+      )}
+    </PadSurface>
   );
 }

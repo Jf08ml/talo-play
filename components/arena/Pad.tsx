@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { AdjustButton, PadSurface, usePadSettings } from "@/components/PadKit";
+import { padDefaults, type PadControl } from "@/lib/padLayout";
 import { Keyboard, MonitorPlay, Shield, Sparkles, Swords } from "lucide-react";
 import { MODE_INFO, NO_PAD, fighterColor, fighterName, openPad, teamInfo, wavesSurvived, type ArenaPad, type ArenaState } from "@/lib/arena";
 import { MAX_HP, SPECIALS, SPECIAL_MAX, WEAPONS, specialOf } from "@/lib/arenaSim";
@@ -18,12 +20,37 @@ import { TOUCH_LOOK } from "./Controls";
  * counted so none is lost). Shows my health, special meter and gear and
  * vibrates when I'm hit. On a computer: WASD move, the arrows look, J
  * attacks, K blocks, L dodges, I kicks, O the special, space jumps, E picks up.
+ * «Ajustar» moves and resizes every button and sets the look's sensitivity
+ * (`arena.controles`).
  */
 
 /** ~30 a second: the look feels direct on the TV without flooding the database. */
 const SEND_MS = 33;
-const STICK_R = 60;
 const DEAD = 0.12;
+
+type PadId = "stick" | "atacar" | "bloquear" | "patada" | "especial" | "agarrar" | "saltar" | "esquivar" | "gestos";
+const CONTROLS: Record<PadId, PadControl> = {
+  stick: { label: "Joystick", size: 128 },
+  atacar: { label: "Atacar", size: 104 },
+  bloquear: { label: "Bloquear", size: 60, wide: 1.6 },
+  patada: { label: "Patada", size: 48, wide: 1.9 },
+  especial: { label: "Especial", size: 48, wide: 1.7 },
+  agarrar: { label: "Agarrar", size: 46, wide: 1.7 },
+  saltar: { label: "Saltar", size: 46, wide: 1.7 },
+  esquivar: { label: "Esquivar", size: 46, wide: 1.7 },
+  gestos: { label: "Gestos", size: 40, wide: 4.6 },
+};
+const DEFAULTS = padDefaults<PadId>({
+  stick: { x: 0.22, y: 0.6, s: 1 },
+  atacar: { x: 0.84, y: 0.8, s: 1 },
+  bloquear: { x: 0.84, y: 0.54, s: 1 },
+  patada: { x: 0.84, y: 0.35, s: 1 },
+  especial: { x: 0.58, y: 0.36, s: 1 },
+  agarrar: { x: 0.58, y: 0.53, s: 1 },
+  saltar: { x: 0.58, y: 0.7, s: 1 },
+  esquivar: { x: 0.58, y: 0.87, s: 1 },
+  gestos: { x: 0.74, y: 0.1, s: 1 },
+});
 /** Arrow keys turn the look this fast (rad/s). */
 const KEY_LOOK = 2.4;
 
@@ -51,10 +78,9 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
   const padRef = useRef<ReturnType<typeof openPad> | null>(null);
   const lastAt = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [stick, setStick] = useState<{ ox: number; oy: number; x: number; y: number } | null>(null);
   const [held, setHeld] = useState({ a: false, b: false });
-  const stickId = useRef<number | null>(null);
-  const lookId = useRef<{ id: number; x: number; y: number } | null>(null);
+  const [settings, setSettings] = usePadSettings("arena.controles", DEFAULTS);
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     const p = openPad(roomId, clientId);
@@ -179,50 +205,6 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const stickDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (stickId.current !== null) return;
-    stickId.current = e.pointerId;
-    capture(e);
-    const r = e.currentTarget.getBoundingClientRect();
-    setStick({ ox: e.clientX - r.left, oy: e.clientY - r.top, x: 0, y: 0 });
-  };
-  const stickMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.pointerId !== stickId.current || !stick) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    let dx = e.clientX - r.left - stick.ox;
-    let dy = e.clientY - r.top - stick.oy;
-    const len = Math.hypot(dx, dy);
-    if (len > STICK_R) {
-      dx = (dx / len) * STICK_R;
-      dy = (dy / len) * STICK_R;
-    }
-    setStick({ ...stick, x: dx, y: dy });
-    setMove(dx / STICK_R, -dy / STICK_R);
-  };
-  const stickUp = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.pointerId !== stickId.current) return;
-    stickId.current = null;
-    setStick(null);
-    setMove(0, 0);
-  };
-
-  // Look: drag anywhere on the right side (the buttons keep their own touches).
-  const lookDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (lookId.current) return;
-    lookId.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
-    capture(e);
-  };
-  const lookMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const l = lookId.current;
-    if (!l || e.pointerId !== l.id) return;
-    turn((e.clientX - l.x) * TOUCH_LOOK, (e.clientY - l.y) * TOUCH_LOOK);
-    l.x = e.clientX;
-    l.y = e.clientY;
-  };
-  const lookUp = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (lookId.current?.id === e.pointerId) lookId.current = null;
-  };
-
   const team = state.roster[clientId];
   const color = team ? fighterColor(state, clientId) : "#94a3b8";
   const label = !team ? "Mirando" : state.mode === "equipos" || state.mode === "rey" ? teamInfo(team).label : MODE_INFO[state.mode].label;
@@ -262,6 +244,48 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
       press(c);
     },
   });
+
+  const plain = "flex h-full w-full items-center justify-center rounded-2xl text-sm font-bold";
+  const face = (id: PadId) => {
+    switch (id) {
+      case "atacar":
+        return (
+          <span
+            className={`flex h-full w-full items-center justify-center rounded-full border-[3px] border-talo-ink font-display text-xl text-talo-ink transition-transform ${held.a ? "scale-95 brightness-110" : ""}`}
+            style={{ background: color }}
+          >
+            Atacar
+          </span>
+        );
+      case "bloquear":
+        return (
+          <span className={`${plain} gap-1.5 ${held.b ? "bg-white text-talo-ink" : "bg-white/[0.14] text-white"}`}>
+            <Shield className="h-4 w-4" /> Bloquear
+          </span>
+        );
+      case "especial":
+        return (
+          <span className={`${plain} flex-col text-[11px] leading-tight ${full ? "animate-pulse bg-white text-talo-ink" : "bg-white/[0.06] text-white/35"}`}>
+            <Sparkles className="h-4 w-4" />
+            {gear ? SPECIALS[specialOf(gear.w)].label : "Especial"}
+          </span>
+        );
+      case "agarrar":
+        return <span className={`${plain} bg-talo-hero/90 text-talo-ink`}>Agarrar</span>;
+      case "gestos":
+        return (
+          <span className="flex h-full w-full items-center justify-between gap-1">
+            {EMOTES.map((em) => (
+              <span key={em.id} className="flex h-full flex-1 items-center justify-center rounded-xl bg-white/[0.08] text-lg">
+                {em.emoji}
+              </span>
+            ))}
+          </span>
+        );
+      default:
+        return <span className={`${plain} bg-white/[0.14] text-white`}>{CONTROLS[id].label}</span>;
+    }
+  };
 
   return (
     <div className="flex h-dvh flex-col gap-3 bg-talo-ink p-3 text-white select-none [touch-action:none]">
@@ -313,100 +337,67 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
       ) : !team ? (
         <div className="flex flex-1 items-center justify-center p-6 text-center text-white/60">Estás mirando este combate en la pantalla grande. Entras en el próximo.</div>
       ) : (
-        <div className="flex min-h-0 flex-1 gap-3">
-          <div
-            onPointerDown={stickDown}
-            onPointerMove={stickMove}
-            onPointerUp={stickUp}
-            onPointerCancel={stickUp}
-            className="relative flex-1 overflow-hidden rounded-[24px] bg-white/[0.06] ring-1 ring-white/[0.08]"
-          >
-            {stick ? (
-              <>
-                <span className="absolute h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/25" style={{ left: stick.ox, top: stick.oy }} />
-                <span
-                  className="absolute h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-talo-ink"
-                  style={{ left: stick.ox + stick.x, top: stick.oy + stick.y, background: color }}
-                />
-              </>
-            ) : (
-              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-center text-white/40">
-                <span className="h-24 w-24 rounded-full border-2 border-dashed border-white/25" />
-                <span className="px-3 text-sm font-bold">Moverte (a fondo hacia adelante: correr)</span>
+        <PadSurface
+          controls={CONTROLS}
+          settings={settings}
+          stick={{ id: "stick", color, onMove: (x, y) => setMove(x, -y), hint: "Moverte (a fondo: correr)" }}
+          onLook={(dx, dy) => turn(dx * TOUCH_LOOK, dy * TOUCH_LOOK)}
+          edit={{
+            open: editing,
+            onClose: () => setEditing(false),
+            onChange: setSettings,
+            defaults: DEFAULTS,
+            face: (id) => face(id),
+            sens: { label: "Sensibilidad al mirar", min: 0.4, max: 2.5 },
+          }}
+          className="min-h-0 flex-1 rounded-[24px] bg-white/[0.04] ring-1 ring-white/[0.08]"
+        >
+          {(place) => (
+            <>
+              <span className="pointer-events-none absolute left-[46%] top-3 text-xs font-bold text-white/30">Arrastra aquí para mirar</span>
+              {/* Gestures, seen on the TV over your knight. */}
+              <div className="flex items-center justify-between gap-1" style={place("gestos")}>
+                {EMOTES.map((em, i) => (
+                  <button
+                    key={em.id}
+                    type="button"
+                    aria-label={em.label}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      gesture(i + 1);
+                    }}
+                    className="flex h-full flex-1 items-center justify-center rounded-xl bg-white/[0.08] text-lg active:bg-white/25"
+                  >
+                    {em.emoji}
+                  </button>
+                ))}
               </div>
-            )}
-          </div>
-
-          <div
-            onPointerDown={lookDown}
-            onPointerMove={lookMove}
-            onPointerUp={lookUp}
-            onPointerCancel={lookUp}
-            className="relative flex-1 overflow-hidden rounded-[24px] bg-white/[0.03] ring-1 ring-white/[0.08]"
-          >
-            <span className="pointer-events-none absolute left-4 top-3 text-sm font-bold text-white/35">Arrastra aquí para mirar</span>
-            {/* Gestures, seen on the TV over your knight. */}
-            <div className="absolute right-3 top-2.5 flex gap-1.5">
-              {EMOTES.map((em, i) => (
-                <button
-                  key={em.id}
-                  type="button"
-                  aria-label={em.label}
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    gesture(i + 1);
-                  }}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.08] text-lg active:bg-white/25"
-                >
-                  {em.emoji}
-                </button>
-              ))}
-            </div>
-            <div className="absolute bottom-3 right-3 flex items-end gap-3">
-              <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  {...tap("s")}
-                  aria-label="Golpe especial"
-                  className={`flex h-12 w-20 flex-col items-center justify-center rounded-2xl text-[11px] font-bold leading-tight ${full ? "animate-pulse bg-white text-talo-ink" : "bg-white/[0.06] text-white/35"}`}
-                >
-                  <Sparkles className="h-4 w-4" />
-                  {gear ? SPECIALS[specialOf(gear.w)].label : "Especial"}
-                </button>
-                <button type="button" {...tap("p")} className="h-12 w-20 rounded-2xl bg-talo-hero/90 text-sm font-bold text-talo-ink active:bg-talo-hero">
-                  Agarrar
-                </button>
-                <button type="button" {...tap("j")} className="h-12 w-20 rounded-2xl bg-white/[0.14] text-sm font-bold active:bg-white/25">
-                  Saltar
-                </button>
-                <button type="button" {...tap("d")} className="h-12 w-20 rounded-2xl bg-white/[0.14] text-sm font-bold active:bg-white/25">
-                  Esquivar
-                </button>
-              </div>
-              <div className="flex flex-col items-center gap-3">
-                <button type="button" {...tap("k")} className="h-12 w-24 rounded-2xl bg-white/[0.14] text-sm font-bold active:bg-white/25">
-                  Patada
-                </button>
-                <button
-                  type="button"
-                  {...holdBtn("b")}
-                  className={`flex h-16 w-24 items-center justify-center gap-1.5 rounded-2xl text-sm font-bold ${held.b ? "bg-white text-talo-ink" : "bg-white/[0.14] text-white"}`}
-                >
-                  <Shield className="h-4 w-4" /> Bloquear
-                </button>
-                <button
-                  type="button"
-                  {...holdBtn("a")}
-                  className={`flex h-28 w-28 items-center justify-center rounded-full border-[3px] border-talo-ink font-display text-xl text-talo-ink transition-transform ${held.a ? "scale-95 brightness-110" : ""}`}
-                  style={{ background: color }}
-                >
-                  Atacar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+              <button type="button" {...tap("s")} aria-label="Golpe especial" style={place("especial")}>
+                {face("especial")}
+              </button>
+              <button type="button" {...tap("p")} style={place("agarrar")}>
+                {face("agarrar")}
+              </button>
+              <button type="button" {...tap("j")} style={place("saltar")}>
+                {face("saltar")}
+              </button>
+              <button type="button" {...tap("d")} style={place("esquivar")}>
+                {face("esquivar")}
+              </button>
+              <button type="button" {...tap("k")} style={place("patada")}>
+                {face("patada")}
+              </button>
+              <button type="button" {...holdBtn("b")} style={place("bloquear")}>
+                {face("bloquear")}
+              </button>
+              <button type="button" {...holdBtn("a")} style={place("atacar")}>
+                {face("atacar")}
+              </button>
+              <AdjustButton onClick={() => setEditing(true)} className="absolute left-2 top-2" />
+            </>
+          )}
+        </PadSurface>
       )}
 
       <p className="pointer-events-none hidden items-center justify-center gap-1.5 text-xs text-white/40 [@media(hover:hover)_and_(pointer:fine)]:flex">

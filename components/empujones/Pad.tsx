@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Keyboard } from "lucide-react";
+import { AdjustButton, PadSurface, usePadSettings } from "@/components/PadKit";
+import { padDefaults, type PadControl } from "@/lib/padLayout";
 import { openPad, type PadWire } from "@/lib/empujonesRoom";
 import { DASH_COOLDOWN, GRIP_DRAIN, GRIP_FILL, GRIP_MIN } from "@/lib/empujones";
 
@@ -10,13 +12,24 @@ import { DASH_COOLDOWN, GRIP_DRAIN, GRIP_FILL, GRIP_MIN } from "@/lib/empujones"
  * the thumb lands) and two buttons on the right, «Empujar» (a dash) and
  * «Aguantar» (hold to plant your feet). On a computer, WASD or the arrows
  * move, space or J dashes and Shift or K holds. Up on the stick is up on
- * the big screen.
+ * the big screen. «Ajustar» moves and resizes them and sets the stick's
+ * sensitivity (`empujones.controles`).
  */
 
 const SEND_MS = 50;
-/** Stick travel (px) for full speed. */
-const STICK_R = 56;
 const DEAD = 0.12;
+
+type PadId = "stick" | "empujar" | "aguantar";
+const CONTROLS: Record<PadId, PadControl> = {
+  stick: { label: "Joystick", size: 130 },
+  empujar: { label: "Empujar", size: 130, wide: 1.1 },
+  aguantar: { label: "Aguantar", size: 80, wide: 1.8 },
+};
+const DEFAULTS = padDefaults<PadId>({
+  stick: { x: 0.24, y: 0.55, s: 1 },
+  empujar: { x: 0.76, y: 0.36, s: 1 },
+  aguantar: { x: 0.76, y: 0.8, s: 1 },
+});
 
 const MOVE_KEYS: Record<string, [number, number]> = {
   ArrowUp: [0, -1],
@@ -82,10 +95,9 @@ function useSender(roomId: string, clientId: string) {
 
 export default function Pad({ roomId, clientId, color, locked = false }: { roomId: string; clientId: string; color: string; locked?: boolean }) {
   const { send, read } = useSender(roomId, clientId);
-  const [stick, setStick] = useState<{ ox: number; oy: number; x: number; y: number } | null>(null);
   const [bracing, setBracing] = useState(false);
-  const stickId = useRef<number | null>(null);
-  const zoneRef = useRef<HTMLDivElement>(null);
+  const [settings, setSettings] = usePadSettings("empujones.controles", DEFAULTS);
+  const [editing, setEditing] = useState(false);
   const coolRef = useRef<HTMLSpanElement>(null);
   const gripRef = useRef<HTMLSpanElement>(null);
   const coolUntil = useRef(0);
@@ -180,99 +192,82 @@ export default function Pad({ roomId, clientId, color, locked = false }: { roomI
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const stickDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (stickId.current !== null) return;
-    stickId.current = e.pointerId;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    const r = e.currentTarget.getBoundingClientRect();
-    setStick({ ox: e.clientX - r.left, oy: e.clientY - r.top, x: 0, y: 0 });
-  };
-  const stickMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.pointerId !== stickId.current || !stick) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    let dx = e.clientX - r.left - stick.ox;
-    let dy = e.clientY - r.top - stick.oy;
-    const len = Math.hypot(dx, dy);
-    if (len > STICK_R) {
-      dx = (dx / len) * STICK_R;
-      dy = (dy / len) * STICK_R;
-    }
-    setStick({ ...stick, x: dx, y: dy });
-    setMove(dx / STICK_R, dy / STICK_R);
-  };
-  const stickUp = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.pointerId !== stickId.current) return;
-    stickId.current = null;
-    setStick(null);
-    setMove(0, 0);
-  };
+  const dashFace = (cool?: ReactNode) => (
+    <span
+      className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-[24px] border-[3px] border-talo-ink font-display text-2xl text-talo-ink"
+      style={{ background: color }}
+    >
+      {cool}
+      <span className="relative">Empujar</span>
+    </span>
+  );
+  const braceFace = (grip?: ReactNode) => (
+    <span
+      className={`relative flex h-full w-full flex-col items-center justify-center gap-1.5 overflow-hidden rounded-[24px] px-3 text-lg font-bold ${
+        bracing ? "bg-white text-talo-ink" : "bg-white/[0.1] text-white"
+      }`}
+    >
+      Aguantar
+      {grip ?? <span className="h-1.5 w-full rounded-full bg-black/30" />}
+    </span>
+  );
 
   return (
-    <div className={`flex min-h-[46vh] flex-1 select-none gap-3 [touch-action:none] ${locked ? "opacity-60" : ""}`}>
-      <div
-        ref={zoneRef}
-        onPointerDown={stickDown}
-        onPointerMove={stickMove}
-        onPointerUp={stickUp}
-        onPointerCancel={stickUp}
-        className="relative flex-1 overflow-hidden rounded-[24px] bg-white/[0.06] ring-1 ring-white/[0.08]"
-      >
-        {stick ? (
-          <>
-            <span
-              className="absolute h-28 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white/25"
-              style={{ left: stick.ox, top: stick.oy }}
-            />
-            <span
-              className="absolute h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-talo-ink"
-              style={{ left: stick.ox + stick.x, top: stick.oy + stick.y, background: color }}
-            />
-          </>
-        ) : (
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-center text-white/40">
-            <span className="h-24 w-24 rounded-full border-2 border-dashed border-white/25" />
-            <span className="px-3 text-sm font-bold">Apoya el dedo y muévelo para caminar</span>
-          </div>
-        )}
-      </div>
-
-      <div className="flex w-[42%] max-w-48 flex-col gap-3">
-        <button
-          type="button"
-          onPointerDown={(e) => {
-            e.preventDefault();
-            dash();
-          }}
-          className="relative flex flex-[3] items-center justify-center overflow-hidden rounded-[24px] border-[3px] border-talo-ink font-display text-2xl text-talo-ink active:scale-95"
-          style={{ background: color }}
-        >
-          <span ref={coolRef} className="absolute inset-0 origin-bottom bg-talo-ink/45" style={{ transform: "scaleY(0)" }} />
-          <span className="relative">Empujar</span>
-        </button>
-        <button
-          type="button"
-          onPointerDown={(e) => {
-            e.preventDefault();
-            e.currentTarget.setPointerCapture(e.pointerId);
-            brace(true);
-          }}
-          onPointerUp={() => brace(false)}
-          onPointerCancel={() => brace(false)}
-          onContextMenu={(e) => e.preventDefault()}
-          className={`relative flex flex-[2] flex-col items-center justify-center gap-1.5 overflow-hidden rounded-[24px] px-3 text-lg font-bold ${
-            bracing ? "bg-white text-talo-ink" : "bg-white/[0.1] text-white"
-          }`}
-        >
-          Aguantar
-          <span className="h-1.5 w-full overflow-hidden rounded-full bg-black/30">
-            <span ref={gripRef} className="block h-full origin-left rounded-full bg-talo-hero" />
-          </span>
-        </button>
-      </div>
-
-      <p className="pointer-events-none fixed bottom-2 left-1/2 hidden -translate-x-1/2 items-center gap-1.5 text-xs text-white/40 [@media(hover:hover)_and_(pointer:fine)]:flex">
-        <Keyboard className="h-3.5 w-3.5" /> WASD o flechas · espacio: empujar · Shift: aguantar
-      </p>
-    </div>
+    <PadSurface
+      controls={CONTROLS}
+      settings={settings}
+      stick={{ id: "stick", color, onMove: setMove, hint: "Apoya el dedo y muévelo" }}
+      edit={{
+        open: editing,
+        onClose: () => setEditing(false),
+        onChange: setSettings,
+        defaults: DEFAULTS,
+        face: (id) => (id === "empujar" ? dashFace() : braceFace()),
+        sens: { label: "Sensibilidad joystick", min: 0.5, max: 2 },
+      }}
+      className={`min-h-[46vh] flex-1 rounded-[24px] bg-white/[0.04] ring-1 ring-white/[0.08] ${locked ? "opacity-60" : ""}`}
+    >
+      {(place) => (
+        <>
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              dash();
+            }}
+            className="active:scale-95"
+            style={place("empujar")}
+          >
+            {dashFace(<span ref={coolRef} className="absolute inset-0 origin-bottom bg-talo-ink/45" style={{ transform: "scaleY(0)" }} />)}
+          </button>
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              try {
+                e.currentTarget.setPointerCapture(e.pointerId);
+              } catch {}
+              brace(true);
+            }}
+            onPointerUp={() => brace(false)}
+            onPointerCancel={() => brace(false)}
+            onContextMenu={(e) => e.preventDefault()}
+            style={place("aguantar")}
+          >
+            {braceFace(
+              <span className="h-1.5 w-full overflow-hidden rounded-full bg-black/30">
+                <span ref={gripRef} className="block h-full origin-left rounded-full bg-talo-hero" />
+              </span>
+            )}
+          </button>
+          <AdjustButton onClick={() => setEditing(true)} className="absolute right-2 top-2" />
+          <p className="pointer-events-none absolute bottom-2 left-1/2 hidden -translate-x-1/2 items-center gap-1.5 whitespace-nowrap text-xs text-white/40 [@media(hover:hover)_and_(pointer:fine)]:flex">
+            <Keyboard className="h-3.5 w-3.5" /> WASD o flechas · espacio: empujar · Shift: aguantar
+          </p>
+        </>
+      )}
+    </PadSurface>
   );
 }
