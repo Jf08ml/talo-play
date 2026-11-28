@@ -27,7 +27,33 @@ interface EngineVoice {
   wind: GainNode;
   windSrc: AudioBufferSourceNode;
   pan: StereoPannerNode | null;
+  /** The recorded loops (when loaded): engine low/high, tire screech, wind, drift sparks. */
+  rec: {
+    idle: AudioBufferSourceNode;
+    /** One steady engine tone, pitched by speed. */
+    eng: AudioBufferSourceNode;
+    idleG: GainNode;
+    engG: GainNode;
+    loops: AudioBufferSourceNode[];
+    skid: GainNode;
+    wind: GainNode;
+    spark: GainNode;
+  } | null;
+  /** The gear it's in, the speed last frame, a shift's dip until, the last launch, and whether it's drifting. */
+  gear: number;
+  lastSpeed: number;
+  dipUntil: number;
+  launchAt: number;
+  drifting: boolean;
 }
+
+/** The recorded sounds (public/sounds/carreras, made with ElevenLabs); any that fails keeps its synthesized one. */
+const SAMPLE_NAMES = [
+  "motor-parejo", "motor-ralenti", "arranque", "cambio", "derrape", "chispas", "rebufo", "nivel-derrape", "miniturbo", "miniturbo-morado", "turbo", "salto", "aterrizaje",
+  "truco-giro", "truco-bien", "truco-mal", "choque", "caja", "escudo", "escudo-golpe", "aceite", "cohete", "trompo", "cuenta", "largada", "vuelta", "final",
+] as const;
+type SampleName = (typeof SAMPLE_NAMES)[number];
+const LOOPS: SampleName[] = ["motor-ralenti", "motor-parejo", "derrape", "rebufo", "chispas"];
 
 /** Engine speed (0.15 idle … 1 just before a shift) for a speed fraction. */
 function rpm(speed: number): number {
@@ -47,6 +73,10 @@ export class RaceAudio {
   private noise: AudioBuffer | null = null;
   private engines = new Map<string, EngineVoice>();
   private muted = false;
+  private samples = new Map<SampleName, AudioBuffer>();
+  /** The tunnel's echo: everything also goes through a short reverb, up only under a roof. */
+  private echo: GainNode | null = null;
+  private inTunnel = false;
   private unlock = () => {
     if (this.ctx?.state === "suspended") this.ctx.resume().catch(() => {});
   };
@@ -63,16 +93,71 @@ export class RaceAudio {
     comp.threshold.value = -14;
     comp.ratio.value = 6;
     this.master.connect(comp).connect(this.ctx.destination);
+    // A concrete tube's reverb: a made-up impulse of decaying noise, off until a tunnel.
+    const verb = this.ctx.createConvolver();
+    const irLen = Math.floor(this.ctx.sampleRate * 1.1);
+    const ir = this.ctx.createBuffer(2, irLen, this.ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = ir.getChannelData(ch);
+      for (let i = 0; i < irLen; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / irLen, 2.6);
+    }
+    verb.buffer = ir;
+    this.echo = this.ctx.createGain();
+    this.echo.gain.value = 0;
+    this.master.connect(verb).connect(this.echo).connect(comp);
     const len = this.ctx.sampleRate;
     this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const data = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
     for (const ev of ["pointerdown", "keydown", "touchend"]) window.addEventListener(ev, this.unlock, { passive: true });
+    void this.loadSamples();
+  }
+
+  /** Fetches and decodes the recorded sounds; once the loops are in, the engines restart with them. */
+  private async loadSamples() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    await Promise.all(
+      SAMPLE_NAMES.map(async (name) => {
+        try {
+          const res = await fetch(`/sounds/carreras/${name}.mp3`);
+          if (!res.ok) return;
+          const buf = await ctx.decodeAudioData(await res.arrayBuffer());
+          this.samples.set(name, buf);
+        } catch {
+          // Keeps the synthesized one.
+        }
+      })
+    );
+    if (this.ctx && LOOPS.every((n) => this.samples.has(n))) this.silence();
+  }
+
+  /** Plays a recorded one-shot; false if it isn't loaded (the caller synthesizes instead). */
+  private sample(name: SampleName, vol: number, pan = 0, rate = 1): boolean {
+    const buf = this.samples.get(name);
+    if (!buf) return false;
+    if (!this.live) return true;
+    const ctx = this.ctx!;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = rate;
+    const g = ctx.createGain();
+    g.gain.value = vol;
+    src.connect(g).connect(this.panned(pan));
+    src.start();
+    return true;
   }
 
   setMuted(muted: boolean) {
     this.muted = muted;
     if (this.ctx && this.master) this.master.gain.setTargetAtTime(muted ? 0 : 0.8, this.ctx.currentTime, 0.05);
+  }
+
+  /** Under a tunnel's roof (the echo fades in) or out in the open. */
+  setTunnel(inside: boolean) {
+    if (inside === this.inTunnel || !this.ctx || !this.echo) return;
+    this.inTunnel = inside;
+    this.echo.gain.setTargetAtTime(inside ? 0.55 : 0, this.ctx.currentTime, 0.12);
   }
 
   private get live(): boolean {
@@ -130,27 +215,88 @@ export class RaceAudio {
     sub.start();
     skidSrc.start();
     windSrc.start();
-    v = { saw, sub, filter, gain, skid, skidSrc, wind, windSrc, pan };
+    let rec: EngineVoice["rec"] = null;
+    if (LOOPS.every((n) => this.samples.has(n))) {
+      const loop = (name: SampleName) => {
+        const src = ctx.createBufferSource();
+        src.buffer = this.samples.get(name)!;
+        src.loop = true;
+        const g = ctx.createGain();
+        g.gain.value = 0;
+        src.connect(g).connect(out);
+        // Each car starts its loop at a different point, so four engines don't sound as one.
+        src.start(0, Math.random() * src.buffer.duration);
+        return { src, g };
+      };
+      const id = loop("motor-ralenti");
+      const en = loop("motor-parejo");
+      const sk = loop("derrape");
+      const wi = loop("rebufo");
+      const sp = loop("chispas");
+      rec = {
+        idle: id.src,
+        eng: en.src,
+        idleG: id.g,
+        engG: en.g,
+        loops: [id.src, en.src, sk.src, wi.src, sp.src],
+        skid: sk.g,
+        wind: wi.g,
+        spark: sp.g,
+      };
+    }
+    v = { saw, sub, filter, gain, skid, skidSrc, wind, windSrc, pan, rec, gear: 0, lastSpeed: 0, dipUntil: 0, launchAt: -9, drifting: false };
     this.engines.set(key, v);
     return v;
   }
 
   /**
    * Sets a car's engine: `speed` as a fraction of top speed, `slip` 0–1 for
-   * the tire screech, `volume` 0–1 (distance, or a quieter rival), `pan` −1…1.
+   * the tire screech, `volume` 0–1 (distance, or a quieter rival), `pan` −1…1,
+   * `throttle` whether the gas is pressed (off: the engine drops and quiets).
    */
-  engine(key: string, speed: number, slip = 0, volume = 1, pan = 0) {
+  engine(key: string, speed: number, slip = 0, volume = 1, pan = 0, throttle = true) {
     const v = this.voice(key);
     if (!v || !this.ctx) return;
     const t = this.ctx.currentTime;
     const r = rpm(speed);
     const f = 42 + r * 100;
+    v.pan?.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), t, RAMP);
+    if (v.rec) {
+      const sp = Math.min(1.3, Math.abs(speed));
+      // The gear (rpm drops at each shift): going up one while speeding up, the shift's clunk and a short dip.
+      let gear = 0;
+      while (gear < GEARS.length - 2 && sp >= GEARS[gear + 1]) gear++;
+      // A quiet clunk on each upshift with the gas down (only the player's own car, or a close one).
+      if (gear > v.gear && sp > v.lastSpeed && throttle && volume > 0.5) {
+        v.dipUntil = t + 0.1;
+        this.sample("cambio", 0.22 * volume, pan);
+      }
+      // Pulling away from a stop: the launch roar (not again for a while).
+      if (v.lastSpeed < 0.04 && sp >= 0.04 && sp > v.lastSpeed && throttle && t - v.launchAt > 2.5) {
+        v.launchAt = t;
+        this.sample("arranque", 0.45 * volume, pan);
+      }
+      v.gear = gear;
+      v.lastSpeed = sp;
+      // Idle when (almost) stopped; then one steady engine tone whose pitch follows the speed, with a
+      // gentle dip at each shift (mostly the speed, a little of the gearbox, so it never jumps around).
+      // Off the gas it drops a little and quiets.
+      const base = 0.36 * volume * (t < v.dipUntil ? 0.6 : 1) * (throttle ? 1 : 0.65);
+      const idle = Math.max(0, Math.min(1, 1 - sp / 0.05));
+      const revs = sp * 0.75 + r * 0.25;
+      v.rec.idleG.gain.setTargetAtTime(base * idle, t, RAMP);
+      v.rec.engG.gain.setTargetAtTime(base * (1 - idle), t, RAMP);
+      v.rec.eng.playbackRate.setTargetAtTime((0.55 + revs * 0.95) * (throttle ? 1 : 0.92), t, 0.05);
+      // Tire screech: by how much it slides, and loud all through a drift.
+      const screech = Math.max(Math.min(1, Math.max(0, slip)) * 0.5, v.drifting ? 0.85 : 0);
+      v.rec.skid.gain.setTargetAtTime(screech * volume, t, 0.05);
+      return;
+    }
     v.saw.frequency.setTargetAtTime(f, t, RAMP);
     v.sub.frequency.setTargetAtTime(f / 2, t, RAMP);
     v.filter.frequency.setTargetAtTime(350 + r * 1700, t, RAMP);
     v.gain.gain.setTargetAtTime((0.05 + r * 0.06) * volume, t, RAMP);
     v.skid.gain.setTargetAtTime(Math.min(1, slip) * 0.12 * volume, t, 0.04);
-    v.pan?.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), t, RAMP);
   }
 
   /** Stops engines whose car is gone (or every engine with no `keep`). */
@@ -165,6 +311,10 @@ export class RaceAudio {
       v.sub.stop(stopAt + 0.3);
       v.skidSrc.stop(stopAt + 0.3);
       v.windSrc.stop(stopAt + 0.3);
+      if (v.rec) {
+        for (const g of [v.rec.idleG, v.rec.engG, v.rec.skid, v.rec.wind, v.rec.spark]) g.gain.setTargetAtTime(0, stopAt - 0.2, 0.05);
+        for (const src of v.rec.loops) src.stop(stopAt + 0.3);
+      }
       this.engines.delete(key);
     }
   }
@@ -187,6 +337,7 @@ export class RaceAudio {
   /** A crash: a noise burst and a low thump, louder the harder the hit (0–1). */
   hit(strength: number) {
     if (!this.live) return;
+    if (this.sample("choque", 0.35 + 0.45 * Math.max(0.15, Math.min(1, strength)))) return;
     const ctx = this.ctx!;
     const t = ctx.currentTime;
     const k = Math.max(0.15, Math.min(1, strength));
@@ -241,12 +392,14 @@ export class RaceAudio {
   /** Taking off from a ramp or a crest: a rising whoosh. */
   jump(pan = 0) {
     if (!this.live) return;
+    if (this.sample("salto", 0.5, pan)) return;
     this.sweep(500, 2200, 0.35, 0.35, pan);
   }
 
   /** Touching down; `strength` 0–1 by how long it flew. */
   land(strength: number, pan = 0) {
     if (!this.live) return;
+    if (this.sample("aterrizaje", 0.3 + 0.4 * Math.max(0.2, Math.min(1, strength)), pan)) return;
     const k = Math.max(0.2, Math.min(1, strength));
     this.tone(90, this.ctx!.currentTime, 0.18, "sine", 0.45 * k, 40);
     this.sweep(900, 250, 0.2, 0.3 * k, pan);
@@ -255,6 +408,7 @@ export class RaceAudio {
   /** Over a boost pad: a fast rising whoosh with a little zap. */
   boost(pan = 0) {
     if (!this.live) return;
+    if (this.sample("turbo", 0.55, pan)) return;
     const t = this.ctx!.currentTime;
     this.sweep(300, 3200, 0.5, 0.4, pan);
     this.tone(330, t, 0.35, "sawtooth", 0.06, 990);
@@ -263,6 +417,8 @@ export class RaceAudio {
   /** One spark under a drift: a tiny bright tick (several a second make the crackle). */
   crackle(pan = 0) {
     if (!this.live) return;
+    // With the recordings, the sparks are a loop on the car's voice (`sparks`).
+    if (this.samples.has("chispas")) return;
     const ctx = this.ctx!;
     const t = ctx.currentTime;
     const src = ctx.createBufferSource();
@@ -280,6 +436,7 @@ export class RaceAudio {
   /** A drift's sparks change color: a short chime, higher for each (1 blue, 2 orange, 3 purple). */
   driftLevel(tier: number, pan = 0) {
     if (!this.live) return;
+    if (this.sample("nivel-derrape", 0.5, pan, [1, 1, 1.19, 1.41][Math.max(1, Math.min(3, tier))])) return;
     const t = this.ctx!.currentTime;
     const f = [0, 880, 1175, 1568][Math.max(1, Math.min(3, tier))];
     this.tone(f, t, 0.18, "triangle", 0.13, undefined, pan);
@@ -289,6 +446,7 @@ export class RaceAudio {
   /** A mini-turbo: a blast, longer and stronger for orange (2) and much more for purple (3). */
   miniTurbo(tier: number, pan = 0) {
     if (!this.live) return;
+    if (this.sample(tier >= 3 ? "miniturbo-morado" : "miniturbo", tier >= 3 ? 0.7 : 0.45 + tier * 0.1, pan, tier === 2 ? 0.92 : 1)) return;
     const t = this.ctx!.currentTime;
     const k = Math.max(1, Math.min(3, tier));
     this.tone(120 - k * 15, t, 0.15 + k * 0.08, "sine", 0.35 + k * 0.1, 40, pan);
@@ -299,6 +457,7 @@ export class RaceAudio {
   /** A trick starting: a quick spin, two whooshes going round. */
   trickSpin(pan = 0) {
     if (!this.live) return;
+    if (this.sample("truco-giro", 0.5, pan)) return;
     this.sweep(700, 2600, 0.18, 0.28, pan);
     setTimeout(() => this.live && this.sweep(2600, 700, 0.2, 0.24, pan), 170);
   }
@@ -306,6 +465,7 @@ export class RaceAudio {
   /** Landing a trick: «¡ta-dá!» when it's done in time, a dull thud when still spinning. */
   trickLand(ok: boolean, pan = 0) {
     if (!this.live) return;
+    if (this.sample(ok ? "truco-bien" : "truco-mal", 0.55, pan)) return;
     const t = this.ctx!.currentTime;
     if (ok) {
       this.tone(784, t, 0.12, "square", 0.09, undefined, pan);
@@ -321,18 +481,82 @@ export class RaceAudio {
   draftWind(key: string, level: number) {
     const v = this.engines.get(key);
     if (!v || !this.ctx) return;
-    v.wind.gain.setTargetAtTime(Math.max(0, Math.min(1, level)) * 0.1, this.ctx.currentTime, 0.08);
+    const k = Math.max(0, Math.min(1, level));
+    if (v.rec) v.rec.wind.gain.setTargetAtTime(k * 0.4, this.ctx.currentTime, 0.08);
+    else v.wind.gain.setTargetAtTime(k * 0.1, this.ctx.currentTime, 0.08);
+  }
+
+  /** A drift's sparks crackling on a car's voice: `level` 0 (none) … 1 (purple). Recorded loop only. */
+  sparks(key: string, level: number) {
+    const v = this.engines.get(key);
+    if (!v) return;
+    v.drifting = level > 0;
+    if (!v.rec || !this.ctx) return;
+    v.rec.spark.gain.setTargetAtTime(Math.max(0, Math.min(1, level)) * 0.5, this.ctx.currentTime, 0.06);
   }
 
   /** The slipstream's push: a long airy whoosh. */
   draftPush(pan = 0) {
     if (!this.live) return;
+    if (this.sample("turbo", 0.45, pan, 0.85)) return;
     this.sweep(200, 1800, 0.6, 0.32, pan);
+  }
+
+  /** A box taken: the roulette's quick ticks, rising. */
+  roulette(pan = 0) {
+    if (!this.live) return;
+    if (this.sample("caja", 0.5, pan)) return;
+    const t = this.ctx!.currentTime;
+    for (let i = 0; i < 8; i++) this.tone(600 + i * 70, t + i * 0.12, 0.05, "square", 0.05, undefined, pan);
+  }
+
+  /** A shield up: a bright shimmer. */
+  shieldUp(pan = 0) {
+    if (!this.live) return;
+    if (this.sample("escudo", 0.55, pan)) return;
+    const t = this.ctx!.currentTime;
+    this.tone(660, t, 0.5, "sine", 0.1, 1320, pan);
+    this.tone(990, t + 0.05, 0.45, "triangle", 0.06, 1980, pan);
+  }
+
+  /** A shield taking a hit: a metallic clang. */
+  shieldBlock(pan = 0) {
+    if (!this.live) return;
+    if (this.sample("escudo-golpe", 0.6, pan)) return;
+    const t = this.ctx!.currentTime;
+    this.tone(1250, t, 0.35, "triangle", 0.14, 900, pan);
+    this.tone(1870, t, 0.25, "sine", 0.08, 1400, pan);
+  }
+
+  /** Oil dropped: a wet splat. */
+  splat(pan = 0) {
+    if (!this.live) return;
+    if (this.sample("aceite", 0.6, pan)) return;
+    this.sweep(1400, 200, 0.25, 0.3, pan);
+    this.tone(160, this.ctx!.currentTime, 0.15, "sine", 0.25, 70, pan);
+  }
+
+  /** A rocket off: a hiss rising into a roar. */
+  rocketLaunch(pan = 0) {
+    if (!this.live) return;
+    if (this.sample("cohete", 0.55, pan)) return;
+    this.sweep(400, 3000, 0.7, 0.35, pan);
+    this.tone(90, this.ctx!.currentTime, 0.5, "sawtooth", 0.08, 220, pan);
+  }
+
+  /** Spun out (a rocket or oil): a crash and the car turning round. */
+  spunOut(pan = 0) {
+    if (!this.live) return;
+    if (this.sample("trompo", 0.65, pan)) return;
+    this.hit(0.7);
+    const t = this.ctx!.currentTime;
+    for (let i = 0; i < 4; i++) this.tone(500 - i * 60, t + 0.1 + i * 0.18, 0.15, "triangle", 0.07, 250 - i * 30, pan);
   }
 
   /** Countdown: a short beep for 3, 2, 1 and a long high one for the start. */
   beep(go = false) {
     if (!this.live) return;
+    if (this.sample(go ? "largada" : "cuenta", 0.5)) return;
     const t = this.ctx!.currentTime;
     if (go) {
       this.tone(880, t, 0.6, "square", 0.16);
@@ -345,6 +569,7 @@ export class RaceAudio {
   /** A lap done; `last` = the final lap starts (a brighter triple chime). */
   lap(last = false) {
     if (!this.live) return;
+    if (this.sample("vuelta", 0.5, 0, last ? 1.12 : 1)) return;
     const t = this.ctx!.currentTime;
     const notes = last ? [784, 988, 1319] : [659, 988];
     notes.forEach((f, i) => this.tone(f, t + i * 0.11, 0.3, "triangle", 0.16));
@@ -353,6 +578,7 @@ export class RaceAudio {
   /** Crossing the line at the end: a little fanfare (`won` adds a final high note). */
   finish(won = false) {
     if (!this.live) return;
+    if (this.sample("final", won ? 0.6 : 0.45)) return;
     const t = this.ctx!.currentTime;
     const notes = won ? [523, 659, 784, 1047, 1319] : [523, 659, 784, 1047];
     notes.forEach((f, i) => {
@@ -390,7 +616,10 @@ export class RaceCues {
   /** Longest time in the air of the current flight, per car (absent = on the road). */
   private flights = new Map<string, number>();
   /** What each car was doing last frame (its stunt counts, drift color, trick), to tell what just happened. */
-  private stunts = new Map<string, { pads: number; minis: number; purples: number; tricks: number; drafts: number; tier: number; spinning: boolean; ready: boolean; crackle: number }>();
+  private stunts = new Map<
+    string,
+    { pads: number; minis: number; purples: number; tricks: number; drafts: number; tier: number; spinning: boolean; ready: boolean; crackle: number; item: string; used: number; shield: number; out: boolean }
+  >();
 
   constructor(private audio: RaceAudio | null) {}
 
@@ -461,6 +690,10 @@ export class RaceCues {
       spinning: car.trick > 0,
       ready: car.trickReady,
       crackle: prev?.crackle ?? 0,
+      item: car.item,
+      used: car.used,
+      shield: car.shield,
+      out: car.spinOut > 0,
     };
     // A new car (a new race) starts counting from here.
     if (prev && car.pads >= prev.pads && car.minis >= prev.minis) {
@@ -472,6 +705,16 @@ export class RaceCues {
       if (car.tricks > prev.tricks) a?.trickLand(true, pan);
       else if (prev.ready && !now.ready) a?.trickLand(false, pan);
       if (car.drift && tier > prev.tier) a?.driftLevel(tier, pan);
+      // Power-ups: a box (the roulette), what was used (by what it was), a spin-out, a shield taking a hit.
+      if (car.item && !prev.item && car.used === prev.used) a?.roulette(pan);
+      if (car.used > prev.used) {
+        if (prev.item === "turbo" || prev.item === "turbo3") a?.miniTurbo(2, pan);
+        else if (prev.item === "escudo") a?.shieldUp(pan);
+        else if (prev.item === "aceite") a?.splat(pan);
+        else if (prev.item === "cohete") a?.rocketLaunch(pan);
+      }
+      if (now.out && !prev.out) a?.spunOut(pan);
+      else if (prev.shield > 0.1 && car.shield === 0 && car.used === prev.used) a?.shieldBlock(pan);
       // Drifting: sparks crackle, faster with each color.
       if (car.drift) {
         now.crackle += dt * (8 + tier * 7);
@@ -481,7 +724,8 @@ export class RaceCues {
         }
       } else now.crackle = 0;
     }
-    this.audio?.draftWind(key, car.draft / DRAFT_CHARGE);
+    this.audio?.draftWind(key, Math.max(0, car.draft) / DRAFT_CHARGE);
+    this.audio?.sparks(key, car.drift ? 0.35 + tier * 0.22 : 0);
     this.stunts.set(key, now);
   }
 

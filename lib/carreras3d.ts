@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { MODEL_SCALE, carBody, carModelsReady, carWheel, loadCarModels } from "./carreras3dModels";
+import { MODEL_SCALE, carBody, carModelsReady, carWheel, decoInstances, loadCarModels, loadDecoModels, type DecoId } from "./carreras3dModels";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { mulberry32 } from "./random";
 import { Bloom, aimShadow, glowColor, type Quality } from "./postfx";
@@ -14,6 +14,9 @@ import {
   type Track,
   type TrackTheme,
   type Zone,
+  TUNNEL_HEIGHT,
+  inTunnel,
+  intoZone,
 } from "./carrerasTrack";
 
 /**
@@ -672,6 +675,10 @@ function labelSprite(text: string, color: string): THREE.Sprite {
 // ---- Cars ------------------------------------------------------------------
 
 const WHEEL_R = 4.2;
+/** A drift's first sparks, before the first color. */
+const DRIFT_WHITE = glowColor(0xf8fafc, 1.2);
+/** The slipstream's streaks: a pale sky blue. */
+const DRAFT_COLOR = glowColor(0xbae6fd, 1.15);
 /** The mini-turbo's sparks: blue, orange, purple (over 1: they glow under bloom). */
 const DRIFT_COLORS = [glowColor(0x60a5fa, 1.6), glowColor(0xfb923c, 1.6), glowColor(0xc084fc, 1.8)];
 /** The race number's square on a modeled body's doors (meters; shared by every car). */
@@ -1253,6 +1260,15 @@ interface CarObj extends CarParts {
   drift: number;
   spin: number;
   driftAcc: number;
+  draft: number;
+  draftAcc: number;
+  /** The drift's look: the nose turned into the bend (eased), the drift last frame, and the hop when one starts. */
+  driftYaw: number;
+  driftWas: number;
+  hop: number;
+  /** The shield's bubble (shown while it lasts) and the spin-out's progress. */
+  bubble: THREE.Mesh;
+  out: number;
 }
 
 export interface CarPoseInput {
@@ -1271,6 +1287,18 @@ export interface CarPoseInput {
   drift?: number;
   /** A trick spin's progress, 0…1 (0 or absent: none). */
   spin?: number;
+  /** Slipstream charged, 0…1 (wind streaks past the car while it fills). */
+  draft?: number;
+  /** A shield on (a bubble around it), and a spin-out's progress 0…1 (it turns round twice). */
+  shield?: boolean;
+  out?: number;
+}
+
+/** What's on the road besides the cars (lib/carrerasItems.ts): power-up boxes, oil, rockets. */
+export interface ItemWorld {
+  boxes: { x: number; y: number; z: number; on: boolean }[];
+  slicks: { x: number; y: number; z: number }[];
+  rockets: { x: number; y: number; z: number; heading: number }[];
 }
 
 export interface ViewRequest {
@@ -1290,6 +1318,43 @@ export class RaceScene {
   private smoke = new Particles(500, false, -6);
   private sparks = new Particles(300, true, 160);
   private flames = new Particles(260, true, -20);
+  /** Power-ups on the road (`setItemWorld`) and the shared shapes they're made of. */
+  private boxes: THREE.Group[] = [];
+  private slicks: THREE.Mesh[] = [];
+  private rockets: THREE.Group[] = [];
+  private boxGeo: THREE.BoxGeometry | null = null;
+  private slickGeo: THREE.BufferGeometry | null = null;
+  private bubbleGeo: THREE.SphereGeometry | null = null;
+  private qTexture: THREE.CanvasTexture | null = null;
+  private boxTime = 0;
+  /**
+   * What the dressing models replace, recorded while building: the drawn pieces
+   * (hidden once the models are in) and where they stand.
+   */
+  private deco: {
+    track: Track | null;
+    ramps: THREE.Object3D[];
+    pads: THREE.Object3D[];
+    trees: { meshes: THREE.Object3D[]; spots: [number, number, number][]; kind: DecoId } | null;
+    city: { meshes: THREE.Object3D[]; spots: [number, number, number][] } | null;
+    tires: { mesh: THREE.Object3D | null; spots: [number, number, number][] };
+    mouths: { i: number; enter: boolean; w: number }[];
+    /** Street lamps: the drawn poles and bulbs, where each stands and which way it leans (to the road). */
+    lamps: { meshes: THREE.Object3D[]; spots: { x: number; y: number; z: number; rot: number }[] } | null;
+    /** Grandstands: the group, its drawn parts (steps, roof, posts, people), and its size. */
+    stands: { stand: THREE.Group; parts: THREE.Object3D[]; gap: number; depth: number }[];
+    /** Billboards: the drawn backs and legs, the faces (kept, moved onto the model's panel), where each stands. */
+    boards: { frames: THREE.Object3D[]; faces: THREE.InstancedMesh[]; spots: { x: number; z: number; rot: number }[] } | null;
+    /** The start gantry: its group, drawn posts and banner, the light housing and bulbs, and the road's width. */
+    start: { gantry: THREE.Group; hide: THREE.Object3D[]; lights: THREE.Object3D[]; w: number } | null;
+    /** Where no fence goes (stands, billboards): [x, z, radius]. */
+    keepOut: [number, number, number][];
+  } = { track: null, ramps: [], pads: [], trees: null, city: null, tires: { mesh: null, spots: [] }, mouths: [], lamps: null, stands: [], boards: null, start: null, keepOut: [] };
+  /** Life: the wind's clock for the swaying leaves, the boost pads' arrows (pulsing) and the people in the stands (cheering). */
+  private breeze = { value: 0 };
+  private padGlow: { mat: THREE.MeshLambertMaterial | THREE.MeshBasicMaterial; base: THREE.Color }[] = [];
+  private crowds: { mesh: THREE.InstancedMesh; base: THREE.Vector3[]; phase: number[] }[] = [];
+  private disposed = false;
   /** Specks rushing past at high speed. */
   private wind = new Particles(260, false, 0);
   private confettiP = new Particles(500, false, 70);
@@ -1333,6 +1398,10 @@ export class RaceScene {
     this.maxDpr = opts.maxDpr ?? (high ? 1.75 : 1.25);
     // The modeled cars: drawn ones until they load, then `setCars` swaps them.
     void loadCarModels();
+    // The track's dressing: drawn pieces until the models load, then swapped (`decorate`).
+    void loadDecoModels().then((ok) => {
+      if (ok && !this.disposed) this.decorate();
+    });
     this.look = LOOKS[track.def.theme] ?? LOOKS.campo;
     this.worldW = track.worldW;
     this.worldH = track.worldH;
@@ -1454,16 +1523,24 @@ export class RaceScene {
 
     // Ramps and boost pads.
     const rampMat = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, flatShading: true });
-    for (const r of track.ramps) this.scene.add(new THREE.Mesh(rampGeometry(track, r), rampMat));
+    this.deco.track = track;
+    for (const r of track.ramps) {
+      const mesh = new THREE.Mesh(rampGeometry(track, r), rampMat);
+      this.deco.ramps.push(mesh);
+      this.scene.add(mesh);
+    }
     if (track.boosts.length) {
       this.arrows = arrowTexture();
       const mat = new THREE.MeshBasicMaterial({ map: this.arrows, transparent: true, depthWrite: false, side: THREE.DoubleSide });
       for (const b of track.boosts) {
         const pad = new THREE.Mesh(boostGeometry(track, b), mat);
+        this.deco.pads.push(pad);
         pad.renderOrder = 1;
         this.scene.add(pad);
       }
     }
+
+    if (track.tunnels.length) this.buildTunnels(track, nm, w);
 
     this.buildStart(track, w);
     // Places where no tree or building may stand: [x, z, radius].
@@ -1483,7 +1560,8 @@ export class RaceScene {
     const curv = curvatures(track);
     this.buildCorners(track, nm, w, curv);
     keepOut.push(...this.buildBillboards(track, nm, w, curv));
-    if (L.night) this.buildLamps(track, nm, w);
+    this.deco.keepOut = keepOut;
+    if (L.night || track.def.city) this.buildLamps(track, nm, w);
     this.buildScenery(track, w, rand, keepOut);
     // Nothing built so far moves: skip recomputing their matrices every frame.
     this.scene.traverse((o) => {
@@ -1594,6 +1672,92 @@ export class RaceScene {
   }
 
   /** Checkered line, the gantry with the banner and the start lights. */
+  /**
+   * Tunnels: concrete walls just outside the road's walls, an arched roof at
+   * `TUNNEL_HEIGHT`, a portal with warning stripes at each mouth and lights
+   * along the roof (they glow under bloom).
+   */
+  private buildTunnels(track: Track, nm: Normals, w: number) {
+    const n = track.xs.length;
+    const e = w / 2 + 6;
+    const H = TUNNEL_HEIGHT;
+    // The cross-section, from the left foot over the roof to the right foot: [offset, height].
+    const profile: [number, number][] = [
+      [-e, 0],
+      [-e, H * 0.78],
+      [-e * 0.7, H * 0.95],
+      [-e * 0.3, H],
+      [e * 0.3, H],
+      [e * 0.7, H * 0.95],
+      [e, H * 0.78],
+      [e, 0],
+    ];
+    const inner = new THREE.Color(this.look.night ? 0x3f4654 : 0x6b7280);
+    const roof = new THREE.Color(this.look.night ? 0x2b303a : 0x4b5260);
+    const stripeA = new THREE.Color(0xfacc15);
+    const stripeB = new THREE.Color(0x111111);
+    const pos: number[] = [];
+    const col: number[] = [];
+    const lights: THREE.Vector3[] = [];
+    const ring = (i: number, k: number, grow = 0) => {
+      const [off, h] = profile[k];
+      const o = off * (1 + grow);
+      return [track.xs[i] + nm.nx[i] * o, track.hs[i] + ROAD_Y + h * (1 + grow), track.ys[i] + nm.ny[i] * o];
+    };
+    for (const t of track.tunnels) {
+      const inside = (i: number) => intoZone(track, t, track.cum[i]) < t.len;
+      let first = -1;
+      let last = -1;
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        if (!inside(i) || !inside(j)) continue;
+        if (first < 0 || intoZone(track, t, track.cum[i]) < intoZone(track, t, track.cum[first])) first = i;
+        if (last < 0 || intoZone(track, t, track.cum[j]) > intoZone(track, t, track.cum[last])) last = j;
+        for (let k = 0; k < profile.length - 1; k++) {
+          const c = k === 0 || k === profile.length - 2 ? inner : roof;
+          const a = ring(i, k);
+          const b = ring(i, k + 1);
+          const cj = ring(j, k + 1);
+          const d = ring(j, k);
+          pos.push(...a, ...b, ...cj, ...a, ...cj, ...d);
+          for (let v = 0; v < 6; v++) col.push(c.r, c.g, c.b);
+        }
+        // A pair of lights on the roof every 45 units.
+        if (Math.floor(track.cum[j] / 45) !== Math.floor(track.cum[i] / 45)) {
+          for (const side of [-1, 1]) {
+            const o = side * e * 0.45;
+            lights.push(new THREE.Vector3(track.xs[i] + nm.nx[i] * o, track.hs[i] + ROAD_Y + H * 0.97, track.ys[i] + nm.ny[i] * o));
+          }
+        }
+      }
+      // Portals: a thicker frame at each mouth, striped yellow and black.
+      for (const end of [first, last]) {
+        if (end < 0) continue;
+        this.deco.mouths.push({ i: end, enter: end === first, w: e * 2 });
+        for (let k = 0; k < profile.length - 1; k++) {
+          const a = ring(end, k);
+          const b = ring(end, k + 1);
+          const a2 = ring(end, k, 0.22);
+          const b2 = ring(end, k + 1, 0.22);
+          const c = k % 2 ? stripeA : stripeB;
+          pos.push(...a, ...b, ...b2, ...a, ...b2, ...a2);
+          for (let v = 0; v < 6; v++) col.push(c.r, c.g, c.b);
+        }
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+    geo.computeVertexNormals();
+    this.scene.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, flatShading: true })));
+    if (lights.length) {
+      const lamp = new THREE.InstancedMesh(new THREE.BoxGeometry(10, 1.5, 4), new THREE.MeshBasicMaterial({ color: glowColor(0xfff1c1, 1.8) }), lights.length);
+      const m = new THREE.Matrix4();
+      lights.forEach((p, i) => lamp.setMatrixAt(i, m.makeTranslation(p.x, p.y, p.z)));
+      this.scene.add(lamp);
+    }
+  }
+
   private buildStart(track: Track, w: number) {
     const sx = track.xs[0];
     const sz = track.ys[0];
@@ -1640,6 +1804,7 @@ export class RaceScene {
     const housing = new THREE.Mesh(new THREE.BoxGeometry(3, 9, 52), new THREE.MeshLambertMaterial({ color: 0x0f172a }));
     housing.position.set(-1, 70, 0);
     gantry.add(housing);
+    const startLights: THREE.Object3D[] = [housing];
     const bulb = new THREE.CircleGeometry(3, 16);
     for (let i = 0; i < 4; i++) {
       const mat = new THREE.MeshBasicMaterial({ color: 0x1e1b1b });
@@ -1647,11 +1812,13 @@ export class RaceScene {
       b.position.set(-2.6, 70, -18 + i * 12);
       b.rotation.y = -Math.PI / 2;
       gantry.add(b);
+      startLights.push(b);
       this.lights.push(mat);
     }
     gantry.position.set(sx, 0, sz);
     gantry.rotation.y = angle;
     this.scene.add(gantry);
+    this.deco.start = { gantry, hide: gantry.children.filter((c) => c !== housing && !startLights.includes(c)), lights: startLights, w };
   }
 
   /**
@@ -1719,6 +1886,7 @@ export class RaceScene {
         heads.setColorAt(i, c.setHSL(0.07, 0.45, 0.35 + rand() * 0.4));
       });
       stand.add(bodies, heads);
+      this.deco.stands.push({ stand, parts: [...stand.children], gap, depth });
 
       // Local z points away from the track: rotate so it lines up with the normal on this side.
       const angle = -Math.atan2(ty, tx);
@@ -1744,7 +1912,7 @@ export class RaceScene {
     let nextTire = -Infinity;
     for (let i = 0; i < n; i++) {
       const k = curv[i];
-      if (Math.abs(k) < sharp) continue;
+      if (Math.abs(k) < sharp || inTunnel(track, track.cum[i])) continue;
       // Outside of a right turn is the left (normals point right).
       const out = k > 0 ? -1 : 1;
       if (cum[i] >= nextBoard) {
@@ -1809,6 +1977,7 @@ export class RaceScene {
         mesh.setMatrixAt(i, m.compose(v.set(x, y, z), q.identity(), s.set(1, 1, 1)));
         mesh.setColorAt(i, i % 3 === 0 ? b : a);
       });
+      this.deco.tires = { mesh, spots: tires };
       this.scene.add(mesh);
     }
   }
@@ -1826,7 +1995,7 @@ export class RaceScene {
     let nextAt = 250;
     for (let i = 0; i < n; i++) {
       run = Math.abs(curv[i]) < 1 / 900 ? run + (cum[(i + 1) % n] - cum[i] || 10) : 0;
-      if (run < 160 || cum[i] < nextAt || hs[i] > 4) continue;
+      if (run < 160 || cum[i] < nextAt || hs[i] > 4 || inTunnel(track, cum[i])) continue;
       const off = w / 2 + 70;
       const x = xs[i] + nm.nx[i] * side * off;
       const z = ys[i] + nm.ny[i] * side * off;
@@ -1855,6 +2024,7 @@ export class RaceScene {
     backGeo.translate(0, 34, 0);
     const legGeo = new THREE.BoxGeometry(2.4, 20, 2.4);
     legGeo.translate(0, 10, 0);
+    const boardFaces: THREE.InstancedMesh[] = [];
     const backs = new THREE.InstancedMesh(backGeo, new THREE.MeshLambertMaterial({ color: 0x1f2937 }), spots.length);
     const legs = new THREE.InstancedMesh(legGeo, new THREE.MeshLambertMaterial({ color: 0x475569 }), spots.length * 2);
     BOARDS.forEach((b, k) => {
@@ -1862,6 +2032,8 @@ export class RaceScene {
       if (!mine.length) return;
       const faces = new THREE.InstancedMesh(faceGeo, new THREE.MeshLambertMaterial({ map: boardTexture(b) }), mine.length);
       mine.forEach((p, i) => faces.setMatrixAt(i, m.compose(v.set(p.x, 0, p.z), q.setFromAxisAngle(up, p.rot), one)));
+      faces.userData.spots = mine;
+      boardFaces.push(faces);
       this.scene.add(faces);
     });
     spots.forEach((p, i) => {
@@ -1872,6 +2044,7 @@ export class RaceScene {
       }
     });
     this.scene.add(backs, legs);
+    this.deco.boards = { frames: [backs, legs], faces: boardFaces, spots };
     return spots.map((p) => [p.x, p.z, 90]);
   }
 
@@ -1882,7 +2055,7 @@ export class RaceScene {
     let nextAt = 60;
     let side = 1;
     for (let i = 0; i < n; i++) {
-      if (track.cum[i] < nextAt) continue;
+      if (track.cum[i] < nextAt || inTunnel(track, track.cum[i])) continue;
       nextAt += 210;
       side = -side;
       spots.push({
@@ -1925,6 +2098,7 @@ export class RaceScene {
       pools.setMatrixAt(i, m);
       halos.push(s.x, s.y + 57, s.z);
     });
+    this.deco.lamps = { meshes: [poles, bulbs], spots: spots.map((s) => ({ x: s.x, y: s.y, z: s.z, rot: Math.atan2(s.px - s.x, s.pz - s.z) })) };
     const hg = new THREE.BufferGeometry();
     hg.setAttribute("position", new THREE.Float32BufferAttribute(halos, 3));
     const halo = new THREE.Points(
@@ -1939,6 +2113,12 @@ export class RaceScene {
       })
     );
     this.scene.add(poles, bulbs, pools, halo);
+    // By day (city tracks): lamps standing, but not lit.
+    if (!this.look.night) {
+      bulbs.visible = false;
+      pools.visible = false;
+      halo.visible = false;
+    }
   }
 
   /** Trees (or cacti and rocks) away from the track, and mountains on the horizon. */
@@ -1968,8 +2148,11 @@ export class RaceScene {
       for (let i = spots.length - 1; i >= 0; i--) {
         if (rand() < 0.8 && far(spots[i][0], spots[i][1])) blocks.push(...spots.splice(i, 1));
       }
+      const beforeCity = new Set(this.scene.children);
       this.buildCity(blocks, rand);
+      this.deco.city = { meshes: this.scene.children.filter((c) => !beforeCity.has(c)), spots: blocks };
     }
+    const beforeTrees = new Set(this.scene.children);
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0);
@@ -2040,6 +2223,11 @@ export class RaceScene {
       }
     }
 
+    this.deco.trees = {
+      meshes: this.scene.children.filter((c) => !beforeTrees.has(c)),
+      spots,
+      kind: L.scenery === "desierto" ? "cactus" : L.scenery === "nieve" ? "pino-nieve" : "arbol",
+    };
     const peaks = 30;
     const mountains = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 5), new THREE.MeshLambertMaterial({ flatShading: true }), peaks);
     const caps = L.snowCaps
@@ -2118,6 +2306,273 @@ export class RaceScene {
     }
   }
 
+  /**
+   * Swaps the drawn ramps, boost pads, tunnel mouths, tire stacks, trees and
+   * city blocks for the dressing models (lib/carreras3dModels.ts), at the same
+   * spots. Whatever didn't load keeps its drawn piece.
+   */
+  private decorate() {
+    const d = this.deco;
+    const track = d.track;
+    if (!track) return;
+    const S = MODEL_SCALE;
+    const rnd = mulberry32(Math.round(track.length));
+    // Each copy a little different: greens for leaves, pastel tints for walls, dimmer or brighter windows at night.
+    const tint = (part: string, i: number): THREE.Color | null => {
+      const r = mulberry32(i * 7919 + part.length * 31)();
+      if (part === "Hojas" || part === "Verde claro" || part === "Pino" || part === "Cactus") return new THREE.Color().setHSL(0.25 + (r - 0.5) * 0.08, 0.5, 0.78 + r * 0.22);
+      if (part === "Fachada") return new THREE.Color().setHSL(r, 0.35, 0.82 + r * 0.12);
+      if (part === "Luz" && this.look.night) return new THREE.Color().setScalar(0.45 + r * 0.55);
+      return null;
+    };
+    const opts = { night: this.look.night, shadows: this.shadows, glow: (c: THREE.Color, k: number) => c.multiplyScalar(k), tint, wind: this.breeze };
+    const m = () => new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0);
+    const add = (g: THREE.Group | null, replaced: THREE.Object3D[]) => {
+      if (!g) return;
+      this.scene.add(g);
+      for (const r of replaced) r.visible = false;
+    };
+    // Along the road at arc length s, `lat` across it (+ right): position and facing (+z along the road).
+    const along = (s: number, lat: number, lift: number, scale: THREE.Vector3, back = false) => {
+      const f = frameAt(track, s);
+      q.setFromAxisAngle(up, Math.atan2(back ? -f.dx : f.dx, back ? -f.dy : f.dy));
+      return m().compose(new THREE.Vector3(f.x - f.dy * lat, f.h + lift, f.y + f.dx * lat), q, scale);
+    };
+
+    // Laid on the road from s0 to s0 + len, `lat` across: from its start to its end point, so it follows the
+    // road's slope (flat at its middle height it would sink at one end and stick out at the other on a hill).
+    const pitch = new THREE.Quaternion();
+    const right = new THREE.Vector3(1, 0, 0);
+    const span = (s0: number, len: number, lat: number, lift: number, sx: number, sy: number, unitLen: number) => {
+      const at = (s: number) => {
+        const f = frameAt(track, ((s % track.length) + track.length) % track.length);
+        return new THREE.Vector3(f.x - f.dy * lat, f.h, f.y + f.dx * lat);
+      };
+      const a = at(s0);
+      const b = at(s0 + len);
+      const dir = b.clone().sub(a);
+      const flat = Math.hypot(dir.x, dir.z);
+      q.setFromAxisAngle(up, Math.atan2(dir.x, dir.z)).multiply(pitch.setFromAxisAngle(right, -Math.atan2(dir.y, flat)));
+      // On a crest the road between the ends rises over the straight piece: lift it just enough not to sink.
+      let sink = 0;
+      for (let i = 1; i < 6; i++) sink = Math.max(sink, at(s0 + (len * i) / 6).y - (a.y + (dir.y * i) / 6));
+      const mid = a.add(b).multiplyScalar(0.5);
+      mid.y += lift + sink;
+      return m().compose(mid, q, new THREE.Vector3(sx, sy, dir.length() / unitLen));
+    };
+
+    // Ramps and boost pads: stretched to their zone on the road.
+    add(
+      decoInstances(
+        "rampa",
+        track.ramps.map((r) => span(r.s0, r.len, (r.lo + r.hi) / 2, ROAD_Y, (r.hi - r.lo) / 15, RAMP_HEIGHT / 3.5, 10)),
+        opts
+      ),
+      d.ramps
+    );
+    const turbo = decoInstances(
+      "turbo",
+      track.boosts.map((b) => span(b.s0, b.len, (b.lo + b.hi) / 2, ROAD_Y + 0.3, (b.hi - b.lo) / 7, S, 8)),
+      opts
+    );
+    add(turbo, d.pads);
+    // The pads' arrows pulse.
+    for (const c of turbo?.children ?? []) {
+      if (c.name !== "Luz") continue;
+      const mat = (c as THREE.Mesh).material as THREE.MeshLambertMaterial | THREE.MeshBasicMaterial;
+      this.padGlow.push({ mat, base: mat.color.clone() });
+    }
+    // Tunnel mouths: facing the cars coming in, and out the other end.
+    add(
+      decoInstances(
+        "tunel-boca",
+        d.mouths.map((mo) => along(track.cum[mo.i], 0, ROAD_Y, new THREE.Vector3(mo.w / 17, TUNNEL_HEIGHT / 7.5, S), mo.enter)),
+        opts
+      ),
+      []
+    );
+    // Tire stacks at the sharp bends.
+    add(
+      decoInstances(
+        "llantas",
+        d.tires.spots.map(([x, y, z]) => m().compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(up, (x * 3 + z) % 6.28), new THREE.Vector3(S * 0.9, S * 0.9, S * 0.9))),
+        opts
+      ),
+      d.tires.mesh ? [d.tires.mesh] : []
+    );
+    // Trees (or cacti, or snowy pines) where the drawn ones stood.
+    if (d.trees) {
+      add(
+        decoInstances(
+          d.trees.kind,
+          d.trees.spots.map(([x, z, sc]) =>
+            m().compose(new THREE.Vector3(x, 0, z), q.setFromAxisAngle(up, (x * 13 + z * 7) % (Math.PI * 2)), new THREE.Vector3(1, 1, 1).multiplyScalar(S * 1.15 * sc))
+          ),
+          opts
+        ),
+        d.trees.meshes
+      );
+    }
+    // Street lamps, leaning over the road.
+    if (d.lamps) {
+      add(
+        decoInstances(
+          "farol",
+          d.lamps.spots.map((l) => m().compose(new THREE.Vector3(l.x, l.y, l.z), q.setFromAxisAngle(up, l.rot), new THREE.Vector3(7.6, 7.6, 7.6))),
+          opts
+        ),
+        d.lamps.meshes
+      );
+    }
+    // Billboards: the model's legs and frame; the faces (with their texts) moved onto its panel.
+    if (d.boards) {
+      const k = 15;
+      const frame = decoInstances(
+        "cartel",
+        d.boards.spots.map((b) => m().compose(new THREE.Vector3(b.x, 0, b.z), q.setFromAxisAngle(up, b.rot), new THREE.Vector3(k, k, k))),
+        opts
+      );
+      if (frame) {
+        // The model's own panel stays hidden behind the face.
+        for (const c of frame.children) if (c.name === "Cartel") c.visible = false;
+        add(frame, d.boards.frames);
+        const mat = new THREE.Matrix4();
+        for (const faces of d.boards.faces) {
+          const spots = faces.userData.spots as { x: number; z: number; rot: number }[];
+          spots.forEach((b, i) => {
+            // The face (120×30, centered at y 34) onto the panel: 3–6 m up, its front at z 0.29.
+            const fx = Math.sin(b.rot);
+            const fz = Math.cos(b.rot);
+            const front = 0.29 * k + 0.4 - 0.8;
+            q.setFromAxisAngle(up, b.rot);
+            mat.compose(new THREE.Vector3(b.x + fx * front, 4.5 * k - 34 * 1.5, b.z + fz * front), q, new THREE.Vector3(1, 1.5, 1));
+            faces.setMatrixAt(i, mat);
+          });
+          faces.instanceMatrix.needsUpdate = true;
+          faces.computeBoundingSphere();
+        }
+      }
+    }
+    // The start gantry: the model over the road; its own lights hidden behind the working ones.
+    if (d.start) {
+      const st = d.start;
+      const k = (st.w / 2 + 8) / 10.5;
+      // Model x across the road (the gantry's local z), its front (+z) toward the grid (local −x).
+      const g = decoInstances("largada", [m().compose(new THREE.Vector3(0, 0, 0), q.setFromAxisAngle(up, -Math.PI / 2), new THREE.Vector3(k, k, k))], opts);
+      if (g) {
+        for (const c of g.children) if (c.name === "Luz") c.visible = false;
+        st.gantry.add(g);
+        for (const o of st.hide) o.visible = false;
+        // The working bulbs right on the model's four light discs (its own housing replaces the drawn box).
+        for (const o of st.lights) {
+          if (o === st.lights[0]) {
+            o.visible = false;
+            continue;
+          }
+          o.position.y = 8.5 * k;
+          o.position.x = -(0.79 * k + 0.4);
+          o.position.z *= (1.71 * k) / 18;
+          o.updateMatrix(); // static matrices are frozen after build
+        }
+        st.gantry.updateMatrixWorld(true);
+      }
+    }
+    // Grandstands: the model, with people standing on its three rows of seats (they cheer).
+    for (const sd of d.stands) {
+      const kx = 190 / 20;
+      const kz = sd.depth / 8;
+      const ky = S;
+      const g = decoInstances("grada", [m().compose(new THREE.Vector3(0, 0, sd.gap + sd.depth / 2), q.setFromAxisAngle(up, Math.PI), new THREE.Vector3(kx, ky, kz))], opts);
+      if (!g) continue;
+      sd.stand.add(g);
+      for (const p of sd.parts) p.visible = false;
+      // Seat rows (model z center, seat top), front (by the track) to back; turned half round.
+      const rows: [number, number][] = [
+        [2.66, 2.32],
+        [0.41, 3.06],
+        [-1.84, 3.8],
+      ];
+      const pos: THREE.Vector3[] = [];
+      for (const [zc, top] of rows) {
+        for (let x = -76; x <= 76; x += 4.4) {
+          if (rnd() < 0.15) continue;
+          pos.push(new THREE.Vector3(x + (rnd() - 0.5) * 1.4, top * ky, sd.gap + sd.depth / 2 - zc * kz + (rnd() - 0.5) * 3));
+        }
+      }
+      const bodyGeo = new THREE.BoxGeometry(2.8, 4.2, 2.4).translate(0, 2.1, 0);
+      const headGeo = new THREE.BoxGeometry(2, 2, 2).translate(0, 5.3, 0);
+      const bodies = new THREE.InstancedMesh(bodyGeo, new THREE.MeshLambertMaterial(), pos.length);
+      const heads = new THREE.InstancedMesh(headGeo, new THREE.MeshLambertMaterial(), pos.length);
+      const mm = new THREE.Matrix4();
+      const c = new THREE.Color();
+      pos.forEach((p, i) => {
+        mm.makeTranslation(p.x, p.y, p.z);
+        bodies.setMatrixAt(i, mm);
+        heads.setMatrixAt(i, mm);
+        bodies.setColorAt(i, c.setHSL(rnd(), 0.75, 0.55));
+        heads.setColorAt(i, c.setHSL(0.07, 0.45, 0.35 + rnd() * 0.4));
+      });
+      bodies.frustumCulled = heads.frustumCulled = false;
+      sd.stand.add(bodies, heads);
+      const phase = pos.map(() => rnd() * Math.PI * 2);
+      this.crowds.push({ mesh: bodies, base: pos, phase }, { mesh: heads, base: pos, phase });
+    }
+    // Fences behind the barriers on the straights, and cones by the ramps and the power-up boxes.
+    {
+      const nm = trackNormals(track);
+      const curv = curvatures(track);
+      const w = track.def.width;
+      const fences: THREE.Matrix4[] = [];
+      const len = 6 * S;
+      let next = 0;
+      for (let i = 0; i < track.xs.length; i++) {
+        const s = track.cum[i];
+        if (s < next || Math.abs(curv[i]) > 1 / 900 || track.hs[i] > 4 || inTunnel(track, s)) continue;
+        for (const side of [-1, 1]) {
+          const off = w / 2 + 32;
+          const x = track.xs[i] + nm.nx[i] * side * off;
+          const z = track.ys[i] + nm.ny[i] * side * off;
+          if (!clearOfTrack(track, i, x, z, w / 2 + 24)) continue;
+          if (d.keepOut.some(([kx, kz, r]) => Math.hypot(kx - x, kz - z) < r * 0.8)) continue;
+          // Along the road, its front to the road.
+          q.setFromAxisAngle(up, Math.atan2(-nm.nx[i] * side, -nm.ny[i] * side));
+          fences.push(m().compose(new THREE.Vector3(x, 0, z), q, new THREE.Vector3(S, S, S)));
+        }
+        next = s + len;
+      }
+      add(decoInstances("valla", fences, opts), []);
+      const cones: THREE.Matrix4[] = [];
+      const cone = (s: number) => {
+        for (const side of [-1, 1]) cones.push(along(s, side * (w / 2 + 9), 0, new THREE.Vector3(S * 1.5, S * 1.5, S * 1.5)));
+      };
+      for (const r of track.ramps) {
+        cone(r.s0 - 25);
+        cone(r.s0 + r.len + 10);
+      }
+      for (const f of [0.16, 0.48, 0.79]) cone(track.length * f);
+      add(decoInstances("cono", cones, opts), []);
+    }
+    // City blocks: three kinds of building, turned to the street grid.
+    if (d.city) {
+      const kinds: DecoId[] = ["edificio-a", "edificio-b", "edificio-c"];
+      const groups = kinds.map((kind, k) =>
+        decoInstances(
+          kind,
+          d.city!.spots
+            .filter((_, i) => i % 3 === k)
+            .map(([x, z, sc]) => m().compose(new THREE.Vector3(x, 0, z), q.setFromAxisAngle(up, Math.round((x + z) / 97) * (Math.PI / 2)), new THREE.Vector3(1, 1, 1).multiplyScalar(S * (0.55 + sc * 0.2)))),
+          opts
+        )
+      );
+      if (groups.every(Boolean)) {
+        for (const g of groups) this.scene.add(g!);
+        for (const mesh of d.city.meshes) mesh.visible = false;
+      }
+    }
+  }
+
   /** Makes the scene's cars match `cars` (key → paint, stripes, number and name label). */
   setCars(cars: Record<string, CarLook>) {
     for (const [key, obj] of this.cars) {
@@ -2135,6 +2590,18 @@ export class RaceScene {
       if (this.shadows) parts.body.traverse((o) => ((o as THREE.Mesh).castShadow = (o as THREE.Mesh).isMesh));
       const label = info.label ? labelSprite(info.label, info.tag ?? info.color) : null;
       if (label) parts.group.add(label);
+      // The shield: a light bubble around the car, hidden until it has one.
+      this.bubbleGeo ??= new THREE.SphereGeometry(1, 20, 14);
+      this.bubbleGeo.userData.shared = true;
+      const bubble = new THREE.Mesh(
+        this.bubbleGeo,
+        new THREE.MeshBasicMaterial({ color: glowColor(0x7dd3fc, 1.2), transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false })
+      );
+      bubble.scale.set(26, 15, 17);
+      bubble.position.y = 8;
+      bubble.visible = false;
+      bubble.renderOrder = 3;
+      parts.group.add(bubble);
       this.scene.add(parts.group);
       this.cars.set(key, {
         ...parts,
@@ -2161,6 +2628,13 @@ export class RaceScene {
         drift: 0,
         spin: 0,
         driftAcc: 0,
+        draft: 0,
+        draftAcc: 0,
+        driftYaw: 0,
+        driftWas: 0,
+        hop: 0,
+        bubble,
+        out: 0,
       });
     }
   }
@@ -2180,6 +2654,92 @@ export class RaceScene {
     car.bump = pose.bump ?? 0;
     car.drift = pose.drift ?? 0;
     car.spin = pose.spin ?? 0;
+    car.draft = pose.draft ?? 0;
+    car.bubble.visible = !!pose.shield;
+    car.out = pose.out ?? 0;
+  }
+
+  /** Boxes, oil and rockets on the road, as the race runner sees them now. */
+  setItemWorld(w: ItemWorld) {
+    // Boxes: made once per track (their number doesn't change), hidden while taken.
+    while (this.boxes.length < w.boxes.length) {
+      this.boxGeo ??= new THREE.BoxGeometry(17, 17, 17);
+      this.boxGeo.userData.shared = true;
+      const g = new THREE.Group();
+      g.userData.moving = true;
+      const cube = new THREE.Mesh(
+        this.boxGeo,
+        new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.55, transparent: true, opacity: 0.9, shininess: 140 })
+      );
+      g.add(cube);
+      // A halo around it, so it reads from far away (and glows under bloom).
+      const halo = new THREE.Sprite(
+        new THREE.SpriteMaterial({ map: this.glow, color: glowColor(0xfff3b0, 1.4), transparent: true, opacity: 0.75, depthWrite: false, blending: THREE.AdditiveBlending })
+      );
+      halo.scale.set(44, 44, 1);
+      g.add(halo);
+      this.qTexture ??= canvasTexture(64, 64, (ctx) => {
+        ctx.font = "bold 52px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = "rgba(17,17,17,0.9)";
+        ctx.strokeText("?", 32, 35);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText("?", 32, 35);
+      });
+      this.qTexture.name = "glow";
+      const q = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.qTexture, depthWrite: false }));
+      q.scale.set(15, 15, 1);
+      g.add(q);
+      this.scene.add(g);
+      this.boxes.push(g);
+    }
+    w.boxes.forEach((b, i) => {
+      const g = this.boxes[i];
+      g.visible = b.on;
+      g.position.set(b.x, b.z + 15, b.y);
+    });
+    for (let i = w.boxes.length; i < this.boxes.length; i++) this.boxes[i].visible = false;
+
+    // Oil: a dark, glossy puddle with a violet sheen.
+    while (this.slicks.length < w.slicks.length) {
+      this.slickGeo ??= new THREE.CircleGeometry(20, 24).rotateX(-Math.PI / 2);
+      this.slickGeo.userData.shared = true;
+      const m = new THREE.Mesh(this.slickGeo, new THREE.MeshPhongMaterial({ color: 0x1b1530, emissive: 0x2e1065, shininess: 160, specular: 0xc4b5fd }));
+      m.renderOrder = 1;
+      this.scene.add(m);
+      this.slicks.push(m);
+    }
+    this.slicks.forEach((m, i) => {
+      const sl = w.slicks[i];
+      m.visible = !!sl;
+      if (sl) m.position.set(sl.x, sl.z + ROAD_Y + 0.5, sl.y);
+    });
+
+    // Rockets: a red body and a nose, nose first, with a flame behind.
+    while (this.rockets.length < w.rockets.length) {
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 12, 10).rotateZ(Math.PI / 2), new THREE.MeshPhongMaterial({ color: 0xef4444, shininess: 90 }));
+      const nose = new THREE.Mesh(new THREE.ConeGeometry(2.6, 6, 10).rotateZ(-Math.PI / 2), new THREE.MeshPhongMaterial({ color: 0xf8fafc, shininess: 90 }));
+      nose.position.x = 9;
+      g.add(body, nose);
+      this.scene.add(g);
+      this.rockets.push(g);
+    }
+    this.rockets.forEach((g, i) => {
+      const r = w.rockets[i];
+      g.visible = !!r;
+      if (!r) return;
+      g.position.set(r.x, r.z, r.y);
+      g.rotation.y = -r.heading;
+      // The exhaust.
+      const fx = Math.cos(r.heading);
+      const fz = Math.sin(r.heading);
+      for (let k = 0; k < 2; k++) {
+        this.flames.spawn(r.x - fx * 8, r.z, r.y - fz * 8, -fx * 80, (this.rand() - 0.5) * 20, -fz * 80, this.flameColors[k], 4 + this.rand() * 2, 0.15, 0.9, -10, r.z - 6);
+      }
+    });
   }
 
   /** Crossing the finish line: confetti over the car. */
@@ -2247,6 +2807,33 @@ export class RaceScene {
   /** Wheels, steering, pitch, brake lights, smoke, sparks and flames; then the ambience. */
   private update(dt: number) {
     if (dt <= 0) return;
+    // Power-up boxes: turning, bobbing and cycling through colors.
+    this.boxTime += dt;
+    // Life: the wind in the leaves, the boost pads' arrows pulsing, the stands cheering.
+    this.breeze.value += dt;
+    const pulse = 0.75 + 0.45 * Math.sin(this.boxTime * 7);
+    for (const p of this.padGlow) p.mat.color.copy(p.base).multiplyScalar(pulse);
+    if (this.crowds.length) {
+      const mm = new THREE.Matrix4();
+      for (const cr of this.crowds) {
+        cr.base.forEach((p, i) => {
+          const jump = Math.max(0, Math.sin(this.boxTime * 5 + cr.phase[i])) * 2.2;
+          cr.mesh.setMatrixAt(i, mm.makeTranslation(p.x, p.y + jump, p.z));
+        });
+        cr.mesh.instanceMatrix.needsUpdate = true;
+      }
+    }
+    this.boxes.forEach((g, i) => {
+      if (!g.visible) return;
+      g.rotation.y = this.boxTime * 1.6 + i;
+      g.children[0].rotation.x = this.boxTime * 1.1 + i;
+      g.position.y += Math.sin(this.boxTime * 3 + i) * 0.04;
+      const mat = (g.children[0] as THREE.Mesh).material as THREE.MeshPhongMaterial;
+      mat.color.setHSL((this.boxTime * 0.25 + i * 0.13) % 1, 0.9, 0.6);
+      mat.emissive.copy(mat.color);
+      const s = 1 + 0.08 * Math.sin(this.boxTime * 5 + i);
+      g.children[0].scale.setScalar(s);
+    });
     const ease = (k: number) => 1 - Math.exp(-dt * k);
     for (const car of this.cars.values()) {
       // Wheels roll with the speed; front wheels follow how fast the car turns.
@@ -2298,6 +2885,17 @@ export class RaceScene {
       car.body.rotation.z = car.pitch;
       // A trick: a full barrel roll while it lasts.
       car.body.rotation.x = car.spin > 0 ? car.spin * Math.PI * 2 * Math.sign(car.lateral || 1) : 0;
+      // A spin-out: it turns round twice on itself.
+      // Drifting: the nose swings into the bend (well past where it's going), and a little hop as it starts.
+      const yawWant = car.drift ? -Math.sign(car.drift) * (0.38 + 0.06 * (Math.abs(car.drift) - 1)) : 0;
+      car.driftYaw += (yawWant - car.driftYaw) * ease(9);
+      if (car.drift && !car.driftWas) car.hop = 1;
+      car.driftWas = car.drift;
+      car.hop = Math.max(0, car.hop - dt * 4);
+      car.body.position.y = Math.sin(car.hop * Math.PI) * 4;
+      car.body.rotation.y = car.out > 0 ? car.out * Math.PI * 4 : car.driftYaw;
+      // The shield's bubble shimmers.
+      if (car.bubble.visible) (car.bubble.material as THREE.MeshBasicMaterial).opacity = 0.22 + 0.1 * Math.sin(this.boxTime * 9);
       car.floor.rotation.z = car.groundPitch;
       car.floor.position.y = -lift;
       // The shadow spreads and fades the higher the car flies.
@@ -2352,9 +2950,27 @@ export class RaceScene {
         car.smokeAcc = 0;
       }
       const tier = Math.abs(car.drift) - 1;
-      if (tier >= 1 && lift < 1) {
+      if (car.drift && lift < 1) {
         car.driftAcc += dt * (30 + tier * 15);
-        const color = DRIFT_COLORS[tier - 1];
+        const color = tier >= 1 ? DRIFT_COLORS[tier - 1] : DRIFT_WHITE;
+        // Tire smoke while it slides.
+        if (this.rand() < dt * 30) {
+          const side = this.rand() < 0.5 ? 1 : -1;
+          this.smoke.spawn(
+            p.x - fx * 12 - fz * side * 8,
+            car.ground + 3,
+            p.z - fz * 12 + fx * side * 8,
+            -fx * 30 + (this.rand() - 0.5) * 20,
+            12 + this.rand() * 10,
+            -fz * 30 + (this.rand() - 0.5) * 20,
+            this.smokeColor,
+            8,
+            0.8,
+            0.45,
+            20,
+            car.ground
+          );
+        }
         while (car.driftAcc >= 1) {
           car.driftAcc -= 1;
           const side = this.rand() < 0.5 ? 1 : -1;
@@ -2444,6 +3060,31 @@ export class RaceScene {
             car.ground
           );
         }
+      }
+      // In someone's wake: light streaks rush past along the car, more as the push charges.
+      if (car.draft > 0.05) {
+        car.draftAcc += dt * (20 + car.draft * 60);
+        while (car.draftAcc >= 1) {
+          car.draftAcc -= 1;
+          const side = (this.rand() < 0.5 ? 1 : -1) * (10 + this.rand() * 10);
+          const along = -10 + this.rand() * 40;
+          this.wind.spawn(
+            p.x + fx * along - fz * side,
+            car.ground + 4 + this.rand() * 12,
+            p.z + fz * along + fx * side,
+            -fx * 320,
+            0,
+            -fz * 320,
+            DRAFT_COLOR,
+            2.2 + car.draft * 1.8,
+            0.18,
+            0.6 + car.draft * 0.4,
+            0,
+            car.ground
+          );
+        }
+      } else {
+        car.draftAcc = 0;
       }
       car.shake = Math.max(0, car.shake - dt);
     }
@@ -2621,6 +3262,7 @@ export class RaceScene {
   }
 
   dispose() {
+    this.disposed = true;
     disposeTree(this.scene);
     if (this.carGeo) for (const g of Object.values(this.carGeo)) g.dispose();
     this.bloom?.dispose();

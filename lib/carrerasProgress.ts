@@ -118,9 +118,12 @@ export interface RaceStats {
   mp?: number;
   t?: number;
   r?: number;
+  /** Power-ups used, and rockets that caught who they chased. */
+  u?: number;
+  h?: number;
 }
 
-export const EMPTY_RACE: RaceStats = { b: 0, j: 0, air: 0, w: 0, p: 0, l: 0, m: 0, mp: 0, t: 0, r: 0 };
+export const EMPTY_RACE: RaceStats = { b: 0, j: 0, air: 0, w: 0, p: 0, l: 0, m: 0, mp: 0, t: 0, r: 0, u: 0, h: 0 };
 
 /** A race as it ended for me. */
 export interface RaceSummary {
@@ -148,6 +151,7 @@ export function raceXp(r: RaceSummary): number {
     Math.min(12, (s.m ?? 0) * 2 + (s.mp ?? 0) * 2) +
     Math.min(8, (s.t ?? 0) * 2) +
     Math.min(6, (s.r ?? 0) * 2) +
+    Math.min(8, (s.u ?? 0) + (s.h ?? 0) * 3) +
     (r.finished && s.w === 0 ? 10 : 0)
   );
 }
@@ -177,6 +181,8 @@ export const MISSIONS: MissionDef[] = [
   { id: "morado2", text: "Carga 2 mini-turbos morados", goal: 2, xp: 100, count: (r) => r.stats.mp ?? 0 },
   { id: "trucos4", text: "Haz 4 trucos en el aire", goal: 4, xp: 80, count: (r) => r.stats.t ?? 0 },
   { id: "rebufo3", text: "Aprovecha el rebufo 3 veces", goal: 3, xp: 70, count: (r) => r.stats.r ?? 0 },
+  { id: "poderes5", text: "Usa 5 poderes", goal: 5, xp: 60, count: (r) => r.stats.u ?? 0 },
+  { id: "cohetes2", text: "Acierta 2 cohetes", goal: 2, xp: 90, count: (r) => r.stats.h ?? 0 },
 ];
 
 /** The day's three missions (same for everyone that UTC day; not the same three as Arena's day). */
@@ -369,7 +375,12 @@ export class RaceStatsTracker {
     return c;
   }
 
-  step(key: string, car: { air: number; pads: number; minis: number; purples: number; tricks: number; drafts: number }, wallHit: number, dt: number) {
+  step(
+    key: string,
+    car: { air: number; pads: number; minis: number; purples: number; tricks: number; drafts: number; used: number; rocketHits: number },
+    wallHit: number,
+    dt: number
+  ) {
     const c = this.of(key);
     c.t += dt;
     // The car keeps its own counts from the start (a new car each race).
@@ -378,6 +389,8 @@ export class RaceStatsTracker {
     c.stats.mp = car.purples;
     c.stats.t = car.tricks;
     c.stats.r = car.drafts;
+    c.stats.u = car.used;
+    c.stats.h = car.rocketHits;
     if (car.air > 0) c.stats.air += dt;
     else if (c.air >= JUMP_MIN) c.stats.j++;
     c.air = car.air;

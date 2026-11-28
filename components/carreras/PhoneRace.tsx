@@ -12,6 +12,10 @@ import {
   racersOf,
   reportFinish,
   writeRaceStats,
+  gasOf,
+  dropSlick,
+  fireRocket,
+  subscribeItems,
   seatOf,
   sendBotPose,
   subscribePoses,
@@ -33,9 +37,11 @@ import {
   lapsDone,
   newBrain,
   stepCar,
+  inTunnel,
   slipstream,
   driftTier,
   TRICK_SECONDS,
+  SPIN_OUT_SECONDS,
   wrongWay,
   type BotBrain,
   type Car,
@@ -50,7 +56,23 @@ import { TaloMark } from "@/components/TaloLogo";
 import Controller, { useWakeLock } from "./Controller";
 import { Standings, seatCarLook, stuntOf, useCameraMode, useSoundSetting } from "./shared";
 import { RaceStatsTracker } from "@/lib/carrerasProgress";
+import {
+  SLICK_SECONDS,
+  botUsesItem,
+  hitRockets,
+  hitSlicks,
+  itemBoxes,
+  rocketAlive,
+  rocketPose,
+  rocketProgress,
+  rocketTarget,
+  takeBoxes,
+  spendItem,
+  type Rocket,
+  type Slick,
+} from "@/lib/carrerasItems";
 import { RaceRewardCard, type RaceReward } from "./RaceProgress";
+import { ItemCard } from "./ItemCard";
 import { Eye, RotateCw, Volume2, VolumeX } from "lucide-react";
 import FullscreenButton from "@/components/FullscreenButton";
 import { useQuality } from "@/hooks/useQuality";
@@ -75,6 +97,9 @@ interface Ghost {
   /** Drift and trick, as its pose said. */
   d: number;
   k: number;
+  /** Shield on (1) and spin-out progress. */
+  sh: number;
+  o: number;
 }
 
 interface Hud {
@@ -82,6 +107,11 @@ interface Hud {
   place: number;
   count: number;
   wrong: boolean;
+  /** The power held and whether its roulette turns (3D power-ups). */
+  item: string;
+  rolling: boolean;
+  /** Drifting: -1 not, 0 sliding, 1 blue, 2 orange, 3 purple. */
+  drift: number;
 }
 
 /** A lap just done (its time), shown for a few seconds. */
@@ -114,6 +144,8 @@ function poseOf(car: Car, game: number, now: number): CarPose {
     t: Math.round(now),
     ...(car.drift ? { d: car.drift * (1 + driftTier(car)) } : {}),
     ...(car.trick > 0 ? { k: Math.round((1 - car.trick / TRICK_SECONDS) * 100) / 100 } : {}),
+    ...(car.shield > 0 ? { sh: 1 } : {}),
+    ...(car.spinOut > 0 ? { o: Math.round((1 - car.spinOut / SPIN_OUT_SECONDS) * 100) / 100 } : {}),
   };
 }
 
@@ -183,6 +215,13 @@ export default function PhoneRace({
   }, [flash]);
 
   useEffect(() => subscribePoses(roomId, (p) => (posesRef.current = p)), [roomId]);
+  // This race's oil and rockets (everyone's, mine too once the server has them).
+  const itemsRef = useRef<{ slicks: Slick[]; rockets: Rocket[] }>({ slicks: [], rockets: [] });
+  const gameNo = state.gameNo;
+  useEffect(() => {
+    itemsRef.current = { slicks: [], rockets: [] };
+    return subscribeItems(roomId, gameNo, (items) => (itemsRef.current = items));
+  }, [roomId, gameNo]);
 
   // Sound lives as long as the race view (a new context would need another tap to start).
   useEffect(() => {
@@ -242,6 +281,16 @@ export default function PhoneRace({
     let lastSpeed = -1;
     let lastLapText = "";
     let bots: BotRun | null = null;
+    // Power-ups: the boxes (hidden for a moment when a car drives through, here), what each car already met,
+    // my «Poder» presses seen, and the rockets I fired that already got there.
+    const boxes = itemBoxes(track);
+    let hidden: number[] = [];
+    let seenSlick = new Map<string, Set<string>>();
+    let seenRocket = new Map<string, Set<string>>();
+    let pressSeen = -1;
+    let rocketsLanded = new Set<string>();
+    let itemsGame = -1;
+    let spunSeen = 0;
     // In development `window.__carrerasAuto = true` drives my car like a bot (for testing).
     const autoBrain = process.env.NODE_ENV !== "production" ? newBrain("dificil", 0) : null;
     const ghosts = new Map<Seat, Ghost>();
@@ -301,7 +350,7 @@ export default function PhoneRace({
               ? { steer: 0, brake: false, gas: false }
               : auto
                 ? botInput(own, track, autoBrain, STEP)
-                : { steer: inputRef.current.s, brake: inputRef.current.b, drift: !!inputRef.current.d };
+                : { steer: inputRef.current.s, brake: inputRef.current.b, drift: !!inputRef.current.d, gas: gasOf(inputRef.current) };
             const hit = stepCar(own, input, track, STEP);
             if (cues.hit("wall", hit)) scene.impact(seat!, hit);
             if (!done) stats.step("own", own, hit, STEP);
@@ -350,6 +399,84 @@ export default function PhoneRace({
       } else {
         acc = 0;
       }
+
+      // Power-ups for the cars this phone runs (mine, and the bots if it's their host). Oil and rockets go to the room.
+      if (itemsGame !== s.gameNo) {
+        itemsGame = s.gameNo;
+        hidden = [];
+        seenSlick = new Map();
+        seenRocket = new Map();
+        rocketsLanded = new Set();
+        pressSeen = -1;
+      }
+      if (s.status === "racing" && moving) {
+        const world = itemsRef.current;
+        const progress: Record<string, number> = {};
+        for (const r of racers) {
+          if (r === seat && own) progress[r] = own.progress;
+          else if (runBots?.cars.has(r)) progress[r] = runBots.cars.get(r)!.progress;
+          else {
+            const g = ghosts.get(r);
+            if (g) progress[r] = g.p;
+          }
+        }
+        const order = Object.keys(progress).sort((x, y) => progress[y] - progress[x]);
+        const fire = (key: string, car: Car) => {
+          const act = spendItem(car);
+          if (act?.kind === "aceite") dropSlick(roomId, s.gameNo, { x: Math.round(act.x), y: Math.round(act.y), z: Math.round(act.z) });
+          else if (act?.kind === "cohete") {
+            const target = rocketTarget(key, progress);
+            if (target) fireRocket(roomId, s.gameNo, { by: key, target, p0: Math.round(car.progress) });
+          }
+        };
+        const meet = (key: string, car: Car) => {
+          hitSlicks(car, world.slicks, now, seenSlick.get(key) ?? seenSlick.set(key, new Set()).get(key)!);
+          hitRockets(key, car, world.rockets, now, seenRocket.get(key) ?? seenRocket.set(key, new Set()).get(key)!);
+        };
+        if (own && s.results[seat!] === undefined) {
+          takeBoxes(own, boxes, hidden, now, order.indexOf(seat!) + 1, racers.length);
+          const presses = inputRef.current.i ?? 0;
+          if (pressSeen >= 0 && presses > pressSeen) fire(seat!, own);
+          pressSeen = presses;
+          meet(seat!, own);
+        }
+        if (runBots) {
+          for (const [r, car] of runBots.cars) {
+            if (s.results[r] !== undefined || runBots.reported.has(r)) continue;
+            takeBoxes(car, boxes, hidden, now, order.indexOf(r) + 1, racers.length);
+            const behind = Math.min(...Object.keys(progress).filter((o) => o !== r && progress[o] < progress[r]).map((o) => progress[r] - progress[o]), Infinity);
+            if (botUsesItem(car, { behind, ahead: order.indexOf(r) > 0, straight: car.drift === 0 })) fire(r, car);
+            meet(r, car);
+          }
+        }
+        // Rivals driving through boxes pop them here too (no power for them: their own phone gives it).
+        for (const g of ghosts.values()) {
+          boxes.forEach((b, i) => {
+            if ((hidden[i] ?? 0) <= now && Math.abs(b.z - g.z) < 16 && Math.hypot(b.x - g.x, b.y - g.y) < 20) hidden[i] = now + 2500;
+          });
+        }
+        // My rockets that reached who they chased: a hit for my missions.
+        if (own) {
+          for (const r of world.rockets) {
+            if (r.by !== seat || rocketsLanded.has(r.id)) continue;
+            const target = progress[r.target];
+            if (target !== undefined && rocketProgress(r, now) >= target) {
+              rocketsLanded.add(r.id);
+              own.rocketHits++;
+            }
+          }
+        }
+      }
+      {
+        const world = itemsRef.current;
+        const progressOfKey = (r: string) => (r === seat && own ? own.progress : runBots?.cars.get(r as Seat)?.progress ?? ghosts.get(r as Seat)?.p);
+        scene.setItemWorld({
+          boxes: boxes.map((b, i) => ({ ...b, on: (hidden[i] ?? 0) <= now })),
+          slicks: world.slicks.filter((sl) => now - sl.t < SLICK_SECONDS * 1000),
+          rockets: world.rockets.filter((r) => rocketAlive(r, now, progressOfKey(r.target))).map((r) => rocketPose(track, r, now)),
+        });
+      }
+
       // My stunts: a word on screen when one fires.
       if (own) {
         const done = own.minis + own.tricks + own.drafts;
@@ -360,9 +487,13 @@ export default function PhoneRace({
           stunts = { m: own.minis, p: own.purples, t: own.tricks };
         }
       }
+      if (own && own.spinOut > 0 && spunSeen === 0) setFlash({ text: "¡Trompo!", sub: "", best: false, key: now });
+      spunSeen = own?.spinOut ?? 0;
+      // Under a tunnel's roof everything echoes.
+      audio?.setTunnel(!!own && inTunnel(track, own.s));
       if (own) {
         cues.air("own", own.air);
-        cues.stunt("own", own, dt);
+        cues.stunt(seat!, own, dt);
       }
       if (own && s.status === "racing" && moving) {
         const done = lapsDone(own, track);
@@ -428,10 +559,12 @@ export default function PhoneRace({
             p: pose.p,
             d: pose.d ?? 0,
             k: pose.k ?? 0,
+            sh: pose.sh ?? 0,
+            o: pose.o ?? 0,
           };
         } else {
           const g = gridCar(track, SEATS.indexOf(r));
-          target = { x: g.x, y: g.y, z: g.z, l: 0, h: g.heading, vx: 0, vy: 0, p: g.progress, d: 0, k: 0 };
+          target = { x: g.x, y: g.y, z: g.z, l: 0, h: g.heading, vx: 0, vy: 0, p: g.progress, d: 0, k: 0, sh: 0, o: 0 };
         }
         const cur = ghosts.get(r);
         if (!cur || Math.hypot(cur.x - target.x, cur.y - target.y) > 150) ghosts.set(r, target);
@@ -446,6 +579,8 @@ export default function PhoneRace({
           cur.p = target.p;
           cur.d = target.d;
           cur.k = target.k;
+          cur.sh = target.sh;
+          cur.o = target.o;
         }
       }
       for (const r of [...ghosts.keys()]) if (!racers.includes(r) || (r === seat && own) || runBots?.cars.has(r)) ghosts.delete(r);
@@ -456,7 +591,7 @@ export default function PhoneRace({
         const b = runBots?.cars.get(r);
         if (b) return { x: b.x, y: b.y, z: b.z, ground: b.ground, h: b.heading, vx: b.vx, vy: b.vy, p: b.progress, bump: b.bump, ...stuntOf(b) };
         const g = ghosts.get(r);
-        return g ? { x: g.x, y: g.y, z: g.z, ground: g.z - g.l, h: g.h, vx: g.vx, vy: g.vy, p: g.p, bump: 0, drift: g.d, spin: g.k } : null;
+        return g ? { x: g.x, y: g.y, z: g.z, ground: g.z - g.l, h: g.h, vx: g.vx, vy: g.vy, p: g.p, bump: 0, drift: g.d, spin: g.k, draft: 0, shield: g.sh > 0, out: g.o } : null;
       };
 
       // Places: finishers by time, then by distance driven.
@@ -473,7 +608,7 @@ export default function PhoneRace({
       for (const r of racers) {
         const c = carOf(r);
         if (!c) continue;
-        scene.setPose(r, { x: c.x, y: c.y, z: c.z, ground: c.ground, heading: c.h, vx: c.vx, vy: c.vy, bump: c.bump, drift: c.drift, spin: c.spin });
+        scene.setPose(r, { x: c.x, y: c.y, z: c.z, ground: c.ground, heading: c.h, vx: c.vx, vy: c.vy, bump: c.bump, drift: c.drift, spin: c.spin, draft: c.draft, shield: c.shield, out: c.out });
         dots.push({ x: c.x, y: c.y, heading: c.h, color: CARS[r].color });
       }
 
@@ -490,7 +625,7 @@ export default function PhoneRace({
             const dist = me ? Math.hypot(c.x - me.x, c.y - me.y) : 0;
             const volume = isMine ? 1 : Math.max(0, 1 - dist / 500) * 0.6;
             const slip = isMine ? Math.abs(-c.vx * Math.sin(c.h) + c.vy * Math.cos(c.h)) : 0;
-            audio.engine(r, Math.hypot(c.vx, c.vy) / MAX_SPEED, (slip - 50) / 150, volume);
+            audio.engine(r, Math.hypot(c.vx, c.vy) / MAX_SPEED, (slip - 50) / 150, volume, 0, r === seat && own ? gasOf(inputRef.current) : true);
           }
           audio.silence(racers);
         }
@@ -515,8 +650,11 @@ export default function PhoneRace({
           place: ranked.indexOf(seat!) + 1,
           count: racers.length,
           wrong: moving && s.results[seat!] === undefined && wrongWay(own, track),
+          item: own.item,
+          rolling: own.roll > 0,
+          drift: own.drift ? driftTier(own) : -1,
         };
-        const key = `${next.lap}:${next.place}:${next.count}:${next.wrong}`;
+        const key = `${next.lap}:${next.place}:${next.count}:${next.wrong}:${next.item}:${next.rolling}:${next.drift}`;
         if (key !== lastHud) {
           lastHud = key;
           setHud(next);
@@ -590,6 +728,27 @@ export default function PhoneRace({
         </div>
       </div>
 
+      {driving && hud && hud.drift >= 0 && myResult === undefined && (
+        <div className="pointer-events-none absolute inset-x-0 top-[38%] flex justify-center">
+          <div
+            key={hud.drift}
+            className="animate-celebration-in rounded-full px-5 py-1.5 font-display text-2xl font-bold text-white"
+            style={{
+              backgroundColor: ["#334155cc", "#2563ebdd", "#ea580cdd", "#9333eadd"][hud.drift],
+              boxShadow: `0 0 24px ${["#e2e8f0", "#60a5fa", "#fb923c", "#c084fc"][hud.drift]}`,
+            }}
+          >
+            {["Derrape", "Derrape · azul", "Derrape · naranja", "¡Derrape morado!"][hud.drift]}
+          </div>
+        </div>
+      )}
+
+      {driving && hud?.item && myResult === undefined && (
+        <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2">
+          <ItemCard id={hud.item} rolling={hud.rolling} hint="Toca «Poder» (E)" />
+        </div>
+      )}
+
       <p className="pointer-events-none absolute inset-x-0 top-20 hidden items-center justify-center gap-1.5 text-xs text-white/90 drop-shadow portrait:flex">
         <RotateCw className="h-3.5 w-3.5" /> Gira el teléfono para ver mejor la pista
       </p>
@@ -642,6 +801,8 @@ export default function PhoneRace({
           locked={counting}
           variant="overlay"
           onInput={(input) => (inputRef.current = input)}
+          powers
+          item={hud?.item ? { id: hud.item, rolling: hud.rolling } : null}
         />
       )}
 

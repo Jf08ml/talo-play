@@ -22,6 +22,7 @@ import {
   trackSeedOf,
   writeLive,
   writeRaceStats,
+  gasOf,
   type CarInputWire,
   type CarrerasGame,
   type CarrerasMeta,
@@ -39,6 +40,7 @@ import {
   lapsDone,
   newBrain,
   stepCar,
+  inTunnel,
   slipstream,
   trackLabel,
   wrongWay,
@@ -54,6 +56,22 @@ import { serverNow } from "@/lib/serverTime";
 import { roomPath } from "@/lib/games";
 import RoomQR from "@/components/RoomQR";
 import { RaceStatsTracker } from "@/lib/carrerasProgress";
+import { ItemCard } from "./ItemCard";
+import {
+  SLICK_SECONDS,
+  botUsesItem,
+  hitRockets,
+  hitSlicks,
+  itemBoxes,
+  rocketAlive,
+  rocketPose,
+  rocketTarget,
+  takeBoxes,
+  spendItem,
+  type ItemBox,
+  type Rocket,
+  type Slick,
+} from "@/lib/carrerasItems";
 import { watchRoomMeta } from "@/lib/roomSettings";
 import { useServerNow } from "@/hooks/useServerNow";
 import FirebaseSetupNotice from "@/components/FirebaseSetupNotice";
@@ -73,10 +91,25 @@ type Status = "loading" | "not-found" | "ready" | "error";
 const subscribeNever = () => () => {};
 const STEP = 1 / 120;
 /** Keyboard driving on the screen itself, to try it without phones. */
-const KEYS: Partial<Record<Seat, { left: string[]; right: string[]; brake: string[]; drift: string[] }>> = {
-  a: { left: ["a", "A"], right: ["d", "D"], brake: ["s", "S"], drift: ["Shift"] },
-  b: { left: ["ArrowLeft"], right: ["ArrowRight"], brake: ["ArrowDown"], drift: ["Enter"] },
+const KEYS: Partial<Record<Seat, { left: string[]; right: string[]; brake: string[]; drift: string[]; item: string[] }>> = {
+  a: { left: ["a", "A"], right: ["d", "D"], brake: ["s", "S"], drift: ["Shift"], item: ["e", "E"] },
+  b: { left: ["ArrowLeft"], right: ["ArrowRight"], brake: ["ArrowDown"], drift: ["Enter"], item: ["/", "-"] },
 };
+
+/** The race's power-ups on the big screen (3D): it runs them all, nothing is shared. */
+interface ItemsRun {
+  boxes: ItemBox[];
+  /** When each box comes back (server time). */
+  hidden: number[];
+  slicks: Slick[];
+  rockets: Rocket[];
+  /** Each car's slicks and rockets already met (each gets each one once). */
+  seenSlick: Partial<Record<Seat, Set<string>>>;
+  seenRocket: Partial<Record<Seat, Set<string>>>;
+  /** «Poder» presses seen per seat (the phone's counter, or a key held last frame). */
+  pressed: Partial<Record<Seat, number>>;
+  next: number;
+}
 
 interface Engine {
   /** Which race (or pre-race grid) these cars belong to. */
@@ -91,6 +124,8 @@ interface Engine {
   stats: RaceStatsTracker;
   /** The cars still racing when it closed got theirs written. */
   statsSent: boolean;
+  /** Power-ups (3D only). */
+  items: ItemsRun | null;
 }
 
 /** Cars go back on the grid when this changes: a new race, or who's seated while waiting. */
@@ -241,7 +276,20 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
       }
       const wire = inputsRef.current[s.seats[seat]];
       // No phone connected (or it dropped): the car brakes instead of driving into a wall.
-      return wire ? { steer: wire.s ?? 0, brake: !!wire.b, drift: !!wire.d } : { steer: 0, brake: false, gas: false };
+      return wire ? { steer: wire.s ?? 0, brake: !!wire.b, drift: !!wire.d, gas: gasOf(wire) } : { steer: 0, brake: false, gas: false };
+    };
+
+    /** Times «Poder» was pressed for this seat so far (the phone's counter; the test keys count each new hold). */
+    const keyHeld: Partial<Record<Seat, boolean>> = {};
+    const keyPresses: Partial<Record<Seat, number>> = {};
+    const pressesFor = (seat: Seat, s: CarrerasState): number => {
+      const k = KEYS[seat];
+      if (k) {
+        const held = k.item.some((key) => keysRef.current.has(key));
+        if (held && !keyHeld[seat]) keyPresses[seat] = (keyPresses[seat] ?? 0) + 1;
+        keyHeld[seat] = held;
+      }
+      return (inputsRef.current[s.seats[seat]]?.i ?? 0) + (keyPresses[seat] ?? 0);
     };
 
     const tick = (t: number) => {
@@ -254,7 +302,18 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
       if (!engine || engine.key !== engineKey(s)) {
         const cars: Partial<Record<Seat, Car>> = {};
         for (const seat of carSeats(s)) cars[seat] = gridCar(track, SEATS.indexOf(seat));
-        engine = { key: engineKey(s), cars, reported: new Set(), lastLive: "", brains: {}, laps: new LapClock(), wrong: "", stats: new RaceStatsTracker(), statsSent: false };
+        engine = {
+          key: engineKey(s),
+          cars,
+          reported: new Set(),
+          lastLive: "",
+          brains: {},
+          laps: new LapClock(),
+          wrong: "",
+          stats: new RaceStatsTracker(),
+          statsSent: false,
+          items: is3d ? { boxes: itemBoxes(track), hidden: [], slicks: [], rockets: [], seenSlick: {}, seenRocket: {}, pressed: {}, next: 0 } : null,
+        };
         scene?.setCars({});
         setFlash({});
         setWrong("");
@@ -302,6 +361,50 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
         acc = 0;
       }
 
+      // Power-ups: boxes, «Poder», oil and rockets (3D). Whoever's behind gets better ones.
+      const items = engine.items;
+      if (items && s.status === "racing" && moving) {
+        const progress: Record<string, number> = Object.fromEntries(seats.map((seat) => [seat, engine!.cars[seat]!.progress]));
+        const order = [...seats].sort((x, y) => progress[y] - progress[x]);
+        for (const seat of seats) {
+          const car = engine.cars[seat]!;
+          if (s.results[seat] !== undefined) continue;
+          takeBoxes(car, items.boxes, items.hidden, now, order.indexOf(seat) + 1, seats.length);
+          let use = false;
+          if (isBotSeat(s, seat)) {
+            const behind = Math.min(...seats.filter((o) => o !== seat && progress[o] < progress[seat]).map((o) => progress[seat] - progress[o]), Infinity);
+            use = botUsesItem(car, { behind, ahead: order.indexOf(seat) > 0, straight: Math.abs(car.drift) === 0 });
+          } else {
+            const count = pressesFor(seat, s);
+            const seen = items.pressed[seat];
+            items.pressed[seat] = count;
+            use = seen !== undefined && count > seen;
+          }
+          if (use) {
+            const act = spendItem(car);
+            if (act?.kind === "aceite") items.slicks.push({ id: `s${items.next++}`, x: act.x, y: act.y, z: act.z, t: now });
+            else if (act?.kind === "cohete") {
+              const target = rocketTarget(seat, progress);
+              if (target) items.rockets.push({ id: `r${items.next++}`, by: seat, target, p0: car.progress, t0: now });
+            }
+          }
+          hitSlicks(car, items.slicks, now, (items.seenSlick[seat] ??= new Set()));
+          for (const r of hitRockets(seat, car, items.rockets, now, (items.seenRocket[seat] ??= new Set()))) {
+            const shooter = engine.cars[r.by as Seat];
+            if (shooter) shooter.rocketHits++;
+          }
+        }
+        items.slicks = items.slicks.filter((sl) => now - sl.t < SLICK_SECONDS * 1000);
+        items.rockets = items.rockets.filter((r) => rocketAlive(r, now, progress[r.target]));
+      }
+      if (scene && items) {
+        scene.setItemWorld({
+          boxes: items.boxes.map((b, i) => ({ ...b, on: (items.hidden[i] ?? 0) <= now })),
+          slicks: items.slicks,
+          rockets: items.rockets.map((r) => rocketPose(track, r, now)),
+        });
+      }
+
       // Finish line, once per car; a chime on every other lap; lap times and the last lap on each view.
       if (s.status === "racing" && moving) {
         const raceMs = now - s.startedAt;
@@ -343,9 +446,11 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
           const pan = is3d ? (seats.length === 1 ? 0 : i % 2 ? 0.6 : -0.6) : (car.x / track.worldW) * 1.6 - 0.8;
           cues.air(seat, car.air, pan);
           cues.stunt(seat, car, dt, pan);
-          audio.engine(seat, Math.hypot(car.vx, car.vy) / MAX_SPEED, (slip - 50) / 150, seats.length > 1 ? 0.7 : 1, pan);
+          audio.engine(seat, Math.hypot(car.vx, car.vy) / MAX_SPEED, (slip - 50) / 150, seats.length > 1 ? 0.7 : 1, pan, isBotSeat(s, seat) || gasOf(inputsRef.current[s.seats[seat]]));
         });
         audio.silence(seats);
+        // A player's car under a tunnel's roof: everything echoes.
+        audio.setTunnel(seats.some((seat) => !isBotSeat(s, seat) && inTunnel(track, engine!.cars[seat]!.s)));
       }
 
       // Places: finishers by time, then by distance driven.
@@ -364,7 +469,8 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
       if (s.status !== "waiting") {
         const cars: Partial<Record<Seat, LiveCar>> = {};
         ranked.forEach((seat, i) => {
-          cars[seat] = { lap: lapsDone(engine!.cars[seat]!, track) + 1, place: i + 1 };
+          const car = engine!.cars[seat]!;
+          cars[seat] = { lap: lapsDone(car, track) + 1, place: i + 1, ...(car.item ? { it: car.item, ro: car.roll > 0 } : {}) };
         });
         const key = JSON.stringify(cars);
         if (key !== engine.lastLive) {
@@ -616,6 +722,11 @@ function ViewTags({
             <div className="absolute bottom-3 left-3">
               <SeatTag seat={seat} state={state} hud={hud} laps={laps} here={here} flash={f} wrong={isWrong} now={now} />
             </div>
+            {hud[seat]?.it && state.results[seat] === undefined && (
+              <div className="absolute right-3 top-3">
+                <ItemCard id={hud[seat]!.it!} rolling={!!hud[seat]!.ro} size={n > 2 ? "sm" : "lg"} hint="«Poder» en tu celular" />
+              </div>
+            )}
           </div>
         );
       })}

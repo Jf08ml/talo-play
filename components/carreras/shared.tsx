@@ -17,7 +17,7 @@ import {
   type Seat,
 } from "@/lib/carreras";
 import type { CameraMode, CarLook } from "@/lib/carreras3d";
-import { TRICK_SECONDS, driftTier, type Car } from "@/lib/carrerasTrack";
+import { DRAFT_CHARGE, SPIN_OUT_SECONDS, TRICK_SECONDS, driftTier, type Car } from "@/lib/carrerasTrack";
 import { DEFAULT_CAR_LOOK, botCarLook, carPaint, validCarLook } from "@/lib/carrerasProgress";
 import type { PresenceMap } from "@/lib/presence";
 import { serverNow } from "@/lib/serverTime";
@@ -42,10 +42,13 @@ export function driverName(state: CarrerasState, seat: Seat, myId = ""): string 
 }
 
 /** What the scene shows of a car's drift (side × (1 + mini-turbo)) and trick spin (0…1). */
-export function stuntOf(car: Car): { drift: number; spin: number } {
+export function stuntOf(car: Car): { drift: number; spin: number; draft: number; shield: boolean; out: number } {
   return {
     drift: car.drift ? car.drift * (1 + driftTier(car)) : 0,
     spin: car.trick > 0 ? 1 - car.trick / TRICK_SECONDS : 0,
+    draft: Math.max(0, car.draft) / DRAFT_CHARGE,
+    shield: car.shield > 0,
+    out: car.spinOut > 0 ? 1 - car.spinOut / SPIN_OUT_SECONDS : 0,
   };
 }
 

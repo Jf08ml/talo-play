@@ -48,6 +48,19 @@
 }
 
 /* A pen stroke drawing itself (Triqui's X and O; paths use pathLength="1"). */
+/* Carreras: the power roulette (components/carreras/ItemCard.tsx), six cells, the last = the first. */
+@keyframes item-roulette {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-83.333%);
+  }
+}
+.item-roulette {
+  animation: item-roulette 0.42s steps(5) infinite;
+}
+
 @keyframes mark-draw {
   from {
     stroke-dashoffset: 1;

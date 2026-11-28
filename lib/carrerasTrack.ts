@@ -16,7 +16,7 @@ import { mulberry32 } from "./random";
 export type TrackTheme = "campo" | "atardecer" | "desierto" | "nieve" | "noche";
 export const THEMES: TrackTheme[] = ["campo", "atardecer", "desierto", "nieve", "noche"];
 
-export type FixedTrackId = "ovalo" | "curvas" | "costa" | "rulos" | "serpentina" | "granpremio" | "canon" | "nocturna";
+export type FixedTrackId = "ovalo" | "curvas" | "costa" | "rulos" | "serpentina" | "granpremio" | "canon" | "nocturna" | "centro";
 /** `aleatoria` is generated from the race state's `trackSeed`. */
 export type TrackId = FixedTrackId | "aleatoria";
 
@@ -48,6 +48,8 @@ export interface TrackDef {
   long?: boolean;
   /** Buildings instead of most trees (3D only). */
   city?: boolean;
+  /** Covered stretches: [from, to] as control point indices (+ fraction), in driving order (3D draws walls and a roof). */
+  tunnels?: [number, number][];
 }
 
 /** Ramps: a wedge on the road, rising to its lip and dropping sharply. */
@@ -71,7 +73,7 @@ export const TRACKS: Record<FixedTrackId, TrackDef> = {
       [420, 200, 30], [700, 160, 55], [1000, 160, 60], [1300, 160, 55], [1580, 200, 30], [1770, 340, 10],
       [1830, 560], [1770, 780], [1580, 920], [1300, 960],
     ],
-    ramps: [{ at: 7.75 }],
+    ramps: [{ at: 7.75 }, { at: 9.45, side: 0.5, span: 0.55 }, { at: 1.5 }],
     boosts: [{ at: 0.35, side: 0.55, span: 0.45 }, { at: 14.4, side: -0.55, span: 0.45 }],
   },
   curvas: {
@@ -86,7 +88,7 @@ export const TRACKS: Record<FixedTrackId, TrackDef> = {
       [1820, 1170], [2080, 1060, 20], [2240, 820, 40], [2230, 520, 55], [2060, 260, 70], [1800, 170, 80],
       [1530, 260, 80], [1360, 450, 78], [1200, 675, 75], [1040, 900, 55], [900, 1080, 12], [740, 1150],
     ],
-    ramps: [{ at: 6.2, side: -0.5, span: 0.55 }],
+    ramps: [{ at: 6.2, side: -0.5, span: 0.55 }, { at: 12.4 }, { at: 22.3, side: 0.5, span: 0.55 }],
     boosts: [{ at: 0.3 }, { at: 17.4, side: 0.5, span: 0.5 }],
   },
   costa: {
@@ -152,8 +154,9 @@ export const TRACKS: Record<FixedTrackId, TrackDef> = {
       [2250, 680], [2535, 800], [2850, 1030], [3150, 1200], [3500, 1250], [3850, 1150],
       [4100, 1300], [4150, 1650], [4000, 1950], [3650, 2150], [3200, 2250],
     ],
-    ramps: [{ at: 21.4 }, { at: 36.3, side: -0.5, span: 0.55 }],
+    ramps: [{ at: 2.4 }, { at: 10.4, side: 0.5, span: 0.55 }, { at: 21.4 }, { at: 24.4, side: -0.5, span: 0.55 }],
     boosts: [{ at: 0.4, side: 0.5, span: 0.5 }, { at: 8.6 }, { at: 23.5, side: -0.5, span: 0.5 }, { at: 40.5 }],
+    tunnels: [[34.6, 37.4]],
   },
   canon: {
     label: "Cañón",
@@ -170,8 +173,9 @@ export const TRACKS: Record<FixedTrackId, TrackDef> = {
       [2200, 220], [1700, 200], [1250, 240], [900, 400], [800, 700, 25], [1000, 950, 50],
       [1300, 1100, 60], [1350, 1400, 40], [1100, 1650, 20], [700, 1700], [400, 1850], [400, 2100], [600, 2220],
     ],
-    ramps: [{ at: 2.3 }, { at: 18.3, side: 0.5, span: 0.55 }, { at: 24.4 }],
+    ramps: [{ at: 2.3 }, { at: 18.3, side: 0.5, span: 0.55 }, { at: 24.4 }, { at: 33.5, side: -0.5, span: 0.55 }],
     boosts: [{ at: 0.5 }, { at: 11.3, side: -0.5, span: 0.5 }, { at: 25.4, side: 0.5, span: 0.5 }, { at: 32.5 }],
+    tunnels: [[11.3, 13.7]],
   },
   nocturna: {
     label: "Nocturna",
@@ -189,12 +193,33 @@ export const TRACKS: Record<FixedTrackId, TrackDef> = {
       [400, 450], [350, 800], [450, 1150], [700, 1350], [1100, 1450], [1600, 1500],
       [2150, 1550], [2450, 1750], [2250, 1950], [1700, 1950], [1100, 1900], [600, 1850], [400, 2050], [550, 2250],
     ],
-    ramps: [{ at: 1.3 }, { at: 17.3, side: -0.5, span: 0.55 }],
+    ramps: [{ at: 1.3 }, { at: 22.6, side: -0.5, span: 0.55 }, { at: 27.5 }],
     boosts: [{ at: 0.4, side: -0.5, span: 0.5 }, { at: 10.3 }, { at: 21.2, side: 0.5, span: 0.5 }, { at: 33.4 }],
+    tunnels: [[17.6, 19.2]],
+  },
+  centro: {
+    label: "Centro",
+    hint: "Larga · ciudad, túneles y autopista",
+    width: 125,
+    theme: "atardecer",
+    long: true,
+    city: true,
+    size: [5200, 3000],
+    points: [
+      [3800, 2700], [3000, 2700], [2200, 2700], [1400, 2700], [800, 2600], [450, 2300],
+      [350, 1800], [400, 1300], [450, 850, 20], [650, 500, 45], [1100, 300, 65], [1800, 250, 75],
+      [2600, 250, 75], [3400, 280, 60], [4100, 350, 35], [4650, 550, 10], [4850, 950], [4850, 1450],
+      [4650, 1800], [4200, 1900], [3600, 1850], [3100, 1700], [2700, 1450], [2300, 1150],
+      [1800, 1050], [1350, 1150], [1100, 1450], [1150, 1850], [1450, 2150], [2000, 2250],
+      [2700, 2250], [3300, 2200], [3800, 2100], [4300, 2250], [4500, 2550], [4250, 2700],
+    ],
+    ramps: [{ at: 2.4 }, { at: 12.3, side: 0.5, span: 0.55 }, { at: 16.4 }, { at: 20.4, side: -0.5, span: 0.55 }],
+    boosts: [{ at: 0.4, side: 0.5, span: 0.5 }, { at: 6.5 }, { at: 13.5, side: -0.5, span: 0.5 }, { at: 26.5 }],
+    tunnels: [[23.2, 24.8], [29.2, 31.8]],
   },
 };
 
-export const TRACK_ORDER: TrackId[] = ["ovalo", "curvas", "costa", "rulos", "serpentina", "granpremio", "canon", "nocturna", "aleatoria"];
+export const TRACK_ORDER: TrackId[] = ["ovalo", "curvas", "costa", "rulos", "serpentina", "granpremio", "canon", "nocturna", "centro", "aleatoria"];
 
 /** Tracks a game offers: the long ones only in 3D (from above their cars would be tiny). */
 export function tracksFor(is3d: boolean): TrackId[] {
@@ -237,6 +262,8 @@ export interface Track {
   worldH: number;
   ramps: Zone[];
   boosts: Zone[];
+  /** Covered stretches (the whole width). */
+  tunnels: Zone[];
 }
 
 const SAMPLE_STEP = 10;
@@ -297,8 +324,20 @@ function sample(def: TrackDef): Track {
     worldH: def.size[1],
     ramps: zones(def.ramps, RAMP_LENGTH, 1),
     boosts: zones(def.boosts, BOOST_LENGTH, 0.5),
+    tunnels: (def.tunnels ?? []).map(([from, to]) => {
+      const s0 = sAt(from);
+      return { s0, len: (sAt(to) - s0 + length) % length, lo: -half, hi: half };
+    }),
   };
 }
+
+/** Whether arc length `s` is under a tunnel. */
+export function inTunnel(track: Track, s: number): boolean {
+  return track.tunnels.some((t) => intoZone(track, t, s) < t.len);
+}
+
+/** A tunnel's roof stands this high over the road (the chase camera rides at ~30). */
+export const TUNNEL_HEIGHT = 62;
 
 /** How far past a zone's start `s` is, along the track (wraps around the start line). */
 export function intoZone(track: Track, zone: Zone, s: number): number {
@@ -391,6 +430,19 @@ export function trackProblem(track: Track): string | null {
     // Flat around the start: the grid, the gantry and the stands.
     const fromStart = Math.min(cum[i], length - cum[i]);
     if (fromStart < 200 && hs[i] > 2) return "start";
+  }
+  // Tunnels: no ramp inside (it'd jump into the roof), and no other part of the track crossing it.
+  for (const t of track.tunnels) {
+    if (track.ramps.some((r) => intoZone(track, t, r.s0) < t.len + 40 || intoZone(track, r, t.s0) < r.len)) return "tunnel-ramp";
+    for (let i = 0; i < n; i += 2) {
+      if (intoZone(track, t, cum[i]) >= t.len) continue;
+      for (let j = 0; j < n; j += 2) {
+        let along = Math.abs(cum[j] - cum[i]);
+        along = Math.min(along, length - along);
+        if (along < w * 3) continue;
+        if (Math.hypot(xs[j] - xs[i], ys[j] - ys[i]) < w + 60 && Math.abs(hs[j] - hs[i]) < TUNNEL_HEIGHT + 60) return "tunnel-cross";
+      }
+    }
   }
   // Separation between parts of the track that aren't neighbors along it.
   const minGap = w + 34;
@@ -607,13 +659,15 @@ const DRIFT_DRAG = 90;
 export const DRIFT_TIERS = [0.75, 1.5, 2.4];
 const MINI_TURBO = [0.45, 0.8, 1.2];
 /** A trick spin's length; landed after it ends, a boost. */
-export const TRICK_SECONDS = 0.45;
+export const TRICK_SECONDS = 0.3;
 const TRICK_BOOST = 0.7;
 /** Slipstream: right behind another car (this far ahead, this close sideways), fast, for this long: a push. */
-const DRAFT_AHEAD = [22, 150];
-const DRAFT_SIDE = 16;
-const DRAFT_FROM = MAX_SPEED * 0.6;
-export const DRAFT_CHARGE = 1.1;
+const DRAFT_AHEAD = [20, 200];
+const DRAFT_SIDE = 32;
+const DRAFT_FROM = MAX_SPEED * 0.5;
+export const DRAFT_CHARGE = 0.8;
+/** After a push, this long before it can charge again (two cars close would push each other forever). */
+const DRAFT_REST = 2.5;
 const DRAFT_BOOST = 0.7;
 
 /** The mini-turbo a drift has charged so far: 0 none, 1 blue, 2 orange, 3 purple. */
@@ -654,9 +708,11 @@ export function slipstream(car: Car, others: { x: number; y: number; z: number }
       }
     }
   }
-  car.draft = behind ? car.draft + dt : Math.max(0, car.draft - dt * 2);
+  // Negative: resting after a push.
+  if (car.draft < 0) car.draft = Math.min(0, car.draft + dt);
+  else car.draft = behind ? car.draft + dt : Math.max(0, car.draft - dt * 2);
   if (car.draft >= DRAFT_CHARGE) {
-    car.draft = 0;
+    car.draft = -DRAFT_REST;
     car.drafts++;
     burst(car, DRAFT_BOOST, 1.08);
   }
@@ -694,7 +750,7 @@ export interface Car {
   trickReady: boolean;
   /** The drift button last step (a trick takes a fresh tap). */
   lastDrift: boolean;
-  /** Seconds of slipstream charged. */
+  /** Seconds of slipstream charged (negative: resting after a push). */
   draft: number;
   /** Counts for the race (missions): boost pads, mini-turbos (and purple ones), tricks landed, slipstream pushes. */
   pads: number;
@@ -702,10 +758,59 @@ export interface Car {
   purples: number;
   tricks: number;
   drafts: number;
+  /** Power-ups (lib/carrerasItems.ts): the one held ("" none), uses left, seconds of the roulette still turning. */
+  item: string;
+  itemN: number;
+  roll: number;
+  /** Seconds of shield left, and of a spin-out (hit by a rocket or oil: no control, losing speed). */
+  shield: number;
+  spinOut: number;
+  /** Counts for the race: power-ups used, rockets that hit someone. */
+  used: number;
+  rocketHits: number;
 }
 
 /** A car's drift, trick and race counts, all at rest. */
-const FRESH = { drift: 0, driftT: 0, trick: 0, trickReady: false, lastDrift: false, draft: 0, pads: 0, minis: 0, purples: 0, tricks: 0, drafts: 0 };
+const FRESH = {
+  drift: 0,
+  driftT: 0,
+  trick: 0,
+  trickReady: false,
+  lastDrift: false,
+  draft: 0,
+  pads: 0,
+  minis: 0,
+  purples: 0,
+  tricks: 0,
+  drafts: 0,
+  item: "",
+  itemN: 0,
+  roll: 0,
+  shield: 0,
+  spinOut: 0,
+  used: 0,
+  rocketHits: 0,
+};
+
+/** A spin-out's length, and how fast it bleeds the speed. */
+export const SPIN_OUT_SECONDS = 1.1;
+const SPIN_OUT_DRAG = 2.0;
+
+/**
+ * Hit by a rocket or oil: spins out (no control for a moment, losing speed)
+ * unless a shield takes it (the shield is spent). Returns whether it spun.
+ */
+export function spinOutCar(car: Car): boolean {
+  if (car.spinOut > 0) return false;
+  if (car.shield > 0) {
+    car.shield = 0;
+    return false;
+  }
+  car.spinOut = SPIN_OUT_SECONDS;
+  car.drift = car.driftT = 0;
+  car.boost = 0;
+  return true;
+}
 
 /**
  * Starting grid behind the start line, two cars per row, facing the driving
@@ -747,6 +852,16 @@ function wrapDelta(d: number, length: number): number {
 
 /** Advances one car by `dt` seconds; returns how hard it hit a wall (speed into it, 0 if it didn't). */
 export function stepCar(car: Car, input: CarInput, track: Track, dt: number): number {
+  // Spinning out: no wheel, no brake, no drift until it's over (the gas stays on: it ends at about a third of its speed).
+  if (car.spinOut > 0) {
+    car.spinOut = Math.max(0, car.spinOut - dt);
+    input = { steer: 0, brake: false };
+    const k = Math.exp(-SPIN_OUT_DRAG * dt);
+    car.vx *= k;
+    car.vy *= k;
+  }
+  car.shield = Math.max(0, car.shield - dt);
+  car.roll = Math.max(0, car.roll - dt);
   const fx = Math.cos(car.heading);
   const fy = Math.sin(car.heading);
   let forward = car.vx * fx + car.vy * fy;
@@ -779,7 +894,7 @@ export function stepCar(car: Car, input: CarInput, track: Track, dt: number): nu
   if (drifting) car.driftT += dt * (0.6 + 0.6 * Math.max(0, steer * car.drift));
 
   // A trick: a tap of the drift button in the air spins the car; land it after the spin for a boost.
-  if (flying && tap && car.air > 0.08 && !car.trickReady) {
+  if (flying && tap && car.air > 0.05 && !car.trickReady) {
     car.trick = TRICK_SECONDS;
     car.trickReady = true;
   }
@@ -878,7 +993,10 @@ export function stepCar(car: Car, input: CarInput, track: Track, dt: number): nu
       car.vz -= GRAVITY * dt;
       car.air = dt;
     } else {
-      car.vz = (ground - car.z) / dt;
+      // Rising with the road at most as fast as its steepest slope allows: driving onto a ramp from its side
+      // or its high end is a step up, and taken as a speed (30 units in one tick) it fired the car into the sky.
+      const climb = Math.hypot(car.vx, car.vy) * (MAX_SLOPE + RAMP_HEIGHT / RAMP_LENGTH);
+      car.vz = Math.min((ground - car.z) / dt, climb);
       car.z = ground;
     }
   }

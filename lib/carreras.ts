@@ -1,4 +1,4 @@
-import { ref, get, onDisconnect, onValue, remove, serverTimestamp, set, update, type Unsubscribe } from "firebase/database";
+import { ref, get, onDisconnect, onValue, push, remove, serverTimestamp, set, update, type Unsubscribe } from "firebase/database";
 import { getDb } from "./firebase";
 import { generateRoomCode } from "./ids";
 import { serverNow } from "./serverTime";
@@ -6,6 +6,7 @@ import { transactState } from "./transact";
 import { makeSeed } from "./random";
 import { BOT_LEVELS, isLongTrack, isTrackId, type BotLevel, type TrackId } from "./carrerasTrack";
 import type { CarLookIds, RaceStats } from "./carrerasProgress";
+import type { Rocket, Slick } from "./carrerasItems";
 
 /**
  * Carreras, two games on the same rooms, physics and controls: `carreras`
@@ -104,11 +105,22 @@ export interface CarInputWire {
   b: boolean;
   /** The drift button held (absent on older phones). */
   d?: boolean;
+  /** Times «Poder» was pressed (a counter, so a quick tap is never lost). */
+  i?: number;
+  /** Manual throttle chosen (`m`) and «Acelerar» held (`g`); without `m` the gas is automatic. */
+  m?: boolean;
+  g?: boolean;
 }
+
+/** The gas for a phone's input: held «Acelerar» in manual mode, always on otherwise. */
+export const gasOf = (wire: CarInputWire | undefined): boolean => !wire?.m || !!wire.g;
 
 export interface LiveCar {
   lap: number;
   place: number;
+  /** The power held (lib/carrerasItems.ts `ItemId`) and whether its roulette is still turning. */
+  it?: string;
+  ro?: boolean;
 }
 
 export interface CarrerasLive {
@@ -135,6 +147,9 @@ export interface CarPose {
   /** Drifting (side × (1 + mini-turbo charged)) and a trick spin's progress (0…1); absent when not. */
   d?: number;
   k?: number;
+  /** Shield on (1), and a spin-out's progress (0…1); absent when not. */
+  sh?: number;
+  o?: number;
 }
 
 export function isCarrerasGame(game: unknown): game is CarrerasGame {
@@ -440,6 +455,31 @@ export function writeRaceStats(roomId: string, gameNo: number, seat: Seat, stats
 
 export function subscribeRaceStats(roomId: string, seat: Seat, cb: (stats: (RaceStats & { g: number }) | null) => void): Unsubscribe {
   return onValue(ref(getDb(), `${base(roomId)}/stats/${seat}`), (snap) => cb(snap.val()));
+}
+
+// ---- Power-ups (telefono: oil and rockets every phone sees) ---------------------
+
+/** This race's oil and rockets (each race has its own, so an old one never shows). */
+const itemsPath = (roomId: string, gameNo: number) => `${base(roomId)}/items/g${gameNo}`;
+
+/** Oil dropped on the road (stamped with the server's time). */
+export function dropSlick(roomId: string, gameNo: number, slick: { x: number; y: number; z: number }) {
+  return push(ref(getDb(), `${itemsPath(roomId, gameNo)}/slicks`), { ...slick, t: serverTimestamp() }).catch(console.error);
+}
+
+/** A rocket fired by `by` at `target` from progress `p0` (stamped with the server's time). */
+export function fireRocket(roomId: string, gameNo: number, rocket: { by: string; target: string; p0: number }) {
+  return push(ref(getDb(), `${itemsPath(roomId, gameNo)}/rockets`), { ...rocket, t0: serverTimestamp() }).catch(console.error);
+}
+
+export function subscribeItems(roomId: string, gameNo: number, cb: (items: { slicks: Slick[]; rockets: Rocket[] }) => void): Unsubscribe {
+  return onValue(ref(getDb(), itemsPath(roomId, gameNo)), (snap) => {
+    const raw = (snap.val() ?? {}) as { slicks?: Record<string, Omit<Slick, "id">>; rockets?: Record<string, Omit<Rocket, "id">> };
+    cb({
+      slicks: Object.entries(raw.slicks ?? {}).map(([id, s]) => ({ id, ...s })),
+      rockets: Object.entries(raw.rockets ?? {}).map(([id, r]) => ({ id, ...r })),
+    });
+  });
 }
 
 // ---- Car poses (telefono: every phone → everyone) -------------------------

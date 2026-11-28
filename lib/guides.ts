@@ -872,6 +872,14 @@ export const GUIDES: Record<GameId, Guide> = {
         ],
       },
       {
+        title: "Poderes",
+        text: [
+          "En la pista hay cajas de colores con un signo de pregunta: pasa por una y, tras un momento, tienes un poder. Úsalo con el botón «Poder» (E en la computadora).",
+          "Turbo (o triple turbo): un empujón de velocidad. Escudo: una burbuja que te protege de un ataque. Mancha de aceite: la dejas detrás y quien la pisa da un trompo. Cohete: persigue al auto que va delante tuyo y lo hace girar.",
+          "Quien va atrás recibe mejores poderes y quien va primero, más defensas: así la carrera se mantiene pareja hasta el final.",
+        ],
+      },
+      {
         title: "Pistas",
         text: [
           "Hay pistas cortas para empezar y tres largas, solo en 3D: Gran Premio (un ocho con puente), Cañón (subidas y saltos en el desierto) y Nocturna (una ciudad de noche con autopista). También hay pistas armadas al azar.",

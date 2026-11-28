@@ -108,7 +108,7 @@ export function useRaceReward(roomId: string, state: CarrerasState | null, myId:
     const myTime = state.results[seat];
     const place = 1 + (myTime === undefined ? times.length : times.filter((ms) => ms < myTime).length);
     const raceStats: RaceStats = mine
-      ? { b: mine.b ?? 0, j: mine.j ?? 0, air: mine.air ?? 0, w: mine.w ?? 0, p: mine.p ?? 0, l: mine.l ?? 0, m: mine.m ?? 0, mp: mine.mp ?? 0, t: mine.t ?? 0, r: mine.r ?? 0 }
+      ? { b: mine.b ?? 0, j: mine.j ?? 0, air: mine.air ?? 0, w: mine.w ?? 0, p: mine.p ?? 0, l: mine.l ?? 0, m: mine.m ?? 0, mp: mine.mp ?? 0, t: mine.t ?? 0, r: mine.r ?? 0, u: mine.u ?? 0, h: mine.h ?? 0 }
       : EMPTY_RACE;
     const { next, gained, completed, levelsUp } = applyRace(loadCarProgress(), {
       played: true,

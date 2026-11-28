@@ -371,7 +371,13 @@ function Driver({
         <p className="font-display text-3xl font-bold text-slate-100">{counting ? left : info ? `${info.place}°` : ""}</p>
       </div>
       {result === undefined ? (
-        <Controller color={CARS[seat].color} locked={counting} onInput={send} />
+        <Controller
+          color={CARS[seat].color}
+          locked={counting}
+          onInput={send}
+          powers={meta.game === "carreras3d"}
+          item={info?.it ? { id: info.it, rolling: !!info.ro } : null}
+        />
       ) : (
         <p className="rounded-xl bg-slate-900/70 p-4 text-center text-slate-300">Esperando a que lleguen los demás…</p>
       )}
