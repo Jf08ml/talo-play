@@ -14,15 +14,17 @@ import { loadPad, padBox, savePad, type PadControl, type PadPlace, type PadSetti
 
 /** The settings saved under `key` (defaults must be a module constant). */
 export function usePadSettings<K extends string>(key: string, defaults: PadSettings<K>): [PadSettings<K>, (s: PadSettings<K>) => void] {
-  const [settings, setSettings] = useState<PadSettings<K>>(() => (typeof window === "undefined" ? defaults : loadPad(key, defaults)));
+  const [state, setState] = useState<{ key: string; settings: PadSettings<K> }>(() => ({ key, settings: typeof window === "undefined" ? defaults : loadPad(key, defaults) }));
+  // Another layout (the phone turned sideways): load its own.
+  if (state.key !== key) setState({ key, settings: loadPad(key, defaults) });
   const set = useCallback(
     (s: PadSettings<K>) => {
-      setSettings(s);
+      setState({ key, settings: s });
       savePad(key, s);
     },
     [key]
   );
-  return [settings, set];
+  return [state.key === key ? state.settings : defaults, set];
 }
 
 /** An element's size, kept up to date. */

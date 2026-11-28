@@ -1,5 +1,6 @@
 "use client";
 
+import ControllerShell, { ControllerActions } from "@/components/ControllerShell";
 import { useEffect, useRef, useState } from "react";
 import { Keyboard, MonitorPlay, RefreshCw, ShieldCheck, Skull, SlidersHorizontal, Trophy } from "lucide-react";
 import {
@@ -370,13 +371,14 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
         >
           <SlidersHorizontal className="h-4 w-4" />
         </button>
+        <ControllerActions game="fuego" className="absolute right-2 top-2 z-20" />
         {editing && <ControlsEditor settings={touch} onChange={changeTouch} onClose={() => setEditing(false)} />}
       </div>
     );
   }
 
   return (
-    <div className="flex h-dvh flex-col gap-2 bg-talo-ink p-2.5 text-white select-none [touch-action:none]">
+    <ControllerShell className="gap-2">
       <div className="flex items-center gap-3 rounded-2xl bg-white/[0.06] px-3 py-2">
         <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: color }} />
         <div className="min-w-0 flex-1">
@@ -401,7 +403,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
           )}
         </div>
         {alive && guarded(state, clientId, t) && <ShieldCheck className="h-5 w-5 shrink-0 text-cyan-300" aria-label="Protegido" />}
-        <MonitorPlay className="h-5 w-5 shrink-0 text-white/40" aria-label="Mira la pantalla grande" />
+        <ControllerActions game="fuego" />
       </div>
 
       {chaos && (
@@ -430,7 +432,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
       <p className="pointer-events-none hidden items-center justify-center gap-1.5 text-xs text-white/40 [@media(hover:hover)_and_(pointer:fine)]:flex">
         <Keyboard className="h-3.5 w-3.5" /> WASD moverte · flechas mirar · J disparar · K apuntar · C habilidad · espacio saltar · R recargar · Q cambiar arma · G globo · F golpe · E agarrar
       </p>
-    </div>
+    </ControllerShell>
   );
 }
 

@@ -1355,6 +1355,8 @@ export class RaceScene {
   private padGlow: { mat: THREE.MeshLambertMaterial | THREE.MeshBasicMaterial; base: THREE.Color }[] = [];
   private crowds: { mesh: THREE.InstancedMesh; base: THREE.Vector3[]; phase: number[] }[] = [];
   private disposed = false;
+  /** The shadow map was drawn at least once. */
+  private shadowReady = false;
   /** Specks rushing past at high speed. */
   private wind = new Particles(260, false, 0);
   private confettiP = new Particles(500, false, 70);
@@ -3150,6 +3152,13 @@ export class RaceScene {
         const half = Math.min(900, Math.max(320, Math.ceil((Math.max(x1 - x0, z1 - z0) / 2 + 220) / 80) * 80));
         aimShadow(this.sun, (x0 + x1) / 2, y / count, (z0 + z1) / 2, half, this.sunDir);
         this.renderer.shadowMap.needsUpdate = true;
+        this.shadowReady = true;
+      } else if (!this.shadowReady) {
+        // No car followed yet (the big screen's aerial view before the start): draw the shadow map once anyway.
+        // Materials first drawn without it don't match it later, and WebGL then skips everything lit.
+        aimShadow(this.sun, this.cx, 0, this.cz, 900, this.sunDir);
+        this.renderer.shadowMap.needsUpdate = true;
+        this.shadowReady = true;
       }
     }
     views.forEach((view, i) => {

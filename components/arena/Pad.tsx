@@ -1,9 +1,10 @@
 "use client";
 
+import ControllerShell, { ControllerActions } from "@/components/ControllerShell";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { AdjustButton, PadSurface, usePadSettings } from "@/components/PadKit";
 import { padDefaults, type PadControl } from "@/lib/padLayout";
-import { Keyboard, MonitorPlay, Shield, Sparkles, Swords } from "lucide-react";
+import { Keyboard, Shield, Sparkles, Swords } from "lucide-react";
 import { MODE_INFO, NO_PAD, fighterColor, fighterName, openPad, teamInfo, wavesSurvived, type ArenaPad, type ArenaState } from "@/lib/arena";
 import { MAX_HP, SPECIALS, SPECIAL_MAX, WEAPONS, specialOf } from "@/lib/arenaSim";
 import { useWakeLock } from "@/components/carreras/Controller";
@@ -288,7 +289,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
   };
 
   return (
-    <div className="flex h-dvh flex-col gap-3 bg-talo-ink p-3 text-white select-none [touch-action:none]">
+    <ControllerShell className="gap-3">
       <div className="flex items-center gap-3 rounded-2xl bg-white/[0.06] px-4 py-2.5">
         <span className="h-4 w-4 shrink-0 rounded-full" style={{ background: color }} />
         <div className="min-w-0 flex-1">
@@ -313,7 +314,7 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
             </div>
           )}
         </div>
-        <MonitorPlay className="h-5 w-5 shrink-0 text-white/40" aria-label="Mira la pantalla grande" />
+        <ControllerActions game="arena" />
       </div>
 
       {state.status === "finished" ? (
@@ -403,6 +404,6 @@ export default function Pad({ roomId, clientId, state }: { roomId: string; clien
       <p className="pointer-events-none hidden items-center justify-center gap-1.5 text-xs text-white/40 [@media(hover:hover)_and_(pointer:fine)]:flex">
         <Keyboard className="h-3.5 w-3.5" /> WASD moverte · flechas mirar · J atacar · K bloquear · L esquivar · I patada · O especial · espacio saltar · E agarrar · 1–4 gestos
       </p>
-    </div>
+    </ControllerShell>
   );
 }

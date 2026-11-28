@@ -28,6 +28,7 @@ import {
 import { trackLabel } from "@/lib/carrerasTrack";
 import { formatRaceTime } from "@/lib/format";
 import { roomPath } from "@/lib/games";
+import ControllerShell, { ControllerActions } from "@/components/ControllerShell";
 import { useClientIdentity } from "@/hooks/useClientIdentity";
 import { useRoomPresence } from "@/hooks/useRoomPresence";
 import { useServerNow } from "@/hooks/useServerNow";
@@ -349,6 +350,38 @@ function Driver({
   const counting = now > 0 && left > 0;
   const result = state.results[seat];
 
+  const status = counting
+    ? "Largan en…"
+    : result !== undefined
+      ? `¡Llegaste! ${formatRaceTime(result)}`
+      : info
+        ? `Vuelta ${Math.min(info.lap, meta.laps)}/${meta.laps}`
+        : `${meta.laps} vueltas`;
+  const big = counting ? left : info ? `${info.place}°` : "";
+
+  if (result === undefined) {
+    // Driving: the pad takes the whole screen (sideways it has room to spread), the car and the exit in one row on top.
+    return (
+      <ControllerShell>
+        <Controller
+          color={CARS[seat].color}
+          locked={counting}
+          onInput={send}
+          powers={meta.game === "carreras3d"}
+          item={info?.it ? { id: info.it, rolling: !!info.ro } : null}
+          bar={
+            <>
+              <CarDot seat={seat} className="h-6 w-9 shrink-0" />
+              <span className="min-w-0 truncate text-xs text-slate-300">{status}</span>
+              <span className="font-display text-2xl leading-none text-slate-100">{big}</span>
+            </>
+          }
+          actions={<ControllerActions game={meta.game} />}
+        />
+      </ControllerShell>
+    );
+  }
+
   return (
     <>
       <div
@@ -358,29 +391,11 @@ function Driver({
         <CarDot seat={seat} className="h-8 w-12" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-slate-100">{CARS[seat].label}</p>
-          <p className="text-xs text-slate-400">
-            {counting
-              ? "Largan en…"
-              : result !== undefined
-                ? `¡Llegaste! ${formatRaceTime(result)}`
-                : info
-                  ? `Vuelta ${Math.min(info.lap, meta.laps)}/${meta.laps}`
-                  : `${meta.laps} vueltas`}
-          </p>
+          <p className="text-xs text-slate-400">{status}</p>
         </div>
-        <p className="font-display text-3xl font-bold text-slate-100">{counting ? left : info ? `${info.place}°` : ""}</p>
+        <p className="font-display text-3xl font-bold text-slate-100">{big}</p>
       </div>
-      {result === undefined ? (
-        <Controller
-          color={CARS[seat].color}
-          locked={counting}
-          onInput={send}
-          powers={meta.game === "carreras3d"}
-          item={info?.it ? { id: info.it, rolling: !!info.ro } : null}
-        />
-      ) : (
-        <p className="rounded-xl bg-slate-900/70 p-4 text-center text-slate-300">Esperando a que lleguen los demás…</p>
-      )}
+      <p className="rounded-xl bg-slate-900/70 p-4 text-center text-slate-300">Esperando a que lleguen los demás…</p>
     </>
   );
 }

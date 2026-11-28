@@ -32,6 +32,15 @@ const PANEL = padDefaults<PadId>({
   frenar: { x: 0.78, y: 0.64, s: 1.4 },
   acelerar: { x: 0.78, y: 0.86, s: 1.4 },
 });
+/** The pad next to a big screen with the phone sideways: steering on the left, the rest spread to the right. */
+const WIDE = padDefaults<PadId>({
+  izquierda: { x: 0.09, y: 0.55, s: 1.25 },
+  derecha: { x: 0.26, y: 0.55, s: 1.25 },
+  poder: { x: 0.49, y: 0.5, s: 1.3 },
+  acelerar: { x: 0.66, y: 0.27, s: 1.3 },
+  frenar: { x: 0.66, y: 0.75, s: 1.4 },
+  derrape: { x: 0.87, y: 0.52, s: 1.5 },
+});
 /** Over the race on the phone itself: a wide, low strip, everything in a row. */
 const OVERLAY = padDefaults<PadId>({
   izquierda: { x: 0.08, y: 0.5, s: 0.88 },
@@ -237,6 +246,8 @@ export default function Controller({
   variant = "panel",
   powers = false,
   item = null,
+  bar,
+  actions,
 }: {
   color: string;
   /** Countdown still running: controls show, but the car won't move yet. */
@@ -247,6 +258,10 @@ export default function Controller({
   powers?: boolean;
   /** The power held, and whether its roulette still turns. */
   item?: { id: string; rolling: boolean } | null;
+  /** Panel: what goes first in the top row (the car, lap, place). */
+  bar?: ReactNode;
+  /** Panel: what goes last in the top row (full screen, «Salir»). */
+  actions?: ReactNode;
 }) {
   const [mode, setMode] = useState<ControlMode>(readMode);
   const [gasMode, setGasMode] = useState<GasMode>(readGas);
@@ -265,7 +280,12 @@ export default function Controller({
   const presses = useRef(0);
   const [itemDown, setItemDown] = useState(false);
   const overlay = variant === "overlay";
-  const [settings, setSettings] = usePadSettings(overlay ? "carreras.controles.celular" : "carreras.controles.pantalla", overlay ? OVERLAY : PANEL);
+  const landscape = useLandscape();
+  // Each shape keeps its own layout: over the race, the pad sideways and the pad upright.
+  const look = overlay ? "celular" : landscape ? "horizontal" : "pantalla";
+  const padControls = look === "pantalla" ? CONTROLS : OVERLAY_CONTROLS;
+  const padDefaultsNow = look === "celular" ? OVERLAY : look === "horizontal" ? WIDE : PANEL;
+  const [settings, setSettings] = usePadSettings(`carreras.controles.${look}`, padDefaultsNow);
   const [editing, setEditing] = useState(false);
 
   const emit = (wire: CarInputWire) => {
@@ -411,12 +431,12 @@ export default function Controller({
   );
 
   const modeToggle = (
-    <div className={`grid grid-cols-2 gap-1 rounded-xl p-1 ring-1 ${overlay ? "bg-slate-950/60 ring-white/15" : "bg-slate-900/80 ring-slate-700"}`}>
+    <div className={`grid grid-cols-2 gap-1 rounded-xl p-1 ring-1 bg-slate-950/60 ring-white/15`}>
       {(["botones", "inclinacion"] as ControlMode[]).map((m) => (
         <button
           key={m}
           onClick={() => switchMode(m)}
-          className={`flex items-center justify-center gap-1.5 rounded-lg font-medium transition ${overlay ? "px-2 py-1 text-xs" : "py-2 text-sm"} ${
+          className={`flex items-center justify-center gap-1.5 rounded-lg font-medium transition px-2 py-1 text-xs ${
             mode === m ? "bg-violet-600 text-white shadow-[0_0_15px_rgba(139,92,246,0.5)]" : "text-slate-300"
           }`}
         >
@@ -431,10 +451,10 @@ export default function Controller({
     <button
       type="button"
       onClick={() => switchGas(manual ? "auto" : "manual")}
-      className={`pointer-events-auto flex items-center justify-center gap-1.5 rounded-xl font-medium ring-1 ${overlay ? "bg-slate-950/60 px-2 py-1 text-xs ring-white/15" : "w-full bg-slate-900/80 py-2 text-sm ring-slate-700"} text-slate-200`}
+      className={`pointer-events-auto flex items-center justify-center gap-1.5 rounded-xl font-medium ring-1 bg-slate-950/60 px-2 py-1 text-xs ring-white/15 text-slate-200`}
       aria-label={`Acelerador ${manual ? "manual" : "automático"}: tocar para cambiar`}
     >
-      <Gauge className="h-4 w-4" /> Acelerador: <b className={manual ? "text-lime-300" : "text-sky-300"}>{manual ? "Manual" : "Automático"}</b>
+      <Gauge className="h-4 w-4" /> <span className="hidden min-[420px]:inline">Acelerador:</span> <b className={manual ? "text-lime-300" : "text-sky-300"}>{manual ? "Manual" : "Automático"}</b>
     </button>
   );
 
@@ -457,7 +477,7 @@ export default function Controller({
   const held = item && isItem(item.id) ? item : null;
   const ItemIcon = held ? ITEM_ICONS[held.id as ItemId] : Sparkles;
   const itemColor = held && !held.rolling ? ITEMS[held.id as ItemId].color : "#64748b";
-  const steerIcon = overlay ? "h-12 w-12" : "h-16 w-16";
+  const steerIcon = look === "pantalla" ? "h-16 w-16" : "h-12 w-12";
 
   /** How each control looks (the pad and the editor). */
   const face = (id: PadId) => {
@@ -542,18 +562,18 @@ export default function Controller({
   const hidden: PadId[] = [...(tiltMode ? (["izquierda", "derecha"] as PadId[]) : []), ...(manual ? [] : (["acelerar"] as PadId[])), ...(powers ? [] : (["poder"] as PadId[]))];
   const pad = (
     <PadSurface
-      controls={overlay ? OVERLAY_CONTROLS : CONTROLS}
+      controls={padControls}
       settings={settings}
       edit={{
         open: editing,
         onClose: () => setEditing(false),
         onChange: setSettings,
-        defaults: overlay ? OVERLAY : PANEL,
+        defaults: padDefaultsNow,
         face: (id) => face(id),
         faded: hidden,
         sens: { label: "Sensibilidad inclinación", min: 0.5, max: 2 },
       }}
-      className={overlay ? "min-h-0 flex-1" : "min-h-56 flex-1"}
+      className="min-h-0 flex-1"
     >
       {(place) =>
         (Object.keys(CONTROLS) as PadId[])
@@ -609,31 +629,32 @@ export default function Controller({
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-3" style={{ touchAction: "none" }} onContextMenu={(e) => e.preventDefault()}>
-      {modeToggle}
-      <div className="flex gap-2">
-        <div className="flex-1">{gasToggle}</div>
+    <div className="flex min-h-0 flex-1 flex-col gap-2" style={{ touchAction: "none" }} onContextMenu={(e) => e.preventDefault()}>
+      <div className="flex flex-wrap items-center gap-2">
+        {bar && <div className="flex min-w-0 flex-1 items-center gap-2 max-[560px]:basis-full">{bar}</div>}
+        {modeToggle}
+        {gasToggle}
+        {tiltMode && !needsTiltTap && wheel("h-9 w-9")}
         {adjust}
+        {actions}
       </div>
       {tiltError && <p className="text-center text-xs text-amber-300">{tiltError}</p>}
-      {tiltMode && !needsTiltTap && (
-        <div className="flex flex-col items-center gap-2 py-1">
-          {wheel("h-20 w-20")}
-          <p className="text-xs text-slate-400">Inclínalo como un volante, con la pantalla hacia ti.</p>
-        </div>
-      )}
-      {tiltMode && needsTiltTap ? <div className="flex min-h-56 flex-1">{tiltTap}</div> : pad}
-
-      {fine && <div className="rounded-xl bg-slate-900/80 p-2 ring-1 ring-slate-700">{keysHint}</div>}
-      <p className="text-center text-xs text-slate-500">
-        {locked
-          ? manual
-            ? "Prepárate: cuando larguen, mantén «Acelerar»."
-            : "Prepárate: el auto acelera solo cuando largan."
-          : `${manual ? "Mantén «Acelerar» para ir." : "El auto acelera solo."} Mantén «Derrape» mientras doblas y suéltalo para el mini-turbo; tócalo en el aire para un truco.`}
-      </p>
+      {locked && <p className="text-center text-xs text-slate-400">{manual ? "Prepárate: cuando larguen, mantén «Acelerar»." : "Prepárate: el auto acelera solo cuando largan."}</p>}
+      {tiltMode && needsTiltTap ? <div className="flex min-h-0 flex-1">{tiltTap}</div> : pad}
+      {fine && <div className="rounded-xl bg-slate-900/80 p-1.5 ring-1 ring-slate-700">{keysHint}</div>}
     </div>
   );
+}
+
+const LANDSCAPE = "(orientation: landscape)";
+const subscribeLandscape = (cb: () => void) => {
+  const q = window.matchMedia(LANDSCAPE);
+  q.addEventListener("change", cb);
+  return () => q.removeEventListener("change", cb);
+};
+/** The phone held sideways. */
+function useLandscape(): boolean {
+  return useSyncExternalStore(subscribeLandscape, () => window.matchMedia(LANDSCAPE).matches, () => false);
 }
 
 function Key({ children }: { children: ReactNode }) {

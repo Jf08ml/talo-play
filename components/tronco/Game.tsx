@@ -1,5 +1,6 @@
 "use client";
 
+import ControllerShell, { ControllerActions } from "@/components/ControllerShell";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Eye, Gamepad2, Gauge } from "lucide-react";
 import { Talo } from "@/components/Talo";
@@ -505,12 +506,14 @@ export default function TroncoGame({
 
   if (control) {
     return (
+      <ControllerShell>
       <div className="relative flex min-h-0 flex-1 flex-col">
         {viewToggle}
-        <div className="flex shrink-0 flex-col items-center gap-3 px-4 pb-3 pt-12 text-center">
+        <ControllerActions game="tronco" className="absolute left-0 top-0 z-10" />
+        <div className="flex shrink-0 flex-col items-center gap-3 px-4 pb-3 pt-12 text-center landscape:gap-1.5 landscape:pb-2">
           {chips}
           {playing ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 landscape:hidden">
               <Talo {...playerTalo(myId, me.color, 44)} expr={meOut ? "triste" : flash && !flash.text.includes("aire") ? "contento" : "normal"} />
               <div className="text-left">
                 <p className="text-xs font-bold uppercase tracking-wide text-white/50">Eres</p>
@@ -520,7 +523,7 @@ export default function TroncoGame({
           ) : (
             <p className="text-base font-bold text-white/80">Estás mirando: en la próxima entras tú también.</p>
           )}
-          <div className="flex min-h-[88px] flex-col items-center justify-center gap-1.5">
+          <div className="flex min-h-[88px] flex-col items-center justify-center gap-1.5 landscape:min-h-[56px]">
             {countdown > 0 ? (
               <>
                 <span key={countdown} className="animate-celebration-in font-display text-6xl text-white">
@@ -558,6 +561,7 @@ export default function TroncoGame({
         </div>
         {buttons}
       </div>
+      </ControllerShell>
     );
   }
 

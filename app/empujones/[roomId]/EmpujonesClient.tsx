@@ -1,5 +1,6 @@
 "use client";
 
+import ControllerShell, { ControllerActions } from "@/components/ControllerShell";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, MonitorPlay } from "lucide-react";
@@ -234,12 +235,12 @@ function Playing({ roomId, state, live, myId }: { roomId: string; state: Empujon
         : "¡Empuja a los demás al agua!";
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-3 p-3">
-      <div className="flex items-center gap-3 rounded-[20px] bg-[#1c1c1c] p-3 ring-1 ring-white/[0.08]" style={{ boxShadow: `inset 0 0 0 2px ${info.color}` }}>
+    <ControllerShell className="gap-2">
+      <div className="flex items-center gap-3 rounded-[20px] bg-[#1c1c1c] px-3 py-2 ring-1 ring-white/[0.08]" style={{ boxShadow: `inset 0 0 0 2px ${info.color}` }}>
         <span className="h-9 w-9 shrink-0 rounded-full border-[3px] border-talo-ink" style={{ background: info.color }} />
         <div className="min-w-0 flex-1">
           <p className={`truncate font-bold ${out ? "text-[#FF5FA2]" : "text-white"}`}>{line}</p>
-          <p className="text-xs text-white/50">Mira tu talo en la pantalla: es el de este color.</p>
+          <p className="text-xs text-white/50 landscape:hidden">Mira tu talo en la pantalla: es el de este color.</p>
         </div>
         <div className="flex shrink-0 flex-col items-end">
           <span className="flex gap-1">
@@ -251,9 +252,10 @@ function Playing({ roomId, state, live, myId }: { roomId: string; state: Empujon
             {won} de {state.target}
           </span>
         </div>
+        <ControllerActions game="empujones" />
       </div>
       <Pad roomId={roomId} clientId={myId} color={info.color} locked={out || counting || between} />
-    </main>
+    </ControllerShell>
   );
 }
 
