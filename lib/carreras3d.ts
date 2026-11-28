@@ -1,4 +1,4 @@
-import { TV_MIN_SCALE, tvDpr } from "@/lib/tvMode";
+import { tvDpr, tvMinScale } from "@/lib/tvMode";
 import * as THREE from "three";
 import { MODEL_SCALE, carBody, carModelsReady, carWheel, decoInstances, loadCarModels, loadDecoModels, type DecoId } from "./carreras3dModels";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -3223,7 +3223,8 @@ export class RaceScene {
     this.adaptClock += dt;
     if (this.adaptClock < 1.5) return;
     this.adaptClock = 0;
-    const min = this.tv ? TV_MIN_SCALE : 0.6;
+    const min = this.tv ? tvMinScale() : 0.6;
+    if (this.dprScale < min) this.dprScale = min;
     if (this.frameAvg > 1 / 40 && this.dprScale > min) this.dprScale = Math.max(min, this.dprScale - 0.1);
     else if (this.frameAvg < 1 / 56 && this.dprScale < 1) this.dprScale = Math.min(1, this.dprScale + 0.05);
   }

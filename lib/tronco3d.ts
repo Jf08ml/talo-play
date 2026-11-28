@@ -479,6 +479,15 @@ export class TroncoScene {
   frame(v: SceneView) {
     const dt = this.lastTime ? Math.min(0.1, Math.max(0, v.time - this.lastTime)) : 0;
     this.lastTime = v.time;
+    // Modo TV: follow the level's pixel budget as it changes (Automático moves it).
+    if (this.lite) {
+      const size = this.renderer.getSize(new THREE.Vector2());
+      const dpr = tvDpr(Math.min(2, window.devicePixelRatio || 1), size.x, size.y);
+      if (Math.abs(this.renderer.getPixelRatio() - dpr) > 0.01) {
+        this.renderer.setPixelRatio(dpr);
+        this.renderer.setSize(size.x, size.y, false);
+      }
+    }
     const meView = v.players.find((p) => p.me);
 
     // A kick shows as the log turning around (or leaving the opener's feet).
