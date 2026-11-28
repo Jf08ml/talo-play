@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
+import ScanQrButton from "@/components/QrScanner";
 
 /**
  * "¿Te invitaron?": join any room by code. Goes through `/sala/{code}`, which
@@ -10,7 +11,8 @@ import { ArrowRight } from "lucide-react";
  *
  * The code is typed over six gray boxes: a monospaced font whose advance plus
  * the letter spacing equals one box plus its gap, so each letter lands in its
- * box. Codes have letters and digits (lib/ids.ts).
+ * box. Codes have letters and digits (lib/ids.ts). «Escanear QR» reads a
+ * room's QR with the camera instead (components/QrScanner.tsx).
  */
 export default function JoinRoomForm({ id = "join-code" }: { id?: string }) {
   const router = useRouter();
@@ -24,9 +26,12 @@ export default function JoinRoomForm({ id = "join-code" }: { id?: string }) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-2.5 sm:gap-3">
-      <label htmlFor={id} className="text-[15px] font-bold text-talo-ink">
-        ¿Te invitaron? Escribe el código
-      </label>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <label htmlFor={id} className="text-[15px] font-bold text-talo-ink">
+          ¿Te invitaron? Escribe el código
+        </label>
+        <ScanQrButton className="flex items-center gap-1.5 rounded-full border-2 border-talo-ink bg-white px-3 py-1 text-[14px] font-bold text-talo-ink transition hover:bg-talo-surface" />
+      </div>
       <div className="flex items-center gap-2 sm:gap-3">
         {/* Boxes 39.6/44 px wide with 6/8 px gaps; JetBrains Mono advances 0.6em. */}
         <div className="relative h-[54px] w-[268px] shrink-0 overflow-hidden rounded-[10px] outline-offset-3 outline-talo-blue focus-within:outline-3 sm:h-[60px] sm:w-[304px]">
