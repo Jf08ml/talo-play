@@ -1,5 +1,6 @@
 "use client";
 
+import TvModeButton, { useTvMode } from "@/components/TvModeButton";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -364,7 +365,10 @@ export default function Battle({
   const [camera, toggleCamera] = useStored<ArenaCamera>(CAMERA_KEY, "primera", "tercera");
   const cameraRef = useRef(camera);
   const [sound, toggleSound] = useStored<"on" | "off">(SOUND_KEY, "on", "off");
-  const [quality, toggleQuality] = useQuality("arena.calidad");
+  // The big screen may be a TV: Modo TV draws it lighter.
+  const tvMode = useTvMode();
+  const tv = screen && tvMode;
+  const [quality, toggleQuality] = useQuality("arena.calidad", tv);
   const audioRef = useRef<ArenaAudio | null>(null);
   const [hud, setHud] = useState<Hud | null>(null);
   const [hurt, setHurt] = useState(false);
@@ -507,7 +511,7 @@ export default function Battle({
     const canvas = canvasRef.current;
     if (!canvas || !quality) return;
     const map = getMap(stateRef.current.map);
-    const scene = new ArenaScene(canvas, { quality, map: map.id });
+    const scene = new ArenaScene(canvas, { quality, map: map.id, tv });
     // On a TV the names are read from the couch (big over the whole arena, normal in a split view).
     let tagScale = 0;
     const audio = audioRef.current;
@@ -1615,7 +1619,7 @@ export default function Battle({
       for (const a of myArrows) a.down();
       scene.dispose();
     };
-  }, [roomId, myId, gameNo, fine, quality, screen]);
+  }, [roomId, myId, gameNo, fine, quality, screen, tv]);
 
   const now = clock || serverNow();
   const counting = state.status === "fighting" && now < state.startedAt;
@@ -1744,7 +1748,8 @@ export default function Battle({
             <button onClick={toggleSound} aria-label={sound === "on" ? "Silenciar" : "Activar sonido"} className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur">
               {sound === "on" ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </button>
-            <QualityButton quality={quality} onToggle={toggleQuality} />
+            {!tv && <QualityButton quality={quality} onToggle={toggleQuality} />}
+            {screen && <TvModeButton className="rounded-xl bg-slate-950/60 px-2.5 py-2 text-xs text-white backdrop-blur" />}
             {!screen && (
               <button onClick={toggleCamera} className="flex items-center gap-1 rounded-xl bg-slate-950/60 px-2.5 py-2 text-xs text-white backdrop-blur">
                 <Eye className="h-4 w-4" /> {camera === "primera" ? "1ª persona" : "3ª persona"}

@@ -677,7 +677,8 @@ export default function PhoneRace({
 
   return (
     <div className="fixed inset-0 z-40 select-none overflow-hidden bg-sky-300" style={{ touchAction: "none" }}>
-      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+      {/* A new canvas for every scene: two renderers never share one WebGL context. */}
+      <canvas key={`${trackId}|${trackSeed}|${laps}|${racersKey}|${quality}`} ref={canvasRef} className="absolute inset-0 h-full w-full" />
 
       {/* Top bar: place and lap, minimap, camera. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3">

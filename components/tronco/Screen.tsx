@@ -1,5 +1,6 @@
 "use client";
 
+import TvModeButton, { useTvMode } from "@/components/TvModeButton";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -138,12 +139,13 @@ export default function TroncoScreen({ roomId }: { roomId: string }) {
 
   // The ring, drawn every frame from the state, the timeline and the acts.
   const hasState = !!state;
+  const tv = useTvMode();
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !hasState) return;
     let scene: TroncoScene;
     try {
-      scene = new TroncoScene(canvas, { tv: true });
+      scene = new TroncoScene(canvas, { tv: true, lite: tv });
     } catch (err) {
       console.error(err);
       return;
@@ -227,7 +229,7 @@ export default function TroncoScreen({ roomId }: { roomId: string }) {
       ro.disconnect();
       scene.dispose();
     };
-  }, [hasState]);
+  }, [hasState, tv]);
 
 
   const now = useServerNow(state?.status === "playing", 250);
@@ -286,6 +288,7 @@ export default function TroncoScreen({ roomId }: { roomId: string }) {
               <button onClick={() => setMuted(!muted)} className={chip} aria-label={muted ? "Activar sonido" : "Silenciar"}>
                 {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
               </button>
+              <TvModeButton className={chip} />
               <FullscreenButton className={chip} iconClassName="h-5 w-5" />
             </div>
           </div>

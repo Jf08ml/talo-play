@@ -1,3 +1,4 @@
+import { tvDpr, tvModeOn } from "@/lib/tvMode";
 import { BODY_R, FALL_TIME, ISLAND_R } from "./empujones";
 
 /**
@@ -90,9 +91,11 @@ export class IslandPainter {
 
   draw(bodies: DrawBody[], radius: number, warn: boolean, dt: number) {
     const { canvas, ctx } = this;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = canvas.clientWidth;
     const h = canvas.clientHeight;
+    const base = Math.min(2, window.devicePixelRatio || 1);
+    // Modo TV: within the TV's pixel budget, scaled up by the browser.
+    const dpr = tvModeOn() ? tvDpr(base, w, h) : base;
     if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);

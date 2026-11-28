@@ -1,3 +1,4 @@
+import { tvDpr } from "@/lib/tvMode";
 import * as THREE from "three";
 import { JUMP_LEN, LOG_LENGTH, RING, jumpHeight, wrapPi, type Cue } from "./tronco";
 
@@ -116,6 +117,8 @@ export class TroncoScene {
   private warnGeo: THREE.BufferGeometry;
   /** Bigger name tags, for a TV seen from the couch. */
   private tv: boolean;
+  /** Modo TV (lib/tvMode.ts): fewer pixels, no antialiasing, no shadows. */
+  private lite: boolean;
   private wave: THREE.Mesh;
   private waveLife = 1;
   private bits: Bit[] = [];
@@ -128,11 +131,13 @@ export class TroncoScene {
   private lastTime = 0;
   private disposables: { dispose: () => void }[] = [];
 
-  constructor(canvas: HTMLCanvasElement, { tv = false }: { tv?: boolean } = {}) {
+  constructor(canvas: HTMLCanvasElement, { tv = false, lite = false }: { tv?: boolean; lite?: boolean } = {}) {
     this.tv = tv;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+    this.lite = lite;
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !lite, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-    this.renderer.shadowMap.enabled = true;
+    // Modo TV: no real-time shadows (the talos keep their blob shadow if any).
+    this.renderer.shadowMap.enabled = !lite;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.scene.background = new THREE.Color("#A9DCFA");
@@ -461,6 +466,9 @@ export class TroncoScene {
   }
 
   resize(w: number, h: number) {
+    const base = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = this.lite ? tvDpr(base, w, h) : base;
+    if (this.renderer.getPixelRatio() !== dpr) this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / Math.max(1, h);
     // Narrow phones: a wider view so the whole ring fits.

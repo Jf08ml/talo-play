@@ -1,5 +1,6 @@
 "use client";
 
+import TvModeButton from "@/components/TvModeButton";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -426,6 +427,7 @@ export default function EmpujonesScreen({ roomId }: { roomId: string }) {
                   <X className="h-5 w-5" />
                 </button>
               )}
+              <TvModeButton className={chip} />
               <FullscreenButton className={chip} iconClassName="h-5 w-5" />
             </div>
           </div>

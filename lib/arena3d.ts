@@ -1,3 +1,4 @@
+import { tvDpr } from "@/lib/tvMode";
 import * as THREE from "three";
 import { mulberry32 } from "./random";
 import { Bloom, aimShadow, glowColor, type Quality } from "./postfx";
@@ -410,7 +411,7 @@ export class ArenaScene {
 
   constructor(
     private canvas: HTMLCanvasElement,
-    opts: { maxDpr?: number; quality?: Quality; map?: ArenaMapId } = {}
+    opts: { maxDpr?: number; quality?: Quality; map?: ArenaMapId; tv?: boolean } = {}
   ) {
     this.map = getMap(opts.map);
     this.R = this.map.bounds.kind === "circle" ? this.map.bounds.r : this.map.extent;
@@ -420,7 +421,8 @@ export class ArenaScene {
     const high = (opts.quality ?? "alta") === "alta";
     this.shadows = high;
     this.maxDpr = opts.maxDpr ?? (high ? 1.75 : 1.25);
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+    this.tv = !!opts.tv;
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !this.tv, powerPreference: "high-performance" });
     this.renderer.autoClear = false;
     if (high) {
       this.renderer.shadowMap.enabled = true;
@@ -471,6 +473,8 @@ export class ArenaScene {
   }
 
   private maxDpr: number;
+  /** Modo TV (lib/tvMode.ts): fewer pixels, no antialiasing. */
+  private tv = false;
 
   private build() {
     const s = this.scene;
@@ -1357,10 +1361,11 @@ export class ArenaScene {
 
   /** Fits the renderer to the canvas; the canvas' size in CSS pixels, or null while it has none. */
   private fit(): { cw: number; ch: number; dpr: number } | null {
-    const dpr = Math.min(window.devicePixelRatio || 1, this.maxDpr);
     const cw = this.canvas.clientWidth;
     const ch = this.canvas.clientHeight;
     if (!cw || !ch) return null;
+    const base = Math.min(window.devicePixelRatio || 1, this.maxDpr);
+    const dpr = this.tv ? Math.round(tvDpr(base, cw, ch) * 100) / 100 : base;
     if (this.renderer.getPixelRatio() !== dpr) this.renderer.setPixelRatio(dpr);
     const size = this.renderer.getSize(new THREE.Vector2());
     if (size.x !== cw || size.y !== ch) this.renderer.setSize(cw, ch, false);

@@ -1,3 +1,4 @@
+import { TV_MIN_SCALE, tvDpr } from "@/lib/tvMode";
 import * as THREE from "three";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
@@ -1320,6 +1321,8 @@ export class FuegoScene {
   private world: World;
   /** Adaptive resolution: fraction of the pixel ratio drawn, average frame time, and when it was last checked. */
   private dprScale = 1;
+  /** Modo TV (lib/tvMode.ts): fewer pixels, no antialiasing. */
+  private tv = false;
   private frameAvg = 1 / 60;
   private adaptClock = 0;
   private shadows: boolean;
@@ -1327,15 +1330,16 @@ export class FuegoScene {
   constructor(
     private canvas: HTMLCanvasElement,
     mapId: MapId,
-    opts: { quality?: Quality } = {}
+    opts: { quality?: Quality; tv?: boolean } = {}
   ) {
     const high = (opts.quality ?? "alta") === "alta";
     this.maxDpr = high ? 1.75 : 1.25;
+    this.tv = !!opts.tv;
     this.shadows = high;
     this.map = MAPS[mapId];
     this.theme = THEMES[this.map.theme];
     this.world = worldOf(mapId);
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !this.tv, powerPreference: "high-performance" });
     this.renderer.autoClear = false;
     this.renderer.setClearColor(this.theme.fog);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -2367,16 +2371,18 @@ export class FuegoScene {
     this.adaptClock += dt;
     if (this.adaptClock < 1.5) return;
     this.adaptClock = 0;
-    if (this.frameAvg > 1 / 40 && this.dprScale > 0.6) this.dprScale = Math.max(0.6, this.dprScale - 0.1);
+    const min = this.tv ? TV_MIN_SCALE : 0.6;
+    if (this.frameAvg > 1 / 40 && this.dprScale > min) this.dprScale = Math.max(min, this.dprScale - 0.1);
     else if (this.frameAvg < 1 / 56 && this.dprScale < 1) this.dprScale = Math.min(1, this.dprScale + 0.05);
   }
 
   /** The canvas' size in CSS pixels and the pixel ratio, with the renderer resized to match (null while hidden). */
   private fit(): { cw: number; ch: number; dpr: number } | null {
-    const dpr = Math.round(Math.min(window.devicePixelRatio || 1, this.maxDpr) * this.dprScale * 100) / 100;
     const cw = this.canvas.clientWidth;
     const ch = this.canvas.clientHeight;
     if (!cw || !ch) return null;
+    const base = Math.min(window.devicePixelRatio || 1, this.maxDpr);
+    const dpr = Math.round((this.tv ? tvDpr(base, cw, ch) : base) * this.dprScale * 100) / 100;
     if (this.renderer.getPixelRatio() !== dpr) {
       this.renderer.setPixelRatio(dpr);
       this.composer?.setPixelRatio(dpr);

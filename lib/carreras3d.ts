@@ -1,3 +1,4 @@
+import { TV_MIN_SCALE, tvDpr } from "@/lib/tvMode";
 import * as THREE from "three";
 import { MODEL_SCALE, carBody, carModelsReady, carWheel, decoInstances, loadCarModels, loadDecoModels, type DecoId } from "./carreras3dModels";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -1382,6 +1383,8 @@ export class RaceScene {
   private size2 = new THREE.Vector2();
   /** Fraction of the device pixel ratio drawn (adaptive resolution), the average frame time and when it was last checked. */
   private dprScale = 1;
+  /** Modo TV (lib/tvMode.ts): fewer pixels, no antialiasing. */
+  private tv = false;
   private frameAvg = 1 / 60;
   private adaptClock = 0;
   /** Middle of the track's world. */
@@ -1393,9 +1396,10 @@ export class RaceScene {
   constructor(
     private canvas: HTMLCanvasElement,
     track: Track,
-    opts: { maxDpr?: number; quality?: Quality } = {}
+    opts: { maxDpr?: number; quality?: Quality; tv?: boolean } = {}
   ) {
     const high = (opts.quality ?? "alta") === "alta";
+    this.tv = !!opts.tv;
     this.shadows = high;
     this.maxDpr = opts.maxDpr ?? (high ? 1.75 : 1.25);
     // The modeled cars: drawn ones until they load, then `setCars` swaps them.
@@ -1412,7 +1416,7 @@ export class RaceScene {
     const L = this.look;
     // Bigger worlds see a bit farther before the haze.
     const far = Math.max(1, Math.min(1.4, track.worldW / 1800));
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !this.tv, powerPreference: "high-performance" });
     this.renderer.setClearColor(L.horizon);
     if (high) {
       this.renderer.shadowMap.enabled = true;
@@ -3114,10 +3118,11 @@ export class RaceScene {
   /** Draws one view per request (1 full, 2 side by side, 3–4 in a grid). */
   render(views: ViewRequest[], mode: CameraMode, dt: number) {
     this.adapt(dt);
-    const dpr = Math.min(window.devicePixelRatio || 1, this.maxDpr) * this.dprScale;
     const cw = this.canvas.clientWidth;
     const ch = this.canvas.clientHeight;
     if (!cw || !ch) return;
+    const base = Math.min(window.devicePixelRatio || 1, this.maxDpr);
+    const dpr = (this.tv ? tvDpr(base, cw, ch) : base) * this.dprScale;
     if (Math.abs(this.renderer.getPixelRatio() - dpr) > 0.01) this.renderer.setPixelRatio(dpr);
     const size = this.renderer.getSize(this.size2);
     if (size.x !== cw || size.y !== ch) this.renderer.setSize(cw, ch, false);
@@ -3198,7 +3203,8 @@ export class RaceScene {
     this.adaptClock += dt;
     if (this.adaptClock < 1.5) return;
     this.adaptClock = 0;
-    if (this.frameAvg > 1 / 40 && this.dprScale > 0.6) this.dprScale = Math.max(0.6, this.dprScale - 0.1);
+    const min = this.tv ? TV_MIN_SCALE : 0.6;
+    if (this.frameAvg > 1 / 40 && this.dprScale > min) this.dprScale = Math.max(min, this.dprScale - 0.1);
     else if (this.frameAvg < 1 / 56 && this.dprScale < 1) this.dprScale = Math.min(1, this.dprScale + 0.05);
   }
 

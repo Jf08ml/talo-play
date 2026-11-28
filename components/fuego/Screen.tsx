@@ -1,5 +1,6 @@
 "use client";
 
+import TvModeButton from "@/components/TvModeButton";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -111,7 +112,10 @@ function Waiting({ roomId, meta, state, presence }: { roomId: string; meta: Fueg
         <Link href="/fuego-cruzado" className="flex items-center gap-2 rounded-xl px-3 py-2 text-white/70 hover:bg-white/10" aria-label="Volver">
           <ArrowLeft className="h-5 w-5" /> <TaloMark className="h-6 w-6" />
         </Link>
-        <FullscreenButton className="rounded-xl p-2 text-white/80 hover:bg-white/10" />
+        <div className="flex items-center gap-2">
+          <TvModeButton className="rounded-xl px-3 py-2 text-sm font-bold text-white/80 hover:bg-white/10" />
+          <FullscreenButton className="rounded-xl p-2 text-white/80 hover:bg-white/10" />
+        </div>
       </div>
       <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col items-center justify-center gap-10 p-6 lg:flex-row lg:items-start">
         <div className="flex w-full max-w-xl flex-col gap-5 rounded-3xl bg-white/[0.05] p-8">

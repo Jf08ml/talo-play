@@ -1,5 +1,6 @@
 "use client";
 
+import TvModeButton, { useTvMode } from "@/components/TvModeButton";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -155,7 +156,8 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
   const [flash, setFlash] = useState<Partial<Record<Seat, Flash>>>({});
   const [wrong, setWrong] = useState<string>("");
   const [camera, toggleCamera] = useCameraMode();
-  const [quality, toggleQuality] = useQuality("carreras.calidad");
+  const tv = useTvMode();
+  const [quality, toggleQuality] = useQuality("carreras.calidad", tv);
   const [sound, toggleSound] = useSoundSetting();
 
   const canvas3dRef = useRef<HTMLCanvasElement>(null);
@@ -254,7 +256,7 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
   useEffect(() => {
     if (!trackId || !hasState || !canvas3dRef.current || (is3d && !quality)) return;
     const track = getTrack(trackId, trackSeed);
-    const scene = is3d ? new RaceScene(canvas3dRef.current, track, { quality: quality ?? "alta" }) : null;
+    const scene = is3d ? new RaceScene(canvas3dRef.current, track, { quality: quality ?? "alta", tv }) : null;
     const audio = audioRef.current;
     const cues = new RaceCues(audio);
     let engine: Engine | null = null;
@@ -512,7 +514,7 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
       scene?.dispose();
       audio?.silence();
     };
-  }, [trackId, trackSeed, hasState, laps, roomId, is3d, quality]);
+  }, [trackId, trackSeed, hasState, laps, roomId, is3d, quality, tv]);
 
   const now = useServerNow(state?.status === "racing", 100);
 
@@ -528,7 +530,8 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
 
   return (
     <div className={`fixed inset-0 flex flex-col text-slate-100 ${is3d ? "bg-sky-300" : "bg-[#0b2a18]"}`}>
-      <canvas ref={canvas3dRef} className={`absolute inset-0 h-full w-full ${is3d ? "" : "hidden"}`} />
+      {/* A new canvas for every scene: two renderers never share one WebGL context. */}
+      <canvas key={`${trackId}|${trackSeed}|${laps}|${quality}|${tv}`} ref={canvas3dRef} className={`absolute inset-0 h-full w-full ${is3d ? "" : "hidden"}`} />
       <canvas ref={canvas2dRef} className={`absolute inset-0 h-full w-full ${is3d ? "hidden" : ""}`} />
 
       {status === "loading" && <RoomLoading text="Armando la pista…" />}
@@ -564,7 +567,8 @@ export default function ScreenClient({ game, roomId }: { game: CarrerasGame; roo
               <button onClick={toggleSound} className={chip} aria-label={sound ? "Silenciar" : "Activar sonido"} title={sound ? "Silenciar" : "Activar sonido"}>
                 {sound ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
               </button>
-              {is3d && <QualityButton quality={quality} onToggle={toggleQuality} className="pointer-events-auto !rounded-xl !bg-slate-950/70 !px-3 !text-sm" />}
+              {is3d && !tv && <QualityButton quality={quality} onToggle={toggleQuality} className="pointer-events-auto !rounded-xl !bg-slate-950/70 !px-3 !text-sm" />}
+              {is3d && <TvModeButton className={chip} />}
               {is3d && (
                 <button onClick={toggleCamera} className={chip}>
                   <Eye className="h-4 w-4" /> {camera === "detras" ? "Detrás" : "Cabina"}

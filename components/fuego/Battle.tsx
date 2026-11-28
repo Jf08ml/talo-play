@@ -1,5 +1,6 @@
 "use client";
 
+import TvModeButton, { useTvMode } from "@/components/TvModeButton";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
@@ -418,7 +419,10 @@ export default function Battle({
   const [hurtDirs, setHurtDirs] = useState<{ a: number; id: number; shield: boolean }[]>([]);
   const [shieldBroke, setShieldBroke] = useState(0);
   const [paintHits, setPaintHits] = useState<{ id: number; x: number; y: number; size: number; rot: number; color: string }[]>([]);
-  const [quality, toggleQuality] = useQuality(QUALITY_KEY);
+  // The big screen may be a TV: Modo TV draws it lighter.
+  const tvMode = useTvMode();
+  const tv = screen && tvMode;
+  const [quality, toggleQuality] = useQuality(QUALITY_KEY, tv);
   const [toast, setToast] = useState<Toast | null>(null);
   const [aimToggle, setAimToggle] = useState(false);
   // Touch layout, sensitivity and options (remembered per device), and the editor open or not.
@@ -472,7 +476,7 @@ export default function Battle({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !quality) return;
-    const scene = new FuegoScene(canvas, mapId, { quality });
+    const scene = new FuegoScene(canvas, mapId, { quality, tv });
     const world = worldOf(mapId);
     const graph = navGraph(mapId);
     const map = MAPS[mapId];
@@ -1737,7 +1741,7 @@ export default function Battle({
       for (const pr of myProj) pr.down();
       scene.dispose();
     };
-  }, [roomId, myId, gameNo, mapId, fine, quality, screen]);
+  }, [roomId, myId, gameNo, mapId, fine, quality, screen, tv]);
 
   // Messages fade.
   useEffect(() => {
@@ -1874,7 +1878,8 @@ export default function Battle({
             <button onClick={() => setSound((v) => (v === "on" ? "off" : "on"))} aria-label={sound === "on" ? "Silenciar" : "Activar sonido"} className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur">
               {sound === "on" ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </button>
-            <QualityButton quality={quality} onToggle={toggleQuality} />
+            {!tv && <QualityButton quality={quality} onToggle={toggleQuality} />}
+            {screen && <TvModeButton className="rounded-xl bg-slate-950/60 px-2.5 py-2 text-xs text-white backdrop-blur" />}
             <button onClick={() => setBoard((v) => !v)} aria-label="Tabla" className="rounded-xl bg-slate-950/60 p-2 text-white backdrop-blur">
               <ListOrdered className="h-4 w-4" />
             </button>

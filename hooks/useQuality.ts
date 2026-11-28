@@ -6,9 +6,10 @@ import type { Quality } from "@/lib/postfx";
 /**
  * The graphics quality of a 3D game, remembered per game under `storageKey`.
  * Until the user picks one: high with a mouse (computers), low on touch
- * (phones). Null on the first render, before it's known.
+ * (phones). Null on the first render, before it's known. `tv`: a big screen
+ * in Modo TV (lib/tvMode.ts), always low.
  */
-export function useQuality(storageKey: string): [Quality | null, () => void] {
+export function useQuality(storageKey: string, tv = false): [Quality | null, () => void] {
   const [quality, setQuality] = useState<Quality | null>(null);
   useEffect(() => {
     let saved: string | null = null;
@@ -31,5 +32,5 @@ export function useQuality(storageKey: string): [Quality | null, () => void] {
       }
       return next;
     });
-  return [quality, toggle];
+  return [quality && tv ? "baja" : quality, toggle];
 }

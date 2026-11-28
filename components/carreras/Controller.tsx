@@ -34,21 +34,21 @@ const PANEL = padDefaults<PadId>({
 });
 /** The pad next to a big screen with the phone sideways: steering on the left, the rest spread to the right. */
 const WIDE = padDefaults<PadId>({
-  izquierda: { x: 0.09, y: 0.55, s: 1.25 },
-  derecha: { x: 0.26, y: 0.55, s: 1.25 },
-  poder: { x: 0.49, y: 0.5, s: 1.3 },
-  acelerar: { x: 0.66, y: 0.27, s: 1.3 },
-  frenar: { x: 0.66, y: 0.75, s: 1.4 },
-  derrape: { x: 0.87, y: 0.52, s: 1.5 },
+  izquierda: { x: 0.112, y: 0.56, s: 1.5 },
+  derecha: { x: 0.315, y: 0.56, s: 1.5 },
+  poder: { x: 0.5, y: 0.3, s: 1.35 },
+  frenar: { x: 0.5, y: 0.76, s: 1.35 },
+  acelerar: { x: 0.66, y: 0.3, s: 1.35 },
+  derrape: { x: 0.85, y: 0.58, s: 1.75 },
 });
 /** Over the race on the phone itself: a wide, low strip, everything in a row. */
 const OVERLAY = padDefaults<PadId>({
-  izquierda: { x: 0.08, y: 0.5, s: 0.88 },
-  derecha: { x: 0.225, y: 0.5, s: 0.88 },
-  poder: { x: 0.46, y: 0.5, s: 1 },
-  acelerar: { x: 0.6, y: 0.5, s: 1.1 },
-  frenar: { x: 0.74, y: 0.5, s: 1.1 },
-  derrape: { x: 0.9, y: 0.5, s: 1 },
+  izquierda: { x: 0.075, y: 0.5, s: 0.95 },
+  derecha: { x: 0.205, y: 0.5, s: 0.95 },
+  poder: { x: 0.47, y: 0.52, s: 1.1 },
+  acelerar: { x: 0.6, y: 0.52, s: 1.15 },
+  frenar: { x: 0.72, y: 0.52, s: 1.2 },
+  derrape: { x: 0.885, y: 0.52, s: 1.25 },
 });
 
 export type ControlMode = "botones" | "inclinacion";
@@ -285,11 +285,12 @@ export default function Controller({
   const look = overlay ? "celular" : landscape ? "horizontal" : "pantalla";
   const padControls = look === "pantalla" ? CONTROLS : OVERLAY_CONTROLS;
   const padDefaultsNow = look === "celular" ? OVERLAY : look === "horizontal" ? WIDE : PANEL;
-  const [settings, setSettings] = usePadSettings(`carreras.controles.${look}`, padDefaultsNow);
+  const [settings, setSettings] = usePadSettings(`carreras.controles2.${look}`, padDefaultsNow);
   const [editing, setEditing] = useState(false);
 
   const emit = (wire: CarInputWire) => {
-    current.current = { ...wire, i: presses.current, m: manual, g: manual && !!wire.g };
+    // Manual throttle: holding «Derrape» also accelerates (the other thumb is on the steering, none is left for «Acelerar»).
+    current.current = { ...wire, i: presses.current, m: manual, g: manual && (!!wire.g || !!wire.d) };
     onInput(current.current);
   };
   const pressItem = () => {
