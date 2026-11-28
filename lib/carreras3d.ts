@@ -1383,8 +1383,10 @@ export class RaceScene {
   private size2 = new THREE.Vector2();
   /** Fraction of the device pixel ratio drawn (adaptive resolution), the average frame time and when it was last checked. */
   private dprScale = 1;
-  /** Modo TV (lib/tvMode.ts): fewer pixels, no antialiasing. */
+  /** Modo TV (lib/tvMode.ts): fewer pixels, no antialiasing, drawn trees and no fences. */
   private tv = false;
+  /** The dressing split by zone of the map (`userData.zone`: its bounds). */
+  private zones: THREE.Object3D[] = [];
   private frameAvg = 1 / 60;
   private adaptClock = 0;
   /** Middle of the track's world. */
@@ -2385,11 +2387,11 @@ export class RaceScene {
     );
     add(turbo, d.pads);
     // The pads' arrows pulse.
-    for (const c of turbo?.children ?? []) {
-      if (c.name !== "Luz") continue;
+    turbo?.traverse((c) => {
+      if (c.name !== "Luz" || !(c as THREE.Mesh).isMesh) return;
       const mat = (c as THREE.Mesh).material as THREE.MeshLambertMaterial | THREE.MeshBasicMaterial;
-      this.padGlow.push({ mat, base: mat.color.clone() });
-    }
+      if (!this.padGlow.some((p) => p.mat === mat)) this.padGlow.push({ mat, base: mat.color.clone() });
+    });
     // Tunnel mouths: facing the cars coming in, and out the other end.
     add(
       decoInstances(
@@ -2409,11 +2411,13 @@ export class RaceScene {
       d.tires.mesh ? [d.tires.mesh] : []
     );
     // Trees (or cacti, or snowy pines) where the drawn ones stood.
-    if (d.trees) {
+    // Modo TV keeps the drawn trees: a few dozen triangles each instead of the model's ~3000.
+    if (d.trees && !this.tv) {
       add(
         decoInstances(
           d.trees.kind,
-          d.trees.spots.map(([x, z, sc]) =>
+          d.trees.spots
+            .map(([x, z, sc]) =>
             m().compose(new THREE.Vector3(x, 0, z), q.setFromAxisAngle(up, (x * 13 + z * 7) % (Math.PI * 2)), new THREE.Vector3(1, 1, 1).multiplyScalar(S * 1.15 * sc))
           ),
           opts
@@ -2442,7 +2446,9 @@ export class RaceScene {
       );
       if (frame) {
         // The model's own panel stays hidden behind the face.
-        for (const c of frame.children) if (c.name === "Cartel") c.visible = false;
+        frame.traverse((c) => {
+          if (c.name === "Cartel") c.visible = false;
+        });
         add(frame, d.boards.frames);
         const mat = new THREE.Matrix4();
         for (const faces of d.boards.faces) {
@@ -2468,7 +2474,9 @@ export class RaceScene {
       // Model x across the road (the gantry's local z), its front (+z) toward the grid (local −x).
       const g = decoInstances("largada", [m().compose(new THREE.Vector3(0, 0, 0), q.setFromAxisAngle(up, -Math.PI / 2), new THREE.Vector3(k, k, k))], opts);
       if (g) {
-        for (const c of g.children) if (c.name === "Luz") c.visible = false;
+        g.traverse((c) => {
+          if (c.name === "Luz") c.visible = false;
+        });
         st.gantry.add(g);
         for (const o of st.hide) o.visible = false;
         // The working bulbs right on the model's four light discs (its own housing replaces the drawn box).
@@ -2548,7 +2556,8 @@ export class RaceScene {
         }
         next = s + len;
       }
-      add(decoInstances("valla", fences, opts), []);
+      // Not in Modo TV: ~1000 triangles a section, little seen from the couch.
+      if (!this.tv) add(decoInstances("valla", fences, opts), []);
       const cones: THREE.Matrix4[] = [];
       const cone = (s: number) => {
         for (const side of [-1, 1]) cones.push(along(s, side * (w / 2 + 9), 0, new THREE.Vector3(S * 1.5, S * 1.5, S * 1.5)));
@@ -2577,6 +2586,11 @@ export class RaceScene {
         for (const mesh of d.city.meshes) mesh.visible = false;
       }
     }
+    // The dressing's zones (lib/carreras3dModels.ts): `render` hides those past the fog in each view.
+    this.zones = [];
+    this.scene.traverse((o) => {
+      if (o.userData.zone) this.zones.push(o);
+    });
   }
 
   /** Makes the scene's cars match `cars` (key → paint, stripes, number and name label). */
@@ -3184,6 +3198,12 @@ export class RaceScene {
         const d = car.group.position.distanceTo(rig.camera.position);
         car.label.visible = key !== view.key && d > 70;
         (car.label.material as THREE.SpriteMaterial).opacity = Math.min(1, (d - 70) / 90);
+      }
+      const fogFar = (this.scene.fog as THREE.Fog).far;
+      const eye = rig.camera.position;
+      for (const z of this.zones) {
+        const sphere = z.userData.zone as THREE.Sphere;
+        z.visible = eye.distanceTo(sphere.center) - sphere.radius < fogFar;
       }
       this.renderer.setViewport(x, ch - yTop - vh, vw, vh);
       this.renderer.setScissor(x, ch - yTop - vh, vw, vh);

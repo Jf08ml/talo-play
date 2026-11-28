@@ -204,6 +204,16 @@ export function decoInstances(id: DecoId, at: THREE.Matrix4[], opts: DecoOpts): 
   if (!t || !at.length) return null;
   const g = new THREE.Group();
   const m = new THREE.Matrix4();
+  // Many copies (trees, fences, buildings): split by zone of the map, so each view only draws the zones it sees.
+  const zones = new Map<string, number[]>();
+  at.forEach((mat, i) => {
+    const key = at.length > ZONE_MIN ? `${Math.floor(mat.elements[12] / ZONE_SIZE)},${Math.floor(mat.elements[14] / ZONE_SIZE)}` : "";
+    const list = zones.get(key);
+    if (list) list.push(i);
+    else zones.set(key, [i]);
+  });
+  const zoned = zones.size > 1;
+  const zoneGroups = [...zones.values()].map(() => new THREE.Group());
   t.traverse((o) => {
     const mesh = o as THREE.Mesh;
     if (!mesh.isMesh) return;
@@ -276,16 +286,38 @@ export function decoInstances(id: DecoId, at: THREE.Matrix4[], opts: DecoOpts): 
       };
       material.customProgramCacheKey = () => "deco-sway";
     }
-    const inst = new THREE.InstancedMesh(geo, material, at.length);
-    at.forEach((mat, i) => {
-      inst.setMatrixAt(i, m.copy(mat));
-      const c = opts.tint?.(name, i);
-      if (c) inst.setColorAt(i, c);
+    [...zones.values()].forEach((list, z) => {
+      const inst = new THREE.InstancedMesh(geo, material, list.length);
+      list.forEach((i, k) => {
+        inst.setMatrixAt(k, m.copy(at[i]));
+        const c = opts.tint?.(name, i);
+        if (c) inst.setColorAt(k, c);
+      });
+      inst.name = name;
+      inst.castShadow = opts.shadows && name !== "Luz";
+      inst.computeBoundingSphere();
+      (zoned ? zoneGroups[z] : g).add(inst);
     });
-    inst.name = name;
-    inst.castShadow = opts.shadows && name !== "Luz";
-    inst.computeBoundingSphere();
-    g.add(inst);
   });
+  if (zoned) {
+    // Each zone knows its bounds: the scene hides the ones past the fog (`userData.zone`).
+    for (const zg of zoneGroups) {
+      const sphere = new THREE.Sphere();
+      let first = true;
+      for (const c of zg.children) {
+        const b = (c as THREE.InstancedMesh).boundingSphere;
+        if (!b) continue;
+        if (first) sphere.copy(b);
+        else sphere.union(b);
+        first = false;
+      }
+      zg.userData.zone = sphere;
+      g.add(zg);
+    }
+  }
   return g;
 }
+
+/** Pieces with more copies than this are split by zone, `ZONE_SIZE` units a side. */
+const ZONE_MIN = 24;
+const ZONE_SIZE = 700;
